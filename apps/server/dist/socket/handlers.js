@@ -192,7 +192,7 @@ export function registerHandlers(io, socket) {
             Object.assign(room, startCurrentAction(room));
         }
     }, 'CARD_CONFIRM_PROGRESS', (room) => { if (room.phase === 'night') {
-        io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, actionId: 'night-start', timestamp: Date.now() });
+        io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() });
         emitActionStart(io, room);
     } }));
     on(socket, 'NIGHT_ACTION_SUBMIT', async (raw) => {
@@ -327,7 +327,7 @@ export function emitActionStart(io, room) {
     const action = room.nightActionQueue[room.currentNightActionIndex];
     if (!action)
         return;
-    io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.action(action.role), actionId: action.id, timestamp: Date.now() });
+    io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.action(action.role), audioKey: action.role, actionId: action.id, timestamp: Date.now() });
     io.to(roomChannel(room.roomCode)).emit('NIGHT_ACTION_STARTED', { actionId: action.id, role: action.role, expiresAt: action.expiresAt });
 }
-export function emitDayStart(io, room) { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.dayStart, actionId: 'day-start', timestamp: Date.now() }); io.to(roomChannel(room.roomCode)).emit('DAY_STARTED', { expiresAt: room.dayExpiresAt }); }
+export function emitDayStart(io, room) { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.dayStart, audioKey: 'day-start', actionId: 'day-start', timestamp: Date.now() }); io.to(roomChannel(room.roomCode)).emit('DAY_STARTED', { expiresAt: room.dayExpiresAt }); }

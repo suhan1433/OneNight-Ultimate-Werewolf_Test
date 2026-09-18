@@ -13,9 +13,18 @@ export const socket = io(isDev ? (import.meta.env.VITE_SOCKET_URL ?? 'http://loc
 });
 socket.on('ROOM_STATE', (game: ClientGameState) => useGame.getState().setGame(game));
 socket.on('ERROR', ({ message }: { message: string }) => useGame.getState().setError(message));
-socket.on('NARRATOR_SPEECH', ({ text }: { text: string }) => {
-  if (!useGame.getState().tts || !('speechSynthesis' in window)) return;
-  speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'ko-KR'; utterance.rate = .96; utterance.pitch = .9; speechSynthesis.speak(utterance);
+let currentNarration: HTMLAudioElement | null = null;
+
+export function setNarrationEnabled(enabled: boolean) {
+  if (!enabled && currentNarration) { currentNarration.pause(); currentNarration.currentTime = 0; currentNarration = null; }
+}
+
+socket.on('NARRATOR_SPEECH', ({ audioKey }: { audioKey?: string }) => {
+  if (!useGame.getState().tts || !audioKey) return;
+  if (currentNarration) { currentNarration.pause(); currentNarration.currentTime = 0; }
+  const audio = new Audio(`/${audioKey}.mp3`);
+  audio.preload = 'auto'; audio.volume = .9; currentNarration = audio;
+  void audio.play().catch(() => { /* The next user interaction will allow playback if a browser blocks this one. */ });
 });
 socket.on('connect', () => { const saved = session(); if (saved) socket.emit('ROOM_JOIN', saved, (ack: Ack) => { if (!ack.ok) localStorage.removeItem('werewolf-session'); }); });
 // Function instances can be paused/recycled, so a persisted deadline is checked

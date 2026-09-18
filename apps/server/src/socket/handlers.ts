@@ -116,7 +116,7 @@ export function registerHandlers(io: Server, socket: Socket) {
   on(socket, 'CARD_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId) => {
     if (room.phase !== 'card_reveal') throw new Error('카드 확인 단계가 아닙니다.'); const p = room.players.find((x) => x.id === playerId)!; p.hasConfirmedCard = true;
     if (room.players.every((x) => x.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startCurrentAction(room)); }
-  }, 'CARD_CONFIRM_PROGRESS', (room) => { if (room.phase === 'night') { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, actionId: 'night-start', timestamp: Date.now() }); emitActionStart(io, room); } }));
+  }, 'CARD_CONFIRM_PROGRESS', (room) => { if (room.phase === 'night') { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() }); emitActionStart(io, room); } }));
   on(socket, 'NIGHT_ACTION_SUBMIT', async (raw) => {
     const base = safe(requestSchema.extend({ actionId: z.string().uuid(), command: z.custom<NightCommand>() }), raw); const playerId = assertSession(socket, base.roomCode);
     if (!(await once(base.roomCode, base.requestId))) return;
@@ -171,7 +171,7 @@ async function mutate(io: Server, socket: Socket, raw: unknown, change: (room: R
 
 export function emitActionStart(io: Server, room: Room) {
   const action = room.nightActionQueue[room.currentNightActionIndex]; if (!action) return;
-  io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.action(action.role), actionId: action.id, timestamp: Date.now() });
+  io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.action(action.role), audioKey: action.role, actionId: action.id, timestamp: Date.now() });
   io.to(roomChannel(room.roomCode)).emit('NIGHT_ACTION_STARTED', { actionId: action.id, role: action.role, expiresAt: action.expiresAt });
 }
-export function emitDayStart(io: Server, room: Room) { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.dayStart, actionId: 'day-start', timestamp: Date.now() }); io.to(roomChannel(room.roomCode)).emit('DAY_STARTED', { expiresAt: room.dayExpiresAt }); }
+export function emitDayStart(io: Server, room: Room) { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.dayStart, audioKey: 'day-start', actionId: 'day-start', timestamp: Date.now() }); io.to(roomChannel(room.roomCode)).emit('DAY_STARTED', { expiresAt: room.dayExpiresAt }); }
