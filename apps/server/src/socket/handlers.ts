@@ -49,6 +49,7 @@ export function registerHandlers(io: Server, socket: Socket) {
     const data = safe(z.object({ roomCode: codeSchema }).passthrough(), raw); const playerId = assertSession(socket, data.roomCode);
     const room = await getRoom(data.roomCode);
     if (!room || !['lobby', 'day'].includes(room.phase)) throw new Error('음성 대화는 대기실과 낮에만 사용할 수 있습니다.');
+    socket.to(roomChannel(data.roomCode)).emit('VOICE_PEER_JOINED', { playerId });
     return room.players.filter((player) => player.id !== playerId && player.connected).map((player) => player.id);
   });
   const relayVoiceSignal = (event: 'VOICE_OFFER' | 'VOICE_ANSWER' | 'VOICE_ICE') => on(socket, event, async (raw) => {
