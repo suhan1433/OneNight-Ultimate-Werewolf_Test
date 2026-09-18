@@ -26,6 +26,20 @@ docker compose up --build
 
 `http://localhost:8080`에서 접속합니다. Nginx가 두 Node 서버에 sticky routing(`ip_hash`)을 적용하고, 두 서버는 Socket.IO Redis Adapter와 같은 Redis 게임 상태를 공유합니다. WebSocket만 쓸 때는 sticky session이 필수는 아니지만 polling fallback의 연속 요청을 같은 인스턴스에 유지하기 위해 설정했습니다.
 
+## GitHub + Vercel 배포
+
+이 프로젝트는 Vercel에 프런트엔드만 배포해야 합니다. `apps/server`는 Socket.IO 연결을 계속 유지하고 400ms 주기 스케줄러를 실행하므로, Vercel의 일반 정적 배포/함수 모델에 넣을 수 없습니다. 서버는 Docker를 지원하는 지속 실행 호스트(Render, Railway, Fly.io 등)에 배포하고, Redis는 TLS를 지원하는 관리형 Redis(예: Upstash)에 연결합니다.
+
+저장소를 GitHub에 push한 뒤 Vercel에서 해당 저장소를 import하면 루트의 `vercel.json`이 다음을 설정합니다.
+
+- Build Command: `npm run build -w @werewolf/shared && npm run build -w @werewolf/web`
+- Output Directory: `apps/web/dist`
+- Install Command: `npm ci`
+
+Vercel 프로젝트 환경 변수에는 `VITE_SOCKET_URL=https://배포된-서버-주소`를 추가합니다. 서버 환경 변수에는 `REDIS_URL=rediss://...`, `WEB_ORIGIN=https://배포된-vercel-주소`, `PORT=3001`을 추가합니다. `WEB_ORIGIN`에는 쉼표로 여러 Preview/Production 주소를 넣을 수 있습니다.
+
+Vercel에서 Root Directory를 `apps/web`로 바꾸면 루트 workspace와 `packages/shared`를 빌드에서 볼 수 없으므로, 이 저장소에서는 Root Directory를 저장소 루트(`.`)로 유지해야 합니다. GitHub push 후 Vercel이 자동으로 Preview/Production 배포를 생성합니다.
+
 ## 구현 구조
 
 ```text
