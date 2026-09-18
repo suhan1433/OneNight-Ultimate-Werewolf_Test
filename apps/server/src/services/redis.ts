@@ -1,4 +1,4 @@
-import { Redis } from 'ioredis';
+import { default as Redis } from 'ioredis';
 import type { Room } from '@werewolf/shared';
 
 export const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', { maxRetriesPerRequest: null });
