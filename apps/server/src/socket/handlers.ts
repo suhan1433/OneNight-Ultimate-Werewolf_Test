@@ -61,7 +61,7 @@ export function registerHandlers(io: Server, socket: Socket) {
   relayVoiceSignal('VOICE_OFFER'); relayVoiceSignal('VOICE_ANSWER'); relayVoiceSignal('VOICE_ICE');
 
   on(socket, 'ROOM_CREATE', async (raw) => {
-    const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180,300,420,600].includes(v)) }), raw);
+    const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180,300,420,600].includes(v)) }), raw);
     if (data.selectedRoles.length !== data.maxPlayers + 3 || data.selectedRoles.some((r) => !(r in ROLE_DEFINITIONS))) throw new Error('역할 카드는 인원수 + 3장이어야 합니다.');
     for (const definition of Object.values(ROLE_DEFINITIONS)) if (data.selectedRoles.filter((r) => r === definition.id).length > definition.maxCount) throw new Error(`${definition.name} 역할이 허용 수량을 초과했습니다.`);
     let roomCode = '';
@@ -116,17 +116,20 @@ export function registerHandlers(io: Server, socket: Socket) {
   on(socket, 'PLAYER_READY', async (raw) => mutate(io, socket, raw, (room, playerId) => { if (room.phase !== 'lobby') throw new Error('로비에서만 준비할 수 있습니다.'); const p = room.players.find((x) => x.id === playerId)!; p.isReady = !p.isReady; }));
   on(socket, 'ROOM_SETTINGS', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => {
     if (room.hostId !== playerId || room.phase !== 'lobby') throw new Error('방장만 설정할 수 있습니다.');
-    const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180,300,420,600].includes(v)), selectedRoles: z.array(z.string()).min(6).max(13).optional() }), payload);
+    // Accept a legacy room's old 3/5-second value once, then migrate it to
+    // the new 8-second minimum when any lobby setting is saved.
+    const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180,300,420,600].includes(v)), selectedRoles: z.array(z.string()).max(13).optional() }), payload);
     if (settings.selectedRoles) {
-      if (settings.selectedRoles.length !== room.maxPlayers + 3 || settings.selectedRoles.some((role) => !(role in ROLE_DEFINITIONS))) throw new Error('역할 카드는 참가 인원 + 3장이어야 합니다.');
+      if (settings.selectedRoles.some((role) => !(role in ROLE_DEFINITIONS))) throw new Error('유효하지 않은 역할 카드가 있습니다.');
       for (const definition of Object.values(ROLE_DEFINITIONS)) if (settings.selectedRoles.filter((role) => role === definition.id).length > definition.maxCount) throw new Error(`${definition.name} 역할이 허용 수량을 초과했습니다.`);
       room.selectedRoles = settings.selectedRoles as RoleType[];
     }
-    room.actionTimeLimitSeconds = settings.actionTimeLimitSeconds; room.dayTimeLimitSeconds = settings.dayTimeLimitSeconds;
+    room.actionTimeLimitSeconds = Math.max(8, settings.actionTimeLimitSeconds); room.dayTimeLimitSeconds = settings.dayTimeLimitSeconds;
   }));
   on(socket, 'GAME_START', async (raw) => mutate(io, socket, raw, (room, playerId) => {
     if (room.hostId !== playerId) throw new Error('방장만 시작할 수 있습니다.');
     if (room.phase !== 'lobby' || room.players.length !== room.maxPlayers || !room.players.every((p) => p.isReady)) throw new Error('정원이 모두 입장하고 준비해야 합니다.');
+    if (room.selectedRoles.length !== room.players.length + 3) throw new Error('역할 카드는 인원수 + 3장 모두 선택해야 시작할 수 있습니다.');
     const assigned = assignRoles(room.players, room.selectedRoles);
     room.players = assigned.players.map((player) => ({ ...player, vote: null })); room.centerCards = assigned.centerCards; room.phase = 'card_reveal'; room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null;
   }, 'GAME_STARTED'));
