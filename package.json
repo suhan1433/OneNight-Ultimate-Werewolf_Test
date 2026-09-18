@@ -1,0 +1,16 @@
+{
+  "name": "midnight-werewolf-online",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n server,web -c magenta,cyan \"npm run dev -w @werewolf/server\" \"npm run dev -w @werewolf/web\"",
+    "build": "npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web",
+    "test": "npm run test -w @werewolf/server",
+    "typecheck": "npm run typecheck -w @werewolf/shared && npm run typecheck -w @werewolf/server && npm run typecheck -w @werewolf/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,21 @@
+.leave-fab {
+  position: fixed;
+  z-index: 20;
+  top: 16px;
+  left: 88px;
+  height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background: #141228cc;
+  color: #e4aaa5;
+  backdrop-filter: blur(9px);
+  cursor: pointer;
+  font-size: .72rem;
+}
+
+main.day .leave-fab {
+  background: #fff8e8dd;
+  color: #8a3f38;
+  border-color: #caa85e;
+}
