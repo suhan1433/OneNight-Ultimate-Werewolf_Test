@@ -16,6 +16,14 @@ if (!redisUrl) {
 export const redis = new Redis(redisUrl, { maxRetriesPerRequest: null });
 export const pubClient = redis.duplicate();
 export const subClient = redis.duplicate();
+
+// ioredis emits `error` on connection/authentication failures. An EventEmitter
+// with no error listener can terminate a Vercel Function during cold start,
+// turning a useful Redis error into FUNCTION_INVOCATION_FAILED (500).
+for (const [name, client] of [['redis', redis], ['redis-pub', pubClient], ['redis-sub', subClient]] as const) {
+  client.on('error', (error) => console.error(`${name}_connection_error`, error));
+}
+
 const roomKey = (code: string) => `game:room:${code}`;
 
 export async function getRoom(code: string): Promise<Room | null> {

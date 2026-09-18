@@ -4,13 +4,20 @@ import { default as Redis } from 'ioredis';
  * connection.  Do not substitute UPSTASH_REDIS_REST_URL/KV_REST_API_URL here:
  * those are HTTPS REST endpoints and cannot be used by ioredis or Pub/Sub.
  */
-const redisUrl = process.env.REDIS_URL ?? (process.env.VERCEL ? undefined : 'redis://localhost:6379');
+const redisUrl = process.env.REDIS_URL
+    ?? (process.env.RUN_STANDALONE_SERVER === 'true' ? 'redis://localhost:6379' : undefined);
 if (!redisUrl) {
     throw new Error('REDIS_URL (a rediss:// TCP connection string) is required on Vercel. Redis REST credentials are not compatible with Socket.IO Pub/Sub.');
 }
 export const redis = new Redis(redisUrl, { maxRetriesPerRequest: null });
 export const pubClient = redis.duplicate();
 export const subClient = redis.duplicate();
+// ioredis emits `error` on connection/authentication failures. An EventEmitter
+// with no error listener can terminate a Vercel Function during cold start,
+// turning a useful Redis error into FUNCTION_INVOCATION_FAILED (500).
+for (const [name, client] of [['redis', redis], ['redis-pub', pubClient], ['redis-sub', subClient]]) {
+    client.on('error', (error) => console.error(`${name}_connection_error`, error));
+}
 const roomKey = (code) => `game:room:${code}`;
 export async function getRoom(code) {
     const raw = await redis.get(roomKey(code));

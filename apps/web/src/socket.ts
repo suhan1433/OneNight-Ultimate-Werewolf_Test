@@ -2,11 +2,11 @@ import { io } from 'socket.io-client';
 import type { Ack, ClientGameState } from '@werewolf/shared';
 import { useGame } from './store';
 const isDev = import.meta.env.DEV;
-// Production uses the deployment origin. Vercel serves the Function at this
-// prefix, and Socket.IO appends /socket.io to it.
+// Production uses the deployment origin. This is the exact Vercel Function
+// route, so the WebSocket upgrade is dispatched without a nested path.
 export const socket = io(isDev ? (import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:3001') : undefined, {
   autoConnect: true,
-  path: isDev ? '/socket.io' : '/api/socket-io/socket.io',
+  path: isDev ? '/socket.io' : '/api/socket',
   // Vercel WebSocket Functions do not support Socket.IO's polling fallback.
   transports: isDev ? ['websocket', 'polling'] : ['websocket'],
   reconnection: true,
