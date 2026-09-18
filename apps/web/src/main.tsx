@@ -31,32 +31,38 @@ function App() {
   </main>;
 }
 
-const rtcConfig: RTCConfiguration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+const rtcConfig: RTCConfiguration = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  ...(import.meta.env.VITE_TURN_URL ? [{ urls: import.meta.env.VITE_TURN_URL, username: import.meta.env.VITE_TURN_USERNAME, credential: import.meta.env.VITE_TURN_CREDENTIAL }] : []),
+] };
 function VoiceChat({game}:{game:ClientGameState}) {
-  const [enabled,setEnabled]=useState(false); const [muted,setMuted]=useState(false);
-  const streamRef=useRef<MediaStream|null>(null); const peersRef=useRef(new Map<string,RTCPeerConnection>()); const audiosRef=useRef(new Map<string,HTMLAudioElement>()); const pendingIceRef=useRef(new Map<string,RTCIceCandidateInit[]>());
+  const [enabled,setEnabled]=useState(false); const [muted,setMuted]=useState(false); const [voiceState,setVoiceState]=useState<'idle'|'requesting'|'connecting'|'ready'|'error'>('idle');
+  const streamRef=useRef<MediaStream|null>(null); const peersRef=useRef(new Map<string,RTCPeerConnection>()); const audiosRef=useRef(new Map<string,HTMLAudioElement>()); const pendingIceRef=useRef(new Map<string,RTCIceCandidateInit[]>()); const recoveryTimersRef=useRef(new Map<string,number>());
   const allowed=game.phase==='lobby'||game.phase==='day';
-  const closePeers=()=>{for(const peer of peersRef.current.values())peer.close();peersRef.current.clear();pendingIceRef.current.clear();for(const audio of audiosRef.current.values()){audio.pause();audio.srcObject=null}audiosRef.current.clear();};
-  const stopVoice=()=>{closePeers();streamRef.current?.getTracks().forEach(track=>track.stop());streamRef.current=null;};
+  const closePeers=()=>{for(const peer of peersRef.current.values())peer.close();peersRef.current.clear();pendingIceRef.current.clear();for(const timer of recoveryTimersRef.current.values())window.clearTimeout(timer);recoveryTimersRef.current.clear();for(const audio of audiosRef.current.values()){audio.pause();audio.srcObject=null}audiosRef.current.clear();};
+  const stopVoice=()=>{closePeers();streamRef.current?.getTracks().forEach(track=>track.stop());streamRef.current=null;setVoiceState('idle');};
   useEffect(()=>()=>stopVoice(),[]);
   useEffect(()=>{
     if(!enabled||!allowed){stopVoice();return;}
     let disposed=false;
     const signal=(event:'VOICE_OFFER'|'VOICE_ANSWER'|'VOICE_ICE',targetPlayerId:string,payload:unknown)=>void emitAck(event,{...req(game),targetPlayerId,payload}).catch(()=>{});
     const flushIce=async(id:string,peer:RTCPeerConnection)=>{for(const candidate of pendingIceRef.current.get(id)??[])await peer.addIceCandidate(candidate);pendingIceRef.current.delete(id)};
-    const createPeer=(id:string)=>{const existing=peersRef.current.get(id);if(existing)return existing;const peer=new RTCPeerConnection(rtcConfig);peersRef.current.set(id,peer);streamRef.current?.getTracks().forEach(track=>peer.addTrack(track,streamRef.current!));peer.onicecandidate=event=>{if(event.candidate)signal('VOICE_ICE',id,event.candidate.toJSON())};peer.ontrack=event=>{let audio=audiosRef.current.get(id);if(!audio){audio=new Audio();audio.autoplay=true;audiosRef.current.set(id,audio)}audio.srcObject=event.streams[0]!;void audio.play().catch(()=>{})};peer.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(peer.connectionState)){peer.close();peersRef.current.delete(id)}};return peer;};
-    const offer=async(id:string)=>{const peer=createPeer(id);if(peer.signalingState!=='stable')return;const description=await peer.createOffer();await peer.setLocalDescription(description);signal('VOICE_OFFER',id,description)};
+    const offer=async(id:string,restart=false)=>{try{const peer=createPeer(id);if(peer.signalingState!=='stable')return;if(restart)peer.restartIce();const description=await peer.createOffer(restart?{iceRestart:true}:undefined);await peer.setLocalDescription(description);signal('VOICE_OFFER',id,description)}catch{setVoiceState('error')}};
+    const scheduleRecovery=(id:string,peer:RTCPeerConnection)=>{if(game.playerId.localeCompare(id)>=0||recoveryTimersRef.current.has(id))return;const timer=window.setTimeout(()=>{recoveryTimersRef.current.delete(id);if(!disposed&&['disconnected','failed'].includes(peer.connectionState))void offer(id,true)},2_000);recoveryTimersRef.current.set(id,timer)};
+    const createPeer=(id:string)=>{const existing=peersRef.current.get(id);if(existing)return existing;const peer=new RTCPeerConnection(rtcConfig);peersRef.current.set(id,peer);streamRef.current?.getTracks().forEach(track=>peer.addTrack(track,streamRef.current!));peer.onicecandidate=event=>{if(event.candidate)signal('VOICE_ICE',id,event.candidate.toJSON())};peer.ontrack=event=>{let audio=audiosRef.current.get(id);if(!audio){audio=new Audio();audio.autoplay=true;audiosRef.current.set(id,audio)}audio.srcObject=event.streams[0]!;const start=()=>void audio!.play().catch(()=>{});audio.onloadedmetadata=start;audio.oncanplay=start;start()};peer.onconnectionstatechange=()=>{if(peer.connectionState==='connected'){const timer=recoveryTimersRef.current.get(id);if(timer)window.clearTimeout(timer);recoveryTimersRef.current.delete(id);setVoiceState('ready')}if(['disconnected','failed'].includes(peer.connectionState)){setVoiceState('connecting');scheduleRecovery(id,peer)}};return peer;};
     const onOffer=async({senderId,payload}:{senderId:string;payload:RTCSessionDescriptionInit})=>{if(disposed)return;const peer=createPeer(senderId);await peer.setRemoteDescription(payload);await flushIce(senderId,peer);const answer=await peer.createAnswer();await peer.setLocalDescription(answer);signal('VOICE_ANSWER',senderId,answer)};
     const onAnswer=async({senderId,payload}:{senderId:string;payload:RTCSessionDescriptionInit})=>{const peer=peersRef.current.get(senderId);if(peer){await peer.setRemoteDescription(payload);await flushIce(senderId,peer)}};
     const onIce=async({senderId,payload}:{senderId:string;payload:RTCIceCandidateInit})=>{const peer=peersRef.current.get(senderId);if(peer?.remoteDescription)await peer.addIceCandidate(payload);else pendingIceRef.current.set(senderId,[...(pendingIceRef.current.get(senderId)??[]),payload]);};
-    const onPeerJoined=({playerId}:{playerId:string})=>{if(game.playerId.localeCompare(playerId)<0&&!peersRef.current.has(playerId))void offer(playerId)};
+    const onPeerJoined=({playerId}:{playerId:string})=>{if(game.playerId.localeCompare(playerId)<0&&!peersRef.current.has(playerId)){setVoiceState('connecting');void offer(playerId)}};
     socket.on('VOICE_OFFER',onOffer);socket.on('VOICE_ANSWER',onAnswer);socket.on('VOICE_ICE',onIce);socket.on('VOICE_PEER_JOINED',onPeerJoined);
-    void navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},video:false}).then(async stream=>{if(disposed){stream.getTracks().forEach(track=>track.stop());return}streamRef.current=stream;stream.getAudioTracks().forEach(track=>track.enabled=!muted);const peerIds=await emitAck<string[]>('VOICE_JOIN',{...req(game)});await Promise.all(peerIds.filter(id=>game.playerId.localeCompare(id)<0).map(offer));}).catch(()=>useGame.getState().setError('마이크 권한을 허용해야 음성 대화를 사용할 수 있습니다.'));
+    setVoiceState('requesting');
+    void navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},video:false}).then(async stream=>{if(disposed){stream.getTracks().forEach(track=>track.stop());return}streamRef.current=stream;stream.getAudioTracks().forEach(track=>track.enabled=!muted);const peerIds=await emitAck<string[]>('VOICE_JOIN',{...req(game)});if(disposed)return;setVoiceState(peerIds.length?'connecting':'ready');await Promise.all(peerIds.filter(id=>game.playerId.localeCompare(id)<0).map(id=>offer(id)));}).catch(()=>{setVoiceState('error');useGame.getState().setError('마이크 권한을 허용해야 음성 대화를 사용할 수 있습니다.')});
     return()=>{disposed=true;socket.off('VOICE_OFFER',onOffer);socket.off('VOICE_ANSWER',onAnswer);socket.off('VOICE_ICE',onIce);socket.off('VOICE_PEER_JOINED',onPeerJoined);stopVoice()};
   },[enabled,allowed,game.roomCode,game.playerId]);
   const toggleMute=()=>{const next=!muted;setMuted(next);streamRef.current?.getAudioTracks().forEach(track=>track.enabled=!next)};
   if(!allowed)return null;
-  return <div className="voice-controls"><button className="voice-fab" onClick={()=>setEnabled(value=>!value)}>{enabled?'🎙 음성 나가기':'🎙 음성 참가'}</button>{enabled&&<button className="voice-fab mute" onClick={toggleMute}>{muted?'🔇 마이크 켜기':'🎤 음소거'}</button>}</div>;
+  const stateLabel={idle:'',requesting:'마이크 준비 중',connecting:'상대와 연결 중…',ready:'말할 수 있음',error:'연결 실패 · 다시 참가'}[voiceState];
+  return <div className="voice-controls"><button className="voice-fab" onClick={()=>setEnabled(value=>!value)}>{enabled?'🎙 음성 나가기':'🎙 음성 참가'}</button>{enabled&&<><span className={`voice-status ${voiceState}`}>{stateLabel}</span><button className="voice-fab mute" onClick={toggleMute}>{muted?'🔇 마이크 켜기':'🎤 음소거'}</button></>}</div>;
 }
 
 function Home() {

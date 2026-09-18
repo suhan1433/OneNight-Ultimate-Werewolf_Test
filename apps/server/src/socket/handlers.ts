@@ -10,6 +10,7 @@ const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
 const nicknameSchema = z.string().trim().min(1).max(16);
 const requestSchema = z.object({ roomCode: codeSchema, requestId: z.string().min(8).max(100) });
 const roomChannel = (code: string) => `game:${code}`;
+const voiceChannel = (code: string) => `voice:${code}`;
 const playerChannel = (id: string) => `player:${id}`;
 const safe = <T>(schema: z.ZodType<T>, data: unknown): T => { const parsed = schema.safeParse(data); if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? '잘못된 요청입니다.'); return parsed.data; };
 const token = () => randomBytes(24).toString('base64url');
@@ -49,13 +50,16 @@ export function registerHandlers(io: Server, socket: Socket) {
     const data = safe(z.object({ roomCode: codeSchema }).passthrough(), raw); const playerId = assertSession(socket, data.roomCode);
     const room = await getRoom(data.roomCode);
     if (!room || !['lobby', 'day'].includes(room.phase)) throw new Error('음성 대화는 대기실과 낮에만 사용할 수 있습니다.');
-    socket.to(roomChannel(data.roomCode)).emit('VOICE_PEER_JOINED', { playerId });
-    return room.players.filter((player) => player.id !== playerId && player.connected).map((player) => player.id);
+    socket.join(voiceChannel(data.roomCode));
+    const voiceSockets = await io.in(voiceChannel(data.roomCode)).allSockets();
+    socket.to(voiceChannel(data.roomCode)).emit('VOICE_PEER_JOINED', { playerId });
+    return room.players.filter((player) => player.id !== playerId && player.socketId && voiceSockets.has(player.socketId)).map((player) => player.id);
   });
   const relayVoiceSignal = (event: 'VOICE_OFFER' | 'VOICE_ANSWER' | 'VOICE_ICE') => on(socket, event, async (raw) => {
     const data = safe(z.object({ roomCode: codeSchema, targetPlayerId: z.string().uuid(), payload: z.unknown() }).passthrough(), raw); const playerId = assertSession(socket, data.roomCode);
     const room = await getRoom(data.roomCode);
-    if (!room || !['lobby', 'day'].includes(room.phase) || !room.players.some((player) => player.id === data.targetPlayerId && player.connected)) throw new Error('현재 음성 연결을 만들 수 없습니다.');
+    const voiceSockets = await io.in(voiceChannel(data.roomCode)).allSockets();
+    if (!room || !['lobby', 'day'].includes(room.phase) || !room.players.some((player) => player.id === data.targetPlayerId && player.socketId && voiceSockets.has(player.socketId))) throw new Error('현재 음성 연결을 만들 수 없습니다.');
     io.to(playerChannel(data.targetPlayerId)).emit(event, { senderId: playerId, payload: data.payload }); return {};
   });
   relayVoiceSignal('VOICE_OFFER'); relayVoiceSignal('VOICE_ANSWER'); relayVoiceSignal('VOICE_ICE');

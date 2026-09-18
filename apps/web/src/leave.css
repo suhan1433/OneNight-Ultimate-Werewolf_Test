@@ -44,5 +44,8 @@ main.day .leave-fab {
 }
 
 .voice-fab.mute { color: #efa9a2; }
+.voice-status { display:block; margin:5px 0 2px; font-size:.67rem; text-align:center; color:#c8c0db; }
+.voice-status.ready { color:#8fd09e; }
+.voice-status.error { color:#efa9a2; }
 main.day .voice-fab { background: #fff8e8dd; border-color: #caa85e; color: #4d331f; }
 main.day .voice-fab.mute { color: #9b403a; }
