@@ -37,7 +37,14 @@ const getNarrationAudio = (audioKey: string) => {
 };
 
 export function preloadNarrations(audioKeys: string[]) {
-  for (const audioKey of new Set(audioKeys)) getNarrationAudio(audioKey).load();
+  for (const audioKey of new Set(audioKeys)) {
+    const audio = getNarrationAudio(audioKey);
+    // The server deliberately emits NARRATOR_SPEECH immediately before the
+    // updated ROOM_STATE for a night action. Calling load() here used to reset
+    // that just-started role recording, making every action after the opening
+    // night line silent. Only start a fetch for media that has not loaded yet.
+    if (audio !== currentNarration && audio.readyState === HTMLMediaElement.HAVE_NOTHING) audio.load();
+  }
 }
 
 function clearNarration() {
