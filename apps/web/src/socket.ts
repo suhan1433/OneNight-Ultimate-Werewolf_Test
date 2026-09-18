@@ -11,9 +11,8 @@ export const socket = io(isDev ? (import.meta.env.VITE_SOCKET_URL ?? 'http://loc
   transports: isDev ? ['websocket', 'polling'] : ['websocket'],
   reconnection: true,
 });
-socket.on('ROOM_STATE', (game: ClientGameState) => useGame.getState().setGame(game));
 socket.on('ERROR', ({ message }: { message: string }) => useGame.getState().setError(message));
-type Narration = { audioKey: string; actionId?: string };
+type Narration = { audioKey: string; receivedAt: number };
 let currentNarration: HTMLAudioElement | null = null;
 let narrationQueue: Narration[] = [];
 let narrationUnlocked = false;
@@ -37,31 +36,61 @@ const getNarrationAudio = (audioKey: string) => {
   return audio;
 };
 
+export function preloadNarrations(audioKeys: string[]) {
+  for (const audioKey of new Set(audioKeys)) getNarrationAudio(audioKey).load();
+}
+
+function clearNarration() {
+  if (currentNarration) { currentNarration.pause(); currentNarration.currentTime = 0; currentNarration = null; }
+  narrationQueue = [];
+}
+
+socket.on('ROOM_STATE', (game: ClientGameState) => {
+  // Start fetching every selected role's recording while cards are being
+  // viewed, so the first real night instruction never waits for a download.
+  if (game.phase === 'card_reveal' || game.phase === 'night') preloadNarrations(['night-start', ...game.selectedRoles]);
+  // A night instruction is never useful once its phase is over. Clearing it
+  // here prevents a blocked mobile playback from resurfacing during the day.
+  if (game.phase !== 'night') clearNarration();
+  useGame.getState().setGame(game);
+});
+
 function playNextNarration() {
   if (currentNarration || !narrationUnlocked || !useGame.getState().tts) return;
+  // Never let a late network/media retry turn into an out-of-context narrator.
+  while (narrationQueue[0] && Date.now() - narrationQueue[0].receivedAt > 1_500) narrationQueue.shift();
   const next = narrationQueue[0];
   if (!next) return;
   const audio = getNarrationAudio(next.audioKey);
   audio.currentTime = 0;
   currentNarration = audio;
-  audio.onended = () => { currentNarration = null; narrationQueue.shift(); playNextNarration(); };
-  audio.onerror = () => { currentNarration = null; narrationQueue.shift(); playNextNarration(); };
+  const discardCurrent = () => { if (currentNarration !== audio) return; currentNarration = null; narrationQueue.shift(); playNextNarration(); };
+  audio.onended = discardCurrent;
+  audio.onerror = discardCurrent;
   void audio.play().catch(() => {
-    // Mobile browsers can require one real tap after reconnecting. Keep this
-    // item queued and retry it on that tap instead of silently losing it.
-    currentNarration = null;
+    // A rejected play() is generally an autoplay-policy rejection. Retrying
+    // much later caused old night lines to play during the day, so drop it.
+    discardCurrent();
   });
 }
 
-const unlockNarration = () => { narrationUnlocked = true; playNextNarration(); };
+const unlockNarration = () => {
+  narrationUnlocked = true;
+  if (currentNarration) { playNextNarration(); return; }
+  // Invoke play() inside the real user gesture. This primes Safari/iOS and
+  // Android WebViews before the server's later Socket event requests audio.
+  const primer = getNarrationAudio('night-start');
+  const wasMuted = primer.muted;
+  primer.muted = true;
+  void primer.play().then(() => { primer.pause(); primer.currentTime = 0; primer.muted = wasMuted; playNextNarration(); }).catch(() => { primer.muted = wasMuted; playNextNarration(); });
+};
 window.addEventListener('pointerdown', unlockNarration, { passive: true });
 window.addEventListener('keydown', unlockNarration);
 
 export function setNarrationEnabled(enabled: boolean) {
   narrationUnlocked = narrationUnlocked || enabled;
   if (!enabled) {
-    if (currentNarration) { currentNarration.pause(); currentNarration.currentTime = 0; currentNarration = null; }
-    narrationQueue = [];
+    clearNarration();
     seenNarrations.clear();
     return;
   }
@@ -73,10 +102,7 @@ socket.on('NARRATOR_SPEECH', ({ audioKey, actionId, timestamp }: { audioKey?: st
   const key = timestamp ? `${actionId ?? audioKey}-${timestamp}` : `${audioKey}-${Date.now()}`;
   if (seenNarrations.has(key)) return;
   seenNarrations.add(key);
-  narrationQueue.push({ audioKey, actionId });
-  // Most browsers allow playback after the first interaction, but attempting
-  // it here also supports browsers that grant Socket-triggered playback.
-  narrationUnlocked = true;
+  narrationQueue.push({ audioKey, receivedAt: Date.now() });
   playNextNarration();
 });
 socket.on('connect', () => { const saved = session(); if (saved) socket.emit('ROOM_JOIN', saved, (ack: Ack) => { if (!ack.ok) localStorage.removeItem('werewolf-session'); }); });

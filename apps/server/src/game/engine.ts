@@ -76,6 +76,10 @@ export function validateNightAction(room: Room, playerId: string, actionId: stri
     const inspectingOnly = command.type === 'inspect_center' && targets.length === 0 && command.centerIndexes?.length === 1;
     const swappingAfterInspection = command.type === 'swap_center' && targets.length === 1 && command.centerIndexes?.length === 1;
     if (!inspectingOnly && !swappingAfterInspection) return '먼저 센터 카드 1장을 확인한 뒤 교환할 플레이어를 선택하세요.';
+    if (swappingAfterInspection) {
+      const seen = room.privateResults[playerId];
+      if (seen?.kind !== 'witch_seen' || Number(seen.centerIndex) !== command.centerIndexes![0]) return '확인한 센터 카드만 플레이어 카드와 교환할 수 있습니다.';
+    }
   }
   if (role === 'werewolf') {
     const wolves = room.players.filter((p) => p.id !== self.id && p.currentRole && WOLF_ROLES.includes(p.currentRole));
