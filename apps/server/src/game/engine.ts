@@ -191,8 +191,8 @@ export function buildPlayerGameState(room: Room, playerId: string, actionResults
     roomCode: room.roomCode, playerId, hostId: room.hostId, maxPlayers: room.maxPlayers, phase: room.phase, selfRole: self.originalRole,
     players: room.players.map((p) => ({ id: p.id, nickname: p.nickname, isReady: p.isReady, hasConfirmedCard: p.hasConfirmedCard, connected: p.connected, isHost: p.id === room.hostId, hasVoted: !!room.votes[p.id] })),
     selectedRoles: room.selectedRoles, currentNightAction: action ? { id: action.id, role: action.role, order: action.order, startedAt: action.startedAt, expiresAt: action.expiresAt, status: action.status, copied: action.copied } : null,
-    isNightActor: isActor, actionContext, actionResult: actionResults[playerId], votesCompleted: Object.keys(room.votes).length, totalPlayers: room.players.length,
-    dayExpiresAt: room.dayExpiresAt, chat: room.chat.slice(-100), publicReveals: room.publicReveals,
+    isNightActor: isActor, actionContext, actionResult: actionResults[playerId], votesCompleted: Object.keys(room.votes).length, dayVoteRequests: (room.voteStartRequests ?? []).length, hasRequestedDayVote: (room.voteStartRequests ?? []).includes(playerId), totalPlayers: room.players.length,
+    dayExpiresAt: room.dayExpiresAt, serverNow: Date.now(), chat: room.chat.slice(-100), publicReveals: room.publicReveals,
     settings: { actionTimeLimitSeconds: room.actionTimeLimitSeconds, dayTimeLimitSeconds: room.dayTimeLimitSeconds }, result: room.result
   };
 }

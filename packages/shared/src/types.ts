@@ -34,7 +34,7 @@ export interface Room {
   roomCode: string; hostId: string; maxPlayers: number; players: Player[]; selectedRoles: RoleType[];
   centerCards: CenterCard[]; phase: Phase; nightActionQueue: NightAction[]; currentNightActionIndex: number;
   actionTimeLimitSeconds: number; dayTimeLimitSeconds: number; ttsEnabled: boolean; nightLog: NightActionLog[];
-  votes: Record<string, string>; processedRequestIds: string[]; chat: ChatMessage[]; publicReveals: string[];
+  votes: Record<string, string>; voteStartRequests: string[]; processedRequestIds: string[]; chat: ChatMessage[]; publicReveals: string[];
   privateResults: Record<string, Record<string, unknown>>;
   protectedPlayerId: string | null; dayExpiresAt: number | null; result: GameResult | null; createdAt: number; updatedAt: number;
 }
@@ -43,7 +43,7 @@ export interface ClientGameState {
   roomCode: string; playerId: string; hostId: string; maxPlayers: number; phase: Phase; selfRole: RoleType | null;
   players: PublicPlayer[]; selectedRoles: RoleType[]; currentNightAction: Omit<NightAction, 'playerIds' | 'actedPlayerIds'> | null;
   isNightActor: boolean; actionContext?: Record<string, unknown>; actionResult?: Record<string, unknown>;
-  votesCompleted: number; totalPlayers: number; dayExpiresAt: number | null; chat: ChatMessage[];
+  votesCompleted: number; dayVoteRequests: number; hasRequestedDayVote: boolean; totalPlayers: number; dayExpiresAt: number | null; serverNow: number; chat: ChatMessage[];
   publicReveals: string[]; settings: { actionTimeLimitSeconds: number; dayTimeLimitSeconds: number };
   result: GameResult | null;
 }

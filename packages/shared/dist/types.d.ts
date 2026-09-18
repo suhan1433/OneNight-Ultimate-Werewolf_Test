@@ -89,6 +89,7 @@ export interface Room {
     ttsEnabled: boolean;
     nightLog: NightActionLog[];
     votes: Record<string, string>;
+    voteStartRequests: string[];
     processedRequestIds: string[];
     chat: ChatMessage[];
     publicReveals: string[];
@@ -122,8 +123,11 @@ export interface ClientGameState {
     actionContext?: Record<string, unknown>;
     actionResult?: Record<string, unknown>;
     votesCompleted: number;
+    dayVoteRequests: number;
+    hasRequestedDayVote: boolean;
     totalPlayers: number;
     dayExpiresAt: number | null;
+    serverNow: number;
     chat: ChatMessage[];
     publicReveals: string[];
     settings: {

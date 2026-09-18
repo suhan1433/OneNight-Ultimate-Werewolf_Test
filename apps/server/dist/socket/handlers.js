@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { NARRATOR_LINES, ROLE_DEFINITIONS } from '@werewolf/shared';
 import { z } from 'zod';
-import { advanceNight, applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startCurrentAction, validateNightAction } from '../game/engine.js';
+import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startCurrentAction, validateNightAction } from '../game/engine.js';
 import { deleteRoom, getRoom, once, saveRoom, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
@@ -62,7 +62,7 @@ export function registerHandlers(io, socket) {
         const playerId = randomUUID();
         const sessionToken = token();
         const now = Date.now();
-        const room = { roomCode, hostId: playerId, maxPlayers: data.maxPlayers, players: [{ id: playerId, nickname: data.nickname, sessionToken, socketId: socket.id, originalRole: null, currentRole: null, isReady: false, hasConfirmedCard: false, hasActedTonight: false, vote: null, connected: true }], selectedRoles: data.selectedRoles, centerCards: [], phase: 'lobby', nightActionQueue: [], currentNightActionIndex: 0, actionTimeLimitSeconds: data.actionTimeLimitSeconds, dayTimeLimitSeconds: data.dayTimeLimitSeconds, ttsEnabled: true, nightLog: [], votes: {}, processedRequestIds: [], chat: [], publicReveals: [], privateResults: {}, protectedPlayerId: null, dayExpiresAt: null, result: null, createdAt: now, updatedAt: now };
+        const room = { roomCode, hostId: playerId, maxPlayers: data.maxPlayers, players: [{ id: playerId, nickname: data.nickname, sessionToken, socketId: socket.id, originalRole: null, currentRole: null, isReady: false, hasConfirmedCard: false, hasActedTonight: false, vote: null, connected: true }], selectedRoles: data.selectedRoles, centerCards: [], phase: 'lobby', nightActionQueue: [], currentNightActionIndex: 0, actionTimeLimitSeconds: data.actionTimeLimitSeconds, dayTimeLimitSeconds: data.dayTimeLimitSeconds, ttsEnabled: true, nightLog: [], votes: {}, voteStartRequests: [], processedRequestIds: [], chat: [], publicReveals: [], privateResults: {}, protectedPlayerId: null, dayExpiresAt: null, result: null, createdAt: now, updatedAt: now };
         await saveRoom(room);
         bind(socket, room, playerId);
         await emitRoomState(io, room);
@@ -150,8 +150,17 @@ export function registerHandlers(io, socket) {
     on(socket, 'ROOM_SETTINGS', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => {
         if (room.hostId !== playerId || room.phase !== 'lobby')
             throw new Error('방장만 설정할 수 있습니다.');
-        const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3, 5, 10, 15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180, 300, 420, 600].includes(v)) }), payload);
-        Object.assign(room, settings);
+        const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3, 5, 10, 15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180, 300, 420, 600].includes(v)), selectedRoles: z.array(z.string()).min(6).max(13).optional() }), payload);
+        if (settings.selectedRoles) {
+            if (settings.selectedRoles.length !== room.maxPlayers + 3 || settings.selectedRoles.some((role) => !(role in ROLE_DEFINITIONS)))
+                throw new Error('역할 카드는 참가 인원 + 3장이어야 합니다.');
+            for (const definition of Object.values(ROLE_DEFINITIONS))
+                if (settings.selectedRoles.filter((role) => role === definition.id).length > definition.maxCount)
+                    throw new Error(`${definition.name} 역할이 허용 수량을 초과했습니다.`);
+            room.selectedRoles = settings.selectedRoles;
+        }
+        room.actionTimeLimitSeconds = settings.actionTimeLimitSeconds;
+        room.dayTimeLimitSeconds = settings.dayTimeLimitSeconds;
     }));
     on(socket, 'GAME_START', async (raw) => mutate(io, socket, raw, (room, playerId) => {
         if (room.hostId !== playerId)
@@ -164,6 +173,7 @@ export function registerHandlers(io, socket) {
         room.phase = 'card_reveal';
         room.result = null;
         room.votes = {};
+        room.voteStartRequests = [];
         room.privateResults = {};
         room.publicReveals = [];
         room.nightLog = [];
@@ -197,9 +207,6 @@ export function registerHandlers(io, socket) {
             const applied = applyNightAction(room, playerId, base.command);
             room = applied.room;
             room.privateResults[playerId] = applied.result;
-            const current = room.nightActionQueue[room.currentNightActionIndex];
-            if (current.actedPlayerIds.length >= current.playerIds.length)
-                room = advanceNight(room, 'completed');
             room.updatedAt = Date.now();
             await saveRoom(room);
             return room;
@@ -225,9 +232,6 @@ export function registerHandlers(io, socket) {
             const applied = applyNightAction(room, playerId, command);
             room = applied.room;
             room.privateResults[playerId] = applied.result;
-            const current = room.nightActionQueue[room.currentNightActionIndex];
-            if (current.actedPlayerIds.length >= current.playerIds.length)
-                room = advanceNight(room, 'completed');
             room.updatedAt = Date.now();
             await saveRoom(room);
             return room;
@@ -239,8 +243,17 @@ export function registerHandlers(io, socket) {
             emitDayStart(io, room);
         return {};
     });
-    on(socket, 'DAY_START', async (raw) => mutate(io, socket, raw, (room, playerId) => { if (room.hostId !== playerId || room.phase !== 'day')
-        throw new Error('진행할 수 없습니다.'); room.phase = 'voting'; room.dayExpiresAt = null; }, 'PHASE_CHANGED'));
+    on(socket, 'DAY_START', async (raw) => mutate(io, socket, raw, (room, playerId) => {
+        if (room.phase !== 'day')
+            throw new Error('토론 단계가 아닙니다.');
+        const requests = new Set(room.voteStartRequests ?? []);
+        requests.add(playerId);
+        room.voteStartRequests = [...requests];
+        if (room.voteStartRequests.length === room.players.length) {
+            room.phase = 'voting';
+            room.dayExpiresAt = null;
+        }
+    }, 'VOTE_PROGRESS'));
     on(socket, 'CHAT_SEND', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => { if (room.phase !== 'day')
         throw new Error('낮에만 채팅할 수 있습니다.'); const { text } = safe(z.object({ text: z.string().trim().min(1).max(300) }), payload); const p = room.players.find((x) => x.id === playerId); room.chat.push({ id: randomUUID(), playerId, nickname: p.nickname, text, at: Date.now() }); }, 'CHAT_MESSAGE'));
     on(socket, 'VOTE_SELECT', async (raw) => { const data = safe(z.object({ roomCode: codeSchema, targetPlayerId: z.string().uuid() }), raw); const playerId = assertSession(socket, data.roomCode); const room = await getRoom(data.roomCode); if (!room || room.phase !== 'voting' || data.targetPlayerId === playerId || !room.players.some((p) => p.id === data.targetPlayerId))
@@ -270,6 +283,7 @@ export function registerHandlers(io, socket) {
         room.nightActionQueue = [];
         room.currentNightActionIndex = 0;
         room.votes = {};
+        room.voteStartRequests = [];
         room.privateResults = {};
         room.publicReveals = [];
         room.nightLog = [];
