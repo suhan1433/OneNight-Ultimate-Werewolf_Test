@@ -17,6 +17,11 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin, credentials: true }, transports: ['websocket', 'polling'] });
 io.adapter(createAdapter(pubClient, subClient));
 io.on('connection', (socket) => registerHandlers(io, socket));
-startScheduler(io);
-const port = Number(process.env.PORT ?? 3001);
-server.listen(port, () => log.info({ port }, 'werewolf_server_started'));
+// Vercel imports this HTTP server as a Function. Only the local Node entrypoint
+// owns a listening port and its development-only process scheduler.
+if (!process.env.VERCEL) {
+    startScheduler(io);
+    const port = Number(process.env.PORT ?? 3001);
+    server.listen(port, () => log.info({ port }, 'werewolf_server_started'));
+}
+export default server;

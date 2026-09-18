@@ -28,17 +28,19 @@ docker compose up --build
 
 ## GitHub + Vercel 배포
 
-이 프로젝트는 Vercel에 프런트엔드만 배포해야 합니다. `apps/server`는 Socket.IO 연결을 계속 유지하고 400ms 주기 스케줄러를 실행하므로, Vercel의 일반 정적 배포/함수 모델에 넣을 수 없습니다. 서버는 Docker를 지원하는 지속 실행 호스트(Render, Railway, Fly.io 등)에 배포하고, Redis는 TLS를 지원하는 관리형 Redis(예: Upstash)에 연결합니다.
+Vercel Fluid Compute의 WebSocket Function으로 웹과 Socket.IO를 같은 deployment에서 실행한다. 정적 웹은 `/`, Socket.IO Function은 `/api/socket-io/socket.io`이고, production 클라이언트는 same-origin 연결을 사용하므로 `VITE_SOCKET_URL`은 설정하지 않는다.
 
-저장소를 GitHub에 push한 뒤 Vercel에서 해당 저장소를 import하면 루트의 `vercel.json`이 다음을 설정합니다.
+Vercel 프로젝트를 저장소 루트(`.`)에서 import한다. Root Directory를 `apps/web`로 변경하면 workspace 의존성과 Function entrypoint를 찾지 못한다. 루트 `vercel.json`이 다음을 설정한다.
 
-- Build Command: `npm run build -w @werewolf/shared && npm run build -w @werewolf/web`
-- Output Directory: `apps/web/dist`
+- Framework Preset: Vite
 - Install Command: `npm ci`
+- Build Command: `npm run build`
+- Output Directory: `apps/web/dist`
+- Function: `api/socket-io.ts`, max duration 300초
 
-Vercel 프로젝트 환경 변수에는 `VITE_SOCKET_URL=https://배포된-서버-주소`를 추가합니다. 서버 환경 변수에는 `REDIS_URL=rediss://...`, `WEB_ORIGIN=https://배포된-vercel-주소`, `PORT=3001`을 추가합니다. `WEB_ORIGIN`에는 쉼표로 여러 Preview/Production 주소를 넣을 수 있습니다.
+Redis Marketplace 리소스를 Production/Preview에 연결한 뒤 `REDIS_URL`을 설정한다. 값은 REST URL이 아니라 `rediss://default:<password>@<host>:6379` 형태의 TCP/TLS connection string이어야 한다. `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`은 HTTP REST용이므로 ioredis와 Socket.IO Redis Pub/Sub adapter에는 사용할 수 없다. Upstash를 사용 중이고 `REDIS_URL`이 자동 주입되지 않았다면 Upstash Console의 **Connect → Node/ioredis**에서 TCP URL을 복사해 Vercel Environment Variables에 `REDIS_URL`로 추가한다.
 
-Vercel에서 Root Directory를 `apps/web`로 바꾸면 루트 workspace와 `packages/shared`를 빌드에서 볼 수 없으므로, 이 저장소에서는 Root Directory를 저장소 루트(`.`)로 유지해야 합니다. GitHub push 후 Vercel이 자동으로 Preview/Production 배포를 생성합니다.
+환경 변수를 새로 연결하거나 변경한 뒤에는 Redeploy해야 적용된다. `WEB_ORIGIN`은 별도 도메인에서 개발 클라이언트를 연결할 때만 설정하며, 쉼표로 여러 origin을 넣을 수 있다. Vercel production에서는 불필요하다.
 
 ## 구현 구조
 
@@ -58,7 +60,7 @@ Socket command → 세션/입력 검증 → Redis 분산 락 → 순수 게임 �
 
 전체 `Room`을 클라이언트로 전송하지 않습니다. 각 플레이어는 자신의 최초 역할과 자신의 행동 결과만 받고, 다른 플레이어의 역할은 결과 단계 전까지 payload에 포함되지 않습니다. 재접속 토큰은 브라우저 `localStorage`에 저장되며 서버의 토큰과 일치할 때만 같은 플레이어로 복구됩니다.
 
-밤 타이머의 `expiresAt`은 Redis 상태에 저장됩니다. 모든 서버의 짧은 scheduler가 만료를 감시하지만 분산 락을 얻은 서버 하나만 전이를 적용하므로, 프로세스가 중단돼도 다른 서버가 timeout/다음 행동을 이어갑니다. 실제 소유자가 없는 선택 역할도 큐에 들어가며, 역할 보유 여부를 유추할 수 없도록 설정된 행동 시간 전체가 지난 뒤 자동 `skipped` 처리됩니다.
+밤 타이머의 `expiresAt`은 Redis 상태에 저장됩니다. 로컬 Node 서버에서는 짧은 scheduler가, Vercel에서는 연결된 플레이어의 `ROOM_SYNC` heartbeat가 만료를 확인합니다. 어떤 Function 인스턴스가 확인해도 Redis 분산 락을 얻은 하나만 전이를 적용하고 Redis adapter가 모든 인스턴스의 Socket.IO room으로 결과를 전파합니다. 실제 소유자가 없는 선택 역할도 큐에 들어가며, 역할 보유 여부를 유추할 수 없도록 설정된 행동 시간 전체가 지난 뒤 자동 `skipped` 처리됩니다.
 
 ## 게임 흐름
 

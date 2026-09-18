@@ -4,6 +4,7 @@ import { NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type NightCommand, type Rol
 import { z } from 'zod';
 import { advanceNight, applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startCurrentAction, validateNightAction } from '../game/engine.js';
 import { deleteRoom, getRoom, once, saveRoom, withRoomLock } from '../services/redis.js';
+import { processExpiredRoom } from '../services/scheduler.js';
 
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
 const nicknameSchema = z.string().trim().min(1).max(16);
@@ -35,6 +36,13 @@ function on<T>(socket: Socket, event: string, handler: (payload: T) => Promise<u
 }
 
 export function registerHandlers(io: Server, socket: Socket) {
+  // On Vercel, this heartbeat is the durable scheduler trigger. It only checks
+  // the room persisted in Redis and is safe when every connected client sends it.
+  socket.on('ROOM_SYNC', () => {
+    const code = socket.data.roomCode as string | undefined;
+    if (code) void processExpiredRoom(io, code);
+  });
+
   on(socket, 'ROOM_CREATE', async (raw) => {
     const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180,300,420,600].includes(v)) }), raw);
     if (data.selectedRoles.length !== data.maxPlayers + 3 || data.selectedRoles.some((r) => !(r in ROLE_DEFINITIONS))) throw new Error('역할 카드는 인원수 + 3장이어야 합니다.');
@@ -63,6 +71,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       room.updatedAt = Date.now(); await saveRoom(room); return room;
     });
     bind(socket, room, joinedId); await emitRoomState(io, room); socket.to(roomChannel(room.roomCode)).emit('PLAYER_JOINED', { playerId: joinedId });
+    await processExpiredRoom(io, room.roomCode);
     return { roomCode: room.roomCode, playerId: joinedId, sessionToken: joinedToken };
   });
 

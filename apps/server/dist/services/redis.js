@@ -1,5 +1,14 @@
-import { Redis } from 'ioredis';
-export const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', { maxRetriesPerRequest: null });
+import { default as Redis } from 'ioredis';
+/**
+ * Socket.IO's Redis adapter uses Redis Pub/Sub, which needs a native Redis TCP
+ * connection.  Do not substitute UPSTASH_REDIS_REST_URL/KV_REST_API_URL here:
+ * those are HTTPS REST endpoints and cannot be used by ioredis or Pub/Sub.
+ */
+const redisUrl = process.env.REDIS_URL ?? (process.env.VERCEL ? undefined : 'redis://localhost:6379');
+if (!redisUrl) {
+    throw new Error('REDIS_URL (a rediss:// TCP connection string) is required on Vercel. Redis REST credentials are not compatible with Socket.IO Pub/Sub.');
+}
+export const redis = new Redis(redisUrl, { maxRetriesPerRequest: null });
 export const pubClient = redis.duplicate();
 export const subClient = redis.duplicate();
 const roomKey = (code) => `game:room:${code}`;
