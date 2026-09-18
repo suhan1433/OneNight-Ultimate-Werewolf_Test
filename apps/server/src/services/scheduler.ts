@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io';
-import { advanceNight } from '../game/engine.js';
+import { advanceNight, startCurrentAction } from '../game/engine.js';
 import { emitActionStart, emitDayStart, emitRoomState } from '../socket/handlers.js';
 import { redis, saveRoom, withRoomLock } from './redis.js';
 
@@ -25,7 +25,11 @@ export async function processExpiredRoom(io: Server, code: string) {
       const now = Date.now();
       if (room.phase === 'night') {
         const current = room.nightActionQueue[room.currentNightActionIndex];
-        if (current?.status === 'active' && current.expiresAt <= now) {
+        if (current?.status === 'pending' && current.expiresAt <= now) {
+          room = startCurrentAction(room, now);
+          transitioned = true;
+          await saveRoom(room);
+        } else if (current?.status === 'active' && current.expiresAt <= now) {
           const wasLast = room.currentNightActionIndex === room.nightActionQueue.length - 1;
           room = advanceNight(room, current.playerIds.length ? 'timeout' : 'skipped', now);
           transitioned = true; dayTransition = wasLast;
@@ -39,10 +43,12 @@ export async function processExpiredRoom(io: Server, code: string) {
       return room;
     });
     if (transitioned) {
-      await emitRoomState(io, room);
+      // Queue the narration before the state that reveals its controls. Socket
+      // ordering makes the audio instruction arrive before its timer begins.
       if (room.phase === 'night') emitActionStart(io, room);
-      else if (dayTransition) emitDayStart(io, room);
-      else io.to(`game:${code}`).emit('PHASE_CHANGED', { phase: room.phase });
+      await emitRoomState(io, room);
+      if (room.phase === 'day' && dayTransition) emitDayStart(io, room);
+      else if (room.phase !== 'night') io.to(`game:${code}`).emit('PHASE_CHANGED', { phase: room.phase });
     }
   } catch {
     // The room can expire or another instance can own the lock. The next sync

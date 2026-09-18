@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
 import { z } from 'zod';
-import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startCurrentAction, validateNightAction } from '../game/engine.js';
+import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
 import { deleteRoom, getRoom, once, saveRoom, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 
@@ -102,7 +102,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       for (const [voterId, targetId] of Object.entries(room.votes)) if (targetId === playerId) delete room.votes[voterId];
       delete room.privateResults[playerId];
       if (room.hostId === playerId && room.players.length) room.hostId = room.players.find((p) => p.connected)?.id ?? room.players[0]!.id;
-      if (room.phase === 'card_reveal' && room.players.length && room.players.every((p) => p.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startCurrentAction(room)); }
+      if (room.phase === 'card_reveal' && room.players.length && room.players.every((p) => p.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startNightIntro(room)); }
       if (room.phase === 'voting' && room.players.length && Object.keys(room.votes).length === room.players.length) { room.result = calculateResult(room); room.phase = 'result'; }
       room.updatedAt = Date.now();
       if (room.players.length) await saveRoom(room); else await deleteRoom(room.roomCode);
@@ -135,8 +135,8 @@ export function registerHandlers(io: Server, socket: Socket) {
   }, 'GAME_STARTED'));
   on(socket, 'CARD_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId) => {
     if (room.phase !== 'card_reveal') throw new Error('카드 확인 단계가 아닙니다.'); const p = room.players.find((x) => x.id === playerId)!; p.hasConfirmedCard = true;
-    if (room.players.every((x) => x.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startCurrentAction(room)); }
-  }, 'CARD_CONFIRM_PROGRESS', (room) => { if (room.phase === 'night') { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() }); emitActionStart(io, room); } }));
+    if (room.players.every((x) => x.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startNightIntro(room)); }
+  }, 'CARD_CONFIRM_PROGRESS', (room) => { if (room.phase === 'night') io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() }); }));
   on(socket, 'NIGHT_ACTION_SUBMIT', async (raw) => {
     const base = safe(requestSchema.extend({ actionId: z.string().uuid(), command: z.custom<NightCommand>() }), raw); const playerId = assertSession(socket, base.roomCode);
     if (!(await once(base.roomCode, base.requestId))) return;
@@ -145,8 +145,10 @@ export function registerHandlers(io: Server, socket: Socket) {
       const applied = applyNightAction(room, playerId, base.command); room = applied.room; room.privateResults[playerId] = applied.result;
       room.updatedAt = Date.now(); await saveRoom(room); return room;
     });
+    const nextAction = room.phase === 'night' && room.nightActionQueue[room.currentNightActionIndex]?.id !== base.actionId;
+    if (nextAction) emitActionStart(io, room);
     await emitRoomState(io, room); io.to(roomChannel(room.roomCode)).emit('NIGHT_ACTION_COMPLETED', { actionId: base.actionId });
-    if (room.phase === 'night' && room.nightActionQueue[room.currentNightActionIndex]?.id !== base.actionId) emitActionStart(io, room); else if (room.phase === 'day') emitDayStart(io, room); return {};
+    if (room.phase === 'day') emitDayStart(io, room); return {};
   });
   on(socket, 'NIGHT_ACTION_CONFIRM', async (raw) => {
     const base = safe(requestSchema.extend({ actionId: z.string().uuid() }), raw); const playerId = assertSession(socket, base.roomCode);
@@ -156,7 +158,9 @@ export function registerHandlers(io: Server, socket: Socket) {
       const applied = applyNightAction(room, playerId, command); room = applied.room; room.privateResults[playerId] = applied.result;
       room.updatedAt = Date.now(); await saveRoom(room); return room;
     });
-    await emitRoomState(io, room); if (room.phase === 'night' && room.nightActionQueue[room.currentNightActionIndex]?.id !== base.actionId) emitActionStart(io, room); else if (room.phase === 'day') emitDayStart(io, room); return {};
+    const nextAction = room.phase === 'night' && room.nightActionQueue[room.currentNightActionIndex]?.id !== base.actionId;
+    if (nextAction) emitActionStart(io, room);
+    await emitRoomState(io, room); if (room.phase === 'day') emitDayStart(io, room); return {};
   });
   on(socket, 'DAY_START', async (raw) => mutate(io, socket, raw, (room, playerId) => {
     if (room.phase !== 'day') throw new Error('토론 단계가 아닙니다.');

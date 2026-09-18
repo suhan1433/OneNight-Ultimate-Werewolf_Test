@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Player, RoleType, Room } from '@werewolf/shared';
-import { advanceNight, applyNightAction, assignRoles, buildNightActionQueue, calculateResult, calculateVotes, determineExecutions, shuffleRoles, startCurrentAction, validateNightAction } from './engine.js';
+import { advanceNight, applyNightAction, assignRoles, buildNightActionQueue, calculateResult, calculateVotes, determineExecutions, shuffleRoles, startCurrentAction, startNightIntro, validateNightAction } from './engine.js';
 
 const player = (id: string, role: RoleType = 'villager'): Player => ({ id, nickname: id, sessionToken: id, socketId: id, originalRole: role, currentRole: role, isReady: true, hasConfirmedCard: true, hasActedTonight: false, vote: null, connected: true });
 const room = (players: Player[], votes: Record<string,string> = {}): Room => ({ roomCode:'ABC234',hostId:players[0]!.id,maxPlayers:players.length,players,selectedRoles:[],centerCards:[],phase:'voting',nightActionQueue:[],currentNightActionIndex:0,actionTimeLimitSeconds:5,dayTimeLimitSeconds:300,ttsEnabled:true,nightLog:[],votes,processedRequestIds:[],chat:[],publicReveals:[],privateResults:{},protectedPlayerId:null,dayExpiresAt:null,result:null,createdAt:0,updatedAt:0 });
@@ -14,6 +14,7 @@ describe('role assignment', () => {
 describe('night queue',()=>{
   it('uses canonical order and includes roles with no owner',()=>{const q=buildNightActionQueue(['seer','werewolf','drunk','villager'],[player('a','seer')]);expect(q.map(x=>x.role)).toEqual(['werewolf','seer','drunk']);expect(q[0]!.playerIds).toEqual([])});
   it('gives an unassigned selected role the full configured action time',()=>{let r=room([player('a','seer'),player('b'),player('c')]);r.phase='night';r.actionTimeLimitSeconds=10;r.nightActionQueue=buildNightActionQueue(['werewolf','seer','villager','villager','villager','drunk'],r.players);r=startCurrentAction(r,1_000);expect(r.nightActionQueue[0]!.playerIds).toEqual([]);expect(r.nightActionQueue[0]!.expiresAt).toBe(11_000)});
+  it('holds the first action until the night-start narration completes',()=>{let r=room([player('a','seer')]);r.phase='night';r.nightActionQueue=buildNightActionQueue(['seer'],r.players);r=startNightIntro(r,1_000);expect(r.nightActionQueue[0]).toMatchObject({status:'pending',startedAt:1_000,expiresAt:5_300});r=startCurrentAction(r,5_300);expect(r.nightActionQueue[0]).toMatchObject({status:'active',startedAt:5_300,expiresAt:10_300});});
   it('times out into the next action',()=>{let r=room([player('a','seer')]);r.phase='night';r.nightActionQueue=buildNightActionQueue(['seer','drunk'],r.players);r=startCurrentAction(r,100);expect(r.nightActionQueue[0]!.expiresAt).toBe(5100);r=advanceNight(r,'timeout',5100);expect(r.currentNightActionIndex).toBe(1);expect(r.nightActionQueue[1]!.status).toBe('active')});
 });
 describe('voting',()=>{

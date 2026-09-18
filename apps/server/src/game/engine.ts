@@ -34,6 +34,18 @@ export function startCurrentAction(room: Room, now = Date.now()): Room {
   return { ...room, nightActionQueue: queue, updatedAt: now };
 }
 
+// The opening narration is 3.984 seconds. Keep a small transport/rendering
+// buffer so every client sees the night intro before the first role appears.
+export const NIGHT_INTRO_DURATION_MS = 4_300;
+
+export function startNightIntro(room: Room, now = Date.now()): Room {
+  const queue = [...room.nightActionQueue];
+  const current = queue[room.currentNightActionIndex];
+  if (!current) return startDay(room, now);
+  queue[room.currentNightActionIndex] = { ...current, status: 'pending', startedAt: now, expiresAt: now + NIGHT_INTRO_DURATION_MS };
+  return { ...room, nightActionQueue: queue, updatedAt: now };
+}
+
 export function advanceNight(room: Room, status: 'completed' | 'timeout' | 'skipped', now = Date.now()): Room {
   const queue = [...room.nightActionQueue];
   const action = queue[room.currentNightActionIndex];
