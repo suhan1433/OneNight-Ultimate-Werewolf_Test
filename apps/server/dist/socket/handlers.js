@@ -48,6 +48,28 @@ export function registerHandlers(io, socket) {
         if (code)
             void processExpiredRoom(io, code);
     });
+    // WebRTC media never passes through Socket.IO. These handlers only relay
+    // connection offers, answers and ICE candidates to authenticated room peers.
+    on(socket, 'VOICE_JOIN', async (raw) => {
+        const data = safe(z.object({ roomCode: codeSchema }).passthrough(), raw);
+        const playerId = assertSession(socket, data.roomCode);
+        const room = await getRoom(data.roomCode);
+        if (!room || !['lobby', 'day'].includes(room.phase))
+            throw new Error('음성 대화는 대기실과 낮에만 사용할 수 있습니다.');
+        return room.players.filter((player) => player.id !== playerId && player.connected).map((player) => player.id);
+    });
+    const relayVoiceSignal = (event) => on(socket, event, async (raw) => {
+        const data = safe(z.object({ roomCode: codeSchema, targetPlayerId: z.string().uuid(), payload: z.unknown() }).passthrough(), raw);
+        const playerId = assertSession(socket, data.roomCode);
+        const room = await getRoom(data.roomCode);
+        if (!room || !['lobby', 'day'].includes(room.phase) || !room.players.some((player) => player.id === data.targetPlayerId && player.connected))
+            throw new Error('현재 음성 연결을 만들 수 없습니다.');
+        io.to(playerChannel(data.targetPlayerId)).emit(event, { senderId: playerId, payload: data.payload });
+        return {};
+    });
+    relayVoiceSignal('VOICE_OFFER');
+    relayVoiceSignal('VOICE_ANSWER');
+    relayVoiceSignal('VOICE_ICE');
     on(socket, 'ROOM_CREATE', async (raw) => {
         const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [3, 5, 10, 15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180, 300, 420, 600].includes(v)) }), raw);
         if (data.selectedRoles.length !== data.maxPlayers + 3 || data.selectedRoles.some((r) => !(r in ROLE_DEFINITIONS)))

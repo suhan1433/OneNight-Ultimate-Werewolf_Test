@@ -19,3 +19,28 @@ main.day .leave-fab {
   color: #8a3f38;
   border-color: #caa85e;
 }
+
+.voice-controls {
+  position: fixed;
+  z-index: 20;
+  top: 62px;
+  left: 16px;
+  display: flex;
+  gap: 6px;
+}
+
+.voice-fab {
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background: #141228cc;
+  color: #e5dcbf;
+  backdrop-filter: blur(9px);
+  cursor: pointer;
+  font-size: .68rem;
+}
+
+.voice-fab.mute { color: #efa9a2; }
+main.day .voice-fab { background: #fff8e8dd; border-color: #caa85e; color: #4d331f; }
+main.day .voice-fab.mute { color: #9b403a; }
