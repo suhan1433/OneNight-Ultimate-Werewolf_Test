@@ -6,7 +6,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "apps/web/dist",
   "functions": {
-    "api/socket.ts": {
+    "api/socket.mjs": {
       "maxDuration": 300
     }
   }
