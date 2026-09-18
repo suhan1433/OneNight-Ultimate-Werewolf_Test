@@ -15,9 +15,10 @@ const io = new Server(server, { cors: { origin, credentials: true }, transports:
 io.adapter(createAdapter(pubClient, subClient));
 io.on('connection', (socket) => registerHandlers(io, socket));
 
-// Vercel imports this HTTP server as a Function. Only the local Node entrypoint
-// owns a listening port and its development-only process scheduler.
-if (!process.env.VERCEL) {
+// Vercel imports this HTTP server as a Function. Never infer this from Vercel
+// system environment variables: projects can choose not to expose them. Local
+// scripts opt in explicitly, so an imported Function can never call listen().
+if (process.env.RUN_STANDALONE_SERVER === 'true') {
   startScheduler(io);
   const port = Number(process.env.PORT ?? 3001);
   server.listen(port, () => log.info({ port }, 'werewolf_server_started'));

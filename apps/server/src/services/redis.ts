@@ -6,7 +6,8 @@ import type { Room } from '@werewolf/shared';
  * connection.  Do not substitute UPSTASH_REDIS_REST_URL/KV_REST_API_URL here:
  * those are HTTPS REST endpoints and cannot be used by ioredis or Pub/Sub.
  */
-const redisUrl = process.env.REDIS_URL ?? (process.env.VERCEL ? undefined : 'redis://localhost:6379');
+const redisUrl = process.env.REDIS_URL
+  ?? (process.env.RUN_STANDALONE_SERVER === 'true' ? 'redis://localhost:6379' : undefined);
 
 if (!redisUrl) {
   throw new Error('REDIS_URL (a rediss:// TCP connection string) is required on Vercel. Redis REST credentials are not compatible with Socket.IO Pub/Sub.');
