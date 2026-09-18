@@ -56,9 +56,9 @@ socket.on('ROOM_STATE', (game: ClientGameState) => {
   // Start fetching every selected role's recording while cards are being
   // viewed, so the first real night instruction never waits for a download.
   if (game.phase === 'card_reveal' || game.phase === 'night') preloadNarrations(['night-start', ...game.selectedRoles]);
-  // A night instruction is never useful once its phase is over. Clearing it
-  // here prevents a blocked mobile playback from resurfacing during the day.
-  if (game.phase !== 'night') clearNarration();
+  // Never pause narration merely because the game state advances. An action
+  // can finish close to its timer boundary, and its recording must be allowed
+  // to finish before the next queued narrator line starts.
   useGame.getState().setGame(game);
 });
 
@@ -72,6 +72,19 @@ function playNextNarration() {
   const discardCurrent = () => { if (currentNarration !== audio) return; currentNarration = null; narrationQueue.shift(); playNextNarration(); };
   audio.onended = discardCurrent;
   audio.onerror = discardCurrent;
+  // A media interruption can pause an HTMLAudioElement without ending it
+  // (notably on mobile browsers while the UI receives another Socket event).
+  // Resume the same element, and therefore the same playback position,
+  // instead of waiting for another screen tap or moving on to another line.
+  const resumeCurrent = () => {
+    if (currentNarration !== audio || audio.ended || !audio.paused || !useGame.getState().tts) return;
+    void audio.play().catch(() => {
+      // If a browser still requires a gesture, keep currentNarration intact.
+      // unlockNarration will retry this exact element at its current position.
+    });
+  };
+  audio.onpause = () => { if (!audio.ended) window.setTimeout(resumeCurrent, 0); };
+  audio.oncanplay = resumeCurrent;
   void audio.play().catch(() => {
     // Browsers (especially Safari and mobile WebViews) can reject a play()
     // started by a Socket event until the next real user gesture. Keep this
@@ -83,6 +96,13 @@ function playNextNarration() {
 
 const unlockNarration = () => {
   narrationUnlocked = true;
+  // Resume an interrupted announcement at its existing position. Do not call
+  // playNextNarration in this case: that function intentionally starts a new
+  // queued line from 0 seconds.
+  if (currentNarration?.paused) {
+    void currentNarration.play().catch(() => {});
+    return;
+  }
   // This is called directly from pointerdown/keydown, making the real
   // narration play request user-initiated rather than relying on a muted
   // primer that some browsers do not treat as an audio unlock.
