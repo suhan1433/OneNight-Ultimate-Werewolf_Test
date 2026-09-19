@@ -68,7 +68,7 @@ export function registerHandlers(io: Server, socket: Socket) {
   relayVoiceSignal('VOICE_OFFER'); relayVoiceSignal('VOICE_ANSWER'); relayVoiceSignal('VOICE_ICE');
 
   on(socket, 'ROOM_CREATE', async (raw) => {
-    const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180,300,420,600].includes(v)) }), raw);
+    const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)) }), raw);
     if (data.selectedRoles.length !== data.maxPlayers + 3 || data.selectedRoles.some((r) => !(r in ROLE_DEFINITIONS))) throw new Error('역할 카드는 인원수 + 3장이어야 합니다.');
     for (const definition of Object.values(ROLE_DEFINITIONS)) if (data.selectedRoles.filter((r) => r === definition.id).length > definition.maxCount) throw new Error(`${definition.name} 역할이 허용 수량을 초과했습니다.`);
     let roomCode = '';
@@ -127,7 +127,7 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (room.hostId !== playerId || room.phase !== 'lobby') throw new Error('방장만 설정할 수 있습니다.');
     // Accept a legacy room's old 3/5-second value once, then migrate it to
     // the new 8-second minimum when any lobby setting is saved.
-    const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [180,300,420,600].includes(v)), selectedRoles: z.array(z.string()).max(13).optional() }), payload);
+    const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)), selectedRoles: z.array(z.string()).max(13).optional() }), payload);
     if (settings.selectedRoles) {
       if (settings.selectedRoles.some((role) => !(role in ROLE_DEFINITIONS))) throw new Error('유효하지 않은 역할 카드가 있습니다.');
       for (const definition of Object.values(ROLE_DEFINITIONS)) if (settings.selectedRoles.filter((role) => role === definition.id).length > definition.maxCount) throw new Error(`${definition.name} 역할이 허용 수량을 초과했습니다.`);

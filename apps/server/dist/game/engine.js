@@ -34,6 +34,17 @@ export function startCurrentAction(room, now = Date.now()) {
     queue[room.currentNightActionIndex] = { ...current, status: 'active', startedAt: now, expiresAt: now + duration };
     return { ...room, nightActionQueue: queue, updatedAt: now };
 }
+// The opening narration is 3.984 seconds. Keep a small transport/rendering
+// buffer so every client sees the night intro before the first role appears.
+export const NIGHT_INTRO_DURATION_MS = 4_300;
+export function startNightIntro(room, now = Date.now()) {
+    const queue = [...room.nightActionQueue];
+    const current = queue[room.currentNightActionIndex];
+    if (!current)
+        return startDay(room, now);
+    queue[room.currentNightActionIndex] = { ...current, status: 'pending', startedAt: now, expiresAt: now + NIGHT_INTRO_DURATION_MS };
+    return { ...room, nightActionQueue: queue, updatedAt: now };
+}
 export function advanceNight(room, status, now = Date.now()) {
     const queue = [...room.nightActionQueue];
     const action = queue[room.currentNightActionIndex];
@@ -76,6 +87,11 @@ export function validateNightAction(room, playerId, actionId, command) {
         const swappingAfterInspection = command.type === 'swap_center' && targets.length === 1 && command.centerIndexes?.length === 1;
         if (!inspectingOnly && !swappingAfterInspection)
             return '먼저 센터 카드 1장을 확인한 뒤 교환할 플레이어를 선택하세요.';
+        if (swappingAfterInspection) {
+            const seen = room.privateResults[playerId];
+            if (seen?.kind !== 'witch_seen' || Number(seen.centerIndex) !== command.centerIndexes[0])
+                return '확인한 센터 카드만 플레이어 카드와 교환할 수 있습니다.';
+        }
     }
     if (role === 'werewolf') {
         const wolves = room.players.filter((p) => p.id !== self.id && p.currentRole && WOLF_ROLES.includes(p.currentRole));

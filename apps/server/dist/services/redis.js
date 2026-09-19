@@ -19,11 +19,47 @@ for (const [name, client] of [['redis', redis], ['redis-pub', pubClient], ['redi
     client.on('error', (error) => console.error(`${name}_connection_error`, error));
 }
 const roomKey = (code) => `game:room:${code}`;
+const FALLBACK_ROOM_TTL_SECONDS = 60 * 60 * 24;
+/** Return the earliest retention deadline applicable to a room. */
+export function roomRetentionDeadline(room) {
+    // Fall back to timestamps already present in legacy persisted rooms. New rooms
+    // write explicit deadlines, but this keeps a deployment from exempting old
+    // lobby/result rooms indefinitely.
+    const lobbyDeadline = room.phase === 'lobby'
+        ? (room.lobbyExpiresAt ?? room.createdAt + 60 * 60 * 1000)
+        : null;
+    const resultDeadline = room.phase === 'result'
+        ? (room.resultExpiresAt ?? room.updatedAt + 30 * 60 * 1000)
+        : null;
+    const deadlines = [lobbyDeadline, room.allOfflineExpiresAt, resultDeadline]
+        .filter((deadline) => typeof deadline === 'number');
+    return deadlines.length ? Math.min(...deadlines) : null;
+}
+export function roomHasExpired(room, now = Date.now()) {
+    const deadline = roomRetentionDeadline(room);
+    return deadline !== null && deadline <= now;
+}
 export async function getRoom(code) {
     const raw = await redis.get(roomKey(code));
     return raw ? JSON.parse(raw) : null;
 }
-export async function saveRoom(room) { await redis.set(roomKey(room.roomCode), JSON.stringify(room), 'EX', 60 * 60 * 24); await redis.sadd('game:rooms', room.roomCode); }
+export async function saveRoom(room) {
+    const deadline = roomRetentionDeadline(room);
+    if (deadline !== null && deadline <= Date.now()) {
+        await deleteRoom(room.roomCode);
+        return;
+    }
+    const ttlSeconds = deadline === null
+        ? FALLBACK_ROOM_TTL_SECONDS
+        : Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
+    await redis.set(roomKey(room.roomCode), JSON.stringify(room), 'EX', ttlSeconds);
+    // Vercel advances only the connected room via ROOM_SYNC, so it does not need
+    // a global index. Avoid retaining a second, non-expiring copy of every code.
+    if (process.env.RUN_STANDALONE_SERVER === 'true')
+        await redis.sadd('game:rooms', room.roomCode);
+    else
+        await redis.srem('game:rooms', room.roomCode);
+}
 export async function deleteRoom(code) { await redis.del(roomKey(code)); await redis.srem('game:rooms', code); }
 export async function withRoomLock(code, fn) {
     const key = `lock:game:${code}`;
@@ -40,6 +76,10 @@ export async function withRoomLock(code, fn) {
         const room = await getRoom(code);
         if (!room)
             throw new Error('방을 찾을 수 없습니다.');
+        if (roomHasExpired(room)) {
+            await deleteRoom(code);
+            throw new Error('방이 만료되었습니다.');
+        }
         return await fn(room);
     }
     finally {

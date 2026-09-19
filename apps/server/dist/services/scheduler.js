@@ -1,6 +1,6 @@
-import { advanceNight } from '../game/engine.js';
+import { advanceNight, startCurrentAction } from '../game/engine.js';
 import { emitActionStart, emitDayStart, emitRoomState } from '../socket/handlers.js';
-import { redis, saveRoom, withRoomLock } from './redis.js';
+import { getRoom, redis, saveRoom, withRoomLock } from './redis.js';
 export function startScheduler(io) {
     const timer = setInterval(async () => {
         for (const code of await redis.smembers('game:rooms')) {
@@ -23,7 +23,12 @@ export async function processExpiredRoom(io, code) {
             const now = Date.now();
             if (room.phase === 'night') {
                 const current = room.nightActionQueue[room.currentNightActionIndex];
-                if (current?.status === 'active' && current.expiresAt <= now) {
+                if (current?.status === 'pending' && current.expiresAt <= now) {
+                    room = startCurrentAction(room, now);
+                    transitioned = true;
+                    await saveRoom(room);
+                }
+                else if (current?.status === 'active' && current.expiresAt <= now) {
                     const wasLast = room.currentNightActionIndex === room.nightActionQueue.length - 1;
                     room = advanceNight(room, current.playerIds.length ? 'timeout' : 'skipped', now);
                     transitioned = true;
@@ -41,17 +46,25 @@ export async function processExpiredRoom(io, code) {
             return room;
         });
         if (transitioned) {
-            await emitRoomState(io, room);
+            // Queue the narration before the state that reveals its controls. Socket
+            // ordering makes the audio instruction arrive before its timer begins.
             if (room.phase === 'night')
                 emitActionStart(io, room);
-            else if (dayTransition)
+            await emitRoomState(io, room);
+            if (room.phase === 'day' && dayTransition)
                 emitDayStart(io, room);
-            else
+            else if (room.phase !== 'night')
                 io.to(`game:${code}`).emit('PHASE_CHANGED', { phase: room.phase });
         }
     }
     catch {
         // The room can expire or another instance can own the lock. The next sync
         // will retry safely, so neither case is an application error.
+    }
+    finally {
+        // Redis expires the room value itself. Its code is stored separately for
+        // local scheduler discovery, so remove stale index entries as well.
+        if (!(await getRoom(code)))
+            await redis.srem('game:rooms', code);
     }
 }
