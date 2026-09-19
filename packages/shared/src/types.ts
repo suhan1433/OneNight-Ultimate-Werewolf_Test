@@ -36,7 +36,10 @@ export interface Room {
   actionTimeLimitSeconds: number; dayTimeLimitSeconds: number; ttsEnabled: boolean; nightLog: NightActionLog[];
   votes: Record<string, string>; voteStartRequests: string[]; processedRequestIds: string[]; chat: ChatMessage[]; publicReveals: string[];
   privateResults: Record<string, Record<string, unknown>>;
-  protectedPlayerId: string | null; dayExpiresAt: number | null; result: GameResult | null; createdAt: number; updatedAt: number;
+  protectedPlayerId: string | null; dayExpiresAt: number | null; result: GameResult | null;
+  /** Internal retention deadlines. Kept optional so rooms saved before this policy remain readable. */
+  lobbyExpiresAt?: number | null; allOfflineExpiresAt?: number | null; resultExpiresAt?: number | null;
+  createdAt: number; updatedAt: number;
 }
 export interface PublicPlayer { id: string; nickname: string; isReady: boolean; hasConfirmedCard: boolean; connected: boolean; isHost: boolean; hasVoted: boolean; }
 export interface ClientGameState {

@@ -1,7 +1,7 @@
 import type { Server } from 'socket.io';
 import { advanceNight, startCurrentAction } from '../game/engine.js';
 import { emitActionStart, emitDayStart, emitRoomState } from '../socket/handlers.js';
-import { redis, saveRoom, withRoomLock } from './redis.js';
+import { getRoom, redis, saveRoom, withRoomLock } from './redis.js';
 
 export function startScheduler(io: Server) {
   const timer = setInterval(async () => {
@@ -53,5 +53,9 @@ export async function processExpiredRoom(io: Server, code: string) {
   } catch {
     // The room can expire or another instance can own the lock. The next sync
     // will retry safely, so neither case is an application error.
+  } finally {
+    // Redis expires the room value itself. Its code is stored separately for
+    // local scheduler discovery, so remove stale index entries as well.
+    if (!(await getRoom(code))) await redis.srem('game:rooms', code);
   }
 }

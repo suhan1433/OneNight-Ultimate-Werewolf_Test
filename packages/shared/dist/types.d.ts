@@ -97,6 +97,10 @@ export interface Room {
     protectedPlayerId: string | null;
     dayExpiresAt: number | null;
     result: GameResult | null;
+    /** Internal retention deadlines. Kept optional so rooms saved before this policy remain readable. */
+    lobbyExpiresAt?: number | null;
+    allOfflineExpiresAt?: number | null;
+    resultExpiresAt?: number | null;
     createdAt: number;
     updatedAt: number;
 }
