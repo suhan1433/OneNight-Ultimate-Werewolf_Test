@@ -37,9 +37,31 @@ export async function processExpiredRoom(io, code) {
                 }
             }
             else if (room.phase === 'day' && room.dayExpiresAt && room.dayExpiresAt <= now) {
-                room.phase = 'voting';
-                room.dayExpiresAt = null;
-                room.updatedAt = now;
+                if (room.moderatorMode) {
+                    room.players = room.players.map((p) => ({ ...p, originalRole: null, currentRole: null, isReady: false, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
+                    room.centerCards = [];
+                    room.phase = 'lobby';
+                    room.nightActionQueue = [];
+                    room.currentNightActionIndex = 0;
+                    room.votes = {};
+                    room.voteStartRequests = [];
+                    room.privateResults = {};
+                    room.publicReveals = [];
+                    room.nightLog = [];
+                    room.chat = [];
+                    room.dayExpiresAt = null;
+                    room.result = null;
+                    room.protectedPlayerId = null;
+                    room.lobbyExpiresAt = now + 60 * 60 * 1000;
+                    room.allOfflineExpiresAt = null;
+                    room.resultExpiresAt = null;
+                    room.updatedAt = now;
+                }
+                else {
+                    room.phase = 'voting';
+                    room.dayExpiresAt = null;
+                    room.updatedAt = now;
+                }
                 transitioned = true;
                 await saveRoom(room);
             }

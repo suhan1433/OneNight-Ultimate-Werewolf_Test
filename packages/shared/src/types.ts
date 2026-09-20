@@ -32,6 +32,8 @@ export interface GameResult {
 }
 export interface Room {
   roomCode: string; hostId: string; maxPlayers: number; players: Player[]; selectedRoles: RoleType[];
+  /** 실물 카드 게임의 사회자 화면만 제공하는 오프라인 방인지 여부. */
+  moderatorMode?: boolean;
   centerCards: CenterCard[]; phase: Phase; nightActionQueue: NightAction[]; currentNightActionIndex: number;
   actionTimeLimitSeconds: number; dayTimeLimitSeconds: number; ttsEnabled: boolean; nightLog: NightActionLog[];
   votes: Record<string, string>; voteStartRequests: string[]; processedRequestIds: string[]; chat: ChatMessage[]; publicReveals: string[];
@@ -44,6 +46,7 @@ export interface Room {
 export interface PublicPlayer { id: string; nickname: string; isReady: boolean; hasConfirmedCard: boolean; connected: boolean; isHost: boolean; hasVoted: boolean; }
 export interface ClientGameState {
   roomCode: string; playerId: string; hostId: string; maxPlayers: number; phase: Phase; selfRole: RoleType | null;
+  moderatorMode: boolean;
   players: PublicPlayer[]; selectedRoles: RoleType[]; currentNightAction: Omit<NightAction, 'playerIds' | 'actedPlayerIds'> | null;
   isNightActor: boolean; actionContext?: Record<string, unknown>; actionResult?: Record<string, unknown>;
   votesCompleted: number; dayVoteRequests: number; hasRequestedDayVote: boolean; totalPlayers: number; dayExpiresAt: number | null; serverNow: number; chat: ChatMessage[];

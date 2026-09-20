@@ -205,6 +205,7 @@ export function buildPlayerGameState(room: Room, playerId: string, actionResults
   }
   return {
     roomCode: room.roomCode, playerId, hostId: room.hostId, maxPlayers: room.maxPlayers, phase: room.phase, selfRole: self.originalRole,
+    moderatorMode: !!room.moderatorMode,
     players: room.players.map((p) => ({ id: p.id, nickname: p.nickname, isReady: p.isReady, hasConfirmedCard: p.hasConfirmedCard, connected: p.connected, isHost: p.id === room.hostId, hasVoted: !!room.votes[p.id] })),
     selectedRoles: room.selectedRoles, currentNightAction: action ? { id: action.id, role: action.role, order: action.order, startedAt: action.startedAt, expiresAt: action.expiresAt, status: action.status, copied: action.copied } : null,
     isNightActor: isActor, actionContext, actionResult: actionResults[playerId], votesCompleted: Object.keys(room.votes).length, dayVoteRequests: (room.voteStartRequests ?? []).length, hasRequestedDayVote: (room.voteStartRequests ?? []).includes(playerId), totalPlayers: room.players.length,

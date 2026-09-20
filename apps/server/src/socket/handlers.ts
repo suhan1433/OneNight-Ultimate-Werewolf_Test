@@ -68,13 +68,13 @@ export function registerHandlers(io: Server, socket: Socket) {
   relayVoiceSignal('VOICE_OFFER'); relayVoiceSignal('VOICE_ANSWER'); relayVoiceSignal('VOICE_ICE');
 
   on(socket, 'ROOM_CREATE', async (raw) => {
-    const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)) }), raw);
+    const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)), moderatorMode: z.boolean().optional().default(false) }), raw);
     if (data.selectedRoles.length !== data.maxPlayers + 3 || data.selectedRoles.some((r) => !(r in ROLE_DEFINITIONS))) throw new Error('역할 카드는 인원수 + 3장이어야 합니다.');
     for (const definition of Object.values(ROLE_DEFINITIONS)) if (data.selectedRoles.filter((r) => r === definition.id).length > definition.maxCount) throw new Error(`${definition.name} 역할이 허용 수량을 초과했습니다.`);
     let roomCode = '';
     do { roomCode = Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join(''); } while (await getRoom(roomCode));
     const playerId = randomUUID(); const sessionToken = token(); const now = Date.now();
-    const room: Room = { roomCode, hostId: playerId, maxPlayers: data.maxPlayers, players: [{ id: playerId, nickname: data.nickname, sessionToken, socketId: socket.id, originalRole: null, currentRole: null, isReady: false, hasConfirmedCard: false, hasActedTonight: false, vote: null, connected: true }], selectedRoles: data.selectedRoles as RoleType[], centerCards: [], phase: 'lobby', nightActionQueue: [], currentNightActionIndex: 0, actionTimeLimitSeconds: data.actionTimeLimitSeconds, dayTimeLimitSeconds: data.dayTimeLimitSeconds, ttsEnabled: true, nightLog: [], votes: {}, voteStartRequests: [], processedRequestIds: [], chat: [], publicReveals: [], privateResults: {}, protectedPlayerId: null, dayExpiresAt: null, result: null, lobbyExpiresAt: now + LOBBY_TTL_MS, allOfflineExpiresAt: null, resultExpiresAt: null, createdAt: now, updatedAt: now };
+    const room: Room = { roomCode, hostId: playerId, maxPlayers: data.maxPlayers, moderatorMode: data.moderatorMode, players: [{ id: playerId, nickname: data.nickname, sessionToken, socketId: socket.id, originalRole: null, currentRole: null, isReady: false, hasConfirmedCard: false, hasActedTonight: false, vote: null, connected: true }], selectedRoles: data.selectedRoles as RoleType[], centerCards: [], phase: 'lobby', nightActionQueue: [], currentNightActionIndex: 0, actionTimeLimitSeconds: data.actionTimeLimitSeconds, dayTimeLimitSeconds: data.dayTimeLimitSeconds, ttsEnabled: true, nightLog: [], votes: {}, voteStartRequests: [], processedRequestIds: [], chat: [], publicReveals: [], privateResults: {}, protectedPlayerId: null, dayExpiresAt: null, result: null, lobbyExpiresAt: now + LOBBY_TTL_MS, allOfflineExpiresAt: null, resultExpiresAt: null, createdAt: now, updatedAt: now };
     await saveRoom(room); bind(socket, room, playerId); await emitRoomState(io, room);
     return { roomCode, playerId, sessionToken };
   });
@@ -87,6 +87,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       if (reconnect) { reconnect.socketId = socket.id; reconnect.connected = true; room.allOfflineExpiresAt = null; joinedId = reconnect.id; joinedToken = reconnect.sessionToken; }
       else {
         if (room.phase !== 'lobby') throw new Error('이미 시작된 게임입니다. 재접속 정보가 필요합니다.');
+        if (room.moderatorMode) throw new Error('오프라인 사회자 방에는 다른 기기로 참가할 수 없습니다.');
         if (room.players.length >= room.maxPlayers) throw new Error('방이 가득 찼습니다.');
         if (!data.nickname) throw new Error('닉네임을 입력해주세요.');
         if (room.players.some((p) => p.nickname === data.nickname)) throw new Error('이미 사용 중인 닉네임입니다.');
@@ -137,11 +138,18 @@ export function registerHandlers(io: Server, socket: Socket) {
   }));
   on(socket, 'GAME_START', async (raw) => mutate(io, socket, raw, (room, playerId) => {
     if (room.hostId !== playerId) throw new Error('방장만 시작할 수 있습니다.');
+    if (room.moderatorMode) {
+      if (room.phase !== 'lobby') throw new Error('로비에서만 시작할 수 있습니다.');
+      room.players = room.players.map((player) => ({ ...player, originalRole: null, currentRole: null, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
+      room.centerCards = []; room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, []); room.currentNightActionIndex = 0; Object.assign(room, startNightIntro(room));
+      room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
+      return;
+    }
     if (room.phase !== 'lobby' || room.players.length !== room.maxPlayers || !room.players.every((p) => p.isReady)) throw new Error('정원이 모두 입장하고 준비해야 합니다.');
     if (room.selectedRoles.length !== room.players.length + 3) throw new Error('역할 카드는 인원수 + 3장 모두 선택해야 시작할 수 있습니다.');
     const assigned = assignRoles(room.players, room.selectedRoles);
     room.players = assigned.players.map((player) => ({ ...player, vote: null })); room.centerCards = assigned.centerCards; room.phase = 'card_reveal'; room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
-  }, 'GAME_STARTED'));
+  }, 'GAME_STARTED', (room) => { if (room.moderatorMode) io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() }); }));
   on(socket, 'CARD_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId) => {
     if (room.phase !== 'card_reveal') throw new Error('카드 확인 단계가 아닙니다.'); const p = room.players.find((x) => x.id === playerId)!; p.hasConfirmedCard = true;
     if (room.players.every((x) => x.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startNightIntro(room)); }
@@ -173,6 +181,7 @@ export function registerHandlers(io: Server, socket: Socket) {
   });
   on(socket, 'DAY_START', async (raw) => mutate(io, socket, raw, (room, playerId) => {
     if (room.phase !== 'day') throw new Error('토론 단계가 아닙니다.');
+    if (room.moderatorMode) throw new Error('오프라인 사회자 모드는 투표를 진행하지 않습니다.');
     const requests = new Set(room.voteStartRequests ?? []); requests.add(playerId); room.voteStartRequests = [...requests];
     if (room.voteStartRequests.length === room.players.length) { room.phase = 'voting'; room.dayExpiresAt = null; }
   }, 'VOTE_PROGRESS'));
@@ -184,7 +193,7 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (Object.keys(room.votes).length === room.players.length) { room.result = calculateResult(room); room.players = room.players.map((p) => ({ ...p, currentRole: room.result!.players.find((x) => x.id === p.id)!.currentRole })); room.phase = 'result'; room.resultExpiresAt = Date.now() + RESULT_TTL_MS; }
   }, 'VOTE_PROGRESS', (room) => { if (room.phase === 'result') io.to(roomChannel(room.roomCode)).emit('GAME_RESULT', room.result); }));
   on(socket, 'GAME_RESTART', async (raw) => mutate(io, socket, raw, (room, playerId) => {
-    if (room.hostId !== playerId || room.phase !== 'result') throw new Error('방장만 대기실로 돌아갈 수 있습니다.');
+    if (room.hostId !== playerId || (room.phase !== 'result' && !(room.moderatorMode && room.phase === 'day'))) throw new Error('방장만 대기실로 돌아갈 수 있습니다.');
     room.players = room.players.map((p) => ({ ...p, originalRole: null, currentRole: null, isReady: false, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
     room.centerCards = []; room.phase = 'lobby'; room.nightActionQueue = []; room.currentNightActionIndex = 0; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.chat = []; room.dayExpiresAt = null; room.result = null; room.protectedPlayerId = null; room.lobbyExpiresAt = Date.now() + LOBBY_TTL_MS; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
   }, 'PHASE_CHANGED'));

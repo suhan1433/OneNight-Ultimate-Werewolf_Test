@@ -80,6 +80,8 @@ export interface Room {
     maxPlayers: number;
     players: Player[];
     selectedRoles: RoleType[];
+    /** 실물 카드 게임의 사회자 화면만 제공하는 오프라인 방인지 여부. */
+    moderatorMode?: boolean;
     centerCards: CenterCard[];
     phase: Phase;
     nightActionQueue: NightAction[];
@@ -120,6 +122,7 @@ export interface ClientGameState {
     maxPlayers: number;
     phase: Phase;
     selfRole: RoleType | null;
+    moderatorMode: boolean;
     players: PublicPlayer[];
     selectedRoles: RoleType[];
     currentNightAction: Omit<NightAction, 'playerIds' | 'actedPlayerIds'> | null;
