@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io';
-import { NARRATOR_LINES } from '@werewolf/shared';
+import { NARRATOR_LINES, type Room } from '@werewolf/shared';
 import { advanceNight, buildNightActionQueue, calculateResult, startCurrentAction, startNightIntro } from '../game/engine.js';
 import { emitActionStart, emitDayStart, emitRoomState } from '../socket/handlers.js';
 import { getRoom, redis, saveRoom, withRoomLock } from './redis.js';
@@ -29,13 +29,13 @@ export function startScheduler(io: Server) {
  * publishes a transition. In production this is driven by connected clients'
  * ROOM_SYNC heartbeats, rather than an unreliable process-global interval.
  */
-export async function processExpiredRoom(io: Server, code: string) {
+export async function processExpiredRoom(io: Server, code: string): Promise<Room | null> {
   try {
     // ROOM_SYNC is deliberately cheap: clients can poll for a serverless wake-up,
     // but only a room with a due deadline contends on the distributed lock.
     const snapshot = await getRoom(code);
-    if (!snapshot) { if (process.env.RUN_STANDALONE_SERVER === 'true') await redis.srem('game:rooms', code); return; }
-    if (!hasDueWork(snapshot, Date.now())) return;
+    if (!snapshot) { if (process.env.RUN_STANDALONE_SERVER === 'true') await redis.srem('game:rooms', code); return null; }
+    if (!hasDueWork(snapshot, Date.now())) return snapshot;
     let transitioned = false; let dayTransition = false;
     const room = await withRoomLock(code, async (room) => {
       const now = Date.now();
@@ -88,5 +88,6 @@ export async function processExpiredRoom(io: Server, code: string) {
       if (room.phase === 'day' && dayTransition) emitDayStart(io, room);
       else if (room.phase !== 'night') io.to(`game:${code}`).emit('PHASE_CHANGED', { phase: room.phase });
     }
-  } catch { /* A competing request can win the due transition; the next sync reconciles state. */ }
+    return room;
+  } catch { return null; /* A competing request can win the due transition; the next sync reconciles state. */ }
 }

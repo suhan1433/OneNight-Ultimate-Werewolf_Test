@@ -282,7 +282,7 @@ export function buildPlayerGameState(room, playerId, actionResults = {}) {
             actionContext = { kind: 'cards', title: '내 현재 카드', cards: [{ label: '내 카드', role: self.currentRole }] };
     }
     return {
-        roomCode: room.roomCode, playerId, hostId: room.hostId, maxPlayers: room.maxPlayers, phase: room.phase, selfRole: self.originalRole,
+        roomCode: room.roomCode, playerId, hostId: room.hostId, maxPlayers: room.maxPlayers, phase: room.phase, selfRole: self.originalRole, stateVersion: room.updatedAt,
         moderatorMode: !!room.moderatorMode,
         players: room.players.map((p) => ({ id: p.id, nickname: p.nickname, isReady: p.isReady, hasConfirmedCard: p.hasConfirmedCard, connected: p.connected, isHost: p.id === room.hostId, hasVoted: !!room.votes[p.id] })),
         selectedRoles: room.selectedRoles, currentNightAction: action ? { id: action.id, role: action.role, order: action.order, startedAt: action.startedAt, expiresAt: action.expiresAt, status: action.status, copied: action.copied } : null,

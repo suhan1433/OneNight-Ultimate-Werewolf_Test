@@ -36,10 +36,10 @@ export async function processExpiredRoom(io, code) {
         if (!snapshot) {
             if (process.env.RUN_STANDALONE_SERVER === 'true')
                 await redis.srem('game:rooms', code);
-            return;
+            return null;
         }
         if (!hasDueWork(snapshot, Date.now()))
-            return;
+            return snapshot;
         let transitioned = false;
         let dayTransition = false;
         const room = await withRoomLock(code, async (room) => {
@@ -137,6 +137,9 @@ export async function processExpiredRoom(io, code) {
             else if (room.phase !== 'night')
                 io.to(`game:${code}`).emit('PHASE_CHANGED', { phase: room.phase });
         }
+        return room;
     }
-    catch { /* A competing request can win the due transition; the next sync reconciles state. */ }
+    catch {
+        return null; /* A competing request can win the due transition; the next sync reconciles state. */
+    }
 }

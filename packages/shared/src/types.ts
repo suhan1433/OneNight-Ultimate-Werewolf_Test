@@ -48,6 +48,8 @@ export interface Room {
 export interface PublicPlayer { id: string; nickname: string; isReady: boolean; hasConfirmedCard: boolean; connected: boolean; isHost: boolean; hasVoted: boolean; }
 export interface ClientGameState {
   roomCode: string; playerId: string; hostId: string; maxPlayers: number; phase: Phase; selfRole: RoleType | null;
+  /** Monotonic-enough server revision used to discard delayed Socket packets. */
+  stateVersion: number;
   moderatorMode: boolean;
   players: PublicPlayer[]; selectedRoles: RoleType[]; currentNightAction: Omit<NightAction, 'playerIds' | 'actedPlayerIds'> | null;
   isNightActor: boolean; actionContext?: Record<string, unknown>; actionResult?: Record<string, unknown>;

@@ -143,14 +143,14 @@ export const syncRoom = () => { if (socket.connected) socket.emit('ROOM_SYNC'); 
 // an exact check at zero; while a night action is active, a 500ms fallback
 // keeps Vercel wake-up jitter below one second without taking a lock early.
 window.setInterval(() => { if (useGame.getState().game?.phase === 'night') syncRoom(); }, 500);
-window.setInterval(() => { if (useGame.getState().game?.phase !== 'night') syncRoom(); }, 5_000);
+window.setInterval(() => { if (useGame.getState().game?.phase !== 'night') syncRoom(); }, 1_000);
 window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncRoom(); });
 export const requestId = () => crypto.randomUUID();
 export function session(): { roomCode: string; playerId: string; sessionToken: string } | null { try { return JSON.parse(localStorage.getItem('werewolf-session') ?? 'null'); } catch { return null; } }
 export function saveSession(value: unknown) { localStorage.setItem('werewolf-session', JSON.stringify(value)); }
 export async function emitAck<T>(event: string, payload: unknown): Promise<T> {
   if (!socket.connected) throw new Error('서버 연결을 복구하는 중입니다. 잠시 후 다시 시도해주세요.');
-  const send = () => new Promise<T>((resolve, reject) => socket.timeout(5_000).emit(event, payload, (error: Error | null, ack: Ack<T>) => {
+  const send = () => new Promise<T>((resolve, reject) => socket.timeout(1_500).emit(event, payload, (error: Error | null, ack: Ack<T>) => {
     if (error) reject(new Error('서버 응답이 지연되고 있습니다.'));
     else if (ack?.ok) resolve(ack.data as T);
     else reject(new Error(ack?.error ?? '서버 응답이 없습니다.'));

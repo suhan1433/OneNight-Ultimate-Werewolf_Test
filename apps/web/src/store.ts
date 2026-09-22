@@ -4,7 +4,10 @@ interface Store { game: ClientGameState | null; tts: boolean; help: boolean; err
 export const useGame = create<Store>((set) => ({ game: null, tts: localStorage.getItem('tts') !== 'off', help: false, error: null, setGame: (game) => set((state) => {
   // A chat event can arrive just before an older state snapshot from another
   // Function instance. Preserve only same-day messages that snapshot lacks.
-  if (!game || !state.game || game.roomCode !== state.game.roomCode || game.phase !== 'day' || state.game.phase !== 'day') return { game };
+  if (!game || !state.game || game.roomCode !== state.game.roomCode) return { game };
+  if (game.stateVersion < state.game.stateVersion) return state;
+  if (game.stateVersion === state.game.stateVersion) return state;
+  if (game.phase !== 'day' || state.game.phase !== 'day') return { game };
   const chat = [...game.chat, ...state.game.chat.filter((message) => !game.chat.some((current) => current.id === message.id))].slice(-100);
   return { game: { ...game, chat } };
 }), setChatHistory: (messages) => set((state) => !state.game ? state : ({ game: { ...state.game, chat: messages.slice(-100) } })), addChat: (message) => set((state) => {

@@ -42,9 +42,18 @@ function on<T>(socket: Socket, event: string, handler: (payload: T) => Promise<u
 export function registerHandlers(io: Server, socket: Socket) {
   // On Vercel, this heartbeat is the durable scheduler trigger. It only checks
   // the room persisted in Redis and is safe when every connected client sends it.
-  socket.on('ROOM_SYNC', () => {
+  socket.on('ROOM_SYNC', async () => {
     const code = socket.data.roomCode as string | undefined;
-    if (code) void processExpiredRoom(io, code);
+    const playerId = socket.data.playerId as string | undefined;
+    if (!code || !playerId) return;
+    // A broadcast can be lost during a reconnect/function hand-off. Return the
+    // authoritative per-player view on every sync so no client remains on an
+    // old role/action while everyone else advances.
+    try {
+      const room = await processExpiredRoom(io, code) ?? await getRoom(code);
+      const player = room?.players.find((candidate) => candidate.id === playerId);
+      if (room && player?.connected && player.socketId === socket.id) socket.emit('ROOM_STATE', buildPlayerGameState(room, playerId, room.privateResults));
+    } catch { /* a later sync or Socket.IO reconnect will reconcile state */ }
   });
 
   // WebRTC media never passes through Socket.IO. These handlers only relay

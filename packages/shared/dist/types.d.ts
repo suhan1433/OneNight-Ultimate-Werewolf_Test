@@ -124,6 +124,8 @@ export interface ClientGameState {
     maxPlayers: number;
     phase: Phase;
     selfRole: RoleType | null;
+    /** Monotonic-enough server revision used to discard delayed Socket packets. */
+    stateVersion: number;
     moderatorMode: boolean;
     players: PublicPlayer[];
     selectedRoles: RoleType[];
