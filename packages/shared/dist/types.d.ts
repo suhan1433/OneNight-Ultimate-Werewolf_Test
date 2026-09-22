@@ -26,6 +26,8 @@ export interface Player {
     hasActedTonight: boolean;
     vote: string | null;
     connected: boolean;
+    /** Server timestamp used to resolve a player who does not return after a grace period. */
+    disconnectedAt?: number | null;
 }
 export interface CenterCard {
     id: string;

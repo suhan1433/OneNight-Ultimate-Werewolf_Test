@@ -17,6 +17,8 @@ export interface Player {
   id: string; nickname: string; sessionToken: string; socketId: string | null;
   originalRole: RoleType | null; currentRole: RoleType | null; isReady: boolean;
   hasConfirmedCard: boolean; hasActedTonight: boolean; vote: string | null; connected: boolean;
+  /** Server timestamp used to resolve a player who does not return after a grace period. */
+  disconnectedAt?: number | null;
 }
 export interface CenterCard { id: string; role: RoleType; originalRole: RoleType; }
 export interface NightCommand { type: 'confirm' | 'inspect_player' | 'inspect_center' | 'inspect_centers' | 'swap_player' | 'swap_players' | 'swap_center' | 'protect'; targetPlayerIds?: string[]; centerIndexes?: number[]; }

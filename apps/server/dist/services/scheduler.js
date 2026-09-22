@@ -1,6 +1,19 @@
-import { advanceNight, startCurrentAction } from '../game/engine.js';
+import { NARRATOR_LINES } from '@werewolf/shared';
+import { advanceNight, buildNightActionQueue, calculateResult, startCurrentAction, startNightIntro } from '../game/engine.js';
 import { emitActionStart, emitDayStart, emitRoomState } from '../socket/handlers.js';
 import { getRoom, redis, saveRoom, withRoomLock } from './redis.js';
+const DISCONNECT_GRACE_MS = 45_000;
+function hasDueWork(room, now) {
+    if (!room)
+        return false;
+    if (room.phase === 'night')
+        return !!room.nightActionQueue[room.currentNightActionIndex] && room.nightActionQueue[room.currentNightActionIndex].expiresAt <= now;
+    if (room.phase === 'day')
+        return !!room.dayExpiresAt && room.dayExpiresAt <= now;
+    if (room.phase === 'card_reveal' || room.phase === 'voting')
+        return room.players.some((p) => !p.connected && !!p.disconnectedAt && p.disconnectedAt + DISCONNECT_GRACE_MS <= now);
+    return false;
+}
 export function startScheduler(io) {
     const timer = setInterval(async () => {
         for (const code of await redis.smembers('game:rooms')) {
@@ -17,6 +30,16 @@ export function startScheduler(io) {
  */
 export async function processExpiredRoom(io, code) {
     try {
+        // ROOM_SYNC is deliberately cheap: clients can poll for a serverless wake-up,
+        // but only a room with a due deadline contends on the distributed lock.
+        const snapshot = await getRoom(code);
+        if (!snapshot) {
+            if (process.env.RUN_STANDALONE_SERVER === 'true')
+                await redis.srem('game:rooms', code);
+            return;
+        }
+        if (!hasDueWork(snapshot, Date.now()))
+            return;
         let transitioned = false;
         let dayTransition = false;
         const room = await withRoomLock(code, async (room) => {
@@ -65,13 +88,49 @@ export async function processExpiredRoom(io, code) {
                 transitioned = true;
                 await saveRoom(room);
             }
+            if (room.phase === 'card_reveal') {
+                let autoConfirmed = false;
+                for (const player of room.players)
+                    if (!player.connected && player.disconnectedAt && player.disconnectedAt + DISCONNECT_GRACE_MS <= now && !player.hasConfirmedCard) {
+                        player.hasConfirmedCard = true;
+                        autoConfirmed = true;
+                    }
+                if (room.players.every((player) => player.hasConfirmedCard)) {
+                    room.phase = 'night';
+                    room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players);
+                    room.currentNightActionIndex = 0;
+                    room = startNightIntro(room, now);
+                    transitioned = true;
+                    await saveRoom(room);
+                }
+                else if (autoConfirmed) {
+                    transitioned = true;
+                    await saveRoom(room);
+                }
+            }
+            else if (room.phase === 'voting') {
+                const eligible = room.players.filter((player) => player.connected || !player.disconnectedAt || player.disconnectedAt + DISCONNECT_GRACE_MS > now);
+                if (eligible.every((player) => !!room.votes[player.id])) {
+                    room.result = calculateResult(room);
+                    room.players = room.players.map((p) => ({ ...p, currentRole: room.result.players.find((x) => x.id === p.id).currentRole }));
+                    room.phase = 'result';
+                    room.resultExpiresAt = now + 30 * 60 * 1000;
+                    transitioned = true;
+                    await saveRoom(room);
+                }
+            }
             return room;
         });
         if (transitioned) {
             // Queue the narration before the state that reveals its controls. Socket
             // ordering makes the audio instruction arrive before its timer begins.
-            if (room.phase === 'night')
-                emitActionStart(io, room);
+            if (room.phase === 'night') {
+                const action = room.nightActionQueue[room.currentNightActionIndex];
+                if (action?.status === 'active')
+                    emitActionStart(io, room);
+                else
+                    io.to(`game:${code}`).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() });
+            }
             await emitRoomState(io, room);
             if (room.phase === 'day' && dayTransition)
                 emitDayStart(io, room);
@@ -79,14 +138,5 @@ export async function processExpiredRoom(io, code) {
                 io.to(`game:${code}`).emit('PHASE_CHANGED', { phase: room.phase });
         }
     }
-    catch {
-        // The room can expire or another instance can own the lock. The next sync
-        // will retry safely, so neither case is an application error.
-    }
-    finally {
-        // Redis expires the room value itself. Its code is stored separately for
-        // local scheduler discovery, so remove stale index entries as well.
-        if (!(await getRoom(code)))
-            await redis.srem('game:rooms', code);
-    }
+    catch { /* A competing request can win the due transition; the next sync reconciles state. */ }
 }

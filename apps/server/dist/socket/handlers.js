@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { NARRATOR_LINES, ROLE_DEFINITIONS } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
-import { deleteRoom, getRoom, once, saveRoom, withRoomLock } from '../services/redis.js';
+import { appendChat, consumeRateLimit, deleteRoom, getChatHistory, getRoom, once, saveRoom, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
 const nicknameSchema = z.string().trim().min(1).max(16);
@@ -60,6 +60,7 @@ export function registerHandlers(io, socket) {
         const room = await getRoom(data.roomCode);
         if (!room || !['lobby', 'day'].includes(room.phase))
             throw new Error('음성 대화는 대기실과 낮에만 사용할 수 있습니다.');
+        socket.data.voiceRoomCode = data.roomCode;
         socket.join(voiceChannel(data.roomCode));
         const voiceSockets = await io.in(voiceChannel(data.roomCode)).allSockets();
         socket.to(voiceChannel(data.roomCode)).emit('VOICE_PEER_JOINED', { playerId });
@@ -68,9 +69,16 @@ export function registerHandlers(io, socket) {
     const relayVoiceSignal = (event) => on(socket, event, async (raw) => {
         const data = safe(z.object({ roomCode: codeSchema, targetPlayerId: z.string().uuid(), payload: z.unknown() }).passthrough(), raw);
         const playerId = assertSession(socket, data.roomCode);
+        // ICE candidates are numerous. VOICE_JOIN has already validated the sender,
+        // so avoid a Redis GET and Redis-adapter room lookup on this hot path.
+        if (event === 'VOICE_ICE') {
+            if (socket.data.voiceRoomCode !== data.roomCode)
+                throw new Error('음성 대화에 참가해주세요.');
+            io.to(playerChannel(data.targetPlayerId)).emit(event, { senderId: playerId, payload: data.payload });
+            return {};
+        }
         const room = await getRoom(data.roomCode);
-        const voiceSockets = await io.in(voiceChannel(data.roomCode)).allSockets();
-        if (!room || !['lobby', 'day'].includes(room.phase) || !room.players.some((player) => player.id === data.targetPlayerId && player.socketId && voiceSockets.has(player.socketId)))
+        if (!room || !['lobby', 'day'].includes(room.phase) || !room.players.some((player) => player.id === data.targetPlayerId && player.socketId && player.connected))
             throw new Error('현재 음성 연결을 만들 수 없습니다.');
         io.to(playerChannel(data.targetPlayerId)).emit(event, { senderId: playerId, payload: data.payload });
         return {};
@@ -107,6 +115,7 @@ export function registerHandlers(io, socket) {
             if (reconnect) {
                 reconnect.socketId = socket.id;
                 reconnect.connected = true;
+                reconnect.disconnectedAt = null;
                 room.allOfflineExpiresAt = null;
                 joinedId = reconnect.id;
                 joinedToken = reconnect.sessionToken;
@@ -133,6 +142,7 @@ export function registerHandlers(io, socket) {
         });
         bind(socket, room, joinedId);
         await emitRoomState(io, room);
+        socket.emit('CHAT_HISTORY', await getChatHistory(room.roomCode));
         socket.to(roomChannel(room.roomCode)).emit('PLAYER_JOINED', { playerId: joinedId });
         await processExpiredRoom(io, room.roomCode);
         return { roomCode: room.roomCode, playerId: joinedId, sessionToken: joinedToken };
@@ -140,9 +150,9 @@ export function registerHandlers(io, socket) {
     on(socket, 'ROOM_LEAVE', async (raw) => {
         const data = safe(requestSchema, raw);
         const playerId = assertSession(socket, data.roomCode);
-        if (!(await once(data.roomCode, data.requestId)))
-            return {};
-        const room = await withRoomLock(data.roomCode, async (room) => {
+        const room = await withRoomLock(data.roomCode, async (room, alreadyProcessed) => {
+            if (alreadyProcessed)
+                return room;
             room.players = room.players.filter((p) => p.id !== playerId);
             room.nightActionQueue = room.nightActionQueue.map((action) => ({ ...action, playerIds: action.playerIds.filter((id) => id !== playerId), actedPlayerIds: action.actedPlayerIds.filter((id) => id !== playerId) }));
             delete room.votes[playerId];
@@ -166,12 +176,13 @@ export function registerHandlers(io, socket) {
             if (room.players.every((player) => !player.connected))
                 room.allOfflineExpiresAt = Date.now() + ALL_OFFLINE_GRACE_MS;
             room.updatedAt = Date.now();
-            if (room.players.length)
-                await saveRoom(room);
+            if (room.players.length) {
+                await saveRoom(room, data.requestId);
+            }
             else
                 await deleteRoom(room.roomCode);
             return room;
-        });
+        }, data.requestId);
         socket.leave(roomChannel(data.roomCode));
         socket.leave(playerChannel(playerId));
         socket.data.roomCode = undefined;
@@ -263,9 +274,15 @@ export function registerHandlers(io, socket) {
     on(socket, 'NIGHT_ACTION_SUBMIT', async (raw) => {
         const base = safe(requestSchema.extend({ actionId: z.string().uuid(), command: z.custom() }), raw);
         const playerId = assertSession(socket, base.roomCode);
-        if (!(await once(base.roomCode, base.requestId)))
-            return;
-        const room = await withRoomLock(base.roomCode, async (room) => {
+        let duplicate = false;
+        const room = await withRoomLock(base.roomCode, async (room, alreadyProcessed) => {
+            if (alreadyProcessed) {
+                duplicate = true;
+                return room;
+            }
+            const player = room.players.find((p) => p.id === playerId);
+            if (!player || !player.connected || player.socketId !== socket.id)
+                throw new Error('다른 기기에서 세션이 갱신되었습니다.');
             const error = validateNightAction(room, playerId, base.actionId, base.command);
             if (error)
                 throw new Error(error);
@@ -273,9 +290,11 @@ export function registerHandlers(io, socket) {
             room = applied.room;
             room.privateResults[playerId] = applied.result;
             room.updatedAt = Date.now();
-            await saveRoom(room);
+            await saveRoom(room, base.requestId);
             return room;
-        });
+        }, base.requestId);
+        if (duplicate)
+            return {};
         const nextAction = room.phase === 'night' && room.nightActionQueue[room.currentNightActionIndex]?.id !== base.actionId;
         if (nextAction)
             emitActionStart(io, room);
@@ -288,9 +307,15 @@ export function registerHandlers(io, socket) {
     on(socket, 'NIGHT_ACTION_CONFIRM', async (raw) => {
         const base = safe(requestSchema.extend({ actionId: z.string().uuid() }), raw);
         const playerId = assertSession(socket, base.roomCode);
-        if (!(await once(base.roomCode, base.requestId)))
-            return {};
-        const room = await withRoomLock(base.roomCode, async (room) => {
+        let duplicate = false;
+        const room = await withRoomLock(base.roomCode, async (room, alreadyProcessed) => {
+            if (alreadyProcessed) {
+                duplicate = true;
+                return room;
+            }
+            const player = room.players.find((p) => p.id === playerId);
+            if (!player || !player.connected || player.socketId !== socket.id)
+                throw new Error('다른 기기에서 세션이 갱신되었습니다.');
             const command = { type: 'confirm' };
             const error = validateNightAction(room, playerId, base.actionId, command);
             if (error)
@@ -299,9 +324,11 @@ export function registerHandlers(io, socket) {
             room = applied.room;
             room.privateResults[playerId] = applied.result;
             room.updatedAt = Date.now();
-            await saveRoom(room);
+            await saveRoom(room, base.requestId);
             return room;
-        });
+        }, base.requestId);
+        if (duplicate)
+            return {};
         const nextAction = room.phase === 'night' && room.nightActionQueue[room.currentNightActionIndex]?.id !== base.actionId;
         if (nextAction)
             emitActionStart(io, room);
@@ -318,13 +345,29 @@ export function registerHandlers(io, socket) {
         const requests = new Set(room.voteStartRequests ?? []);
         requests.add(playerId);
         room.voteStartRequests = [...requests];
-        if (room.voteStartRequests.length === room.players.length) {
+        if (room.voteStartRequests.length >= room.players.filter((p) => p.connected).length) {
             room.phase = 'voting';
             room.dayExpiresAt = null;
         }
     }, 'VOTE_PROGRESS'));
-    on(socket, 'CHAT_SEND', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => { if (room.phase !== 'day')
-        throw new Error('낮에만 채팅할 수 있습니다.'); const { text } = safe(z.object({ text: z.string().trim().min(1).max(300) }), payload); const p = room.players.find((x) => x.id === playerId); room.chat.push({ id: randomUUID(), playerId, nickname: p.nickname, text, at: Date.now() }); }, 'CHAT_MESSAGE'));
+    on(socket, 'CHAT_SEND', async (raw) => {
+        const data = safe(requestSchema.extend({ text: z.string().trim().min(1).max(300) }), raw);
+        const playerId = assertSession(socket, data.roomCode);
+        if (!(await consumeRateLimit(`rate:chat:${data.roomCode}:${playerId}`, 6, 5)))
+            throw new Error('채팅을 너무 빠르게 보내고 있습니다.');
+        if (!(await once(data.roomCode, data.requestId)))
+            return {};
+        const room = await getRoom(data.roomCode);
+        const player = room?.players.find((p) => p.id === playerId);
+        if (!room || !player || !player.connected || player.socketId !== socket.id)
+            throw new Error('다른 기기에서 세션이 갱신되었습니다.');
+        if (room.phase !== 'day')
+            throw new Error('낮에만 채팅할 수 있습니다.');
+        const message = { id: randomUUID(), playerId, nickname: player.nickname, text: data.text, at: Date.now() };
+        await appendChat(data.roomCode, message);
+        io.to(roomChannel(data.roomCode)).emit('CHAT_MESSAGE', message);
+        return {};
+    });
     on(socket, 'VOTE_SELECT', async (raw) => { const data = safe(z.object({ roomCode: codeSchema, targetPlayerId: z.string().uuid() }), raw); const playerId = assertSession(socket, data.roomCode); const room = await getRoom(data.roomCode); if (!room || room.phase !== 'voting' || data.targetPlayerId === playerId || !room.players.some((p) => p.id === data.targetPlayerId))
         throw new Error('유효하지 않은 투표 대상입니다.'); return {}; });
     on(socket, 'VOTE_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => {
@@ -374,6 +417,10 @@ export function registerHandlers(io, socket) {
             const room = await withRoomLock(code, async (room) => { const p = room.players.find((x) => x.id === playerId); if (p && p.socketId === socket.id) {
                 p.connected = false;
                 p.socketId = null;
+                p.disconnectedAt = Date.now();
+                const action = room.nightActionQueue[room.currentNightActionIndex];
+                if (room.phase === 'night' && action?.status === 'active' && action.playerIds.includes(playerId))
+                    action.expiresAt = Math.min(action.expiresAt, Date.now() + 5_000);
                 if (room.hostId === playerId)
                     room.hostId = room.players.find((x) => x.id !== playerId && x.connected)?.id ?? room.hostId;
                 if (room.players.every((player) => !player.connected))
@@ -389,9 +436,17 @@ export function registerHandlers(io, socket) {
 async function mutate(io, socket, raw, change, event, after) {
     const data = safe(requestSchema.passthrough(), raw);
     const playerId = assertSession(socket, data.roomCode);
-    if (!(await once(data.roomCode, data.requestId)))
-        return {};
-    const room = await withRoomLock(data.roomCode, async (room) => { change(room, playerId, data); room.updatedAt = Date.now(); await saveRoom(room); return room; });
+    const room = await withRoomLock(data.roomCode, async (room, alreadyProcessed) => {
+        if (alreadyProcessed)
+            return room;
+        const player = room.players.find((p) => p.id === playerId);
+        if (!player || !player.connected || player.socketId !== socket.id)
+            throw new Error('다른 기기에서 세션이 갱신되었습니다.');
+        change(room, playerId, data);
+        room.updatedAt = Date.now();
+        await saveRoom(room, data.requestId);
+        return room;
+    }, data.requestId);
     await emitRoomState(io, room);
     if (event)
         io.to(roomChannel(room.roomCode)).emit(event, { at: Date.now() });

@@ -19,7 +19,21 @@ for (const [name, client] of [['redis', redis], ['redis-pub', pubClient], ['redi
     client.on('error', (error) => console.error(`${name}_connection_error`, error));
 }
 const roomKey = (code) => `game:room:${code}`;
+const chatKey = (code) => `game:chat:${code}`;
 const FALLBACK_ROOM_TTL_SECONDS = 60 * 60 * 24;
+const MAX_CHAT_MESSAGES = 100;
+const LOCK_TTL_MS = 5_000;
+// Acquiring the mutex, loading the room, and checking an action's completed
+// marker must see one Redis snapshot. This removes a GET from every lock hold
+// and an EXISTS from every idempotent game action.
+const LOCK_AND_LOAD_SCRIPT = `
+  if redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2], 'NX') then
+    local room = redis.call('GET', KEYS[2])
+    local processed = KEYS[3] and redis.call('EXISTS', KEYS[3]) or 0
+    return { 1, room or '', processed }
+  end
+  return { 0, '', 0 }
+`;
 /** Return the earliest retention deadline applicable to a room. */
 export function roomRetentionDeadline(room) {
     // Fall back to timestamps already present in legacy persisted rooms. New rooms
@@ -43,7 +57,8 @@ export async function getRoom(code) {
     const raw = await redis.get(roomKey(code));
     return raw ? JSON.parse(raw) : null;
 }
-export async function saveRoom(room) {
+export async function saveRoom(room, completedRequestId) {
+    const startedAt = performance.now();
     const deadline = roomRetentionDeadline(room);
     if (deadline !== null && deadline <= Date.now()) {
         await deleteRoom(room.roomCode);
@@ -52,38 +67,84 @@ export async function saveRoom(room) {
     const ttlSeconds = deadline === null
         ? FALLBACK_ROOM_TTL_SECONDS
         : Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
-    await redis.set(roomKey(room.roomCode), JSON.stringify(room), 'EX', ttlSeconds);
+    // Chat is a separate capped List. Keeping it out of this serialized value
+    // prevents every game action from rewriting the whole conversation.
+    const storedRoom = { ...room, chat: [] };
+    const pipeline = redis.pipeline().set(roomKey(room.roomCode), JSON.stringify(storedRoom), 'EX', ttlSeconds);
     // Vercel advances only the connected room via ROOM_SYNC, so it does not need
-    // a global index. Avoid retaining a second, non-expiring copy of every code.
+    // a global index. Both commands share one network round trip.
     if (process.env.RUN_STANDALONE_SERVER === 'true')
-        await redis.sadd('game:rooms', room.roomCode);
+        pipeline.sadd('game:rooms', room.roomCode);
     else
-        await redis.srem('game:rooms', room.roomCode);
+        pipeline.srem('game:rooms', room.roomCode);
+    // A new game must not inherit the previous game's day-chat history.
+    if (room.phase === 'lobby')
+        pipeline.del(chatKey(room.roomCode));
+    if (completedRequestId)
+        pipeline.set(`processedRequest:${room.roomCode}:${completedRequestId}`, '1', 'EX', 3600, 'NX');
+    await pipeline.exec();
+    if (process.env.PERF_LOGS === 'true')
+        console.info('redis_room_save', { code: room.roomCode, commands: 2 + Number(room.phase === 'lobby') + Number(!!completedRequestId), ms: Math.round((performance.now() - startedAt) * 10) / 10 });
 }
-export async function deleteRoom(code) { await redis.del(roomKey(code)); await redis.srem('game:rooms', code); }
-export async function withRoomLock(code, fn) {
+export async function deleteRoom(code) { await redis.pipeline().del(roomKey(code)).del(chatKey(code)).srem('game:rooms', code).exec(); }
+export async function getChatHistory(code) {
+    const values = await redis.lrange(chatKey(code), 0, MAX_CHAT_MESSAGES - 1);
+    return values.reverse().flatMap((value) => { try {
+        return [JSON.parse(value)];
+    }
+    catch {
+        return [];
+    } });
+}
+export async function appendChat(code, message) {
+    // LPUSH makes trimming O(1); reverse only when serving a room history.
+    await redis.pipeline().lpush(chatKey(code), JSON.stringify(message)).ltrim(chatKey(code), 0, MAX_CHAT_MESSAGES - 1).expire(chatKey(code), FALLBACK_ROOM_TTL_SECONDS).exec();
+}
+export async function withRoomLock(code, fn, requestId) {
+    const startedAt = performance.now();
     const key = `lock:game:${code}`;
     const token = crypto.randomUUID();
     const until = Date.now() + 3000;
+    let delay = 5;
+    let attempts = 0;
+    let raw = '';
+    let alreadyProcessed = false;
+    let acquired = false;
     while (Date.now() < until) {
-        if (await redis.set(key, token, 'PX', 5000, 'NX'))
+        attempts += 1;
+        const keys = requestId ? [key, roomKey(code), `processedRequest:${code}:${requestId}`] : [key, roomKey(code)];
+        const result = await redis.eval(LOCK_AND_LOAD_SCRIPT, keys.length, ...keys, token, String(LOCK_TTL_MS));
+        if (Number(result[0]) === 1) {
+            acquired = true;
+            raw = result[1] ?? '';
+            alreadyProcessed = Number(result[2]) === 1;
             break;
-        await new Promise((r) => setTimeout(r, 25));
+        }
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay = Math.min(delay * 2, 80);
     }
-    if ((await redis.get(key)) !== token)
+    if (!acquired)
         throw new Error('요청이 몰렸습니다. 다시 시도해주세요.');
+    if (process.env.PERF_LOGS === 'true')
+        console.info('redis_room_lock', { code, attempts, requestId: !!requestId, ms: Math.round((performance.now() - startedAt) * 10) / 10 });
     try {
-        const room = await getRoom(code);
+        const room = raw ? JSON.parse(raw) : null;
         if (!room)
             throw new Error('방을 찾을 수 없습니다.');
         if (roomHasExpired(room)) {
             await deleteRoom(code);
             throw new Error('방이 만료되었습니다.');
         }
-        return await fn(room);
+        return await fn(room, alreadyProcessed);
     }
     finally {
         await redis.eval("if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end", 1, key, token);
     }
 }
 export async function once(code, requestId) { return (await redis.set(`processedRequest:${code}:${requestId}`, '1', 'EX', 3600, 'NX')) === 'OK'; }
+export async function consumeRateLimit(key, limit, windowSeconds) {
+    const count = await redis.incr(key);
+    if (count === 1)
+        await redis.expire(key, windowSeconds);
+    return count <= limit;
+}

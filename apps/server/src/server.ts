@@ -22,6 +22,9 @@ export function createGameServer(socketPath = '/socket.io') {
     path: socketPath,
     cors: { origin, credentials: true },
     transports: ['websocket', 'polling'],
+    maxHttpBufferSize: 100_000,
+    pingInterval: 10_000,
+    pingTimeout: 20_000,
   });
   io.adapter(createAdapter(pubClient, subClient));
   io.on('connection', (socket) => registerHandlers(io, socket));

@@ -40,6 +40,20 @@ Vercel 프로젝트를 저장소 루트(`.`)에서 import한다. Root Directory�
 
 Redis Marketplace 리소스를 Production/Preview에 연결한 뒤 `REDIS_URL`을 설정한다. 값은 REST URL이 아니라 `rediss://default:<password>@<host>:6379` 형태의 TCP/TLS connection string이어야 한다. `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`은 HTTP REST용이므로 ioredis와 Socket.IO Redis Pub/Sub adapter에는 사용할 수 없다. Upstash를 사용 중이고 `REDIS_URL`이 자동 주입되지 않았다면 Upstash Console의 **Connect → Node/ioredis**에서 TCP URL을 복사해 Vercel Environment Variables에 `REDIS_URL`로 추가한다.
 
+`vercel.json`은 게임 Function을 서울(`icn1`)에 고정한다. Redis도 반드시 서울 리전에 생성하거나 이전해야 한다. Vercel Dashboard → Project → Settings → Functions 및 Redis 공급자 Dashboard에서 두 리전을 확인한다. 이미 다른 리전의 Redis를 사용 중이라면 새 서울 인스턴스로 데이터를 이전한 뒤 `REDIS_URL`을 교체하고 redeploy한다. 코드만으로 배포된 Redis 인스턴스의 실제 리전은 조회·변경할 수 없다.
+
+음성 채팅은 NAT 우회를 위해 TURN을 사용한다. Vercel Environment Variables에 아래 값을 설정하고 redeploy한다. `turns:`(TLS/TCP)와 `turn:`(UDP)을 함께 넣으면 모바일/사내망에서 성공률이 높다.
+
+```text
+VITE_TURN_URLS=turn:turn.example.com:3478?transport=udp,turns:turn.example.com:5349?transport=tcp
+VITE_TURN_USERNAME=<TURN username>
+VITE_TURN_CREDENTIAL=<TURN credential>
+```
+
+coturn, Twilio Network Traversal, Metered 또는 동등한 TURN 공급자를 사용할 수 있다. 이 값은 브라우저에 전달되는 WebRTC 단기 자격증명이므로, 장기 비밀번호를 직접 넣지 말고 TURN 공급자의 time-limited credential 기능을 사용한다.
+
+운영 전후 비교에는 서버 `PERF_LOGS=true`(락 획득 시도 수·지연, Room 저장 pipeline 지연)와 웹 `VITE_PERF_LOGS=true`(피어 연결까지의 시간)를 일시적으로 켠다. 측정이 끝나면 로그 비용을 피하기 위해 두 값은 제거한다.
+
 환경 변수를 새로 연결하거나 변경한 뒤에는 Redeploy해야 적용된다. `WEB_ORIGIN`은 별도 도메인에서 개발 클라이언트를 연결할 때만 설정하며, 쉼표로 여러 origin을 넣을 수 있다. Vercel production에서는 불필요하다.
 
 ## 구현 구조

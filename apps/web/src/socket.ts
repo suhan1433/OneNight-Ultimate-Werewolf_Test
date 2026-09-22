@@ -61,6 +61,8 @@ socket.on('ROOM_STATE', (game: ClientGameState) => {
   // to finish before the next queued narrator line starts.
   useGame.getState().setGame(game);
 });
+socket.on('CHAT_MESSAGE', (message) => useGame.getState().addChat(message));
+socket.on('CHAT_HISTORY', (messages) => useGame.getState().setChatHistory(messages));
 
 function playNextNarration() {
   if (currentNarration || !narrationUnlocked || !useGame.getState().tts) return;
@@ -133,12 +135,27 @@ socket.on('NARRATOR_SPEECH', ({ audioKey, actionId, timestamp }: { audioKey?: st
   narrationUnlocked = true;
   playNextNarration();
 });
-socket.on('connect', () => { const saved = session(); if (saved) socket.emit('ROOM_JOIN', saved, (ack: Ack) => { if (!ack.ok) localStorage.removeItem('werewolf-session'); }); });
+socket.on('connect', () => { const saved = session(); if (saved) socket.emit('ROOM_JOIN', saved, (ack: Ack) => { if (!ack.ok) localStorage.removeItem('werewolf-session'); else syncRoom(); }); });
 // Function instances can be paused/recycled, so a persisted deadline is checked
 // by active players instead of relying on a server-global setInterval.
 export const syncRoom = () => { if (socket.connected) socket.emit('ROOM_SYNC'); };
-window.setInterval(syncRoom, 250);
+// This is only a serverless wake-up fallback. Expiry is also checked exactly
+// when a local countdown reaches zero, avoiding a lock storm every 250ms.
+window.setInterval(syncRoom, 5_000);
+window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncRoom(); });
 export const requestId = () => crypto.randomUUID();
 export function session(): { roomCode: string; playerId: string; sessionToken: string } | null { try { return JSON.parse(localStorage.getItem('werewolf-session') ?? 'null'); } catch { return null; } }
 export function saveSession(value: unknown) { localStorage.setItem('werewolf-session', JSON.stringify(value)); }
-export function emitAck<T>(event: string, payload: unknown): Promise<T> { return new Promise((resolve, reject) => socket.emit(event, payload, (ack: Ack<T>) => ack?.ok ? resolve(ack.data as T) : reject(new Error(ack?.error ?? '서버 응답이 없습니다.')))); }
+export async function emitAck<T>(event: string, payload: unknown): Promise<T> {
+  if (!socket.connected) throw new Error('서버 연결을 복구하는 중입니다. 잠시 후 다시 시도해주세요.');
+  const send = () => new Promise<T>((resolve, reject) => socket.timeout(5_000).emit(event, payload, (error: Error | null, ack: Ack<T>) => {
+    if (error) reject(new Error('서버 응답이 지연되고 있습니다.'));
+    else if (ack?.ok) resolve(ack.data as T);
+    else reject(new Error(ack?.error ?? '서버 응답이 없습니다.'));
+  }));
+  try { return await send(); } catch (error) {
+    // Same requestId is retained in payload, so this is safe for state-changing commands.
+    if (!socket.connected || !(error instanceof Error) || error.message !== '서버 응답이 지연되고 있습니다.') throw error;
+    return send();
+  }
+}
