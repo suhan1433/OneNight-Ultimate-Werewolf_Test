@@ -129,7 +129,13 @@ export async function withRoomLock<T>(code: string, fn: (room: Room, alreadyProc
     if (roomHasExpired(room)) { await deleteRoom(code); throw new Error('방이 만료되었습니다.'); }
     return await fn(room, alreadyProcessed);
   }
-  finally { await redis.eval("if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end", 1, key, token); }
+  finally {
+    // The lock has a short TTL, so acknowledgement does not need to wait for a
+    // final cross-region Redis round trip. A delayed/failed release is safe:
+    // either this best-effort delete succeeds or the lock expires naturally.
+    void redis.eval("if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end", 1, key, token)
+      .catch((error) => console.error('redis_room_unlock_error', { code, error }));
+  }
 }
 export async function once(code: string, requestId: string) { return (await redis.set(`processedRequest:${code}:${requestId}`, '1', 'EX', 3600, 'NX')) === 'OK'; }
 export async function consumeRateLimit(key: string, limit: number, windowSeconds: number) {
