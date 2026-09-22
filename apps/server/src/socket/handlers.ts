@@ -95,6 +95,11 @@ export function registerHandlers(io: Server, socket: Socket) {
     const data = safe(z.object({ roomCode: codeSchema, nickname: nicknameSchema.optional(), playerId: z.string().uuid().optional(), sessionToken: z.string().optional() }), raw);
     let joinedId = ''; let joinedToken = '';
     const room = await withRoomLock(data.roomCode, async (room) => {
+      // Ready clicks are stored independently to avoid lock contention. Merge
+      // that authoritative value before a join persists/emits the room again,
+      // otherwise a new participant could revive an older `isReady: false`.
+      const readiness = await getReadiness(room.roomCode);
+      room.players = room.players.map((player) => readiness[player.id] === undefined ? player : { ...player, isReady: readiness[player.id] === '1' });
       const reconnect = data.playerId && room.players.find((p) => p.id === data.playerId && p.sessionToken === data.sessionToken);
       if (reconnect) { reconnect.socketId = socket.id; reconnect.connected = true; reconnect.disconnectedAt = null; room.allOfflineExpiresAt = null; joinedId = reconnect.id; joinedToken = reconnect.sessionToken; }
       else {
