@@ -987,6 +987,28 @@ function Lobby({ game }: { game: ClientGameState }) {
           </Panel>
         </>
       )}
+      {game.hostId !== game.playerId && (
+        <Panel>
+          <div className="panel-head">
+            <h3>역할 구성</h3>
+            <b className={deckReady ? "ok" : "bad"}>
+              {game.selectedRoles.length} / {game.maxPlayers + 3}
+            </b>
+          </div>
+          <div className="role-grid">
+            {ROLE_LIST.filter((role) => game.selectedRoles.includes(role.id)).map((role) => (
+              <div className="role-pick" key={role.id}>
+                <span>{role.emoji}</span>
+                <div>
+                  <b>{role.name}</b>
+                  <small>{factionName(role.faction)}</small>
+                </div>
+                <b>×{game.selectedRoles.filter((id) => id === role.id).length}</b>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
       <button
         className={me.isReady ? "ghost" : ""}
         onClick={() =>
@@ -1296,6 +1318,8 @@ function Day({ game }: { game: ClientGameState }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
+  const chatFormRef = useRef<HTMLFormElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   const synced = useRef(false);
   const used = [...new Set(game.selectedRoles)];
   useEffect(() => {
@@ -1308,6 +1332,13 @@ function Day({ game }: { game: ClientGameState }) {
       syncRoom();
     }
   }, [remain]);
+  useEffect(() => {
+    const dismissKeyboard = (event: PointerEvent) => {
+      if (!chatFormRef.current?.contains(event.target as Node)) chatInputRef.current?.blur();
+    };
+    document.addEventListener("pointerdown", dismissKeyboard);
+    return () => document.removeEventListener("pointerdown", dismissKeyboard);
+  }, []);
   const sendChat = () => {
     const value = text.trim();
     if (!value || sending) return;
@@ -1320,6 +1351,7 @@ function Day({ game }: { game: ClientGameState }) {
       at: Date.now(),
     };
     setText("");
+    requestAnimationFrame(() => chatInputRef.current?.focus());
     setSending(true);
     useGame.getState().addChat(message);
     void emitAck("CHAT_SEND", {
@@ -1386,6 +1418,7 @@ function Day({ game }: { game: ClientGameState }) {
           ))}
         </div>
         <form
+          ref={chatFormRef}
           className="chat-form"
           onSubmit={(e) => {
             e.preventDefault();
@@ -1393,6 +1426,7 @@ function Day({ game }: { game: ClientGameState }) {
           }}
         >
           <input
+            ref={chatInputRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="의심과 단서를 나누세요"
