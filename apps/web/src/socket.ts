@@ -63,6 +63,10 @@ socket.on('ROOM_STATE', (game: ClientGameState) => {
 });
 socket.on('CHAT_MESSAGE', (message) => useGame.getState().addChat(message));
 socket.on('CHAT_HISTORY', (messages) => useGame.getState().setChatHistory(messages));
+socket.on('VOTE_PROGRESS', ({ playerId, votesCompleted }: { playerId: string; votesCompleted: number }) => {
+  const game = useGame.getState().game; if (!game || game.phase !== 'voting') return;
+  useGame.setState({ game: { ...game, votesCompleted, players: game.players.map((player) => player.id === playerId ? { ...player, hasVoted: true } : player) } });
+});
 
 function playNextNarration() {
   if (currentNarration || !narrationUnlocked || !useGame.getState().tts) return;

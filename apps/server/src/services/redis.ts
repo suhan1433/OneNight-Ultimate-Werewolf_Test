@@ -26,6 +26,7 @@ for (const [name, client] of [['redis', redis], ['redis-pub', pubClient], ['redi
 
 const roomKey = (code: string) => `game:room:${code}`;
 const chatKey = (code: string) => `game:chat:${code}`;
+const voteKey = (code: string) => `vote:${code}`;
 const FALLBACK_ROOM_TTL_SECONDS = 60 * 60 * 24;
 const MAX_CHAT_MESSAGES = 100;
 const LOCK_TTL_MS = 5_000;
@@ -54,6 +55,10 @@ const RATE_LIMIT_SCRIPT = `
   local count = redis.call('INCR', KEYS[1])
   if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
   return count
+`;
+const VOTE_RECORD_SCRIPT = `
+  local added = redis.call('HSETNX', KEYS[1], ARGV[1], ARGV[2])
+  return { added, redis.call('HLEN', KEYS[1]) }
 `;
 
 /** Return the earliest retention deadline applicable to a room. */
@@ -96,12 +101,12 @@ export async function saveRoom(room: Room, completedRequestId?: string) {
   if (process.env.RUN_STANDALONE_SERVER === 'true') pipeline.sadd('game:rooms', room.roomCode);
   else pipeline.srem('game:rooms', room.roomCode);
   // A new game must not inherit the previous game's day-chat history.
-  if (room.phase === 'lobby') pipeline.del(chatKey(room.roomCode));
+  if (room.phase === 'lobby') pipeline.del(chatKey(room.roomCode)).del(voteKey(room.roomCode));
   if (completedRequestId) pipeline.set(`processedRequest:${room.roomCode}:${completedRequestId}`, '1', 'EX', 3600, 'NX');
   await pipeline.exec();
   if (process.env.PERF_LOGS === 'true') console.info('redis_room_save', { code: room.roomCode, commands: 2 + Number(room.phase === 'lobby') + Number(!!completedRequestId), ms: Math.round((performance.now() - startedAt) * 10) / 10 });
 }
-export async function deleteRoom(code: string) { await redis.pipeline().del(roomKey(code)).del(chatKey(code)).srem('game:rooms', code).exec(); }
+export async function deleteRoom(code: string) { await redis.pipeline().del(roomKey(code)).del(chatKey(code)).del(voteKey(code)).srem('game:rooms', code).exec(); }
 export async function getChatHistory(code: string): Promise<ChatMessage[]> {
   const values = await redis.lrange(chatKey(code), 0, MAX_CHAT_MESSAGES - 1);
   return values.reverse().flatMap((value) => { try { return [JSON.parse(value) as ChatMessage]; } catch { return []; } });
@@ -141,3 +146,8 @@ export async function once(code: string, requestId: string) { return (await redi
 export async function consumeRateLimit(key: string, limit: number, windowSeconds: number) {
   return Number(await redis.eval(RATE_LIMIT_SCRIPT, 1, key, String(windowSeconds))) <= limit;
 }
+export async function recordVote(code: string, playerId: string, targetPlayerId: string) {
+  const [added, count] = await redis.eval(VOTE_RECORD_SCRIPT, 1, voteKey(code), playerId, targetPlayerId) as [number, number];
+  return { added: Number(added) === 1, count: Number(count) };
+}
+export async function getVotes(code: string): Promise<Record<string, string>> { return await redis.hgetall(voteKey(code)); }
