@@ -34,6 +34,20 @@ const LOCK_AND_LOAD_SCRIPT = `
   end
   return { 0, '', 0 }
 `;
+const CHAT_APPEND_SCRIPT = `
+  if redis.call('SET', KEYS[1], '1', 'EX', ARGV[1], 'NX') then
+    redis.call('LPUSH', KEYS[2], ARGV[2])
+    redis.call('LTRIM', KEYS[2], 0, ARGV[3])
+    redis.call('EXPIRE', KEYS[2], ARGV[4])
+    return 1
+  end
+  return 0
+`;
+const RATE_LIMIT_SCRIPT = `
+  local count = redis.call('INCR', KEYS[1])
+  if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+  return count
+`;
 /** Return the earliest retention deadline applicable to a room. */
 export function roomRetentionDeadline(room) {
     // Fall back to timestamps already present in legacy persisted rooms. New rooms
@@ -97,8 +111,9 @@ export async function getChatHistory(code) {
     } });
 }
 export async function appendChat(code, message) {
-    // LPUSH makes trimming O(1); reverse only when serving a room history.
-    await redis.pipeline().lpush(chatKey(code), JSON.stringify(message)).ltrim(chatKey(code), 0, MAX_CHAT_MESSAGES - 1).expire(chatKey(code), FALLBACK_ROOM_TTL_SECONDS).exec();
+    // Idempotency and LPUSH/LTRIM are atomic, so an ACK retry cannot duplicate a
+    // message while this remains one Redis round trip.
+    return Number(await redis.eval(CHAT_APPEND_SCRIPT, 2, `chatMessage:${code}:${message.id}`, chatKey(code), '3600', JSON.stringify(message), String(MAX_CHAT_MESSAGES - 1), String(FALLBACK_ROOM_TTL_SECONDS))) === 1;
 }
 export async function withRoomLock(code, fn, requestId) {
     const startedAt = performance.now();
@@ -143,8 +158,5 @@ export async function withRoomLock(code, fn, requestId) {
 }
 export async function once(code, requestId) { return (await redis.set(`processedRequest:${code}:${requestId}`, '1', 'EX', 3600, 'NX')) === 'OK'; }
 export async function consumeRateLimit(key, limit, windowSeconds) {
-    const count = await redis.incr(key);
-    if (count === 1)
-        await redis.expire(key, windowSeconds);
-    return count <= limit;
+    return Number(await redis.eval(RATE_LIMIT_SCRIPT, 1, key, String(windowSeconds))) <= limit;
 }

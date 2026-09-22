@@ -3,7 +3,7 @@ import type { Server, Socket } from 'socket.io';
 import { NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
-import { appendChat, consumeRateLimit, deleteRoom, getChatHistory, getRoom, once, saveRoom, withRoomLock } from '../services/redis.js';
+import { appendChat, consumeRateLimit, deleteRoom, getChatHistory, getRoom, saveRoom, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
@@ -197,15 +197,14 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (room.voteStartRequests.length >= room.players.filter((p) => p.connected).length) { room.phase = 'voting'; room.dayExpiresAt = null; }
   }, 'VOTE_PROGRESS'));
   on(socket, 'CHAT_SEND', async (raw) => {
-    const data = safe(requestSchema.extend({ text: z.string().trim().min(1).max(300) }), raw); const playerId = assertSession(socket, data.roomCode);
-    if (!(await consumeRateLimit(`rate:chat:${data.roomCode}:${playerId}`, 6, 5))) throw new Error('채팅을 너무 빠르게 보내고 있습니다.');
-    if (!(await once(data.roomCode, data.requestId))) return {};
-    const room = await getRoom(data.roomCode); const player = room?.players.find((p) => p.id === playerId);
+    const data = safe(requestSchema.extend({ messageId: z.string().uuid(), text: z.string().trim().min(1).max(300) }), raw); const playerId = assertSession(socket, data.roomCode);
+    const [allowed, room] = await Promise.all([consumeRateLimit(`rate:chat:${data.roomCode}:${playerId}`, 6, 5), getRoom(data.roomCode)]);
+    if (!allowed) throw new Error('채팅을 너무 빠르게 보내고 있습니다.');
+    const player = room?.players.find((p) => p.id === playerId);
     if (!room || !player || !player.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
     if (room.phase !== 'day') throw new Error('낮에만 채팅할 수 있습니다.');
-    const message = { id: randomUUID(), playerId, nickname: player.nickname, text: data.text, at: Date.now() };
-    await appendChat(data.roomCode, message);
-    io.to(roomChannel(data.roomCode)).emit('CHAT_MESSAGE', message);
+    const message = { id: data.messageId, playerId, nickname: player.nickname, text: data.text, at: Date.now() };
+    if (await appendChat(data.roomCode, message)) io.to(roomChannel(data.roomCode)).emit('CHAT_MESSAGE', message);
     return {};
   });
   on(socket, 'VOTE_SELECT', async (raw) => { const data = safe(z.object({ roomCode: codeSchema, targetPlayerId: z.string().uuid() }), raw); const playerId = assertSession(socket, data.roomCode); const room = await getRoom(data.roomCode); if (!room || room.phase !== 'voting' || data.targetPlayerId === playerId || !room.players.some((p) => p.id === data.targetPlayerId)) throw new Error('유효하지 않은 투표 대상입니다.'); return {}; });

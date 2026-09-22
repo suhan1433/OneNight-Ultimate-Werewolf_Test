@@ -41,6 +41,20 @@ const LOCK_AND_LOAD_SCRIPT = `
   end
   return { 0, '', 0 }
 `;
+const CHAT_APPEND_SCRIPT = `
+  if redis.call('SET', KEYS[1], '1', 'EX', ARGV[1], 'NX') then
+    redis.call('LPUSH', KEYS[2], ARGV[2])
+    redis.call('LTRIM', KEYS[2], 0, ARGV[3])
+    redis.call('EXPIRE', KEYS[2], ARGV[4])
+    return 1
+  end
+  return 0
+`;
+const RATE_LIMIT_SCRIPT = `
+  local count = redis.call('INCR', KEYS[1])
+  if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+  return count
+`;
 
 /** Return the earliest retention deadline applicable to a room. */
 export function roomRetentionDeadline(room: Room): number | null {
@@ -92,9 +106,10 @@ export async function getChatHistory(code: string): Promise<ChatMessage[]> {
   const values = await redis.lrange(chatKey(code), 0, MAX_CHAT_MESSAGES - 1);
   return values.reverse().flatMap((value) => { try { return [JSON.parse(value) as ChatMessage]; } catch { return []; } });
 }
-export async function appendChat(code: string, message: ChatMessage) {
-  // LPUSH makes trimming O(1); reverse only when serving a room history.
-  await redis.pipeline().lpush(chatKey(code), JSON.stringify(message)).ltrim(chatKey(code), 0, MAX_CHAT_MESSAGES - 1).expire(chatKey(code), FALLBACK_ROOM_TTL_SECONDS).exec();
+export async function appendChat(code: string, message: ChatMessage): Promise<boolean> {
+  // Idempotency and LPUSH/LTRIM are atomic, so an ACK retry cannot duplicate a
+  // message while this remains one Redis round trip.
+  return Number(await redis.eval(CHAT_APPEND_SCRIPT, 2, `chatMessage:${code}:${message.id}`, chatKey(code), '3600', JSON.stringify(message), String(MAX_CHAT_MESSAGES - 1), String(FALLBACK_ROOM_TTL_SECONDS))) === 1;
 }
 export async function withRoomLock<T>(code: string, fn: (room: Room, alreadyProcessed: boolean) => Promise<T> | T, requestId?: string): Promise<T> {
   const startedAt = performance.now(); const key = `lock:game:${code}`; const token = crypto.randomUUID(); const until = Date.now() + 3000;
@@ -118,7 +133,5 @@ export async function withRoomLock<T>(code: string, fn: (room: Room, alreadyProc
 }
 export async function once(code: string, requestId: string) { return (await redis.set(`processedRequest:${code}:${requestId}`, '1', 'EX', 3600, 'NX')) === 'OK'; }
 export async function consumeRateLimit(key: string, limit: number, windowSeconds: number) {
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, windowSeconds);
-  return count <= limit;
+  return Number(await redis.eval(RATE_LIMIT_SCRIPT, 1, key, String(windowSeconds))) <= limit;
 }

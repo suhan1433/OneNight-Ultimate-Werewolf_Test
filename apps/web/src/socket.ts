@@ -139,9 +139,11 @@ socket.on('connect', () => { const saved = session(); if (saved) socket.emit('RO
 // Function instances can be paused/recycled, so a persisted deadline is checked
 // by active players instead of relying on a server-global setInterval.
 export const syncRoom = () => { if (socket.connected) socket.emit('ROOM_SYNC'); };
-// This is only a serverless wake-up fallback. Expiry is also checked exactly
-// when a local countdown reaches zero, avoiding a lock storm every 250ms.
-window.setInterval(syncRoom, 5_000);
+// This is only a serverless wake-up fallback. The visible countdown performs
+// an exact check at zero; while a night action is active, a 500ms fallback
+// keeps Vercel wake-up jitter below one second without taking a lock early.
+window.setInterval(() => { if (useGame.getState().game?.phase === 'night') syncRoom(); }, 500);
+window.setInterval(() => { if (useGame.getState().game?.phase !== 'night') syncRoom(); }, 5_000);
 window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncRoom(); });
 export const requestId = () => crypto.randomUUID();
 export function session(): { roomCode: string; playerId: string; sessionToken: string } | null { try { return JSON.parse(localStorage.getItem('werewolf-session') ?? 'null'); } catch { return null; } }
