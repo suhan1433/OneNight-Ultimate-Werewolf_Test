@@ -3,7 +3,7 @@ import type { Server, Socket } from 'socket.io';
 import { NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
-import { appendChat, consumeRateLimit, deleteRoom, getChatHistory, getRoom, getVotes, recordVote, saveRoom, withRoomLock } from '../services/redis.js';
+import { appendChat, clearReadiness, consumeRateLimit, deleteRoom, getChatHistory, getReadiness, getRoom, getVotes, recordVote, saveRoom, toggleReady, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
@@ -135,7 +135,15 @@ export function registerHandlers(io: Server, socket: Socket) {
     return {};
   });
 
-  on(socket, 'PLAYER_READY', async (raw) => mutate(io, socket, raw, (room, playerId) => { if (room.phase !== 'lobby') throw new Error('로비에서만 준비할 수 있습니다.'); const p = room.players.find((x) => x.id === playerId)!; p.isReady = !p.isReady; }));
+  on(socket, 'PLAYER_READY', async (raw) => {
+    const data = safe(requestSchema, raw); const playerId = assertSession(socket, data.roomCode); const room = await getRoom(data.roomCode);
+    const player = room?.players.find((candidate) => candidate.id === playerId);
+    if (!room || room.phase !== 'lobby') throw new Error('로비에서만 준비할 수 있습니다.');
+    if (!player?.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
+    const isReady = await toggleReady(data.roomCode, playerId, data.requestId);
+    io.to(roomChannel(data.roomCode)).emit('READY_PROGRESS', { playerId, isReady });
+    return { isReady };
+  });
   on(socket, 'ROOM_SETTINGS', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => {
     if (room.hostId !== playerId || room.phase !== 'lobby') throw new Error('방장만 설정할 수 있습니다.');
     // Accept a legacy room's old 3/5-second value once, then migrate it to
@@ -148,7 +156,7 @@ export function registerHandlers(io: Server, socket: Socket) {
     }
     room.actionTimeLimitSeconds = Math.max(8, settings.actionTimeLimitSeconds); room.dayTimeLimitSeconds = settings.dayTimeLimitSeconds;
   }));
-  on(socket, 'GAME_START', async (raw) => mutate(io, socket, raw, (room, playerId) => {
+  on(socket, 'GAME_START', async (raw) => mutate(io, socket, raw, async (room, playerId) => {
     if (room.hostId !== playerId) throw new Error('방장만 시작할 수 있습니다.');
     if (room.moderatorMode) {
       if (room.phase !== 'lobby') throw new Error('로비에서만 시작할 수 있습니다.');
@@ -157,7 +165,9 @@ export function registerHandlers(io: Server, socket: Socket) {
       room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
       return;
     }
-    if (room.phase !== 'lobby' || room.players.length !== room.maxPlayers || !room.players.every((p) => p.isReady)) throw new Error('정원이 모두 입장하고 준비해야 합니다.');
+    if (room.phase !== 'lobby') throw new Error('로비에서만 시작할 수 있습니다.');
+    const readiness = await getReadiness(room.roomCode); room.players = room.players.map((p) => ({ ...p, isReady: readiness[p.id] === '1' }));
+    if (room.players.length !== room.maxPlayers || !room.players.every((p) => p.isReady)) throw new Error('정원이 모두 입장하고 준비해야 합니다.');
     if (room.selectedRoles.length !== room.players.length + 3) throw new Error('역할 카드는 인원수 + 3장 모두 선택해야 시작할 수 있습니다.');
     const assigned = assignRoles(room.players, room.selectedRoles);
     room.players = assigned.players.map((player) => ({ ...player, vote: null })); room.centerCards = assigned.centerCards; room.phase = 'card_reveal'; room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
@@ -241,7 +251,7 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (room.hostId !== playerId || (room.phase !== 'result' && !(room.moderatorMode && room.phase === 'day'))) throw new Error('방장만 대기실로 돌아갈 수 있습니다.');
     room.players = room.players.map((p) => ({ ...p, originalRole: null, currentRole: null, isReady: false, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
     room.centerCards = []; room.phase = 'lobby'; room.nightActionQueue = []; room.currentNightActionIndex = 0; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.chat = []; room.dayExpiresAt = null; room.result = null; room.protectedPlayerId = null; room.lobbyExpiresAt = Date.now() + LOBBY_TTL_MS; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
-  }, 'PHASE_CHANGED'));
+  }, 'PHASE_CHANGED', (room) => { void clearReadiness(room.roomCode); }));
 
   socket.on('disconnect', async () => {
     const code = socket.data.roomCode as string | undefined; const playerId = socket.data.playerId as string | undefined; if (!code || !playerId) return;
@@ -249,13 +259,13 @@ export function registerHandlers(io: Server, socket: Socket) {
   });
 }
 
-async function mutate(io: Server, socket: Socket, raw: unknown, change: (room: Room, playerId: string, payload: Record<string, unknown>) => void, event?: string, after?: (room: Room) => void) {
+async function mutate(io: Server, socket: Socket, raw: unknown, change: (room: Room, playerId: string, payload: Record<string, unknown>) => void | Promise<void>, event?: string, after?: (room: Room) => void) {
   const data = safe(requestSchema.passthrough(), raw) as { roomCode: string; requestId: string } & Record<string, unknown>; const playerId = assertSession(socket, data.roomCode);
   const room = await withRoomLock(data.roomCode, async (room, alreadyProcessed) => {
     if (alreadyProcessed) return room;
     const player = room.players.find((p) => p.id === playerId);
     if (!player || !player.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
-    change(room, playerId, data); room.updatedAt = Date.now(); await saveRoom(room, data.requestId); return room;
+    await change(room, playerId, data); room.updatedAt = Date.now(); await saveRoom(room, data.requestId); return room;
   }, data.requestId);
   await emitRoomState(io, room); if (event) io.to(roomChannel(room.roomCode)).emit(event, { at: Date.now() }); after?.(room); return {};
 }

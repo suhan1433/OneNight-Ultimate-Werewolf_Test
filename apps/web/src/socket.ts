@@ -67,6 +67,10 @@ socket.on('VOTE_PROGRESS', ({ playerId, votesCompleted }: { playerId: string; vo
   const game = useGame.getState().game; if (!game || game.phase !== 'voting') return;
   useGame.setState({ game: { ...game, votesCompleted, players: game.players.map((player) => player.id === playerId ? { ...player, hasVoted: true } : player) } });
 });
+socket.on('READY_PROGRESS', ({ playerId, isReady }: { playerId: string; isReady: boolean }) => {
+  const game = useGame.getState().game; if (!game || game.phase !== 'lobby') return;
+  useGame.setState({ game: { ...game, players: game.players.map((player) => player.id === playerId ? { ...player, isReady } : player) } });
+});
 
 function playNextNarration() {
   if (currentNarration || !narrationUnlocked || !useGame.getState().tts) return;
