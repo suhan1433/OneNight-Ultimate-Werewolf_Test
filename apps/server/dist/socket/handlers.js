@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { NARRATOR_LINES, ROLE_DEFINITIONS } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
-import { appendChat, consumeRateLimit, deleteRoom, getChatHistory, getRoom, saveRoom, withRoomLock } from '../services/redis.js';
+import { appendChat, consumeRateLimit, deleteRoom, getChatHistory, getRoom, getVotes, recordVote, saveRoom, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
 const nicknameSchema = z.string().trim().min(1).max(16);
@@ -379,23 +379,45 @@ export function registerHandlers(io, socket) {
     });
     on(socket, 'VOTE_SELECT', async (raw) => { const data = safe(z.object({ roomCode: codeSchema, targetPlayerId: z.string().uuid() }), raw); const playerId = assertSession(socket, data.roomCode); const room = await getRoom(data.roomCode); if (!room || room.phase !== 'voting' || data.targetPlayerId === playerId || !room.players.some((p) => p.id === data.targetPlayerId))
         throw new Error('유효하지 않은 투표 대상입니다.'); return {}; });
-    on(socket, 'VOTE_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => {
-        if (room.phase !== 'voting')
+    on(socket, 'VOTE_CONFIRM', async (raw) => {
+        const data = safe(requestSchema.extend({ targetPlayerId: z.string().uuid() }), raw);
+        const playerId = assertSession(socket, data.roomCode);
+        const room = await getRoom(data.roomCode);
+        const target = data.targetPlayerId;
+        if (!room || room.phase !== 'voting')
             throw new Error('투표 단계가 아닙니다.');
-        const { targetPlayerId } = safe(z.object({ targetPlayerId: z.string().uuid() }), payload);
-        if (targetPlayerId === playerId || !room.players.some((p) => p.id === targetPlayerId))
+        if (target === playerId || !room.players.some((p) => p.id === target))
             throw new Error('유효하지 않은 투표 대상입니다.');
-        if (room.votes[playerId])
-            throw new Error('이미 투표했습니다.');
-        room.votes[playerId] = targetPlayerId;
-        if (Object.keys(room.votes).length === room.players.length) {
-            room.result = calculateResult(room);
-            room.players = room.players.map((p) => ({ ...p, currentRole: room.result.players.find((x) => x.id === p.id).currentRole }));
-            room.phase = 'result';
-            room.resultExpiresAt = Date.now() + RESULT_TTL_MS;
+        const player = room.players.find((p) => p.id === playerId);
+        if (!player?.connected || player.socketId !== socket.id)
+            throw new Error('다른 기기에서 세션이 갱신되었습니다.');
+        const recorded = await recordVote(data.roomCode, playerId, target);
+        const eligible = room.players.filter((p) => p.connected).length;
+        io.to(roomChannel(data.roomCode)).emit('VOTE_PROGRESS', { playerId, votesCompleted: recorded.count });
+        if (recorded.count < eligible)
+            return { votesCompleted: recorded.count };
+        const completed = await withRoomLock(data.roomCode, async (locked) => {
+            if (locked.phase !== 'voting')
+                return locked;
+            const votes = await getVotes(data.roomCode);
+            const currentEligible = locked.players.filter((p) => p.connected).length;
+            if (Object.keys(votes).length < currentEligible)
+                return locked;
+            locked.votes = votes;
+            locked.result = calculateResult(locked);
+            locked.players = locked.players.map((p) => ({ ...p, currentRole: locked.result.players.find((x) => x.id === p.id).currentRole }));
+            locked.phase = 'result';
+            locked.resultExpiresAt = Date.now() + RESULT_TTL_MS;
+            locked.updatedAt = Date.now();
+            await saveRoom(locked, data.requestId);
+            return locked;
+        }, data.requestId);
+        if (completed.phase === 'result') {
+            await emitRoomState(io, completed);
+            io.to(roomChannel(completed.roomCode)).emit('GAME_RESULT', completed.result);
         }
-    }, 'VOTE_PROGRESS', (room) => { if (room.phase === 'result')
-        io.to(roomChannel(room.roomCode)).emit('GAME_RESULT', room.result); }));
+        return { votesCompleted: recorded.count };
+    });
     on(socket, 'GAME_RESTART', async (raw) => mutate(io, socket, raw, (room, playerId) => {
         if (room.hostId !== playerId || (room.phase !== 'result' && !(room.moderatorMode && room.phase === 'day')))
             throw new Error('방장만 대기실로 돌아갈 수 있습니다.');
