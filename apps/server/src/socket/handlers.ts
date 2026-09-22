@@ -148,7 +148,12 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (room.hostId !== playerId || room.phase !== 'lobby') throw new Error('방장만 설정할 수 있습니다.');
     // Accept a legacy room's old 3/5-second value once, then migrate it to
     // the new 8-second minimum when any lobby setting is saved.
-    const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)), selectedRoles: z.array(z.string()).max(13).optional() }), payload);
+    const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)), maxPlayers: z.number().int().min(3).max(10).optional(), selectedRoles: z.array(z.string()).max(13).optional() }), payload);
+    if (settings.maxPlayers !== undefined) {
+      if (settings.maxPlayers < room.players.length) throw new Error('현재 참가 인원보다 정원을 적게 설정할 수 없습니다.');
+      if (settings.selectedRoles && settings.selectedRoles.length !== settings.maxPlayers + 3) throw new Error('변경한 정원에 맞춰 역할 카드를 설정해주세요.');
+      room.maxPlayers = settings.maxPlayers;
+    }
     if (settings.selectedRoles) {
       if (settings.selectedRoles.some((role) => !(role in ROLE_DEFINITIONS))) throw new Error('유효하지 않은 역할 카드가 있습니다.');
       for (const definition of Object.values(ROLE_DEFINITIONS)) if (settings.selectedRoles.filter((role) => role === definition.id).length > definition.maxCount) throw new Error(`${definition.name} 역할이 허용 수량을 초과했습니다.`);
