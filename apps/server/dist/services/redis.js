@@ -21,6 +21,7 @@ for (const [name, client] of [['redis', redis], ['redis-pub', pubClient], ['redi
 const roomKey = (code) => `game:room:${code}`;
 const chatKey = (code) => `game:chat:${code}`;
 const voteKey = (code) => `vote:${code}`;
+const readyKey = (code) => `ready:${code}`;
 const FALLBACK_ROOM_TTL_SECONDS = 60 * 60 * 24;
 const MAX_CHAT_MESSAGES = 100;
 const LOCK_TTL_MS = 5_000;
@@ -52,6 +53,13 @@ const RATE_LIMIT_SCRIPT = `
 const VOTE_RECORD_SCRIPT = `
   local added = redis.call('HSETNX', KEYS[1], ARGV[1], ARGV[2])
   return { added, redis.call('HLEN', KEYS[1]) }
+`;
+const READY_TOGGLE_SCRIPT = `
+  if not redis.call('SET', KEYS[2], '1', 'EX', ARGV[2], 'NX') then return redis.call('HGET', KEYS[1], ARGV[1]) or '0' end
+  local ready = redis.call('HGET', KEYS[1], ARGV[1])
+  local next = ready == '1' and '0' or '1'
+  redis.call('HSET', KEYS[1], ARGV[1], next)
+  return next
 `;
 /** Return the earliest retention deadline applicable to a room. */
 export function roomRetentionDeadline(room) {
@@ -105,7 +113,7 @@ export async function saveRoom(room, completedRequestId) {
     if (process.env.PERF_LOGS === 'true')
         console.info('redis_room_save', { code: room.roomCode, commands: 2 + Number(room.phase === 'lobby') + Number(!!completedRequestId), ms: Math.round((performance.now() - startedAt) * 10) / 10 });
 }
-export async function deleteRoom(code) { await redis.pipeline().del(roomKey(code)).del(chatKey(code)).del(voteKey(code)).srem('game:rooms', code).exec(); }
+export async function deleteRoom(code) { await redis.pipeline().del(roomKey(code)).del(chatKey(code)).del(voteKey(code)).del(readyKey(code)).srem('game:rooms', code).exec(); }
 export async function getChatHistory(code) {
     const values = await redis.lrange(chatKey(code), 0, MAX_CHAT_MESSAGES - 1);
     return values.reverse().flatMap((value) => { try {
@@ -174,3 +182,6 @@ export async function recordVote(code, playerId, targetPlayerId) {
     return { added: Number(added) === 1, count: Number(count) };
 }
 export async function getVotes(code) { return await redis.hgetall(voteKey(code)); }
+export async function toggleReady(code, playerId, requestId) { return (await redis.eval(READY_TOGGLE_SCRIPT, 2, readyKey(code), `readyRequest:${code}:${requestId}`, playerId, '3600')) === '1'; }
+export async function getReadiness(code) { return await redis.hgetall(readyKey(code)); }
+export async function clearReadiness(code) { await redis.del(readyKey(code)); }

@@ -61,8 +61,10 @@ socket.on('ROOM_STATE', (game: ClientGameState) => {
   // to finish before the next queued narrator line starts.
   useGame.getState().setGame(game);
 });
-socket.on('CHAT_MESSAGE', (message) => useGame.getState().addChat(message));
+socket.on('CHAT_MESSAGE', (message) => useGame.getState().addChat(message, 'day'));
 socket.on('CHAT_HISTORY', (messages) => useGame.getState().setChatHistory(messages));
+socket.on('LOBBY_CHAT_MESSAGE', (message) => useGame.getState().addChat(message, 'lobby'));
+socket.on('LOBBY_CHAT_HISTORY', (messages) => useGame.getState().setLobbyChatHistory(messages));
 socket.on('VOTE_PROGRESS', ({ playerId, votesCompleted }: { playerId: string; votesCompleted: number }) => {
   const game = useGame.getState().game; if (!game || game.phase !== 'voting') return;
   useGame.setState({ game: { ...game, votesCompleted, players: game.players.map((player) => player.id === playerId ? { ...player, hasVoted: true } : player) } });

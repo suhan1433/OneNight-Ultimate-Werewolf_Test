@@ -26,6 +26,8 @@ for (const [name, client] of [['redis', redis], ['redis-pub', pubClient], ['redi
 
 const roomKey = (code: string) => `game:room:${code}`;
 const chatKey = (code: string) => `game:chat:${code}`;
+const lobbyChatKey = (code: string) => `game:lobby-chat:${code}`;
+const lobbyChatMessageKeysKey = (code: string) => `game:lobby-chat-message-keys:${code}`;
 const voteKey = (code: string) => `vote:${code}`;
 const readyKey = (code: string) => `ready:${code}`;
 const FALLBACK_ROOM_TTL_SECONDS = 60 * 60 * 24;
@@ -48,6 +50,10 @@ const CHAT_APPEND_SCRIPT = `
     redis.call('LPUSH', KEYS[2], ARGV[2])
     redis.call('LTRIM', KEYS[2], 0, ARGV[3])
     redis.call('EXPIRE', KEYS[2], ARGV[4])
+    if KEYS[3] ~= '' then
+      redis.call('SADD', KEYS[3], KEYS[1])
+      redis.call('EXPIRE', KEYS[3], ARGV[4])
+    end
     return 1
   end
   return 0
@@ -114,15 +120,34 @@ export async function saveRoom(room: Room, completedRequestId?: string) {
   await pipeline.exec();
   if (process.env.PERF_LOGS === 'true') console.info('redis_room_save', { code: room.roomCode, commands: 2 + Number(room.phase === 'lobby') + Number(!!completedRequestId), ms: Math.round((performance.now() - startedAt) * 10) / 10 });
 }
-export async function deleteRoom(code: string) { await redis.pipeline().del(roomKey(code)).del(chatKey(code)).del(voteKey(code)).del(readyKey(code)).srem('game:rooms', code).exec(); }
+export async function deleteRoom(code: string) { await redis.pipeline().del(roomKey(code)).del(chatKey(code)).del(lobbyChatKey(code)).del(lobbyChatMessageKeysKey(code)).del(voteKey(code)).del(readyKey(code)).srem('game:rooms', code).exec(); }
 export async function getChatHistory(code: string): Promise<ChatMessage[]> {
-  const values = await redis.lrange(chatKey(code), 0, MAX_CHAT_MESSAGES - 1);
+  return getChatHistoryFromKey(chatKey(code));
+}
+export async function getLobbyChatHistory(code: string): Promise<ChatMessage[]> {
+  return getChatHistoryFromKey(lobbyChatKey(code));
+}
+async function getChatHistoryFromKey(key: string): Promise<ChatMessage[]> {
+  const values = await redis.lrange(key, 0, MAX_CHAT_MESSAGES - 1);
   return values.reverse().flatMap((value) => { try { return [JSON.parse(value) as ChatMessage]; } catch { return []; } });
 }
 export async function appendChat(code: string, message: ChatMessage): Promise<boolean> {
+  return appendChatToKey(chatKey(code), code, message, '');
+}
+export async function appendLobbyChat(code: string, message: ChatMessage): Promise<boolean> {
+  return appendChatToKey(lobbyChatKey(code), code, message, lobbyChatMessageKeysKey(code));
+}
+async function appendChatToKey(key: string, code: string, message: ChatMessage, messageKeysKey: string): Promise<boolean> {
   // Idempotency and LPUSH/LTRIM are atomic, so an ACK retry cannot duplicate a
   // message while this remains one Redis round trip.
-  return Number(await redis.eval(CHAT_APPEND_SCRIPT, 2, `chatMessage:${code}:${message.id}`, chatKey(code), '3600', JSON.stringify(message), String(MAX_CHAT_MESSAGES - 1), String(FALLBACK_ROOM_TTL_SECONDS))) === 1;
+  return Number(await redis.eval(CHAT_APPEND_SCRIPT, 3, `chatMessage:${code}:${message.id}`, key, messageKeysKey, '3600', JSON.stringify(message), String(MAX_CHAT_MESSAGES - 1), String(FALLBACK_ROOM_TTL_SECONDS))) === 1;
+}
+export async function clearLobbyChat(code: string) {
+  const keyIndex = lobbyChatMessageKeysKey(code);
+  const messageKeys = await redis.smembers(keyIndex);
+  const pipeline = redis.pipeline().del(lobbyChatKey(code)).del(keyIndex);
+  if (messageKeys.length) pipeline.del(...messageKeys);
+  await pipeline.exec();
 }
 export async function withRoomLock<T>(code: string, fn: (room: Room, alreadyProcessed: boolean) => Promise<T> | T, requestId?: string): Promise<T> {
   const startedAt = performance.now(); const key = `lock:game:${code}`; const token = crypto.randomUUID(); const until = Date.now() + 3000;

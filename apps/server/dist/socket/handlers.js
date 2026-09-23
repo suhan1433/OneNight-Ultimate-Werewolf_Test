@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { NARRATOR_LINES, ROLE_DEFINITIONS } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
-import { appendChat, consumeRateLimit, deleteRoom, getChatHistory, getRoom, getVotes, recordVote, saveRoom, withRoomLock } from '../services/redis.js';
+import { appendChat, clearReadiness, consumeRateLimit, deleteRoom, getChatHistory, getReadiness, getRoom, getVotes, recordVote, saveRoom, toggleReady, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
 const nicknameSchema = z.string().trim().min(1).max(16);
@@ -204,14 +204,32 @@ export function registerHandlers(io, socket) {
         }
         return {};
     });
-    on(socket, 'PLAYER_READY', async (raw) => mutate(io, socket, raw, (room, playerId) => { if (room.phase !== 'lobby')
-        throw new Error('로비에서만 준비할 수 있습니다.'); const p = room.players.find((x) => x.id === playerId); p.isReady = !p.isReady; }));
+    on(socket, 'PLAYER_READY', async (raw) => {
+        const data = safe(requestSchema, raw);
+        const playerId = assertSession(socket, data.roomCode);
+        const room = await getRoom(data.roomCode);
+        const player = room?.players.find((candidate) => candidate.id === playerId);
+        if (!room || room.phase !== 'lobby')
+            throw new Error('로비에서만 준비할 수 있습니다.');
+        if (!player?.connected || player.socketId !== socket.id)
+            throw new Error('다른 기기에서 세션이 갱신되었습니다.');
+        const isReady = await toggleReady(data.roomCode, playerId, data.requestId);
+        io.to(roomChannel(data.roomCode)).emit('READY_PROGRESS', { playerId, isReady });
+        return { isReady };
+    });
     on(socket, 'ROOM_SETTINGS', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => {
         if (room.hostId !== playerId || room.phase !== 'lobby')
             throw new Error('방장만 설정할 수 있습니다.');
         // Accept a legacy room's old 3/5-second value once, then migrate it to
         // the new 8-second minimum when any lobby setting is saved.
-        const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3, 5, 8, 10, 15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300, 600, 1200, 1800].includes(v)), selectedRoles: z.array(z.string()).max(13).optional() }), payload);
+        const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3, 5, 8, 10, 15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300, 600, 1200, 1800].includes(v)), maxPlayers: z.number().int().min(3).max(10).optional(), selectedRoles: z.array(z.string()).max(13).optional() }), payload);
+        if (settings.maxPlayers !== undefined) {
+            if (settings.maxPlayers < room.players.length)
+                throw new Error('현재 참가 인원보다 정원을 적게 설정할 수 없습니다.');
+            if (settings.selectedRoles && settings.selectedRoles.length !== settings.maxPlayers + 3)
+                throw new Error('변경한 정원에 맞춰 역할 카드를 설정해주세요.');
+            room.maxPlayers = settings.maxPlayers;
+        }
         if (settings.selectedRoles) {
             if (settings.selectedRoles.some((role) => !(role in ROLE_DEFINITIONS)))
                 throw new Error('유효하지 않은 역할 카드가 있습니다.');
@@ -223,7 +241,7 @@ export function registerHandlers(io, socket) {
         room.actionTimeLimitSeconds = Math.max(8, settings.actionTimeLimitSeconds);
         room.dayTimeLimitSeconds = settings.dayTimeLimitSeconds;
     }));
-    on(socket, 'GAME_START', async (raw) => mutate(io, socket, raw, (room, playerId) => {
+    on(socket, 'GAME_START', async (raw) => mutate(io, socket, raw, async (room, playerId) => {
         if (room.hostId !== playerId)
             throw new Error('방장만 시작할 수 있습니다.');
         if (room.moderatorMode) {
@@ -248,7 +266,11 @@ export function registerHandlers(io, socket) {
             room.resultExpiresAt = null;
             return;
         }
-        if (room.phase !== 'lobby' || room.players.length !== room.maxPlayers || !room.players.every((p) => p.isReady))
+        if (room.phase !== 'lobby')
+            throw new Error('로비에서만 시작할 수 있습니다.');
+        const readiness = await getReadiness(room.roomCode);
+        room.players = room.players.map((p) => ({ ...p, isReady: readiness[p.id] === '1' }));
+        if (room.players.length !== room.maxPlayers || !room.players.every((p) => p.isReady))
             throw new Error('정원이 모두 입장하고 준비해야 합니다.');
         if (room.selectedRoles.length !== room.players.length + 3)
             throw new Error('역할 카드는 인원수 + 3장 모두 선택해야 시작할 수 있습니다.');
@@ -438,7 +460,7 @@ export function registerHandlers(io, socket) {
         room.lobbyExpiresAt = Date.now() + LOBBY_TTL_MS;
         room.allOfflineExpiresAt = null;
         room.resultExpiresAt = null;
-    }, 'PHASE_CHANGED'));
+    }, 'PHASE_CHANGED', (room) => { void clearReadiness(room.roomCode); }));
     socket.on('disconnect', async () => {
         const code = socket.data.roomCode;
         const playerId = socket.data.playerId;
@@ -473,7 +495,7 @@ async function mutate(io, socket, raw, change, event, after) {
         const player = room.players.find((p) => p.id === playerId);
         if (!player || !player.connected || player.socketId !== socket.id)
             throw new Error('다른 기기에서 세션이 갱신되었습니다.');
-        change(room, playerId, data);
+        await change(room, playerId, data);
         room.updatedAt = Date.now();
         await saveRoom(room, data.requestId);
         return room;

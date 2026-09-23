@@ -3,7 +3,7 @@ import type { Server, Socket } from 'socket.io';
 import { NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
-import { appendChat, clearReadiness, consumeRateLimit, deleteRoom, getChatHistory, getReadiness, getRoom, getVotes, recordVote, saveRoom, toggleReady, withRoomLock } from '../services/redis.js';
+import { appendChat, appendLobbyChat, clearLobbyChat, clearReadiness, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, saveRoom, toggleReady, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
@@ -113,7 +113,10 @@ export function registerHandlers(io: Server, socket: Socket) {
       room.allOfflineExpiresAt = null;
       room.updatedAt = Date.now(); await saveRoom(room); return room;
     });
-    bind(socket, room, joinedId); await emitRoomState(io, room); socket.emit('CHAT_HISTORY', await getChatHistory(room.roomCode)); socket.to(roomChannel(room.roomCode)).emit('PLAYER_JOINED', { playerId: joinedId });
+    bind(socket, room, joinedId); await emitRoomState(io, room);
+    if (room.phase === 'lobby') socket.emit('LOBBY_CHAT_HISTORY', await getLobbyChatHistory(room.roomCode));
+    else socket.emit('CHAT_HISTORY', await getChatHistory(room.roomCode));
+    socket.to(roomChannel(room.roomCode)).emit('PLAYER_JOINED', { playerId: joinedId });
     await processExpiredRoom(io, room.roomCode);
     return { roomCode: room.roomCode, playerId: joinedId, sessionToken: joinedToken };
   });
@@ -173,6 +176,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       room.players = room.players.map((player) => ({ ...player, originalRole: null, currentRole: null, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
       room.centerCards = []; room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, []); room.currentNightActionIndex = 0; Object.assign(room, startNightIntro(room));
       room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
+      await clearLobbyChat(room.roomCode);
       return;
     }
     if (room.phase !== 'lobby') throw new Error('로비에서만 시작할 수 있습니다.');
@@ -181,6 +185,7 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (room.selectedRoles.length !== room.players.length + 3) throw new Error('역할 카드는 인원수 + 3장 모두 선택해야 시작할 수 있습니다.');
     const assigned = assignRoles(room.players, room.selectedRoles);
     room.players = assigned.players.map((player) => ({ ...player, vote: null })); room.centerCards = assigned.centerCards; room.phase = 'card_reveal'; room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
+    await clearLobbyChat(room.roomCode);
   }, 'GAME_STARTED', (room) => { if (room.moderatorMode) io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() }); }));
   on(socket, 'CARD_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId) => {
     if (room.phase !== 'card_reveal') throw new Error('카드 확인 단계가 아닙니다.'); const p = room.players.find((x) => x.id === playerId)!; p.hasConfirmedCard = true;
@@ -227,13 +232,19 @@ export function registerHandlers(io: Server, socket: Socket) {
   }, 'VOTE_PROGRESS'));
   on(socket, 'CHAT_SEND', async (raw) => {
     const data = safe(requestSchema.extend({ messageId: z.string().uuid(), text: z.string().trim().min(1).max(300) }), raw); const playerId = assertSession(socket, data.roomCode);
-    const [allowed, room] = await Promise.all([consumeRateLimit(`rate:chat:${data.roomCode}:${playerId}`, 6, 5), getRoom(data.roomCode)]);
+    const allowed = await consumeRateLimit(`rate:chat:${data.roomCode}:${playerId}`, 6, 5);
     if (!allowed) throw new Error('채팅을 너무 빠르게 보내고 있습니다.');
-    const player = room?.players.find((p) => p.id === playerId);
-    if (!room || !player || !player.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
-    if (room.phase !== 'day') throw new Error('낮에만 채팅할 수 있습니다.');
-    const message = { id: data.messageId, playerId, nickname: player.nickname, text: data.text, at: Date.now() };
-    if (await appendChat(data.roomCode, message)) io.to(roomChannel(data.roomCode)).emit('CHAT_MESSAGE', message);
+    let message: { id: string; playerId: string; nickname: string; text: string; at: number } | null = null;
+    let channel: 'CHAT_MESSAGE' | 'LOBBY_CHAT_MESSAGE' = 'CHAT_MESSAGE';
+    await withRoomLock(data.roomCode, async (room) => {
+      const player = room.players.find((p) => p.id === playerId);
+      if (!player || !player.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
+      if (!['lobby', 'day'].includes(room.phase)) throw new Error('대기실과 낮에만 채팅할 수 있습니다.');
+      message = { id: data.messageId, playerId, nickname: player.nickname, text: data.text, at: Date.now() };
+      if (room.phase === 'lobby') { channel = 'LOBBY_CHAT_MESSAGE'; await appendLobbyChat(data.roomCode, message); }
+      else await appendChat(data.roomCode, message);
+    });
+    if (message) io.to(roomChannel(data.roomCode)).emit(channel, message);
     return {};
   });
   on(socket, 'VOTE_SELECT', async (raw) => { const data = safe(z.object({ roomCode: codeSchema, targetPlayerId: z.string().uuid() }), raw); const playerId = assertSession(socket, data.roomCode); const room = await getRoom(data.roomCode); if (!room || room.phase !== 'voting' || data.targetPlayerId === playerId || !room.players.some((p) => p.id === data.targetPlayerId)) throw new Error('유효하지 않은 투표 대상입니다.'); return {}; });

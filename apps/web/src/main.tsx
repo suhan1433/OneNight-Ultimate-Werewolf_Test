@@ -878,6 +878,12 @@ function Lobby({ game }: { game: ClientGameState }) {
           </div>
         ))}
       </div>
+      <ChatPanel
+        game={game}
+        scope="lobby"
+        title="대기실 채팅"
+        placeholder="게임 시작 전 이야기를 나누세요"
+      />
       {game.hostId === game.playerId && (
         <>
           <Panel>
@@ -1313,25 +1319,17 @@ function NightControls({ game }: { game: ClientGameState }) {
     </>
   );
 }
-function Day({ game }: { game: ClientGameState }) {
-  const remain = useCountdown(game.dayExpiresAt, game.serverNow);
+function ChatPanel({ game, scope, title, placeholder }: { game: ClientGameState; scope: 'day' | 'lobby'; title: string; placeholder: string }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
   const chatFormRef = useRef<HTMLFormElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
-  const synced = useRef(false);
-  const used = [...new Set(game.selectedRoles)];
+  const messages = scope === 'lobby' ? game.lobbyChat : game.chat;
   useEffect(() => {
     const chat = chatRef.current;
     if (chat) chat.scrollTop = chat.scrollHeight;
-  }, [game.chat.length]);
-  useEffect(() => {
-    if (remain <= 0 && !synced.current) {
-      synced.current = true;
-      syncRoom();
-    }
-  }, [remain]);
+  }, [messages.length]);
   useEffect(() => {
     const dismissKeyboard = (event: PointerEvent) => {
       if (!chatFormRef.current?.contains(event.target as Node)) chatInputRef.current?.blur();
@@ -1342,35 +1340,41 @@ function Day({ game }: { game: ClientGameState }) {
   const sendChat = () => {
     const value = text.trim();
     if (!value || sending) return;
-    const message = {
-      id: crypto.randomUUID(),
-      playerId: game.playerId,
-      nickname:
-        game.players.find((p) => p.id === game.playerId)?.nickname ?? "",
-      text: value,
-      at: Date.now(),
-    };
+    const message = { id: crypto.randomUUID(), playerId: game.playerId, nickname: game.players.find((p) => p.id === game.playerId)?.nickname ?? "", text: value, at: Date.now() };
     setText("");
     requestAnimationFrame(() => chatInputRef.current?.focus());
     setSending(true);
-    useGame.getState().addChat(message);
-    void emitAck("CHAT_SEND", {
-      ...req(game),
-      messageId: message.id,
-      text: value,
-    })
+    useGame.getState().addChat(message, scope);
+    void emitAck("CHAT_SEND", { ...req(game), messageId: message.id, text: value })
       .catch((error) => {
-        useGame.getState().removeChat(message.id);
-        useGame
-          .getState()
-          .setError(
-            error instanceof Error
-              ? error.message
-              : "채팅을 보내지 못했습니다.",
-          );
+        useGame.getState().removeChat(message.id, scope);
+        useGame.getState().setError(error instanceof Error ? error.message : "채팅을 보내지 못했습니다.");
       })
       .finally(() => setSending(false));
   };
+  return (
+    <Panel>
+      <h3>{title}</h3>
+      <div className="chat" ref={chatRef}>
+        {messages.map((m) => <div key={m.id}><b>{m.nickname}</b><span>{m.text}</span></div>)}
+      </div>
+      <form ref={chatFormRef} className="chat-form" onSubmit={(e) => { e.preventDefault(); sendChat(); }}>
+        <input ref={chatInputRef} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} />
+        <button disabled={sending}>{sending ? "전송 중" : "전송"}</button>
+      </form>
+    </Panel>
+  );
+}
+function Day({ game }: { game: ClientGameState }) {
+  const remain = useCountdown(game.dayExpiresAt, game.serverNow);
+  const synced = useRef(false);
+  const used = [...new Set(game.selectedRoles)];
+  useEffect(() => {
+    if (remain <= 0 && !synced.current) {
+      synced.current = true;
+      syncRoom();
+    }
+  }, [remain]);
   return (
     <section>
       <Header kicker="DAYBREAK" title="날이 밝았습니다" />
@@ -1407,33 +1411,7 @@ function Day({ game }: { game: ClientGameState }) {
           ))}
         </div>
       </Panel>
-      <Panel>
-        <h3>마을 대화</h3>
-        <div className="chat" ref={chatRef}>
-          {game.chat.map((m) => (
-            <div key={m.id}>
-              <b>{m.nickname}</b>
-              <span>{m.text}</span>
-            </div>
-          ))}
-        </div>
-        <form
-          ref={chatFormRef}
-          className="chat-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendChat();
-          }}
-        >
-          <input
-            ref={chatInputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="의심과 단서를 나누세요"
-          />
-          <button disabled={sending}>{sending ? "전송 중" : "전송"}</button>
-        </form>
-      </Panel>
+      <ChatPanel game={game} scope="day" title="마을 대화" placeholder="의심과 단서를 나누세요" />
       <button
         className="vote-request"
         disabled={game.hasRequestedDayVote}

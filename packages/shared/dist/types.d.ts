@@ -140,6 +140,7 @@ export interface ClientGameState {
     dayExpiresAt: number | null;
     serverNow: number;
     chat: ChatMessage[];
+    lobbyChat: ChatMessage[];
     publicReveals: string[];
     settings: {
         actionTimeLimitSeconds: number;

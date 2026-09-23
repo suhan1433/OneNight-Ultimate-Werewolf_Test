@@ -53,7 +53,7 @@ export interface ClientGameState {
   moderatorMode: boolean;
   players: PublicPlayer[]; selectedRoles: RoleType[]; currentNightAction: Omit<NightAction, 'playerIds' | 'actedPlayerIds'> | null;
   isNightActor: boolean; actionContext?: Record<string, unknown>; actionResult?: Record<string, unknown>;
-  votesCompleted: number; dayVoteRequests: number; hasRequestedDayVote: boolean; totalPlayers: number; dayExpiresAt: number | null; serverNow: number; chat: ChatMessage[];
+  votesCompleted: number; dayVoteRequests: number; hasRequestedDayVote: boolean; totalPlayers: number; dayExpiresAt: number | null; serverNow: number; chat: ChatMessage[]; lobbyChat: ChatMessage[];
   publicReveals: string[]; settings: { actionTimeLimitSeconds: number; dayTimeLimitSeconds: number };
   result: GameResult | null;
 }
