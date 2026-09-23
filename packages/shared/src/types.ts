@@ -1,6 +1,6 @@
 export type RoleType =
   | 'werewolf' | 'alpha_wolf' | 'mystic_wolf' | 'dream_wolf' | 'minion'
-  | 'apprentice_tanner' | 'secret_agent' | 'seer' | 'apprentice_seer' | 'robber'
+  | 'apprentice_tanner' | 'seer' | 'apprentice_seer' | 'robber'
   | 'witch' | 'troublemaker' | 'drunk' | 'insomniac' | 'journalist'
   | 'doppelganger' | 'shield_bearer' | 'villager' | 'mason' | 'hunter'
   | 'bodyguard' | 'prince' | 'cursed' | 'tanner';

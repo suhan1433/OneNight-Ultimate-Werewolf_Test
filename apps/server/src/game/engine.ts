@@ -123,7 +123,6 @@ export function applyNightAction(room: Room, playerId: string, command: NightCom
     case 'mystic_wolf': case 'journalist': if (target && !shielded(target)) { result = { kind: 'cards', title: action.role === 'mystic_wolf' ? '신비한 늑대가 확인한 카드' : '신문기자가 확인한 카드', cards: [{ label: target.nickname, role: target.currentRole }] }; if (action.role === 'journalist' && target.currentRole && ROLE_DEFINITIONS[target.currentRole].faction === 'village') room = { ...room, publicReveals: [...room.publicReveals, `${target.nickname}님은 마을 진영입니다.`] }; } break;
     case 'minion': result = { kind: 'people', title: '늑대인간', people: players.filter((p) => p.currentRole && WOLF_ROLES.includes(p.currentRole)).map(privateRole) }; break;
     case 'apprentice_tanner': result = { kind: 'people', title: '무두장이', people: players.filter((p) => p.currentRole === 'tanner').map(privateRole) }; break;
-    case 'secret_agent': result = { kind: 'people', title: '다른 비밀 요원', people: players.filter((p) => p.id !== playerId && p.currentRole === 'secret_agent').map(privateRole) }; break;
     case 'mason': result = { kind: 'people', title: '다른 프리메이슨', people: players.filter((p) => p.id !== playerId && p.currentRole === 'mason').map(privateRole) }; break;
     case 'seer': if (target && !shielded(target)) result = { kind: 'cards', title: '예언자가 확인한 카드', cards: [{ label: target.nickname, role: target.currentRole }] }; else result = { kind: 'cards', title: '예언자가 확인한 센터 카드', cards: indexes.map((i) => ({ label: `센터 카드 ${i + 1}`, role: centers[i]!.role })) }; break;
     case 'apprentice_seer': result = { kind: 'cards', title: '견습 예언자가 확인한 센터 카드', cards: indexes.map((i) => ({ label: `센터 카드 ${i + 1}`, role: centers[i]!.role })) }; break;
@@ -200,7 +199,6 @@ export function buildPlayerGameState(room: Room, playerId: string, actionResults
   let actionContext: Record<string, unknown> | undefined;
   if (isActor && action) {
     if (['werewolf','alpha_wolf','minion'].includes(action.role)) actionContext = { kind: 'people', title: action.role === 'minion' ? '늑대인간' : '함께 깨어난 늑대', people: room.players.filter((p) => p.id !== playerId && p.currentRole && WOLF_ROLES.includes(p.currentRole)).map(privateRole) };
-    if (action.role === 'secret_agent') actionContext = { kind: 'people', title: '다른 비밀 요원', people: room.players.filter((p) => p.id !== playerId && p.currentRole === 'secret_agent').map(privateRole) };
     if (action.role === 'mason') actionContext = { kind: 'people', title: '다른 프리메이슨', people: room.players.filter((p) => p.id !== playerId && p.currentRole === 'mason').map(privateRole) };
     if (action.role === 'apprentice_tanner') actionContext = { kind: 'people', title: '무두장이', people: room.players.filter((p) => p.currentRole === 'tanner').map(privateRole) };
     if (action.role === 'insomniac') actionContext = { kind: 'cards', title: '내 현재 카드', cards: [{ label: '내 카드', role: self.currentRole }] };

@@ -129,7 +129,7 @@ export async function processExpiredRoom(io, code) {
                 if (action?.status === 'active')
                     emitActionStart(io, room);
                 else
-                    io.to(`game:${code}`).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() });
+                    io.to(`game:${code}`).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', stateVersion: room.updatedAt, timestamp: Date.now() });
             }
             await emitRoomState(io, room);
             if (room.phase === 'day' && dayTransition)

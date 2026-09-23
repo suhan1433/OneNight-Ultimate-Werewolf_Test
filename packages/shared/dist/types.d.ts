@@ -1,4 +1,4 @@
-export type RoleType = 'werewolf' | 'alpha_wolf' | 'mystic_wolf' | 'dream_wolf' | 'minion' | 'apprentice_tanner' | 'secret_agent' | 'seer' | 'apprentice_seer' | 'robber' | 'witch' | 'troublemaker' | 'drunk' | 'insomniac' | 'journalist' | 'doppelganger' | 'shield_bearer' | 'villager' | 'mason' | 'hunter' | 'bodyguard' | 'prince' | 'cursed' | 'tanner';
+export type RoleType = 'werewolf' | 'alpha_wolf' | 'mystic_wolf' | 'dream_wolf' | 'minion' | 'apprentice_tanner' | 'seer' | 'apprentice_seer' | 'robber' | 'witch' | 'troublemaker' | 'drunk' | 'insomniac' | 'journalist' | 'doppelganger' | 'shield_bearer' | 'villager' | 'mason' | 'hunter' | 'bodyguard' | 'prince' | 'cursed' | 'tanner';
 export type Faction = 'village' | 'werewolf' | 'minion' | 'tanner';
 export type Phase = 'lobby' | 'card_reveal' | 'night' | 'day' | 'voting' | 'result';
 export type NightActionKind = 'none' | 'inspect_player' | 'inspect_center' | 'inspect_players' | 'swap_player' | 'swap_players' | 'swap_center' | 'protect' | 'confirm';

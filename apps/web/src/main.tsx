@@ -1168,7 +1168,6 @@ function NightControls({ game }: { game: ClientGameState }) {
   const confirmRoles = [
     "minion",
     "apprentice_tanner",
-    "secret_agent",
     "mason",
     "insomniac",
   ];
@@ -1896,7 +1895,6 @@ const fitPreset = (p: RoleType[], n: number) => {
     "cursed",
     "villager",
     "werewolf",
-    "secret_agent",
     "mason",
   ];
   for (const id of fallback) {

@@ -156,9 +156,6 @@ export function applyNightAction(room, playerId, command) {
         case 'apprentice_tanner':
             result = { kind: 'people', title: '무두장이', people: players.filter((p) => p.currentRole === 'tanner').map(privateRole) };
             break;
-        case 'secret_agent':
-            result = { kind: 'people', title: '다른 비밀 요원', people: players.filter((p) => p.id !== playerId && p.currentRole === 'secret_agent').map(privateRole) };
-            break;
         case 'mason':
             result = { kind: 'people', title: '다른 프리메이슨', people: players.filter((p) => p.id !== playerId && p.currentRole === 'mason').map(privateRole) };
             break;
@@ -277,8 +274,6 @@ export function buildPlayerGameState(room, playerId, actionResults = {}) {
     if (isActor && action) {
         if (['werewolf', 'alpha_wolf', 'minion'].includes(action.role))
             actionContext = { kind: 'people', title: action.role === 'minion' ? '늑대인간' : '함께 깨어난 늑대', people: room.players.filter((p) => p.id !== playerId && p.currentRole && WOLF_ROLES.includes(p.currentRole)).map(privateRole) };
-        if (action.role === 'secret_agent')
-            actionContext = { kind: 'people', title: '다른 비밀 요원', people: room.players.filter((p) => p.id !== playerId && p.currentRole === 'secret_agent').map(privateRole) };
         if (action.role === 'mason')
             actionContext = { kind: 'people', title: '다른 프리메이슨', people: room.players.filter((p) => p.id !== playerId && p.currentRole === 'mason').map(privateRole) };
         if (action.role === 'apprentice_tanner')

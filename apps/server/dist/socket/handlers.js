@@ -47,21 +47,32 @@ function on(socket, event, handler) {
 export function registerHandlers(io, socket) {
     // On Vercel, this heartbeat is the durable scheduler trigger. It only checks
     // the room persisted in Redis and is safe when every connected client sends it.
-    socket.on('ROOM_SYNC', async () => {
+    socket.on('ROOM_SYNC', async (callback) => {
         const code = socket.data.roomCode;
         const playerId = socket.data.playerId;
-        if (!code || !playerId)
+        if (!code || !playerId) {
+            callback?.({ ok: false, error: '유효한 게임 세션이 없습니다.' });
             return;
+        }
         // A broadcast can be lost during a reconnect/function hand-off. Return the
         // authoritative per-player view on every sync so no client remains on an
         // old role/action while everyone else advances.
         try {
             const room = await processExpiredRoom(io, code) ?? await getRoom(code);
             const player = room?.players.find((candidate) => candidate.id === playerId);
-            if (room && player?.connected && player.socketId === socket.id)
-                socket.emit('ROOM_STATE', buildPlayerGameState(room, playerId, room.privateResults));
+            if (!room || !player?.connected || player.socketId !== socket.id) {
+                callback?.({ ok: false, error: '게임 상태를 찾을 수 없습니다.' });
+                return;
+            }
+            const state = buildPlayerGameState(room, playerId, room.privateResults);
+            socket.emit('ROOM_STATE', state);
+            callback?.({ ok: true, data: state });
         }
-        catch { /* a later sync or Socket.IO reconnect will reconcile state */ }
+        catch (error) {
+            const message = error instanceof Error ? error.message : '게임 상태를 동기화하지 못했습니다.';
+            callback?.({ ok: false, error: message });
+            console.error('room_sync_error', { code, playerId, error });
+        }
     });
     // WebRTC media never passes through Socket.IO. These handlers only relay
     // connection offers, answers and ICE candidates to authenticated room peers.
@@ -300,7 +311,7 @@ export function registerHandlers(io, socket) {
         room.resultExpiresAt = null;
         await clearLobbyChat(room.roomCode);
     }, 'GAME_STARTED', (room) => { if (room.moderatorMode)
-        io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() }); }));
+        io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', stateVersion: room.updatedAt, timestamp: Date.now() }); }));
     on(socket, 'CARD_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId) => {
         if (room.phase !== 'card_reveal')
             throw new Error('카드 확인 단계가 아닙니다.');
@@ -313,7 +324,7 @@ export function registerHandlers(io, socket) {
             Object.assign(room, startNightIntro(room));
         }
     }, 'CARD_CONFIRM_PROGRESS', (room) => { if (room.phase === 'night')
-        io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() }); }));
+        io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', stateVersion: room.updatedAt, timestamp: Date.now() }); }));
     on(socket, 'NIGHT_ACTION_SUBMIT', async (raw) => {
         const base = safe(requestSchema.extend({ actionId: z.string().uuid(), command: z.custom() }), raw);
         const playerId = assertSession(socket, base.roomCode);
@@ -530,7 +541,7 @@ export function emitActionStart(io, room) {
     const action = room.nightActionQueue[room.currentNightActionIndex];
     if (!action)
         return;
-    io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.action(action.role), audioKey: action.role, actionId: action.id, timestamp: Date.now() });
+    io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.action(action.role), audioKey: action.role, actionId: action.id, stateVersion: room.updatedAt, timestamp: Date.now() });
     io.to(roomChannel(room.roomCode)).emit('NIGHT_ACTION_STARTED', { actionId: action.id, role: action.role, expiresAt: action.expiresAt });
 }
-export function emitDayStart(io, room) { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.dayStart, audioKey: 'day-start', actionId: 'day-start', timestamp: Date.now() }); io.to(roomChannel(room.roomCode)).emit('DAY_STARTED', { expiresAt: room.dayExpiresAt }); }
+export function emitDayStart(io, room) { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.dayStart, audioKey: 'day-start', actionId: 'day-start', stateVersion: room.updatedAt, timestamp: Date.now() }); io.to(roomChannel(room.roomCode)).emit('DAY_STARTED', { expiresAt: room.dayExpiresAt }); }

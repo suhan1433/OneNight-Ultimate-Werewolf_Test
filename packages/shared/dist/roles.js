@@ -19,7 +19,6 @@ export const ROLE_DEFINITIONS = {
     drunk: role('drunk', '주정뱅이', '🍺', 'village', 14, 'swap_center', '자신의 카드와 센터 카드 한 장을 교환합니다.'),
     insomniac: role('insomniac', '불면증 환자', '😴', 'village', 15, 'confirm', '밤이 끝날 때 자신의 현재 역할을 확인합니다.'),
     journalist: role('journalist', '신문기자', '📰', 'village', 16, 'inspect_player', '한 명을 보고 마을 진영이면 이를 공개합니다.'),
-    secret_agent: role('secret_agent', '비밀 요원', '🕵️', 'village', 17, 'confirm', '다른 비밀 요원을 확인합니다.'),
     villager: role('villager', '마을사람', '👤', 'village', null, 'none', '밤 능력이 없는 마을 사람입니다.', villageWin, 3),
     hunter: role('hunter', '사냥꾼', '🏹', 'village', null, 'none', '처형되면 자신이 투표한 사람도 함께 죽습니다.'),
     bodyguard: role('bodyguard', '보디가드', '💂', 'village', null, 'none', '자신이 투표한 대상의 득표를 0으로 만듭니다.'),
