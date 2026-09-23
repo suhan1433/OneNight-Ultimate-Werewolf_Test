@@ -159,6 +159,9 @@ export function applyNightAction(room, playerId, command) {
         case 'secret_agent':
             result = { kind: 'people', title: '다른 비밀 요원', people: players.filter((p) => p.id !== playerId && p.currentRole === 'secret_agent').map(privateRole) };
             break;
+        case 'mason':
+            result = { kind: 'people', title: '다른 프리메이슨', people: players.filter((p) => p.id !== playerId && p.currentRole === 'mason').map(privateRole) };
+            break;
         case 'seer':
             if (target && !shielded(target))
                 result = { kind: 'cards', title: '예언자가 확인한 카드', cards: [{ label: target.nickname, role: target.currentRole }] };
@@ -276,6 +279,8 @@ export function buildPlayerGameState(room, playerId, actionResults = {}) {
             actionContext = { kind: 'people', title: action.role === 'minion' ? '늑대인간' : '함께 깨어난 늑대', people: room.players.filter((p) => p.id !== playerId && p.currentRole && WOLF_ROLES.includes(p.currentRole)).map(privateRole) };
         if (action.role === 'secret_agent')
             actionContext = { kind: 'people', title: '다른 비밀 요원', people: room.players.filter((p) => p.id !== playerId && p.currentRole === 'secret_agent').map(privateRole) };
+        if (action.role === 'mason')
+            actionContext = { kind: 'people', title: '다른 프리메이슨', people: room.players.filter((p) => p.id !== playerId && p.currentRole === 'mason').map(privateRole) };
         if (action.role === 'apprentice_tanner')
             actionContext = { kind: 'people', title: '무두장이', people: room.players.filter((p) => p.currentRole === 'tanner').map(privateRole) };
         if (action.role === 'insomniac')
@@ -287,7 +292,7 @@ export function buildPlayerGameState(room, playerId, actionResults = {}) {
         players: room.players.map((p) => ({ id: p.id, nickname: p.nickname, isReady: p.isReady, hasConfirmedCard: p.hasConfirmedCard, connected: p.connected, isHost: p.id === room.hostId, hasVoted: !!room.votes[p.id] })),
         selectedRoles: room.selectedRoles, currentNightAction: action ? { id: action.id, role: action.role, order: action.order, startedAt: action.startedAt, expiresAt: action.expiresAt, status: action.status, copied: action.copied } : null,
         isNightActor: isActor, actionContext, actionResult: actionResults[playerId], votesCompleted: Object.keys(room.votes).length, dayVoteRequests: (room.voteStartRequests ?? []).length, hasRequestedDayVote: (room.voteStartRequests ?? []).includes(playerId), totalPlayers: room.players.length,
-        dayExpiresAt: room.dayExpiresAt, serverNow: Date.now(), chat: room.chat.slice(-100), publicReveals: room.publicReveals,
+        dayExpiresAt: room.dayExpiresAt, serverNow: Date.now(), chat: room.chat.slice(-100), lobbyChat: [], publicReveals: room.publicReveals,
         settings: { actionTimeLimitSeconds: room.actionTimeLimitSeconds, dayTimeLimitSeconds: room.dayTimeLimitSeconds }, result: room.result
     };
 }

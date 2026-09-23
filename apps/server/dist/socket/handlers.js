@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { NARRATOR_LINES, ROLE_DEFINITIONS } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
-import { appendChat, clearReadiness, consumeRateLimit, deleteRoom, getChatHistory, getReadiness, getRoom, getVotes, recordVote, saveRoom, toggleReady, withRoomLock } from '../services/redis.js';
+import { appendChat, appendLobbyChat, clearLobbyChat, clearReadiness, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, saveRoom, toggleReady, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
 const nicknameSchema = z.string().trim().min(1).max(16);
@@ -122,6 +122,11 @@ export function registerHandlers(io, socket) {
         let joinedId = '';
         let joinedToken = '';
         const room = await withRoomLock(data.roomCode, async (room) => {
+            // Ready clicks are stored independently to avoid lock contention. Merge
+            // that authoritative value before a join persists/emits the room again,
+            // otherwise a new participant could revive an older `isReady: false`.
+            const readiness = await getReadiness(room.roomCode);
+            room.players = room.players.map((player) => readiness[player.id] === undefined ? player : { ...player, isReady: readiness[player.id] === '1' });
             const reconnect = data.playerId && room.players.find((p) => p.id === data.playerId && p.sessionToken === data.sessionToken);
             if (reconnect) {
                 reconnect.socketId = socket.id;
@@ -153,7 +158,10 @@ export function registerHandlers(io, socket) {
         });
         bind(socket, room, joinedId);
         await emitRoomState(io, room);
-        socket.emit('CHAT_HISTORY', await getChatHistory(room.roomCode));
+        if (room.phase === 'lobby')
+            socket.emit('LOBBY_CHAT_HISTORY', await getLobbyChatHistory(room.roomCode));
+        else
+            socket.emit('CHAT_HISTORY', await getChatHistory(room.roomCode));
         socket.to(roomChannel(room.roomCode)).emit('PLAYER_JOINED', { playerId: joinedId });
         await processExpiredRoom(io, room.roomCode);
         return { roomCode: room.roomCode, playerId: joinedId, sessionToken: joinedToken };
@@ -264,6 +272,7 @@ export function registerHandlers(io, socket) {
             room.lobbyExpiresAt = null;
             room.allOfflineExpiresAt = null;
             room.resultExpiresAt = null;
+            await clearLobbyChat(room.roomCode);
             return;
         }
         if (room.phase !== 'lobby')
@@ -289,6 +298,7 @@ export function registerHandlers(io, socket) {
         room.lobbyExpiresAt = null;
         room.allOfflineExpiresAt = null;
         room.resultExpiresAt = null;
+        await clearLobbyChat(room.roomCode);
     }, 'GAME_STARTED', (room) => { if (room.moderatorMode)
         io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() }); }));
     on(socket, 'CARD_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId) => {
@@ -386,17 +396,27 @@ export function registerHandlers(io, socket) {
     on(socket, 'CHAT_SEND', async (raw) => {
         const data = safe(requestSchema.extend({ messageId: z.string().uuid(), text: z.string().trim().min(1).max(300) }), raw);
         const playerId = assertSession(socket, data.roomCode);
-        const [allowed, room] = await Promise.all([consumeRateLimit(`rate:chat:${data.roomCode}:${playerId}`, 6, 5), getRoom(data.roomCode)]);
+        const allowed = await consumeRateLimit(`rate:chat:${data.roomCode}:${playerId}`, 6, 5);
         if (!allowed)
             throw new Error('채팅을 너무 빠르게 보내고 있습니다.');
-        const player = room?.players.find((p) => p.id === playerId);
-        if (!room || !player || !player.connected || player.socketId !== socket.id)
-            throw new Error('다른 기기에서 세션이 갱신되었습니다.');
-        if (room.phase !== 'day')
-            throw new Error('낮에만 채팅할 수 있습니다.');
-        const message = { id: data.messageId, playerId, nickname: player.nickname, text: data.text, at: Date.now() };
-        if (await appendChat(data.roomCode, message))
-            io.to(roomChannel(data.roomCode)).emit('CHAT_MESSAGE', message);
+        let message = null;
+        let channel = 'CHAT_MESSAGE';
+        await withRoomLock(data.roomCode, async (room) => {
+            const player = room.players.find((p) => p.id === playerId);
+            if (!player || !player.connected || player.socketId !== socket.id)
+                throw new Error('다른 기기에서 세션이 갱신되었습니다.');
+            if (!['lobby', 'day'].includes(room.phase))
+                throw new Error('대기실과 낮에만 채팅할 수 있습니다.');
+            message = { id: data.messageId, playerId, nickname: player.nickname, text: data.text, at: Date.now() };
+            if (room.phase === 'lobby') {
+                channel = 'LOBBY_CHAT_MESSAGE';
+                await appendLobbyChat(data.roomCode, message);
+            }
+            else
+                await appendChat(data.roomCode, message);
+        });
+        if (message)
+            io.to(roomChannel(data.roomCode)).emit(channel, message);
         return {};
     });
     on(socket, 'VOTE_SELECT', async (raw) => { const data = safe(z.object({ roomCode: codeSchema, targetPlayerId: z.string().uuid() }), raw); const playerId = assertSession(socket, data.roomCode); const room = await getRoom(data.roomCode); if (!room || room.phase !== 'voting' || data.targetPlayerId === playerId || !room.players.some((p) => p.id === data.targetPlayerId))

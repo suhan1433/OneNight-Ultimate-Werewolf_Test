@@ -1159,6 +1159,7 @@ function NightControls({ game }: { game: ClientGameState }) {
     "minion",
     "apprentice_tanner",
     "secret_agent",
+    "mason",
     "insomniac",
   ];
   if (role === "werewolf" && contextPeople.length)
