@@ -12,10 +12,12 @@ export const socket = io(isDev ? (import.meta.env.VITE_SOCKET_URL ?? 'http://loc
   reconnection: true,
 });
 socket.on('ERROR', ({ message }: { message: string }) => useGame.getState().setError(message));
-type Narration = { audioKey: string; receivedAt: number };
+type Narration = { audioKey: string; actionId: string; stateVersion: number; receivedAt: number };
 let currentNarration: HTMLAudioElement | null = null;
+let currentNarrationInfo: Narration | null = null;
 let narrationQueue: Narration[] = [];
 let narrationUnlocked = false;
+let syncInFlight: Promise<boolean> | null = null;
 
 // Keep the audio elements alive so that the next instruction is normally
 // already in the browser cache.  More importantly, never replace a playing
@@ -48,18 +50,45 @@ export function preloadNarrations(audioKeys: string[]) {
 }
 
 function clearNarration() {
-  if (currentNarration) { currentNarration.pause(); currentNarration.currentTime = 0; currentNarration = null; }
+  if (currentNarration) {
+    const audio = currentNarration;
+    currentNarration = null;
+    currentNarrationInfo = null;
+    audio.onpause = null;
+    audio.pause();
+    audio.currentTime = 0;
+  }
   narrationQueue = [];
+}
+
+function expectedNarrationId(game: ClientGameState): string | null {
+  if (game.phase === 'night') return game.currentNightAction?.status === 'pending' ? 'night-start' : game.currentNightAction?.id ?? null;
+  return game.phase === 'day' ? 'day-start' : null;
+}
+
+function isCurrentNarration(narration: Narration, game: ClientGameState | null) {
+  return !!game && narration.stateVersion === game.stateVersion && narration.actionId === expectedNarrationId(game);
+}
+
+function reconcileNarration(game: ClientGameState) {
+  narrationQueue = narrationQueue.filter((narration) => narration.stateVersion > game.stateVersion || isCurrentNarration(narration, game));
+  if (currentNarration && !isCurrentNarration(currentNarrationInfo!, game)) {
+    const audio = currentNarration;
+    currentNarration = null;
+    currentNarrationInfo = null;
+    audio.onpause = null;
+    audio.pause();
+    audio.currentTime = 0;
+  }
+  playNextNarration();
 }
 
 socket.on('ROOM_STATE', (game: ClientGameState) => {
   // Start fetching every selected role's recording while cards are being
   // viewed, so the first real night instruction never waits for a download.
   if (game.phase === 'card_reveal' || game.phase === 'night') preloadNarrations(['night-start', ...game.selectedRoles]);
-  // Never pause narration merely because the game state advances. An action
-  // can finish close to its timer boundary, and its recording must be allowed
-  // to finish before the next queued narrator line starts.
   useGame.getState().setGame(game);
+  reconcileNarration(useGame.getState().game ?? game);
 });
 socket.on('CHAT_MESSAGE', (message) => useGame.getState().addChat(message, 'day'));
 socket.on('CHAT_HISTORY', (messages) => useGame.getState().setChatHistory(messages));
@@ -78,10 +107,22 @@ function playNextNarration() {
   if (currentNarration || !narrationUnlocked || !useGame.getState().tts) return;
   const next = narrationQueue[0];
   if (!next) return;
+  const game = useGame.getState().game;
+  if (!isCurrentNarration(next, game)) {
+    if (game && next.stateVersion <= game.stateVersion) narrationQueue.shift();
+    return;
+  }
   const audio = getNarrationAudio(next.audioKey);
   audio.currentTime = 0;
   currentNarration = audio;
-  const discardCurrent = () => { if (currentNarration !== audio) return; currentNarration = null; narrationQueue.shift(); playNextNarration(); };
+  currentNarrationInfo = next;
+  const discardCurrent = () => {
+    if (currentNarration !== audio) return;
+    currentNarration = null;
+    currentNarrationInfo = null;
+    narrationQueue = narrationQueue.filter((narration) => narration !== next);
+    playNextNarration();
+  };
   audio.onended = discardCurrent;
   audio.onerror = discardCurrent;
   // A media interruption can pause an HTMLAudioElement without ending it
@@ -102,7 +143,7 @@ function playNextNarration() {
     // started by a Socket event until the next real user gesture. Keep this
     // instruction queued for that gesture; ROOM_STATE clears it when the
     // game moves to a different phase, so it cannot surface in a later phase.
-    if (currentNarration === audio) currentNarration = null;
+    if (currentNarration === audio) { currentNarration = null; currentNarrationInfo = null; }
   });
 }
 
@@ -133,22 +174,50 @@ export function setNarrationEnabled(enabled: boolean) {
   playNextNarration();
 }
 
-socket.on('NARRATOR_SPEECH', ({ audioKey, actionId, timestamp }: { audioKey?: string; actionId?: string; timestamp?: number }) => {
-  if (!useGame.getState().tts || !audioKey) return;
+socket.on('NARRATOR_SPEECH', ({ audioKey, actionId, stateVersion, timestamp }: { audioKey?: string; actionId?: string; stateVersion?: number; timestamp?: number }) => {
+  if (!useGame.getState().tts || !audioKey || !actionId || stateVersion === undefined) return;
   const key = timestamp ? `${actionId ?? audioKey}-${timestamp}` : `${audioKey}-${Date.now()}`;
   if (seenNarrations.has(key)) return;
   seenNarrations.add(key);
-  narrationQueue.push({ audioKey, receivedAt: Date.now() });
+  const game = useGame.getState().game;
+  if (game && stateVersion < game.stateVersion) return;
+  narrationQueue.push({ audioKey, actionId, stateVersion, receivedAt: Date.now() });
   // Try immediately for browsers which have already received a user gesture.
   // If their autoplay policy rejects it, the item stays queued until the next
   // pointer or key input instead of being silently discarded.
   narrationUnlocked = true;
   playNextNarration();
 });
-socket.on('connect', () => { const saved = session(); if (saved) socket.emit('ROOM_JOIN', saved, (ack: Ack) => { if (!ack.ok) localStorage.removeItem('werewolf-session'); else syncRoom(); }); });
+socket.on('connect', () => { useGame.getState().setConnectionState('connected'); const saved = session(); if (saved) socket.emit('ROOM_JOIN', saved, (ack: Ack) => { if (!ack.ok) localStorage.removeItem('werewolf-session'); else void syncRoom(); }); });
+socket.on('disconnect', () => useGame.getState().setConnectionState('reconnecting'));
+socket.io.on('reconnect_attempt', () => useGame.getState().setConnectionState('reconnecting'));
 // Function instances can be paused/recycled, so a persisted deadline is checked
 // by active players instead of relying on a server-global setInterval.
-export const syncRoom = () => { if (socket.connected) socket.emit('ROOM_SYNC'); };
+export const syncRoom = (): Promise<boolean> => {
+  if (!socket.connected) { useGame.getState().setConnectionState('reconnecting'); return Promise.resolve(false); }
+  if (syncInFlight) return syncInFlight;
+  syncInFlight = new Promise<boolean>((resolve) => socket.timeout(1_200).emit('ROOM_SYNC', (error: Error | null, ack: Ack<ClientGameState>) => {
+    if (error || !ack?.ok || !ack.data) { resolve(false); return; }
+    useGame.getState().setGame(ack.data);
+    resolve(true);
+  })).finally(() => { syncInFlight = null; });
+  return syncInFlight;
+};
+
+export function recoverExpiredAction(actionId: string) {
+  const delays = [0, 200, 500, 1_000];
+  useGame.getState().setTransitioningActionId(actionId);
+  const retry = (attempt: number) => {
+    window.setTimeout(() => {
+      void syncRoom().finally(() => {
+        const game = useGame.getState().game;
+        const stillExpired = game?.phase === 'night' && game.currentNightAction?.id === actionId && (game.currentNightAction.expiresAt ?? 0) <= Date.now();
+        if (stillExpired && attempt + 1 < delays.length) retry(attempt + 1);
+      });
+    }, delays[attempt]!);
+  };
+  retry(0);
+}
 // This is only a serverless wake-up fallback. The visible countdown performs
 // an exact check at zero; while a night action is active, a 500ms fallback
 // keeps Vercel wake-up jitter below one second without taking a lock early.

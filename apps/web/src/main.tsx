@@ -18,6 +18,7 @@ import {
   session,
   setNarrationEnabled,
   socket,
+  recoverExpiredAction,
   syncRoom,
 } from "./socket";
 import "./styles.css";
@@ -52,7 +53,7 @@ const optimistic = (apply: () => void, name: string, data: unknown) => {
 };
 
 function App() {
-  const { game, tts, help, error, setTts, setHelp, setError } = useGame();
+  const { game, tts, help, error, connectionState, setTts, setHelp, setError } = useGame();
   useEffect(() => {
     if (!error) return;
     const timer = window.setTimeout(() => setError(null), 1_000);
@@ -110,6 +111,9 @@ function App() {
         </motion.div>
       </AnimatePresence>
       {help && <Help close={() => setHelp(false)} />}
+      {game && connectionState === "reconnecting" && (
+        <div className="connection-banner">연결을 복구하는 중…</div>
+      )}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -749,7 +753,7 @@ function ModeratorNight({ game }: { game: ClientGameState }) {
   useEffect(() => {
     if (action && remain <= 0 && syncedAction.current !== action.id) {
       syncedAction.current = action.id;
-      syncRoom();
+      recoverExpiredAction(action.id);
     }
   }, [action?.id, remain]);
   if (action?.status === "pending")
@@ -773,6 +777,9 @@ function ModeratorNight({ game }: { game: ClientGameState }) {
       <div className={remain <= 2 ? "timer danger" : "timer"}>
         {Math.max(0, remain).toFixed(1)}
       </div>
+      {useGame.getState().transitioningActionId === action?.id && (
+        <p className="transitioning">다음 역할을 준비 중…</p>
+      )}
       <Panel>
         <div className="dots">● ● ●</div>
         <p>
@@ -1089,7 +1096,7 @@ function Night({ game }: { game: ClientGameState }) {
   useEffect(() => {
     if (a && remain <= 0 && syncedAction.current !== a.id) {
       syncedAction.current = a.id;
-      syncRoom();
+      recoverExpiredAction(a.id);
     }
   }, [a?.id, remain]);
   if (a?.status === "pending")
@@ -1113,6 +1120,9 @@ function Night({ game }: { game: ClientGameState }) {
       <div className={remain <= 2 ? "timer danger" : "timer"}>
         {Math.max(0, remain).toFixed(1)}
       </div>
+      {useGame.getState().transitioningActionId === a?.id && (
+        <p className="transitioning">다음 역할을 준비 중…</p>
+      )}
       {game.actionResult && <PrivateResult data={game.actionResult} />}{" "}
       {game.isNightActor && a ? (
         <NightControls game={game} />

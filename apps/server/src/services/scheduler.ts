@@ -82,7 +82,7 @@ export async function processExpiredRoom(io: Server, code: string): Promise<Room
       if (room.phase === 'night') {
         const action = room.nightActionQueue[room.currentNightActionIndex];
         if (action?.status === 'active') emitActionStart(io, room);
-        else io.to(`game:${code}`).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', timestamp: Date.now() });
+        else io.to(`game:${code}`).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', stateVersion: room.updatedAt, timestamp: Date.now() });
       }
       await emitRoomState(io, room);
       if (room.phase === 'day' && dayTransition) emitDayStart(io, room);
