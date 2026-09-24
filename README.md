@@ -1,14 +1,13 @@
 # 한밤의 늑대인간 온라인
 
-기존 `werewolf.html`의 다크 판타지 시각 언어를 바탕으로 다시 만든, 각자 다른 기기에서 접속하는 실시간 멀티플레이 버전입니다. 게임 판정과 타이머는 서버가 담당하며 Redis가 유일한 게임 상태 저장소입니다.
+기존 `werewolf.html`의 다크 판타지 시각 언어를 바탕으로 다시 만든, 각자 다른 기기에서 접속하는 실시간 멀티플레이 버전입니다. 게임 상태는 실행 중인 서버의 메모리에만 저장됩니다.
 
 ## 빠른 실행
 
-Node.js 22와 Redis가 필요합니다.
+Node.js 22가 필요합니다.
 
 ```bash
 npm install
-redis-server
 npm run dev
 ```
 
@@ -16,7 +15,7 @@ npm run dev
 - API/Socket.IO: `http://localhost:3001`
 - 상태 확인: `http://localhost:3001/health`
 
-Redis가 다른 주소라면 `.env.example`을 참고해 `REDIS_URL`을 설정합니다. 스마트폰에서는 Vite 주소의 `localhost` 대신 개발 PC의 LAN IP로 접속하고, `VITE_SOCKET_URL`도 같은 PC의 `3001` 포트로 지정합니다.
+스마트폰에서는 Vite 주소의 `localhost` 대신 개발 PC의 LAN IP로 접속하고, `VITE_SOCKET_URL`도 같은 PC의 `3001` 포트로 지정합니다.
 
 ## Docker 멀티 서버 실행
 
@@ -24,7 +23,7 @@ Redis가 다른 주소라면 `.env.example`을 참고해 `REDIS_URL`을 설정�
 docker compose up --build
 ```
 
-`http://localhost:8080`에서 접속합니다. Nginx가 두 Node 서버에 sticky routing(`ip_hash`)을 적용하고, 두 서버는 Socket.IO Redis Adapter와 같은 Redis 게임 상태를 공유합니다. WebSocket만 쓸 때는 sticky session이 필수는 아니지만 polling fallback의 연속 요청을 같은 인스턴스에 유지하기 위해 설정했습니다.
+인메모리 모드는 서버 간 상태 공유가 없으므로 Docker의 복수 서버 구성에는 적합하지 않습니다. 로컬에서는 `npm run dev`로 단일 서버를 실행하세요.
 
 ## GitHub + Vercel 배포
 
@@ -38,9 +37,7 @@ Vercel 프로젝트를 저장소 루트(`.`)에서 import한다. Root Directory�
 - Output Directory: `apps/web/dist`
 - Function: `api/socket-io.ts`, max duration 300초
 
-Redis Marketplace 리소스를 Production/Preview에 연결한 뒤 `REDIS_URL`을 설정한다. 값은 REST URL이 아니라 `rediss://default:<password>@<host>:6379` 형태의 TCP/TLS connection string이어야 한다. `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`은 HTTP REST용이므로 ioredis와 Socket.IO Redis Pub/Sub adapter에는 사용할 수 없다. Upstash를 사용 중이고 `REDIS_URL`이 자동 주입되지 않았다면 Upstash Console의 **Connect → Node/ioredis**에서 TCP URL을 복사해 Vercel Environment Variables에 `REDIS_URL`로 추가한다.
-
-`vercel.json`은 게임 Function을 서울(`icn1`)에 고정한다. Redis도 반드시 서울 리전에 생성하거나 이전해야 한다. Vercel Dashboard → Project → Settings → Functions 및 Redis 공급자 Dashboard에서 두 리전을 확인한다. 이미 다른 리전의 Redis를 사용 중이라면 새 서울 인스턴스로 데이터를 이전한 뒤 `REDIS_URL`을 교체하고 redeploy한다. 코드만으로 배포된 Redis 인스턴스의 실제 리전은 조회·변경할 수 없다.
+이 모드는 Redis 환경 변수나 유료 외부 저장소가 필요 없습니다. 단, Vercel Function이 cold start·재배포·스케일아웃되면 메모리가 초기화되거나 방마다 서로 다른 인스턴스에 연결될 수 있습니다. 따라서 무료 Vercel 배포는 친구끼리 짧게 한 방을 플레이하는 용도로만 사용하고, 중요한 게임이나 안정적인 재접속은 외부 상태 저장소가 필요합니다.
 
 음성 채팅은 NAT 우회를 위해 TURN을 사용한다. Vercel Environment Variables에 아래 값을 설정하고 redeploy한다. `turns:`(TLS/TCP)와 `turn:`(UDP)을 함께 넣으면 모바일/사내망에서 성공률이 높다.
 
@@ -60,7 +57,7 @@ coturn, Twilio Network Traversal, Metered 또는 동등한 TURN 공급자를 사
 
 ```text
 apps/web       React + TypeScript + Zustand + Framer Motion
-apps/server    Express + Socket.IO + Redis 게임 서비스/스케줄러
+apps/server    Express + Socket.IO + 인메모리 게임 서비스/스케줄러
 packages/shared 역할, 타입, 이벤트, 사회자 문장
 infra          Nginx 멀티 서버 프록시
 ```
@@ -68,13 +65,13 @@ infra          Nginx 멀티 서버 프록시
 서버의 모든 변경 명령은 다음 경로를 따릅니다.
 
 ```text
-Socket command → 세션/입력 검증 → Redis 분산 락 → 순수 게임 엔진
-               → Redis 저장 → 플레이어별 비공개 view 생성 → Socket 전송
+Socket command → 세션/입력 검증 → 프로세스 내 락 → 순수 게임 엔진
+               → 메모리 저장 → 플레이어별 비공개 view 생성 → Socket 전송
 ```
 
 전체 `Room`을 클라이언트로 전송하지 않습니다. 각 플레이어는 자신의 최초 역할과 자신의 행동 결과만 받고, 다른 플레이어의 역할은 결과 단계 전까지 payload에 포함되지 않습니다. 재접속 토큰은 브라우저 `localStorage`에 저장되며 서버의 토큰과 일치할 때만 같은 플레이어로 복구됩니다.
 
-밤 타이머의 `expiresAt`은 Redis 상태에 저장됩니다. 로컬 Node 서버에서는 짧은 scheduler가, Vercel에서는 연결된 플레이어의 `ROOM_SYNC` heartbeat가 만료를 확인합니다. 어떤 Function 인스턴스가 확인해도 Redis 분산 락을 얻은 하나만 전이를 적용하고 Redis adapter가 모든 인스턴스의 Socket.IO room으로 결과를 전파합니다. 실제 소유자가 없는 선택 역할도 큐에 들어가며, 역할 보유 여부를 유추할 수 없도록 설정된 행동 시간 전체가 지난 뒤 자동 `skipped` 처리됩니다.
+밤 타이머의 `expiresAt`은 서버 메모리에 저장됩니다. 단일 장기 실행 Node 서버에서는 짧은 scheduler가, Vercel에서는 연결된 클라이언트의 동기화가 만료를 확인합니다. 실제 소유자가 없는 선택 역할도 큐에 들어가며, 역할 보유 여부를 유추할 수 없도록 설정된 행동 시간 전체가 지난 뒤 자동 `skipped` 처리됩니다.
 
 ## 게임 흐름
 
@@ -108,4 +105,4 @@ Unit test는 역할 배정(3/5/10명), 밤 순서와 부재 역할, timeout 전�
 - Phase 11: Redis Adapter, 분산 락, 재접속, 프로세스 재시작 후 timer recovery, Nginx 2-server Compose 완료
 - Phase 12: 게임 엔진 unit test, 타입 검사 및 production build 구성 완료
 
-운영 환경에서는 Redis TLS/인증, HTTPS, rate limit, 방 정리 정책과 관측 시스템을 배포 플랫폼에 맞게 추가하십시오.
+운영 환경에서 재시작 복구·다중 인스턴스·안정적 재접속이 필요하면 Redis 같은 공유 상태 저장소를 다시 도입해야 합니다.

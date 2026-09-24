@@ -2,7 +2,7 @@ import type { Server } from 'socket.io';
 import { NARRATOR_LINES, type Room } from '@werewolf/shared';
 import { advanceNight, buildNightActionQueue, calculateResult, startCurrentAction, startNightIntro } from '../game/engine.js';
 import { emitActionStart, emitDayStart, emitRoomState } from '../socket/handlers.js';
-import { getRoom, redis, saveRoom, withRoomLock } from './redis.js';
+import { getRoom, getRoomCodes, saveRoom, withRoomLock } from './redis.js';
 
 const DISCONNECT_GRACE_MS = 45_000;
 
@@ -16,7 +16,7 @@ function hasDueWork(room: Awaited<ReturnType<typeof getRoom>>, now: number) {
 
 export function startScheduler(io: Server) {
   const timer = setInterval(async () => {
-    for (const code of await redis.smembers('game:rooms')) {
+    for (const code of getRoomCodes()) {
       await processExpiredRoom(io, code);
     }
   }, 400);
@@ -34,7 +34,7 @@ export async function processExpiredRoom(io: Server, code: string): Promise<Room
     // ROOM_SYNC is deliberately cheap: clients can poll for a serverless wake-up,
     // but only a room with a due deadline contends on the distributed lock.
     const snapshot = await getRoom(code);
-    if (!snapshot) { if (process.env.RUN_STANDALONE_SERVER === 'true') await redis.srem('game:rooms', code); return null; }
+    if (!snapshot) return null;
     if (!hasDueWork(snapshot, Date.now())) return snapshot;
     let transitioned = false; let dayTransition = false;
     const room = await withRoomLock(code, async (room) => {

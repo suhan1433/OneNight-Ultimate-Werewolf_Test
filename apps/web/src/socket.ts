@@ -218,11 +218,9 @@ export function recoverExpiredAction(actionId: string) {
   };
   retry(0);
 }
-// This is only a serverless wake-up fallback. The visible countdown performs
-// an exact check at zero; while a night action is active, a 500ms fallback
-// keeps Vercel wake-up jitter below one second without taking a lock early.
-window.setInterval(() => { if (useGame.getState().game?.phase === 'night') syncRoom(); }, 500);
-window.setInterval(() => { if (useGame.getState().game?.phase !== 'night') syncRoom(); }, 1_000);
+// State changes arrive through Socket.IO. Countdown expiry and reconnects call
+// sync immediately; this is only a low-frequency missed-event recovery path.
+window.setInterval(() => { if (useGame.getState().game) void syncRoom(); }, 30_000);
 window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncRoom(); });
 export const requestId = () => crypto.randomUUID();
 export function session(): { roomCode: string; playerId: string; sessionToken: string } | null { try { return JSON.parse(localStorage.getItem('werewolf-session') ?? 'null'); } catch { return null; } }

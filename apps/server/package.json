@@ -11,11 +11,9 @@
     "typecheck": "npm run build -w @werewolf/shared && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@socket.io/redis-adapter": "^8.3.0",
     "@werewolf/shared": "*",
     "cors": "^2.8.5",
     "express": "^4.21.0",
-    "ioredis": "^5.4.0",
     "pino": "^9.5.0",
     "socket.io": "^4.8.0",
     "zod": "^3.23.0"
