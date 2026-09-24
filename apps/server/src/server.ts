@@ -5,6 +5,7 @@ import pino from 'pino';
 import { Server } from 'socket.io';
 import { registerHandlers } from './socket/handlers.js';
 import { startScheduler } from './services/scheduler.js';
+import { sweepExpiredRooms } from './services/redis.js';
 
 const log = pino();
 
@@ -24,6 +25,7 @@ export function createGameServer(socketPath = '/socket.io') {
     pingInterval: 10_000,
     pingTimeout: 20_000,
   });
+  io.use((_socket, next) => { void sweepExpiredRooms().then(() => next(), next); });
   io.on('connection', (socket) => registerHandlers(io, socket));
   return { server, io };
 }

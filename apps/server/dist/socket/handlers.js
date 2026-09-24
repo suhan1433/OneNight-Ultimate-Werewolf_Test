@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { NARRATOR_LINES, ROLE_DEFINITIONS } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
-import { appendChat, appendLobbyChat, clearLobbyChat, clearReadiness, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, saveRoom, toggleReady, withRoomLock } from '../services/redis.js';
+import { appendChat, appendLobbyChat, canCreateRoom, clearLobbyChat, clearReadiness, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, saveRoom, sweepExpiredRooms, toggleReady, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
 const nicknameSchema = z.string().trim().min(1).max(16);
@@ -45,6 +45,9 @@ function on(socket, event, handler) {
     });
 }
 export function registerHandlers(io, socket) {
+    // Vercel has no reliable process-global interval. Sweep a small bounded
+    // batch before every incoming event so abandoned rooms do not accumulate.
+    socket.use((_event, next) => { void sweepExpiredRooms().then(() => next(), next); });
     // On Vercel, this heartbeat is the durable scheduler trigger. It only checks
     // the room persisted in Redis and is safe when every connected client sends it.
     socket.on('ROOM_SYNC', async (callback) => {
@@ -115,6 +118,8 @@ export function registerHandlers(io, socket) {
         for (const definition of Object.values(ROLE_DEFINITIONS))
             if (data.selectedRoles.filter((r) => r === definition.id).length > definition.maxCount)
                 throw new Error(`${definition.name} 역할이 허용 수량을 초과했습니다.`);
+        if (!canCreateRoom())
+            throw new Error('지금 방이 많이 몰려 있습니다. 잠시 후 다시 시도해주세요.');
         let roomCode = '';
         do {
             roomCode = Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
@@ -407,7 +412,7 @@ export function registerHandlers(io, socket) {
     on(socket, 'CHAT_SEND', async (raw) => {
         const data = safe(requestSchema.extend({ messageId: z.string().uuid(), text: z.string().trim().min(1).max(300) }), raw);
         const playerId = assertSession(socket, data.roomCode);
-        const allowed = await consumeRateLimit(`rate:chat:${data.roomCode}:${playerId}`, 6, 5);
+        const allowed = await consumeRateLimit(data.roomCode, `chat:${playerId}`, 6, 5);
         if (!allowed)
             throw new Error('채팅을 너무 빠르게 보내고 있습니다.');
         let message = null;

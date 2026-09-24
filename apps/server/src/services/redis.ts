@@ -6,10 +6,16 @@ const chats = new Map<string, ChatMessage[]>();
 const lobbyChats = new Map<string, ChatMessage[]>();
 const ready = new Map<string, Map<string, boolean>>();
 const votes = new Map<string, Map<string, string>>();
-const processed = new Map<string, number>();
-const limits = new Map<string, { count: number; expiresAt: number }>();
+const deadlines = new Map<string, number>();
+const processedByRoom = new Map<string, Map<string, number>>();
+const limitsByRoom = new Map<string, Map<string, { count: number; expiresAt: number }>>();
 const roomLocks = new Map<string, Promise<void>>();
 const MAX_CHAT_MESSAGES = 100;
+export const MAX_ROOMS = (() => {
+  const value = Number(process.env.MAX_ROOMS ?? 300);
+  return Number.isInteger(value) && value > 0 ? value : 300;
+})();
+let deadlineIterator: Iterator<string> | undefined;
 
 export function roomRetentionDeadline(room: Room): number | null {
   const lobby = room.phase === 'lobby' ? (room.lobbyExpiresAt ?? room.createdAt + 60 * 60 * 1000) : null;
@@ -18,6 +24,24 @@ export function roomRetentionDeadline(room: Room): number | null {
   return deadlines.length ? Math.min(...deadlines) : null;
 }
 export function roomHasExpired(room: Room, now = Date.now()) { const deadline = roomRetentionDeadline(room); return deadline !== null && deadline <= now; }
+export function canCreateRoom() { return rooms.size < MAX_ROOMS; }
+
+/**
+ * Incrementally clear expired rooms without relying on a process-wide timer.
+ * Each caller inspects at most `max` entries, so a busy Socket.IO server keeps
+ * memory bounded without putting an O(number of rooms) scan on any request.
+ */
+export async function sweepExpiredRooms(max = 20): Promise<number> {
+  const now = Date.now(); let removed = 0;
+  const iterator = deadlineIterator ?? deadlines.keys(); deadlineIterator = iterator;
+  for (let checked = 0; checked < max; checked += 1) {
+    const next = iterator.next();
+    if (next.done) { deadlineIterator = undefined; break; }
+    const deadline = deadlines.get(next.value);
+    if (deadline !== undefined && deadline <= now) { await deleteRoom(next.value); removed += 1; }
+  }
+  return removed;
+}
 export async function getRoom(code: string): Promise<Room | null> {
   const room = rooms.get(code) ?? null;
   if (room && roomHasExpired(room)) { await deleteRoom(code); return null; }
@@ -26,11 +50,13 @@ export async function getRoom(code: string): Promise<Room | null> {
 export async function saveRoom(room: Room, requestId?: string) {
   if (roomHasExpired(room)) { await deleteRoom(room.roomCode); return; }
   rooms.set(room.roomCode, room);
-  if (requestId) processed.set(`${room.roomCode}:${requestId}`, Date.now() + 3_600_000);
+  const deadline = roomRetentionDeadline(room);
+  if (deadline === null) deadlines.delete(room.roomCode); else deadlines.set(room.roomCode, deadline);
+  if (requestId) setProcessed(room.roomCode, requestId);
 }
 export async function deleteRoom(code: string) {
-  rooms.delete(code); chats.delete(code); lobbyChats.delete(code); ready.delete(code); votes.delete(code);
-  for (const key of processed.keys()) if (key.startsWith(`${code}:`)) processed.delete(key);
+  rooms.delete(code); deadlines.delete(code); chats.delete(code); lobbyChats.delete(code); ready.delete(code); votes.delete(code);
+  processedByRoom.delete(code); limitsByRoom.delete(code);
 }
 export function getRoomCodes() { return [...rooms.keys()]; }
 function history(store: Map<string, ChatMessage[]>, code: string) { return [...(store.get(code) ?? [])]; }
@@ -52,22 +78,30 @@ export async function withRoomLock<T>(code: string, fn: (room: Room, alreadyProc
   const queued = previous.then(() => gate); roomLocks.set(code, queued); await previous;
   try {
     const room = await getRoom(code); if (!room) throw new Error('방을 찾을 수 없습니다.');
-    const key = requestId ? `${code}:${requestId}` : ''; const expiresAt = key ? processed.get(key) ?? 0 : 0;
-    if (key && expiresAt <= Date.now()) processed.delete(key);
-    return await fn(room, !!key && expiresAt > Date.now());
+    const expiresAt = requestId ? getProcessed(code, requestId) : 0;
+    return await fn(room, expiresAt > Date.now());
   } finally {
     release();
     void queued.then(() => { if (roomLocks.get(code) === queued) roomLocks.delete(code); });
   }
 }
 export async function once(code: string, requestId: string) {
-  const key = `${code}:${requestId}`; if ((processed.get(key) ?? 0) > Date.now()) return false;
-  processed.set(key, Date.now() + 3_600_000); return true;
+  if (getProcessed(code, requestId) > Date.now()) return false;
+  setProcessed(code, requestId); return true;
 }
-export async function consumeRateLimit(key: string, limit: number, windowSeconds: number) {
-  const now = Date.now(); const old = limits.get(key);
+function getProcessed(code: string, requestId: string) {
+  const requests = processedByRoom.get(code); const expiresAt = requests?.get(requestId) ?? 0;
+  if (expiresAt && expiresAt <= Date.now()) requests?.delete(requestId);
+  return expiresAt;
+}
+function setProcessed(code: string, requestId: string) {
+  const requests = processedByRoom.get(code) ?? new Map<string, number>();
+  requests.set(requestId, Date.now() + 3_600_000); processedByRoom.set(code, requests);
+}
+export async function consumeRateLimit(roomCode: string, key: string, limit: number, windowSeconds: number) {
+  const now = Date.now(); const roomLimits = limitsByRoom.get(roomCode) ?? new Map<string, { count: number; expiresAt: number }>(); const old = roomLimits.get(key);
   const next = !old || old.expiresAt <= now ? { count: 1, expiresAt: now + windowSeconds * 1000 } : { ...old, count: old.count + 1 };
-  limits.set(key, next); return next.count <= limit;
+  roomLimits.set(key, next); limitsByRoom.set(roomCode, roomLimits); return next.count <= limit;
 }
 export async function recordVote(code: string, playerId: string, targetPlayerId: string) {
   const roomVotes = votes.get(code) ?? new Map<string, string>(); const added = !roomVotes.has(playerId);
@@ -75,8 +109,8 @@ export async function recordVote(code: string, playerId: string, targetPlayerId:
 }
 export async function getVotes(code: string): Promise<Record<string, string>> { return Object.fromEntries(votes.get(code) ?? []); }
 export async function toggleReady(code: string, playerId: string, requestId: string) {
-  const key = `${code}:${requestId}`; if ((processed.get(key) ?? 0) > Date.now()) return ready.get(code)?.get(playerId) ?? false;
-  processed.set(key, Date.now() + 3_600_000); const players = ready.get(code) ?? new Map<string, boolean>(); const next = !players.get(playerId);
+  if (getProcessed(code, requestId) > Date.now()) return ready.get(code)?.get(playerId) ?? false;
+  setProcessed(code, requestId); const players = ready.get(code) ?? new Map<string, boolean>(); const next = !players.get(playerId);
   players.set(playerId, next); ready.set(code, players); return next;
 }
 export async function getReadiness(code: string): Promise<Record<string, string>> {
