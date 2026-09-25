@@ -751,11 +751,15 @@ function ModeratorNight({ game }: { game: ClientGameState }) {
   const remain = useCountdown(action?.expiresAt, game.serverNow);
   const syncedAction = useRef<string>();
   useEffect(() => {
-    if (action && remain <= 0 && syncedAction.current !== action.id) {
-      syncedAction.current = action.id;
+    // The night intro and the first role deliberately share an action ID.
+    // Their deadlines are separate transitions, so deduplicating by ID alone
+    // prevents the first role from recovering when its own timer expires.
+    const transitionKey = action && `${action.id}:${action.status}:${action.expiresAt}`;
+    if (action && transitionKey && remain <= 0 && syncedAction.current !== transitionKey) {
+      syncedAction.current = transitionKey;
       recoverExpiredAction(action.id);
     }
-  }, [action?.id, remain]);
+  }, [action?.expiresAt, action?.id, action?.status, remain]);
   if (action?.status === "pending")
     return (
       <section className="center night night-intro">
@@ -1094,11 +1098,14 @@ function Night({ game }: { game: ClientGameState }) {
   const remain = useCountdown(a?.expiresAt, game.serverNow);
   const syncedAction = useRef<string>();
   useEffect(() => {
-    if (a && remain <= 0 && syncedAction.current !== a.id) {
-      syncedAction.current = a.id;
+    // The opening narration is pending on the first role itself, so its
+    // subsequent active deadline needs a distinct recovery key.
+    const transitionKey = a && `${a.id}:${a.status}:${a.expiresAt}`;
+    if (a && transitionKey && remain <= 0 && syncedAction.current !== transitionKey) {
+      syncedAction.current = transitionKey;
       recoverExpiredAction(a.id);
     }
-  }, [a?.id, remain]);
+  }, [a?.expiresAt, a?.id, a?.status, remain]);
   if (a?.status === "pending")
     return (
       <section className="center night night-intro">
