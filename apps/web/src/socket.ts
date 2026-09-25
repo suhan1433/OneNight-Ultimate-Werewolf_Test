@@ -67,7 +67,10 @@ function expectedNarrationId(game: ClientGameState): string | null {
 }
 
 function isCurrentNarration(narration: Narration, game: ClientGameState | null) {
-  return !!game && narration.stateVersion === game.stateVersion && narration.actionId === expectedNarrationId(game);
+  // A player action updates ROOM_STATE while the role and its announcement
+  // remain the same. Match the announced role/phase, rather than requiring an
+  // exact state version, so selecting a card never pauses its narration.
+  return !!game && narration.stateVersion <= game.stateVersion && narration.actionId === expectedNarrationId(game);
 }
 
 function reconcileNarration(game: ClientGameState) {
