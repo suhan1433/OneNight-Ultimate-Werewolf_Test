@@ -757,7 +757,7 @@ function ModeratorNight({ game }: { game: ClientGameState }) {
     const transitionKey = action && `${action.id}:${action.status}:${action.expiresAt}`;
     if (action && transitionKey && remain <= 0 && syncedAction.current !== transitionKey) {
       syncedAction.current = transitionKey;
-      recoverExpiredAction(action.id);
+      recoverExpiredAction(action.id, action.status === "active");
     }
   }, [action?.expiresAt, action?.id, action?.status, remain]);
   if (action?.status === "pending")
@@ -781,7 +781,7 @@ function ModeratorNight({ game }: { game: ClientGameState }) {
       <div className={remain <= 2 ? "timer danger" : "timer"}>
         {Math.max(0, remain).toFixed(1)}
       </div>
-      {useGame.getState().transitioningActionId === action?.id && (
+      {remain <= 0 && useGame.getState().transitioningActionId === action?.id && (
         <p className="transitioning">다음 역할을 준비 중…</p>
       )}
       <Panel>
@@ -1103,7 +1103,7 @@ function Night({ game }: { game: ClientGameState }) {
     const transitionKey = a && `${a.id}:${a.status}:${a.expiresAt}`;
     if (a && transitionKey && remain <= 0 && syncedAction.current !== transitionKey) {
       syncedAction.current = transitionKey;
-      recoverExpiredAction(a.id);
+      recoverExpiredAction(a.id, a.status === "active");
     }
   }, [a?.expiresAt, a?.id, a?.status, remain]);
   if (a?.status === "pending")
@@ -1127,7 +1127,7 @@ function Night({ game }: { game: ClientGameState }) {
       <div className={remain <= 2 ? "timer danger" : "timer"}>
         {Math.max(0, remain).toFixed(1)}
       </div>
-      {useGame.getState().transitioningActionId === a?.id && (
+      {remain <= 0 && useGame.getState().transitioningActionId === a?.id && (
         <p className="transitioning">다음 역할을 준비 중…</p>
       )}
       {game.actionResult && <PrivateResult data={game.actionResult} />}{" "}

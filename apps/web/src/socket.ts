@@ -204,9 +204,11 @@ export const syncRoom = (): Promise<boolean> => {
   return syncInFlight;
 };
 
-export function recoverExpiredAction(actionId: string) {
+export function recoverExpiredAction(actionId: string, showTransition = true) {
   const delays = [0, 200, 500, 1_000];
-  useGame.getState().setTransitioningActionId(actionId);
+  // The opening narration uses the first action's ID while it is still
+  // pending. That deadline starts the role, not a role-to-role transition.
+  if (showTransition) useGame.getState().setTransitioningActionId(actionId);
   const retry = (attempt: number) => {
     window.setTimeout(() => {
       void syncRoom().finally(() => {
