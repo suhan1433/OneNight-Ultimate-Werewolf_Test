@@ -172,8 +172,8 @@ function Board({game}:{game:ClientGameState}){
   const teamChips=(ids:string[])=><div className="team-chips">{ids.map(id=><span className="chip" key={id}>{game.players.find(p=>p.id===id)?.nickname}</span>)}</div>;
 
   return <>
-    <header>
-      <div className="tableau">
+    <header className="game-status" aria-label="현재 원정 현황">
+      <div className="tableau" aria-label="원정 진행도">
         {sizes.map((size,i)=>{
           const result=(game.results as any)[i];
           return <div className={`quest-slot ${result??''} ${i===game.round?'current':''}`} key={`${i}-${result??''}`}>
@@ -181,7 +181,7 @@ function Board({game}:{game:ClientGameState}){
           </div>;
         })}
       </div>
-      <div className="leader-row">
+      <div className="leader-row" aria-label="현재 리더와 부결 횟수">
         <CrownIcon size={15}/><span>리더 <b>{leaderName}</b></span>
         <div className="reject-track">{Array.from({length:5}).map((_,i)=><i className={i<game.rejectCount?'used':''} key={i}/>)}</div>
       </div>
