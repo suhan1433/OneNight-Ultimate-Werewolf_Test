@@ -27,7 +27,11 @@ docker compose up --build
 
 ## GitHub + Vercel 배포
 
-Vercel Fluid Compute의 WebSocket Function으로 웹과 Socket.IO를 같은 deployment에서 실행한다. 정적 웹은 `/`, Socket.IO Function은 `/api/socket-io/socket.io`이고, production 클라이언트는 same-origin 연결을 사용하므로 `VITE_SOCKET_URL`은 설정하지 않는다.
+배포 첫 화면(`/`)에서는 게임을 선택할 수 있습니다. 한밤의 늑대인간은
+`/werewolf/`, 아발론은 `/avalon/`에서 실행되며, 각 게임은 별도의 Socket.IO
+Function과 브라우저 세션을 사용하므로 방 코드와 게임 상태가 서로 섞이지 않습니다.
+
+Vercel Fluid Compute의 WebSocket Function으로 웹과 Socket.IO를 같은 deployment에서 실행한다. 선택 화면은 `/`, 한밤의 늑대인간 Function은 `/api/socket`, 아발론 Function은 `/api/avalon/socket`이다. production 클라이언트는 same-origin 연결을 사용하므로 `VITE_SOCKET_URL`은 설정하지 않는다.
 
 Vercel 프로젝트를 저장소 루트(`.`)에서 import한다. Root Directory를 `apps/web`로 변경하면 workspace 의존성과 Function entrypoint를 찾지 못한다. 루트 `vercel.json`이 다음을 설정한다.
 
@@ -35,7 +39,7 @@ Vercel 프로젝트를 저장소 루트(`.`)에서 import한다. Root Directory�
 - Install Command: `npm ci`
 - Build Command: `npm run build`
 - Output Directory: `apps/web/dist`
-- Function: `api/socket-io.ts`, max duration 300초
+- Functions: `api/socket.mjs`, `api/avalon/socket.mjs`, max duration 300초
 
 이 모드는 Redis 환경 변수나 유료 외부 저장소가 필요 없습니다. 단, Vercel Function이 cold start·재배포·스케일아웃되면 메모리가 초기화되거나 방마다 서로 다른 인스턴스에 연결될 수 있습니다. 따라서 무료 Vercel 배포는 친구끼리 짧게 한 방을 플레이하는 용도로만 사용하고, 중요한 게임이나 안정적인 재접속은 외부 상태 저장소가 필요합니다.
 
