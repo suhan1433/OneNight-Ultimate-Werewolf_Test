@@ -70,9 +70,10 @@ function PhaseRibbon({game}:{game:ClientGameState}){
 
 /* ---------- shared round-table layout ---------- */
 function RoundTable({players,center,renderSeat}:{players:any[];center:React.ReactNode;renderSeat:(p:any,i:number)=>React.ReactNode}){
-  return <div className="table">
+  const radius=players.length>=8?39:42;
+  return <div className={`table table--${players.length}`}>
     <div className="table-center">{center}</div>
-    {players.map((p,i)=><div className="seat" style={seatPos(i,players.length)} key={p.id}>{renderSeat(p,i)}</div>)}
+    {players.map((p,i)=><div className="seat" style={seatPos(i,players.length,radius)} key={p.id}>{renderSeat(p,i)}</div>)}
   </div>;
 }
 
