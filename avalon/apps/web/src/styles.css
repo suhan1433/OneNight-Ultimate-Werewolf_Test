@@ -14,7 +14,7 @@ html{overflow-x:hidden;background:var(--ink-950)}
 body{margin:0;min-height:100vh;min-height:100dvh;overflow-x:hidden;background:radial-gradient(ellipse at 50% -10%,#314b78 0,#111c31 33%,#05070d 78%)}
 body:before{content:'';position:fixed;inset:16px;border:1px solid #c9a35c33;pointer-events:none;background:linear-gradient(90deg,transparent 49.7%,#c9a35c12 50%,transparent 50.3%),linear-gradient(transparent 49.7%,#c9a35c12 50%,transparent 50.3%);mask-image:radial-gradient(circle,black 0 16%,transparent 68%)}
 body:after{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 25%,#0008 100%)}
-.app{position:relative;z-index:1;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:max(28px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(28px,env(safe-area-inset-left))}
+.app{position:relative;z-index:1;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:max(28px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(28px,env(safe-area-inset-left))}
 .home,.center,.board{width:min(760px,100%);text-align:center}
 
 /* ---- motion ---- */
@@ -185,25 +185,25 @@ main.board.tense>*{position:relative;z-index:1}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:14px 20px;background:#8d293c;border:1px solid var(--evil-300);color:white;cursor:pointer;border-radius:2px;animation:toastIn .35s var(--ease-out) both,toastOut .5s ease 2.45s forwards;box-shadow:0 12px 30px #0007}
 
 @media(max-width:500px){
-  .app{align-items:flex-start;padding:52px 16px calc(78px + env(safe-area-inset-bottom))}
+  .app{align-items:center;justify-content:flex-start;padding:56px 16px calc(120px + env(safe-area-inset-bottom))}
   .home,.center,.board{width:100%}
   h1{font-size:clamp(34px,12vw,48px)}
   h2{font-size:clamp(20px,6vw,25px);line-height:1.3}
   .panel,.role,.roster{margin:16px auto;padding:16px}
   .join{flex-direction:column}
   .join button{width:100%}
-  .game-status{position:sticky;top:0;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;margin:0 auto 2px;padding:8px 10px;font-size:12px}
-  .game-status .tableau{justify-content:flex-start;gap:5px}
+  .game-status{position:relative;grid-template-columns:minmax(0,1fr);justify-items:center;gap:7px;margin:0 auto 2px;padding:9px 10px;font-size:12px}
+  .game-status .tableau{justify-content:center;gap:5px}
   .game-status .quest-slot{width:26px;height:26px;font-size:11px}
   .game-status .quest-slot svg{width:14px;height:14px}
-  .game-status .leader-row{justify-content:flex-end;gap:5px;white-space:nowrap;font-size:11px}
+  .game-status .leader-row{justify-content:center;gap:5px;max-width:100%;white-space:nowrap;font-size:11px}
   .game-status .leader-row>svg{width:13px;height:13px}
-  .game-status .leader-row b{display:inline-block;max-width:72px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+  .game-status .leader-row b{display:inline-block;max-width:min(32vw,110px);overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
   .game-status .reject-track{gap:3px;margin-left:3px}
   .game-status .reject-track i{width:5px;height:5px}
-  .board{padding-bottom:76px}
+  .board{padding-bottom:0}
   .board>h2,.vote-stage>h2,.quest-stage>h2{margin:8px 0 4px}
-  .table{width:min(238px,72vw);margin:10px auto}
+  .table{width:min(238px,72vw);margin:22px auto}
   .table--8,.table--9,.table--10{--seat-size:46px}
   .seat .plate,.seat button{font-size:9px;line-height:1.2;padding:6px 3px}
   .table-center{padding:28px}
@@ -222,6 +222,9 @@ main.board.tense>*{position:relative;z-index:1}
   .selection-summary .team-chips{margin:5px 0 0}
   .selection-summary em{margin-top:5px;font-size:11px}
   .role-limit-card{grid-template-columns:1fr}
+  .home .panel{gap:10px}
+  .home .options{gap:7px;margin:2px 0}
+  .home .role-chip{flex:1 1 calc(50% - 7px);justify-content:center;min-width:0;padding:8px 6px;font-size:11px}
   .leave-room{right:12px;bottom:max(12px,env(safe-area-inset-bottom));padding:9px 10px}
   .chat-toggle{right:12px;bottom:58px}.chat-panel{left:12px;right:12px;bottom:58px;width:auto;height:min(270px,calc(100dvh - 128px))}
   .utility-actions{right:12px;top:max(10px,env(safe-area-inset-top))}.help-scrim{padding:12px}.help-modal{max-height:calc(100dvh - 24px)}.help-scroll{padding:16px}.help-rule-grid,.help-roles{grid-template-columns:1fr}.role-dossier{right:12px;top:54px;width:calc(100vw - 24px);max-width:none}
@@ -230,11 +233,11 @@ main.board.tense>*{position:relative;z-index:1}
 
 /* Short upright phones need the decision controls above the fold. */
 @media(max-width:500px) and (min-height:541px) and (max-height:740px) and (orientation:portrait){
-  .app{padding-top:46px;padding-bottom:66px}
+  .app{padding-top:46px;padding-bottom:120px}
   .game-status{padding-top:6px;padding-bottom:6px}
   .phase-ribbon{margin-top:5px;padding-top:6px;padding-bottom:6px}
   .phase-ribbon small{display:none}
-  .table{width:min(210px,64vw);margin:6px auto}
+  .table{width:min(210px,64vw);margin:20px auto}
   .table--8,.table--9,.table--10{--seat-size:42px}
   .seat .plate,.seat button{padding:5px 2px;font-size:8px}
   .selection-core strong{font-size:27px}
