@@ -173,21 +173,11 @@ function Board({game}:{game:ClientGameState}){
   const me=game.playerId,leader=game.leaderId===me;
   const phase=game.phase;
   const leaderName=game.players.find(p=>p.id===game.leaderId)?.nickname;
-  const sizes=QUEST_SIZES[game.maxPlayers]??[2,3,2,3,3];
   const teamChips=(ids:string[])=><div className="team-chips">{ids.map(id=><span className="chip" key={id}>{game.players.find(p=>p.id===id)?.nickname}</span>)}</div>;
   useEffect(()=>{setTeam([]);setApprove(null);setQuestCard(null);},[phase,game.round,game.proposedTeam.join(',')]);
 
   return <>
     <header className="game-status" aria-label="현재 원정 현황">
-      <div className="tableau" aria-label="원정 진행도">
-        {sizes.map((size,i)=>{
-          const result=(game.results as any)[i];
-          const record=game.roundHistory.find(item=>item.round===i);
-          return <button type="button" disabled={!record} onClick={()=>setOpenRound(openRound===i?null:i)} className={`quest-slot ${result??''} ${i===game.round?'current':''}`} key={`${i}-${result??''}`}>
-            {result==='success'?<ShieldIcon size={16}/>:result==='fail'?<SwordsIcon size={16}/>:<span>{size}</span>}
-          </button>;
-        })}
-      </div>
       <div className="leader-row" aria-label="현재 리더와 부결 횟수">
         <CrownIcon size={15}/><span>리더 <b>{leaderName}</b></span>
         <div className="reject-track">{Array.from({length:5}).map((_,i)=><i className={i<game.rejectCount?'used':''} key={i}/>)}</div>
