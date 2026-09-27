@@ -1,0 +1,51 @@
+.leave-fab {
+  position: fixed;
+  z-index: 20;
+  top: 16px;
+  right: 68px;
+  height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background: #141228cc;
+  color: #e4aaa5;
+  backdrop-filter: blur(9px);
+  cursor: pointer;
+  font-size: .72rem;
+}
+
+main.day .leave-fab {
+  background: #fff8e8dd;
+  color: #8a3f38;
+  border-color: #caa85e;
+}
+
+.voice-controls {
+  position: fixed;
+  z-index: 20;
+  top: 68px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.voice-fab {
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background: #141228cc;
+  color: #e5dcbf;
+  backdrop-filter: blur(9px);
+  cursor: pointer;
+  font-size: .68rem;
+}
+
+.voice-fab.mute { color: #efa9a2; }
+.voice-status { display:block; margin:5px 0 2px; font-size:.67rem; text-align:center; color:#c8c0db; }
+.voice-status.ready { color:#8fd09e; }
+.voice-status.error { color:#efa9a2; }
+main.day .voice-fab { background: #fff8e8dd; border-color: #caa85e; color: #4d331f; }
+main.day .voice-fab.mute { color: #9b403a; }

@@ -1,0 +1,4 @@
+.night-intro { min-height: 64vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.eclipse { width: 142px; height: 142px; border-radius: 50%; position: relative; overflow: hidden; background: radial-gradient(circle at 35% 32%, #fff6c8 0 4%, #e5c56a 38%, #8e6428 72%, #422711); box-shadow: 0 0 38px #d8b96188; margin-bottom: 30px; }
+.eclipse::after { content: ''; position: absolute; width: 150px; height: 150px; border-radius: 50%; top: -4px; left: -160px; background: #0b0a1d; box-shadow: 0 0 20px #070611; animation: eclipse-cover 4.1s cubic-bezier(.38,.05,.58,.96) forwards; }
+@keyframes eclipse-cover { to { transform: translateX(315px); } }

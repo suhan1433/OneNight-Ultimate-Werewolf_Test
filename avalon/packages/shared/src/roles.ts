@@ -1,0 +1,5 @@
+import type { RoleType, Team } from './types.js';
+export const ROLE_DEFINITIONS: Record<RoleType, { name: string; team: Team; description: string }> = {
+  merlin:{name:'멀린',team:'good',description:'모드레드를 제외한 모든 악을 알고 있습니다. 암살자에게 정체를 숨기세요.'}, percival:{name:'퍼시벌',team:'good',description:'멀린과 모르가나 중 누가 진짜 멀린인지 알 수 없습니다.'}, loyal:{name:'충성스러운 신하',team:'good',description:'특별 능력 없이 선의 승리를 돕습니다.'}, assassin:{name:'암살자',team:'evil',description:'선이 원정 3회에 성공하면 멀린을 지목할 수 있습니다.'}, morgana:{name:'모르가나',team:'evil',description:'퍼시벌에게 멀린처럼 보입니다.'}, mordred:{name:'모드레드',team:'evil',description:'멀린에게 보이지 않는 악의 세력입니다.'}, oberon:{name:'오베론',team:'evil',description:'다른 악의 세력과 서로의 정체를 알지 못합니다.'}, minion:{name:'모드레드의 수하',team:'evil',description:'다른 악의 세력과 함께 선을 방해합니다.'},
+};
+export const COUNT_TABLE: Record<number,{good:number;evil:number;quests:number[]}> = {5:{good:3,evil:2,quests:[2,3,2,3,3]},6:{good:4,evil:2,quests:[2,3,4,3,4]},7:{good:4,evil:3,quests:[2,3,3,4,4]},8:{good:5,evil:3,quests:[3,4,4,5,5]},9:{good:6,evil:3,quests:[3,4,4,5,5]},10:{good:6,evil:4,quests:[3,4,4,5,5]}};
