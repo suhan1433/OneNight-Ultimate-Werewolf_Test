@@ -1,4 +1,4 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import ReactDOM from 'react-dom/client';
 import {ROLE_DEFINITIONS,type AvalonOptions,type ClientGameState} from '@werewolf/shared';
 import {useGame} from './store';
@@ -134,7 +134,7 @@ function Role({game}:{game:ClientGameState}){
       <p>{def.description}</p>
       {game.roleIntel.length>0&&<div className="intel">{game.roleIntel.map(x=><div key={x}>{x}</div>)}</div>}
     </div>
-    <button className="primary" onClick={()=>call('ROLE_CONFIRM',{roomCode:game.roomCode})}>역할 확인 완료</button>
+    <button className="primary" onClick={()=>call('ROLE_CONFIRM',{roomCode:game.roomCode})}>역할 확인 완료 ({game.roleConfirmedCount}/{game.players.length})</button>
     <p className="muted">다른 사람에게 화면을 보여주지 마세요.</p>
   </section>;
 }
@@ -145,31 +145,36 @@ function Lobby({game}:{game:ClientGameState}){
   const copy=async()=>{try{await navigator.clipboard.writeText(game.roomCode);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{}};
   return <section className="center">
     <h2>원탁 대기실</h2>
-    <RoundTable
-      players={game.players}
-      center={<>
-        <div className="code" onClick={copy}>{game.roomCode}</div>
-        <span className="copy-hint">{copied?'복사됨!':'눌러서 코드 복사'}</span>
-        <span className="muted">{game.players.length}/{game.maxPlayers}명 참가</span>
-      </>}
-      renderSeat={p=><div className={`plate${p.ready?' ready':''}${p.isBot?' bot':''}`}>
-        {p.ready?<CheckIcon size={14}/>:<i className="dot"/>}
-        <span>{p.nickname}</span>{p.isBot&&<small>TEST BOT</small>}
-      </div>}
-    />
+    <div className="lobby-layout">
+      <div className="lobby-code"><small>ROOM CODE</small><div className="code" onClick={copy}>{game.roomCode}</div><span className="copy-hint">{copied?'복사됨!':'눌러서 코드 복사'}</span><span className="muted">{game.players.length}/{game.maxPlayers}명 참가</span></div>
+      <div className="lobby-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=><span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} size={14}/>{ROLE_DEFINITIONS[role].name}</span>)}</div></div>
+      <div className="lobby-players">{game.players.map(p=><div className={`plate${p.ready?' ready':''}${p.isBot?' bot':''}`} key={p.id}>{p.ready?<CheckIcon size={14}/>:<i className="dot"/>}<span>{p.nickname}</span>{p.isBot&&<small>TEST BOT</small>}</div>)}</div>
+    </div>
     <button onClick={()=>call('PLAYER_READY',{roomCode:game.roomCode})}>{me.ready?'준비 취소':'준비 완료'}</button>
     {game.playerId===game.hostId&&<button className="primary" onClick={()=>call('GAME_START',{roomCode:game.roomCode})}>게임 시작</button>}
   </section>;
 }
 
+function RoundHistory({game}:{game:ClientGameState}){
+  const[open,setOpen]=useState<number|null>(null);
+  const name=(id:string)=>game.players.find(player=>player.id===id)?.nickname??'알 수 없음';
+  return <section className="round-history" aria-label="원정 라운드 기록">{Array.from({length:5},(_,round)=>{const record=game.roundHistory.find(item=>item.round===round);return <div className="round-history-item" key={round}><button type="button" disabled={!record} className={`${record?.success?'success':record?'fail':''} ${round===game.round?'current':''}`} onClick={()=>setOpen(open===round?null:round)}><span>{QUEST_SIZES[game.maxPlayers]?.[round]}명</span><small>{record?(record.success?'성공':'실패'):`ROUND ${round+1}`}</small></button>{open===round&&record&&<div className="round-detail"><p><b>원정대</b> 리더 {name(record.leaderId)} · {record.team.map(name).join(', ')}</p><p><b>찬반</b> {game.players.map(player=>`${player.nickname} ${record.votes[player.id]?'찬성':'반대'}`).join(' · ')}</p><p><b>결과</b> 성공 카드 {record.team.length-record.fails}장 · 실패 카드 {record.fails}장</p></div>}</div>;})}</section>;
+}
+
+function ActiveRoles({game}:{game:ClientGameState}){
+  return <section className="active-roles"><b>사용 캐릭터</b>{game.activeRoles.map((role,index)=>{const def=ROLE_DEFINITIONS[role];return <span className={def.team} key={`${role}-${index}`} title={def.description}><RoleIcon role={role} team={def.team} size={14}/>{def.name}</span>;})}</section>;
+}
+
 function Board({game}:{game:ClientGameState}){
   const[team,setTeam]=useState<string[]>([]);
-  const[approve,setApprove]=useState(true);
+  const[approve,setApprove]=useState<boolean|null>(null);
+  const[questCard,setQuestCard]=useState<'success'|'fail'|null>(null);
   const me=game.playerId,leader=game.leaderId===me;
   const phase=game.phase;
   const leaderName=game.players.find(p=>p.id===game.leaderId)?.nickname;
   const sizes=QUEST_SIZES[game.maxPlayers]??[2,3,2,3,3];
   const teamChips=(ids:string[])=><div className="team-chips">{ids.map(id=><span className="chip" key={id}>{game.players.find(p=>p.id===id)?.nickname}</span>)}</div>;
+  useEffect(()=>{setTeam([]);setApprove(null);setQuestCard(null);},[phase,game.round,game.proposedTeam.join(',')]);
 
   return <>
     <header className="game-status" aria-label="현재 원정 현황">
@@ -185,10 +190,12 @@ function Board({game}:{game:ClientGameState}){
         <CrownIcon size={15}/><span>리더 <b>{leaderName}</b></span>
         <div className="reject-track">{Array.from({length:5}).map((_,i)=><i className={i<game.rejectCount?'used':''} key={i}/>)}</div>
       </div>
+      <RoundHistory game={game}/>
     </header>
 
     <main className={`board${phase==='assassination'?' tense':''}`}>
       <PhaseRibbon game={game}/>
+      <ActiveRoles game={game}/>
 
       {phase==='team_build'&&<>
         <h2>원정대 구성 ({game.questSize}명)</h2>
@@ -208,10 +215,10 @@ function Board({game}:{game:ClientGameState}){
           <div className="token-back"><CheckIcon size={18}/><span>제출 완료</span></div>
         :<>
           <div className="vote-tokens">
-            <button className={`token approve${approve?' active':''}`} onClick={()=>setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button>
-            <button className={`token reject${!approve?' active':''}`} onClick={()=>setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button>
+            <button className={`token approve${approve===true?' active':''}`} onClick={()=>setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button>
+            <button className={`token reject${approve===false?' active':''}`} onClick={()=>setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button>
           </div>
-          <button className="primary seal-btn" onClick={()=>call('TEAM_VOTE',{roomCode:game.roomCode,approve})}>비밀 투표 제출</button>
+          <button className="primary seal-btn" disabled={approve===null} onClick={()=>approve!==null&&call('TEAM_VOTE',{roomCode:game.roomCode,approve})}>원정 투표하기 ({game.teamVotesCompleted}/{game.players.length})</button>
         </>}
         <p className="muted">{game.teamVotesCompleted}/{game.players.length}명 투표</p>
       </div>}
@@ -229,10 +236,10 @@ function Board({game}:{game:ClientGameState}){
         {game.proposedTeam.includes(me)?
           game.players.find(p=>p.id===me)?.hasQuestCard?
             <div className="card-back"><CheckIcon size={18}/><span>제출 완료</span></div>
-          :<div className="quest-cards">
-            <button className="qcard success" onClick={()=>call('QUEST_CARD',{roomCode:game.roomCode,card:'success'})}><FactionSeal team="good" size={42}/><span>원정 성공</span><small>SUCCESS</small></button>
-            {ROLE_DEFINITIONS[game.selfRole!].team==='evil'&&<button className="qcard fail" onClick={()=>call('QUEST_CARD',{roomCode:game.roomCode,card:'fail'})}><FactionSeal team="evil" size={42}/><span>원정 실패</span><small>FAIL</small></button>}
-          </div>
+          :<><div className="quest-cards">
+            <button className={`qcard success${questCard==='success'?' active':''}`} onClick={()=>setQuestCard('success')}><FactionSeal team="good" size={42}/><span>원정 성공</span><small>SUCCESS</small></button>
+            {ROLE_DEFINITIONS[game.selfRole!].team==='evil'&&<button className={`qcard fail${questCard==='fail'?' active':''}`} onClick={()=>setQuestCard('fail')}><FactionSeal team="evil" size={42}/><span>원정 실패</span><small>FAIL</small></button>}
+          </div><button className="primary seal-btn" disabled={!questCard} onClick={()=>questCard&&call('QUEST_CARD',{roomCode:game.roomCode,card:questCard})}>원정 {questCard==='success'?'성공':'실패'} 선택하기 ({game.questCardsCompleted}/{game.proposedTeam.length})</button></>
         :<div className="card-back"><span>원정대가 제출 중</span><Dots/></div>}
         <p className="muted">{game.questCardsCompleted}/{game.proposedTeam.length}장 제출</p>
       </div>}
@@ -286,11 +293,13 @@ function Result({game}:{game:ClientGameState}){
 
 function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const[draft,setDraft]=useState('');
+  const latestRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{latestRef.current?.scrollIntoView({block:'end'});},[game.chat?.length]);
   const send=(event:React.FormEvent)=>{event.preventDefault();const text=draft.trim();if(!text)return;setDraft('');call('CHAT_SEND',{roomCode:game.roomCode,text});};
   return <aside className="chat-panel" aria-label="원탁 채팅">
     <div className="chat-title"><span>원탁의 대화</span><small>DISCUSSION</small><button type="button" onClick={close} aria-label="채팅 닫기">×</button></div>
     <div className="chat-log" aria-live="polite">
-      {game.chat?.length?game.chat.map(message=><div className={`chat-message ${message.playerId===game.playerId?'mine':''}`} key={message.id}><b>{message.nickname}</b><p>{message.text}</p></div>):<div className="chat-empty">아직 대화가 없습니다.<br/>원정대를 논의해보세요.</div>}
+      {game.chat?.length?game.chat.map(message=><div className={`chat-message ${message.playerId===game.playerId?'mine':''}`} key={message.id}><b>{message.nickname}</b><p>{message.text}</p></div>):<div className="chat-empty">아직 대화가 없습니다.<br/>원정대를 논의해보세요.</div>}<div ref={latestRef}/>
     </div>
     <form className="chat-compose" onSubmit={send}>
       <input value={draft} maxLength={300} onChange={event=>setDraft(event.target.value)} placeholder="원탁에 메시지 보내기" aria-label="채팅 메시지"/>
