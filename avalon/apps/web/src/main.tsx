@@ -155,10 +155,10 @@ function Lobby({game}:{game:ClientGameState}){
   </section>;
 }
 
-function RoundHistory({game}:{game:ClientGameState}){
-  const[open,setOpen]=useState<number|null>(null);
+function RoundHistory({game,open,setOpen,showSlots=true}:{game:ClientGameState;open:number|null;setOpen:(round:number|null)=>void;showSlots?:boolean}){
   const name=(id:string)=>game.players.find(player=>player.id===id)?.nickname??'알 수 없음';
-  return <section className="round-history" aria-label="원정 라운드 기록">{Array.from({length:5},(_,round)=>{const record=game.roundHistory.find(item=>item.round===round);return <div className="round-history-item" key={round}><button type="button" disabled={!record} className={`${record?.success?'success':record?'fail':''} ${round===game.round?'current':''}`} onClick={()=>setOpen(open===round?null:round)}><span>{QUEST_SIZES[game.maxPlayers]?.[round]}명</span><small>{record?(record.success?'성공':'실패'):`ROUND ${round+1}`}</small></button>{open===round&&record&&<div className="round-detail"><p><b>원정대</b> 리더 {name(record.leaderId)} · {record.team.map(name).join(', ')}</p><p><b>찬반</b> {game.players.map(player=>`${player.nickname} ${record.votes[player.id]?'찬성':'반대'}`).join(' · ')}</p><p><b>결과</b> 성공 카드 {record.team.length-record.fails}장 · 실패 카드 {record.fails}장</p></div>}</div>;})}</section>;
+  const record=open===null?undefined:game.roundHistory.find(item=>item.round===open);
+  return <section className={`round-history ${showSlots?'':'round-history-detail-only'}`} aria-label="원정 라운드 기록">{showSlots&&Array.from({length:5},(_,round)=>{const item=game.roundHistory.find(entry=>entry.round===round);const state=item?.success===true?'success':item?.success===false?'fail':'pending';return <div className="round-history-item" key={round}><button type="button" disabled={!item} className={`${state} ${round===game.round?'current':''}`} onClick={()=>setOpen(open===round?null:round)}><span>{QUEST_SIZES[game.maxPlayers]?.[round]}명</span><small>{item?(item.success===undefined?'진행 중':item.success?'성공':'실패'):`ROUND ${round+1}`}</small></button></div>;})}{record&&<div className="round-detail"><p><b>원정대</b> 리더 {name(record.leaderId)} · {record.team.map(name).join(', ')}</p><p><b>찬반</b> {Object.keys(record.votes).length===game.players.length?game.players.map(player=>`${player.nickname} ${record.votes[player.id]?'찬성':'반대'}`).join(' · '):'투표 진행 중'}</p><p><b>결과</b> {record.fails===undefined?'원정 결과 대기 중':`성공 카드 ${record.team.length-record.fails}장 · 실패 카드 ${record.fails}장`}</p></div>}</section>;
 }
 
 function ActiveRoles({game}:{game:ClientGameState}){
@@ -169,6 +169,7 @@ function Board({game}:{game:ClientGameState}){
   const[team,setTeam]=useState<string[]>([]);
   const[approve,setApprove]=useState<boolean|null>(null);
   const[questCard,setQuestCard]=useState<'success'|'fail'|null>(null);
+  const[openRound,setOpenRound]=useState<number|null>(null);
   const me=game.playerId,leader=game.leaderId===me;
   const phase=game.phase;
   const leaderName=game.players.find(p=>p.id===game.leaderId)?.nickname;
@@ -181,16 +182,17 @@ function Board({game}:{game:ClientGameState}){
       <div className="tableau" aria-label="원정 진행도">
         {sizes.map((size,i)=>{
           const result=(game.results as any)[i];
-          return <div className={`quest-slot ${result??''} ${i===game.round?'current':''}`} key={`${i}-${result??''}`}>
+          const record=game.roundHistory.find(item=>item.round===i);
+          return <button type="button" disabled={!record} onClick={()=>setOpenRound(openRound===i?null:i)} className={`quest-slot ${result??''} ${i===game.round?'current':''}`} key={`${i}-${result??''}`}>
             {result==='success'?<ShieldIcon size={16}/>:result==='fail'?<SwordsIcon size={16}/>:<span>{size}</span>}
-          </div>;
+          </button>;
         })}
       </div>
       <div className="leader-row" aria-label="현재 리더와 부결 횟수">
         <CrownIcon size={15}/><span>리더 <b>{leaderName}</b></span>
         <div className="reject-track">{Array.from({length:5}).map((_,i)=><i className={i<game.rejectCount?'used':''} key={i}/>)}</div>
       </div>
-      <RoundHistory game={game}/>
+      <RoundHistory game={game} open={openRound} setOpen={setOpenRound}/>
     </header>
 
     <main className={`board${phase==='assassination'?' tense':''}`}>
