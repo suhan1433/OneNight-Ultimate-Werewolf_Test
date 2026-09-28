@@ -181,13 +181,14 @@ function Board({game}:{game:ClientGameState}){
   const[team,setTeam]=useState<string[]>([]);
   const[approve,setApprove]=useState<boolean|null>(null);
   const[questCard,setQuestCard]=useState<'success'|'fail'|null>(null);
+  const[privateQuestOpen,setPrivateQuestOpen]=useState(false);
   const[openRound,setOpenRound]=useState<number|null>(null);
   const me=game.playerId,leader=game.leaderId===me;
   const phase=game.phase;
   const leaderPlayer=game.players.find(p=>p.id===game.leaderId);
   const leaderName=leaderPlayer?.nickname;
   const teamChips=(ids:string[])=><div className="team-chips">{ids.map(id=><span className="chip" key={id}>{game.players.find(p=>p.id===id)?.nickname}</span>)}</div>;
-  useEffect(()=>{setTeam([]);setApprove(null);setQuestCard(null);},[phase,game.round,game.proposedTeam.join(',')]);
+  useEffect(()=>{setTeam([]);setApprove(null);setQuestCard(null);setPrivateQuestOpen(false);},[phase,game.round,game.proposedTeam.join(',')]);
 
   return <>
     <header className="game-status" aria-label="현재 원정 현황">
@@ -240,10 +241,17 @@ function Board({game}:{game:ClientGameState}){
         {game.proposedTeam.includes(me)?
           game.players.find(p=>p.id===me)?.hasQuestCard?
             <div className="card-back"><CheckIcon size={18}/><span>제출 완료</span></div>
+          :!privateQuestOpen?<div className="quest-privacy-cover">
+            <div className="card-back"><ShieldIcon size={22}/><span>비공개 카드</span></div>
+            <p>주변을 확인한 뒤 카드 선택을 열어 주세요.</p>
+            <button className="primary seal-btn" onClick={()=>setPrivateQuestOpen(true)}>개인 카드 선택 열기</button>
+          </div>
           :<><div className="quest-cards">
             <button className={`qcard success${questCard==='success'?' active':''}`} onClick={()=>setQuestCard('success')}><FactionSeal team="good" size={42}/><span>원정 성공</span><small>SUCCESS</small></button>
-            {ROLE_DEFINITIONS[game.selfRole!].team==='evil'&&<button className={`qcard fail${questCard==='fail'?' active':''}`} onClick={()=>setQuestCard('fail')}><FactionSeal team="evil" size={42}/><span>원정 실패</span><small>FAIL</small></button>}
-          </div><button className="primary seal-btn" disabled={!questCard} onClick={()=>questCard&&call('QUEST_CARD',{roomCode:game.roomCode,card:questCard})}>원정 {questCard==='success'?'성공':'실패'} 선택하기 ({game.questCardsCompleted}/{game.proposedTeam.length})</button></>
+            <span className="qcard-disabled-wrap" title="선의 세력은 원정 실패를 선택할 수 없습니다.">
+              <button className={`qcard fail${questCard==='fail'?' active':''}`} disabled={ROLE_DEFINITIONS[game.selfRole!].team==='good'} onClick={()=>setQuestCard('fail')} aria-describedby={ROLE_DEFINITIONS[game.selfRole!].team==='good'?'fail-card-disabled-note':undefined}><FactionSeal team="evil" size={42}/><span>원정 실패</span><small>{ROLE_DEFINITIONS[game.selfRole!].team==='good'?'선택 불가':'FAIL'}</small></button>
+            </span>
+          </div>{ROLE_DEFINITIONS[game.selfRole!].team==='good'&&<p className="quest-rule-note" id="fail-card-disabled-note">선의 세력은 원정 실패를 선택할 수 없습니다.</p>}<div className="quest-actions"><button className="secondary" onClick={()=>setPrivateQuestOpen(false)}>화면 가리기</button><button className="primary seal-btn" disabled={!questCard} onClick={()=>questCard&&call('QUEST_CARD',{roomCode:game.roomCode,card:questCard})}>원정 {questCard==='success'?'성공':'실패'} 선택하기 ({game.questCardsCompleted}/{game.proposedTeam.length})</button></div></>
         :<div className="card-back"><span>원정대가 제출 중</span><Dots/></div>}
       </div>}
 
