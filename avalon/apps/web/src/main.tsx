@@ -82,6 +82,7 @@ function Home(){
   const[nickname,setNickname]=useState('');
   const[code,setCode]=useState('');
   const[count,setCount]=useState(5);
+  const[countPickerOpen,setCountPickerOpen]=useState(false);
   const[opts,setOpts]=useState<AvalonOptions>(base);
   const balance=TEAM_BALANCE[count]!;
   const evilSpecialLimit=balance.evil-1;
@@ -94,11 +95,13 @@ function Home(){
     <p>원탁은 하나, 충성은 둘로 갈렸다</p>
     <div className="panel">
       <input placeholder="내 닉네임" value={nickname} onChange={e=>setNickname(e.target.value)}/>
-      <div className="row">
-        <label>인원 <b>{count}명</b></label>
-        <input type="range" min="5" max="10" value={count} onChange={e=>setCount(+e.target.value)}/>
+      <div className="player-count-picker">
+        <span className="count-picker-label">인원:</span>
+        <button type="button" className="count-picker-trigger" onClick={()=>setCountPickerOpen(open=>!open)} aria-expanded={countPickerOpen}>
+          <b>{count}명</b><span className="count-picker-chevron">{countPickerOpen?'−':'+'}</span>
+        </button>
+        {countPickerOpen&&<div className="count-picker-options" role="group" aria-label="게임 인원 선택">{[5,6,7,8,9,10].map(n=><button type="button" className={n===count?'selected':''} onClick={()=>{setCount(n);setCountPickerOpen(false);}} key={n}>{n}<small>명</small></button>)}</div>}
       </div>
-      <div className="ticks">{[5,6,7,8,9,10].map(n=><span className={n===count?'active':''} key={n}>{n}</span>)}</div>
       <div className="role-limit-card">
         <div><FactionSeal team="good" size={28}/><span>선 <b>{balance.good}명</b></span><small>멀린 필수 · 퍼시벌 선택 가능</small></div>
         <div><FactionSeal team="evil" size={28}/><span>악 <b>{balance.evil}명</b></span><small>암살자 필수 · 특수 역할 {evilSpecialSelected}/{evilSpecialLimit}</small></div>
@@ -148,10 +151,19 @@ function Lobby({game}:{game:ClientGameState}){
     <div className="lobby-layout">
       <div className="lobby-code"><small>ROOM CODE</small><div className="code" onClick={copy}>{game.roomCode}</div><span className="copy-hint">{copied?'복사됨!':'눌러서 코드 복사'}</span><span className="muted">{game.players.length}/{game.maxPlayers}명 참가</span></div>
       <div className="lobby-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=><span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} size={14}/>{ROLE_DEFINITIONS[role].name}</span>)}</div></div>
-      <div className="lobby-players">{game.players.map(p=><div className={`plate${p.ready?' ready':''}${p.isBot?' bot':''}`} key={p.id}>{p.ready?<CheckIcon size={14}/>:<i className="dot"/>}<span>{p.nickname}</span>{p.isBot&&<small>TEST BOT</small>}</div>)}</div>
+      <div className="lobby-players" style={{'--lobby-columns':Math.min(game.maxPlayers,5)} as React.CSSProperties}>
+        {Array.from({length:game.maxPlayers},(_,index)=>{
+          const player=game.players[index];
+          return player
+            ?<div className={`plate${player.ready?' ready':''}${player.isBot?' bot':''}`} key={player.id}><span className="seat-number">{index+1}</span>{player.ready?<CheckIcon size={14}/>:<i className="dot"/>}<span>{player.nickname}</span>{player.isBot&&<small>TEST BOT</small>}</div>
+            :<div className="plate empty-seat" key={`empty-${index}`}><span className="seat-number">{index+1}</span><i>+</i><small>빈 자리</small></div>;
+        })}
+      </div>
     </div>
-    <button onClick={()=>call('PLAYER_READY',{roomCode:game.roomCode})}>{me.ready?'준비 취소':'준비 완료'}</button>
-    {game.playerId===game.hostId&&<button className="primary" onClick={()=>call('GAME_START',{roomCode:game.roomCode})}>게임 시작</button>}
+    <div className="lobby-actions">
+      <button className={`ready-button${me.ready?' is-ready':''}`} onClick={()=>call('PLAYER_READY',{roomCode:game.roomCode})}>{me.ready?<><CheckIcon size={17}/> 준비 완료됨</>:'준비 완료'}</button>
+      {game.playerId===game.hostId&&<button className="primary start-button" onClick={()=>call('GAME_START',{roomCode:game.roomCode})}><CrownIcon size={17}/> 게임 시작</button>}
+    </div>
   </section>;
 }
 
@@ -277,7 +289,7 @@ function Result({game}:{game:ClientGameState}){
         </div>;
       })}
     </div>
-    {game.playerId===game.hostId&&<button className="primary" onClick={()=>call('GAME_RESTART',{roomCode:game.roomCode})}>새 게임</button>}
+    {game.playerId===game.hostId&&<button className="primary restart-button" onClick={()=>call('GAME_RESTART',{roomCode:game.roomCode})}><ShieldIcon size={17}/> 새 게임 시작</button>}
   </section>;
 }
 
@@ -333,8 +345,7 @@ function App(){
   };
   return <>
     <div className="app">
-      <div className="utility-actions"><button className="help-button" onClick={()=>setHelpOpen(true)} aria-label="게임 도움말">?</button>{game?.selfRole&&game.phase!=='result'&&<button className="dossier-button" onClick={()=>setDossierOpen(value=>!value)}><EyeIcon size={15}/> 내 역할</button>}</div>
-      {game&&<button className="leave-room" onClick={leave} aria-label="방 나가기"><span>↗</span> 방 나가기</button>}
+      <div className="utility-actions">{game&&<button className="leave-room" onClick={leave} aria-label="방 나가기"><span>↗</span> 나가기</button>}<button className="help-button" onClick={()=>setHelpOpen(true)} aria-label="게임 도움말">?</button>{game?.selfRole&&game.phase!=='result'&&<button className="dossier-button" onClick={()=>setDossierOpen(value=>!value)}><EyeIcon size={15}/> 내 역할</button>}</div>
       {!game?<Home/>
         :game.phase==='lobby'?<Lobby game={game}/>
         :game.phase==='role_reveal'?<Role game={game}/>
