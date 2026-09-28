@@ -212,7 +212,6 @@ function Board({game}:{game:ClientGameState}){
           </div>
           <button className="primary seal-btn" disabled={approve===null} onClick={()=>approve!==null&&call('TEAM_VOTE',{roomCode:game.roomCode,approve})}>원정 투표하기 ({game.teamVotesCompleted}/{game.players.length})</button>
         </>}
-        <p className="muted">{game.teamVotesCompleted}/{game.players.length}명 투표</p>
       </div>}
 
       {phase==='vote_result'&&<>
@@ -233,7 +232,6 @@ function Board({game}:{game:ClientGameState}){
             {ROLE_DEFINITIONS[game.selfRole!].team==='evil'&&<button className={`qcard fail${questCard==='fail'?' active':''}`} onClick={()=>setQuestCard('fail')}><FactionSeal team="evil" size={42}/><span>원정 실패</span><small>FAIL</small></button>}
           </div><button className="primary seal-btn" disabled={!questCard} onClick={()=>questCard&&call('QUEST_CARD',{roomCode:game.roomCode,card:questCard})}>원정 {questCard==='success'?'성공':'실패'} 선택하기 ({game.questCardsCompleted}/{game.proposedTeam.length})</button></>
         :<div className="card-back"><span>원정대가 제출 중</span><Dots/></div>}
-        <p className="muted">{game.questCardsCompleted}/{game.proposedTeam.length}장 제출</p>
       </div>}
 
       {phase==='quest_result'&&<>
