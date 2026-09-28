@@ -231,7 +231,7 @@ function Board({game}:{game:ClientGameState}){
         <h2 className={`reveal-pop ${game.voteResult?.passed?'goodtext':'eviltext'}`}>{game.voteResult?.passed?'원정대 승인':'원정대 부결'}</h2>
         <div className="revealed-votes">{game.revealedVotes?.map(v=>{const player=game.players.find(p=>p.id===v.id);return <div className={v.approve?'approve':'reject'} key={v.id}>{v.approve?<CheckIcon size={15}/>:<SwordsIcon size={15}/>}<span>{player?.nickname}</span></div>})}</div>
         <div className="tally-row"><ShieldIcon size={16}/><b>{game.voteResult?.approve}</b><SwordsIcon size={16}/><b>{game.voteResult?.reject}</b></div>
-        {me===game.hostId&&<button className="primary" onClick={()=>call('VOTE_RESULT_CONTINUE',{roomCode:game.roomCode})}>계속</button>}
+        <button className="primary" disabled={game.hasContinued} onClick={()=>call('VOTE_RESULT_CONTINUE',{roomCode:game.roomCode})}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button>
       </>}
 
       {phase==='quest'&&<div className="quest-stage">
@@ -253,7 +253,7 @@ function Board({game}:{game:ClientGameState}){
         <h2 className={`reveal-pop ${game.questResult?.success?'goodtext':'eviltext'}`}>{game.questResult?.success?'원정 성공!':'원정 실패'}</h2>
         <div className="tally-row">{Array.from({length:game.questResult?.fails??0}).map((_,i)=><SwordsIcon size={16} key={i}/>)}{!game.questResult?.fails&&<ShieldIcon size={16}/>}</div>
         <p className="muted">실패 카드 {game.questResult?.fails}장{game.round===3&&game.maxPlayers>=7?' · 이번 원정은 실패 2장부터 실패':''}</p>
-        {me===game.hostId&&<button className="primary" onClick={()=>call('QUEST_RESULT_CONTINUE',{roomCode:game.roomCode})}>계속</button>}
+        <button className="primary" disabled={game.hasContinued} onClick={()=>call('QUEST_RESULT_CONTINUE',{roomCode:game.roomCode})}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button>
       </>}
 
       {phase==='assassination'&&<>
