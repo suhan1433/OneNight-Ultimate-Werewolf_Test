@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Noto+Serif+KR:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
 
 :root{
   --ink-950:#05070d;--ink-900:#0b1220;--ink-800:#141d30;--ink-700:#1c2740;
@@ -7,7 +7,7 @@
   --good-500:#5f92d1;--good-300:#8bb8ec;
   --evil-500:#c14a5f;--evil-300:#e0566f;
   --ease-out:cubic-bezier(.2,.8,.2,1);
-  font-family:'Noto Serif KR',serif;color:var(--parchment);background:var(--ink-950)
+  font-family:'Noto Sans KR',system-ui,sans-serif;color:var(--parchment);background:var(--ink-950)
 }
 *{box-sizing:border-box}
 html{overflow-x:hidden;background:var(--ink-950)}
@@ -34,16 +34,16 @@ body:after{content:'';position:fixed;inset:0;pointer-events:none;background:radi
 .seal{color:var(--gold-300);animation:emblemGlow 5s ease-in-out infinite}
 .faction-seal{fill:none;stroke:currentColor;stroke-width:2.2;filter:drop-shadow(0 0 7px currentColor)}
 .faction-seal.good{color:var(--good-300)}.faction-seal.evil{color:var(--evil-300)}
-h1,h2,strong,button,.code{font-family:Cinzel,'Noto Serif KR',serif;color:var(--gold-300)}
-h1{font-size:clamp(42px,9vw,70px);margin:10px 0 0;letter-spacing:.12em}
-h2{letter-spacing:.04em}
+h1,h2{font-family:Manrope,'Noto Sans KR',sans-serif;color:var(--gold-300)}
+h1{font-size:clamp(40px,9vw,68px);margin:10px 0 0;letter-spacing:-.055em;font-weight:800}
+h2{letter-spacing:-.035em;font-weight:800}
 .home>p{color:var(--muted);margin:10px 0 0}
 
 .panel,.role,.roster{margin:24px auto;padding:24px;background:linear-gradient(150deg,#182338eF,#101827eF);border:1px solid #c9a35c55;box-shadow:0 20px 55px #0008;border-radius:2px}
 .panel{display:grid;gap:14px;text-align:left}
 
-input{width:100%;min-width:0;padding:13px;background:#05070d99;border:1px solid #c9a35c55;color:#fff;font:inherit;border-radius:2px;transition:border-color .2s ease,box-shadow .2s ease}
-input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px #c9a35c2b}
+input{width:100%;min-width:0;padding:13px 14px;background:#08101dcc;border:1px solid #8fa6c94d;color:#fff;font:inherit;border-radius:12px;transition:border-color .2s ease,box-shadow .2s ease,background .2s ease}
+input:focus{outline:none;border-color:#e9c77d;box-shadow:0 0 0 4px #e9c77d22;background:#0b1524}
 
 .player-count-picker{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px}
 .count-picker-label{color:var(--muted);font-size:13px;white-space:nowrap}
@@ -66,14 +66,16 @@ input:focus{outline:none;border-color:var(--gold-500);box-shadow:0 0 0 3px #c9a3
 .players button.selected{position:relative}
 .players button.selected:after{content:'';position:absolute;top:-4px;right:-4px;width:12px;height:12px;border-radius:50%;background:var(--gold-300);box-shadow:0 0 0 2px var(--ink-900)}
 
-button{padding:12px 18px;border:1px solid #c9a35c88;background:var(--ink-800);color:var(--parchment);cursor:pointer;font-size:15px;border-radius:2px;transition:border-color .18s ease,background .18s ease,transform .12s ease,opacity .18s ease}
-button:hover:not(:disabled),button.selected,.chosen{border-color:var(--gold-300);background:#c9a35c2b}
-button:active:not(:disabled){transform:scale(.96)}
-button:disabled{opacity:.35;cursor:not-allowed}
-button:focus-visible{outline:2px solid var(--gold-300);outline-offset:2px}
+button{padding:12px 18px;border:1px solid #93a9c44d;background:linear-gradient(135deg,#21314ab8,#111c2fe0);box-shadow:inset 0 1px #ffffff12,0 7px 18px #00000024;color:#eef3fb;cursor:pointer;font-family:'Noto Sans KR',system-ui,sans-serif;font-size:14px;font-weight:700;letter-spacing:-.025em;border-radius:12px;transition:border-color .18s ease,background .18s ease,box-shadow .18s ease,transform .15s var(--ease-out),opacity .18s ease}
+button:hover:not(:disabled),button.selected,.chosen{border-color:#e8c67d99;background:linear-gradient(135deg,#304664dd,#17263de8);box-shadow:inset 0 1px #ffffff1c,0 10px 24px #00000038;transform:translateY(-2px)}
+button:active:not(:disabled){transform:translateY(0) scale(.98)}
+button:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+button:focus-visible{outline:2px solid #f4d996;outline-offset:3px}
 
-.primary{background:linear-gradient(#f0d18a,#b98c40);color:#1b1307;font-weight:bold;border-color:transparent;display:inline-flex;align-items:center;gap:8px;justify-content:center}
-.primary:hover:not(:disabled){background:linear-gradient(#f7dea0,#c9993f)}
+.primary{position:relative;overflow:hidden;background:linear-gradient(135deg,#ffe0a0,#d9a94f 52%,#b77b2d);box-shadow:inset 0 1px #fff3c9aa,0 10px 26px #bd823344;color:#211607;font-weight:800;border-color:#ffe7ae88;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.primary:before{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 24%,#fff8d866 46%,transparent 62%);transform:translateX(-120%);transition:transform .45s ease}
+.primary:hover:not(:disabled){background:linear-gradient(135deg,#ffebbb,#e6b85d 52%,#c48734);box-shadow:inset 0 1px #fff7d8,0 14px 30px #bd823366;color:#211607}
+.primary:hover:not(:disabled):before{transform:translateX(120%)}
 .seal-btn{width:100%}
 
 .join{display:flex;gap:8px}
@@ -184,6 +186,28 @@ main.board.tense:before{content:'';position:fixed;inset:0;pointer-events:none;ba
 main.board.tense>*{position:relative;z-index:1}
 
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:14px 20px;background:#8d293c;border:1px solid var(--evil-300);color:white;cursor:pointer;border-radius:2px;animation:toastIn .35s var(--ease-out) both,toastOut .5s ease 2.45s forwards;box-shadow:0 12px 30px #0007}
+
+/* ---- contemporary controls / type ---- */
+.code,.count-picker-options button,.lobby-code>small,.lobby-roles>b,.lobby-players .seat-number,.help-modal header small,.help-scroll h3,.role-dossier h3,.chat-title,.phase-ribbon .ribbon-kicker,.selection-core strong,.qcard small{
+  font-family:Manrope,'Noto Sans KR',sans-serif;
+}
+.code{font-family:Manrope,'Noto Sans KR',sans-serif;font-weight:800;letter-spacing:.08em}
+.count-picker-options{border-radius:14px;backdrop-filter:blur(16px)}
+.count-picker-options button{border-radius:9px;font-family:Manrope,'Noto Sans KR',sans-serif}
+.count-picker-options button small{font-family:'Noto Sans KR',sans-serif}
+.count-picker-options button.selected{color:#271805;background:linear-gradient(135deg,#ffe3a5,#d7a247);box-shadow:0 5px 12px #0004}
+.count-picker-trigger{border-radius:12px}
+.count-picker-chevron{border-color:#dcb86f88;background:#ffffff08}
+.role-chip{border-radius:999px}
+.panel,.role,.roster{border-radius:18px;border-color:#93a9c43d;backdrop-filter:blur(12px)}
+.ready-button,.dossier-button,.chat-toggle{border-radius:999px}
+.help-button{font-family:Manrope,'Noto Sans KR',sans-serif;font-weight:800}
+.seat .plate,.seat button{border-radius:12px}
+.token{border-radius:28px}
+.qcard{border-radius:16px}
+.qcard:before{border-radius:10px}
+.round-history-item>button{border-radius:10px}
+.role-chip.chosen:after{color:#ffe0a0}
 
 @media(max-width:500px){
   .app{align-items:center;justify-content:flex-start;padding:56px 16px calc(120px + env(safe-area-inset-bottom))}
