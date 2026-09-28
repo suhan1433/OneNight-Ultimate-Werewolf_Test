@@ -184,7 +184,8 @@ function Board({game}:{game:ClientGameState}){
   const[openRound,setOpenRound]=useState<number|null>(null);
   const me=game.playerId,leader=game.leaderId===me;
   const phase=game.phase;
-  const leaderName=game.players.find(p=>p.id===game.leaderId)?.nickname;
+  const leaderPlayer=game.players.find(p=>p.id===game.leaderId);
+  const leaderName=leaderPlayer?.nickname;
   const teamChips=(ids:string[])=><div className="team-chips">{ids.map(id=><span className="chip" key={id}>{game.players.find(p=>p.id===id)?.nickname}</span>)}</div>;
   useEffect(()=>{setTeam([]);setApprove(null);setQuestCard(null);},[phase,game.round,game.proposedTeam.join(',')]);
 
@@ -205,7 +206,7 @@ function Board({game}:{game:ClientGameState}){
         <h2>원정대 구성 ({game.questSize}명)</h2>
         <RoundTable
           players={game.players}
-          center={<div className="selection-core"><FactionSeal team="good" size={38}/><strong>{team.length} <small>/ {game.questSize}</small></strong><span>{leader?'원정대를 지명하세요':'리더가 원정대를 구성 중입니다'}{!leader&&<Dots/>}</span></div>}
+          center={<div className="selection-core"><FactionSeal team="good" size={38}/><strong>{team.length} <small>/ {game.questSize}</small></strong><span>{leader?'원정대를 지명하세요':leaderPlayer?.isBot?`${leaderName}이(가) 원정대를 고르는 중입니다`:'리더가 원정대를 구성 중입니다'}{!leader&&<Dots/>}</span></div>}
           renderSeat={p=><button disabled={!leader} className={team.includes(p.id)?'selected':''} onClick={()=>setTeam(team.includes(p.id)?team.filter(x=>x!==p.id):team.length<game.questSize?[...team,p.id]:team)}>{p.nickname}</button>}
         />
         {leader&&<div className="selection-summary"><span>선택된 기사</span>{team.length?teamChips(team):<em>아직 선택된 기사가 없습니다</em>}</div>}
