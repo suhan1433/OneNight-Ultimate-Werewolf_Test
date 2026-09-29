@@ -20,17 +20,20 @@
 .name-reveal{display:inline-flex;align-items:center;gap:8px;padding:8px 14px 8px 8px;border:1px solid #8a7440;border-radius:999px;background:#dcbc6a1c;box-shadow:0 0 22px #dcbc6a1f}
 .name-reveal .avatar{width:30px;height:30px;background:linear-gradient(135deg,#c79a3c,#584226);color:#fff7df}
 
-/* 카드 공개: 뒤집히며 금빛이 번진다 */
-.night-card-row{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;perspective:900px}
-.night-card-wrap{width:114px;color:var(--muted);font-size:.68rem}
+/* 카드 공개: 뒤집히며 금빛이 번진다
+   ※ filter는 transform-style:preserve-3d를 flat으로 강제하므로 사용 금지 (그림자는 box-shadow로).
+   ※ perspective는 회전하는 버튼의 바로 위 부모(.night-card-wrap)에 지정. */
+.night-card-row{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+.night-card-wrap{width:114px;color:var(--muted);font-size:.68rem;perspective:900px}
 .night-card-wrap>small{display:block;height:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.night-role-card{position:relative;display:block;width:114px;height:154px;padding:0;cursor:pointer;transform-style:preserve-3d;filter:drop-shadow(0 14px 22px #000a);background:transparent;border:0}
-.night-role-card:hover{filter:drop-shadow(0 14px 22px #000a) drop-shadow(0 0 12px #dcbc6a66)}
+.night-role-card{position:relative;display:block;width:114px;height:154px;padding:0;cursor:pointer;transform-style:preserve-3d;background:transparent;border:0}
+.night-role-card:hover .night-role-face{box-shadow:0 14px 22px #000a,0 0 12px #dcbc6a66}
+.night-role-card:hover .night-role-front{box-shadow:inset 0 0 30px #dcbc6a22,0 14px 22px #000a,0 0 12px #dcbc6a66}
 .night-role-card:focus-visible{border-radius:14px}
-.night-role-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #b09048;border-radius:14px;backface-visibility:hidden}
+.night-role-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #b09048;border-radius:14px;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 14px 22px #000a}
 .night-role-face:before{content:'';position:absolute;inset:5px;border-radius:9px;border:1px solid #dcbc6a55;pointer-events:none}
 .night-role-back{background:radial-gradient(circle at 50% 30%,#3a2f78,#15102e);color:var(--gold);font-size:2.1rem;text-shadow:0 0 18px #dcbc6a88}
-.night-role-front{transform:rotateY(180deg);padding:8px;color:#fbf0cf;background:radial-gradient(circle at 50% 28%,#4a3c88,#171331 75%);box-shadow:inset 0 0 30px #dcbc6a22}
+.night-role-front{transform:rotateY(180deg);padding:8px;color:#fbf0cf;background:radial-gradient(circle at 50% 28%,#4a3c88,#171331 75%);box-shadow:inset 0 0 30px #dcbc6a22,0 14px 22px #000a}
 .night-role-front span{font-size:2.2rem;filter:drop-shadow(0 4px 12px #dcbc6a66)}
 .night-role-front b{margin-top:5px;font:900 .92rem var(--serif);word-break:keep-all}
 .night-role-front small{color:var(--gold);margin-top:4px;font-size:.61rem}
