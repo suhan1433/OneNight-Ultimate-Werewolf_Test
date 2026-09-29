@@ -25,6 +25,7 @@ import "./styles.css";
 import "./leave.css";
 import "./night-results.css";
 import "./night-intro.css";
+import "./immersion.css";
 
 const req = (game: ClientGameState) => ({
   roomCode: game.roomCode,
@@ -78,6 +79,8 @@ function App() {
   return (
     <main className={`phase-${game?.phase ?? "home"} ${game?.phase === "day" ? "day" : ""}`}>
       <div className="mist" />
+      <div className="meteor" aria-hidden="true" />
+      <div className="grain" aria-hidden="true" />
       {game && (
         <>
           <button
@@ -1064,7 +1067,7 @@ function Reveal({ game }: { game: ClientGameState }) {
       <motion.div
         className="flip"
         animate={{ rotateY: flipped ? 180 : 0 }}
-        onClick={() => setFlipped(true)}
+        onClick={() => { if (!flipped) buzz(30); setFlipped(true); }}
       >
         <div className="card-face back">
           ✦<small>탭하여 역할 확인</small>
@@ -1076,6 +1079,9 @@ function Reveal({ game }: { game: ClientGameState }) {
           <p>{r?.description}</p>
         </div>
       </motion.div>
+      {flipped && (
+        <div className={`flip-burst faction-${r?.faction ?? "village"}`} aria-hidden="true" />
+      )}
       <button
         disabled={!flipped || me.hasConfirmedCard}
         onClick={() => event("CARD_CONFIRM", req(game))}
@@ -1116,7 +1122,7 @@ function Night({ game }: { game: ClientGameState }) {
       </section>
     );
   return (
-    <section className="center night">
+    <section className="center night" data-faction={role?.faction}>
       <div className="crescent">☾</div>
       <div className="eyebrow">NIGHT · {a?.order ?? "—"}</div>
       <h1>
@@ -1392,7 +1398,8 @@ function Day({ game }: { game: ClientGameState }) {
     }
   }, [remain]);
   return (
-    <section>
+    <section className="day-scene">
+      <div className="dawn" aria-hidden="true" />
       <Header kicker="DAYBREAK" title="날이 밝았습니다" />
       <div className="sun-timer">
         <small>남은 토론 시간</small>
@@ -1494,7 +1501,7 @@ function Result({ game }: { game: ClientGameState }) {
   );
   return (
     <section>
-      <div className="winner">
+      <div className={`winner faction-${r.winners[0] ?? "none"}`}>
         <div>✦</div>
         <span>THE NIGHT IS OVER</span>
         <h1>
@@ -1556,7 +1563,11 @@ function Result({ game }: { game: ClientGameState }) {
       <Panel>
         <h3>득표 집계</h3>
         {voteRanking.map(([id, count]) => (
-          <p className="vote-line" key={id}>
+          <p
+            className="vote-line has-bar"
+            style={{ "--w": count / Math.max(1, voteRanking[0]![1]) } as React.CSSProperties}
+            key={id}
+          >
             <b>{name(r, id)}</b>
             <strong>{count}표</strong>
           </p>
