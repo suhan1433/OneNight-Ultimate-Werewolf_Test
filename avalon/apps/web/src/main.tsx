@@ -1,11 +1,13 @@
 import React,{useEffect,useRef,useState} from 'react';
 import ReactDOM from 'react-dom/client';
-import {ROLE_DEFINITIONS,type AvalonOptions,type ClientGameState} from '@werewolf/shared';
+import {ROLE_DEFINITIONS,type AvalonOptions,type ClientGameState,type DelegableAssassinRole} from '@werewolf/shared';
 import {useGame} from './store';
 import {emit,saveSession} from './socket';
 import './styles.css';
 
-const base={percival:false,morgana:false,mordred:false,oberon:false};
+const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false};
+const ROLE_OPTION_KEYS=['assassin','percival','morgana','mordred','oberon'] as const;
+const DELEGABLE_ASSASSIN_ROLES=['morgana','mordred','oberon'] as const;
 const call=(name:string,data:any)=>emit(name,data).catch(e=>useGame.getState().setError(e.message));
 
 // official Avalon quest-size chart (players -> required team size per round)
@@ -62,7 +64,7 @@ function PhaseRibbon({game}:{game:ClientGameState}){
     vote_result:['원탁의 판결','투표 토큰을 공개하고 원정 승인 여부를 확인합니다.'],
     quest:['원정의 결단','원정대원만 자신의 원정 카드를 비밀리에 제출합니다.'],
     quest_result:['원정 보고','섞인 원정 카드의 결과가 공개됩니다.'],
-    assassination:['마지막 암살','암살자는 멀린이라고 생각하는 기사를 지목합니다.'],
+    assassination:['마지막 암살','암살 능력 보유자가 멀린이라고 생각하는 기사를 지목합니다.'],
   };
   const [title,description]=copy[game.phase]??['원탁','기사들이 다음 행동을 기다립니다.'];
   return <div className="phase-ribbon"><span className="ribbon-kicker">ROUND {game.round+1}</span><div><strong>{title}</strong><small>{description}</small></div></div>;
@@ -85,8 +87,17 @@ function Home(){
   const[countPickerOpen,setCountPickerOpen]=useState(false);
   const[opts,setOpts]=useState<AvalonOptions>(base);
   const balance=TEAM_BALANCE[count]!;
-  const evilSpecialLimit=balance.evil-1;
-  const evilSpecialSelected=['morgana','mordred','oberon'].filter(key=>opts[key as keyof AvalonOptions]).length;
+  const evilSpecialLimit=balance.evil-Number(opts.assassin);
+  const evilSpecialSelected=DELEGABLE_ASSASSIN_ROLES.filter(key=>opts[key]).length;
+  const delegatedRole=opts.assassinationAbilityRole;
+  const canCreate=opts.assassin||!!delegatedRole;
+  const toggleRole=(key:typeof ROLE_OPTION_KEYS[number])=>{
+    const next=!opts[key];
+    const nextOptions={...opts,[key]:next};
+    if(key==='assassin'&&next)nextOptions.assassinationAbilityRole=null;
+    if(DELEGABLE_ASSASSIN_ROLES.includes(key as DelegableAssassinRole)&&!next&&delegatedRole===key)nextOptions.assassinationAbilityRole=null;
+    setOpts(nextOptions);
+  };
   const create=async()=>{try{const s=await emit('ROOM_CREATE',{nickname,maxPlayers:count,options:opts});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
   const join=async()=>{try{const s=await emit('ROOM_JOIN',{roomCode:code,nickname});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
   return <section className="home">
@@ -104,19 +115,26 @@ function Home(){
       </div>
       <div className="role-limit-card">
         <div><FactionSeal team="good" size={28}/><span>선 <b>{balance.good}명</b></span><small>멀린 필수 · 퍼시벌 선택 가능</small></div>
-        <div><FactionSeal team="evil" size={28}/><span>악 <b>{balance.evil}명</b></span><small>암살자 필수 · 특수 역할 {evilSpecialSelected}/{evilSpecialLimit}</small></div>
+        <div><FactionSeal team="evil" size={28}/><span>악 <b>{balance.evil}명</b></span><small>선택 악 역할 {Number(opts.assassin)+evilSpecialSelected}/{balance.evil}</small></div>
       </div>
-      <p className="role-limit-hint">특수 역할은 기본 역할(멀린·암살자)을 대체합니다. 악 특수 역할은 최대 {evilSpecialLimit}명까지 선택할 수 있습니다.</p>
       <div className="options">
-        {Object.entries(opts).map(([key,on])=>{
-          const def=ROLE_DEFINITIONS[key as keyof typeof ROLE_DEFINITIONS];
+        {ROLE_OPTION_KEYS.map(key=>{
+          const on=opts[key];
+          const def=ROLE_DEFINITIONS[key];
           const blocked=def.team==='evil'&&!on&&evilSpecialSelected>=evilSpecialLimit;
-          return <button disabled={blocked} className={`role-chip ${on?'chosen':''}`} onClick={()=>setOpts({...opts,[key]:!on})} key={key}>
+          return <button disabled={blocked} className={`role-chip ${on?'chosen':''}`} onClick={()=>toggleRole(key)} key={key}>
             <RoleIcon role={key} team={def.team} size={18}/><span>{def.name}</span>
           </button>;
         })}
       </div>
-      <button className="primary seal-btn" onClick={create}><ShieldIcon size={16}/> 원탁 만들기</button>
+      {!opts.assassin&&<div className="assassination-delegation">
+        <b>암살 능력 위임</b>
+        <p>암살자가 없는 게임입니다. 선택한 악의 세력 중 멀린을 지목할 역할을 정하세요.</p>
+        {evilSpecialSelected===0?<small>먼저 모르가나, 모드레드, 오베론 중 한 역할을 선택하세요.</small>:<div role="radiogroup" aria-label="암살 능력 보유 역할">
+          {DELEGABLE_ASSASSIN_ROLES.filter(role=>opts[role]).map(role=><label key={role}><input type="radio" name="assassinationAbilityRole" checked={delegatedRole===role} onChange={()=>setOpts({...opts,assassinationAbilityRole:role})}/><RoleIcon role={role} team="evil" size={16}/>{ROLE_DEFINITIONS[role].name}</label>)}
+        </div>}
+      </div>}
+      <button className="primary seal-btn" disabled={!canCreate} onClick={create}><ShieldIcon size={16}/> 원탁 만들기</button>
       <div className="divider"><span>또는</span></div>
       <div className="join">
         <input placeholder="초대 코드" value={code} onChange={e=>setCode(e.target.value.toUpperCase())}/>
@@ -132,9 +150,10 @@ function Role({game}:{game:ClientGameState}){
   return <section className="center">
     <div className={`role ${def.team}`}>
       <RoleIcon role={role} team={def.team} size={32}/>
-      <small>{def.team==='good'?'선의 세력':'악의 세력'}</small>
+      <small>{def.team==='good'?'선의 세력':game.hasAssassinationAbility?'악의 세력 · 암살 능력 보유':'악의 세력'}</small>
       <h2>{def.name}</h2>
       <p>{def.description}</p>
+      {game.hasAssassinationAbility&&role!=='assassin'&&<p className="ability-note"><DaggerIcon size={15}/> 암살 능력: 선이 원정 3회에 성공하면 멀린을 지목할 수 있습니다.</p>}
       {game.roleIntel.length>0&&<div className="intel">{game.roleIntel.map(x=><div key={x}>{x}</div>)}</div>}
     </div>
     <button className="primary" onClick={()=>call('ROLE_CONFIRM',{roomCode:game.roomCode})}>역할 확인 완료 ({game.roleConfirmedCount}/{game.players.length})</button>
@@ -150,7 +169,7 @@ function Lobby({game}:{game:ClientGameState}){
     <h2>원탁 대기실</h2>
     <div className="lobby-layout">
       <div className="lobby-code"><small>ROOM CODE</small><div className="code" onClick={copy}>{game.roomCode}</div><span className="copy-hint">{copied?'복사됨!':'눌러서 코드 복사'}</span><span className="muted">{game.players.length}/{game.maxPlayers}명 참가</span></div>
-      <div className="lobby-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=><span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} size={14}/>{ROLE_DEFINITIONS[role].name}</span>)}</div></div>
+      <div className="lobby-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=>{const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} size={14}/>{ROLE_DEFINITIONS[role].name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</div></div>
       <div className="lobby-players" style={{'--lobby-columns':Math.min(game.maxPlayers,5)} as React.CSSProperties}>
         {Array.from({length:game.maxPlayers},(_,index)=>{
           const player=game.players[index];
@@ -174,7 +193,7 @@ function RoundHistory({game,open,setOpen,showSlots=true}:{game:ClientGameState;o
 }
 
 function ActiveRoles({game}:{game:ClientGameState}){
-  return <section className="active-roles"><b>사용 캐릭터</b>{game.activeRoles.map((role,index)=>{const def=ROLE_DEFINITIONS[role];return <span className={def.team} key={`${role}-${index}`} title={def.description}><RoleIcon role={role} team={def.team} size={14}/>{def.name}</span>;})}</section>;
+  return <section className="active-roles"><b>사용 캐릭터</b>{game.activeRoles.map((role,index)=>{const def=ROLE_DEFINITIONS[role];const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span className={def.team} key={`${role}-${index}`} title={delegated?`${def.description} 암살 능력을 함께 가집니다.`:def.description}><RoleIcon role={role} team={def.team} size={14}/>{def.name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</section>;
 }
 
 function Board({game}:{game:ClientGameState}){
@@ -257,15 +276,15 @@ function Board({game}:{game:ClientGameState}){
       </>}
 
       {phase==='assassination'&&<>
-        <h2>암살자의 마지막 기회</h2>
+        <h2>마지막 암살의 기회</h2>
         <RoundTable
           players={game.players.filter(p=>p.id!==me)}
           center={<DaggerIcon size={30}/>}
-          renderSeat={p=>game.selfRole==='assassin'?
+          renderSeat={p=>game.hasAssassinationAbility?
             <button className="target" onClick={()=>call('ASSASSIN_TARGET',{roomCode:game.roomCode,targetId:p.id})}>{p.nickname}</button>
           :<div className="plate">{p.nickname}</div>}
         />
-        {game.selfRole!=='assassin'&&<p className="waiting">암살자가 멀린을 지목하고 있습니다<Dots/></p>}
+        {!game.hasAssassinationAbility&&<p className="waiting">암살 능력 보유자가 멀린을 지목하고 있습니다<Dots/></p>}
       </>}
 
     </main>
@@ -287,7 +306,7 @@ function Result({game}:{game:ClientGameState}){
         return <div className={won?`winner ${def?.team}`:'loser'} key={p.id}>
           {def?<RoleIcon role={role!} team={def.team} size={18}/>:<span/>}
           <span>{p.nickname}</span>
-          <span className="muted">{def?def.name:'—'}</span>
+          <span className="muted">{def?`${def.name}${game.revealedRoles?.find(x=>x.id===p.id)?.hasAssassinationAbility&&role!=='assassin'?' · 암살 능력':''}`:'—'}</span>
           <strong className={`result-badge ${won?'won':'lost'}`}>{won?'승리':'패배'}</strong>
         </div>;
       })}
@@ -319,7 +338,7 @@ function HelpModal({close}:{close:()=>void}){
     <section className="help-modal" onClick={event=>event.stopPropagation()}>
       <header><div><small>THE RESISTANCE: AVALON</small><h2>게임 도움말</h2></div><button onClick={close} aria-label="도움말 닫기">×</button></header>
       <div className="help-scroll">
-        <section><h3>승리 조건</h3><div className="help-rule-grid"><div><FactionSeal team="good" size={30}/><p><b>선의 승리</b><br/>원정 3회 성공 후 암살자가 멀린을 찾지 못하면 승리합니다.</p></div><div><FactionSeal team="evil" size={30}/><p><b>악의 승리</b><br/>원정 3회 실패, 5회 연속 부결, 또는 멀린 암살 성공 시 승리합니다.</p></div></div></section>
+        <section><h3>승리 조건</h3><div className="help-rule-grid"><div><FactionSeal team="good" size={30}/><p><b>선의 승리</b><br/>원정 3회 성공 후 암살 능력 보유자가 멀린을 찾지 못하면 승리합니다.</p></div><div><FactionSeal team="evil" size={30}/><p><b>악의 승리</b><br/>원정 3회 실패, 5회 연속 부결, 또는 멀린 암살 성공 시 승리합니다.</p></div></div></section>
         <section><h3>한 라운드의 흐름</h3><ol className="help-flow"><li>리더가 정해진 인원의 원정대를 지명합니다.</li><li>전원이 찬성·반대를 비밀리에 투표하고 함께 공개합니다.</li><li>승인된 원정대원만 비밀 원정 카드를 냅니다.</li><li>성공/실패 카드 수를 공개하고 다음 리더에게 넘깁니다.</li></ol><p className="help-note">선은 반드시 <b>성공</b> 카드를 냅니다. 악은 성공 또는 실패를 선택합니다. 7명 이상 게임의 4번째 원정은 실패 카드 2장부터 실패입니다.</p></section>
         <section><h3>역할 도감</h3><div className="help-roles">{roles.map(([id,role])=><article className={role.team} key={id}><RoleIcon role={id} team={role.team} size={20}/><div><b>{role.name}</b><small>{role.team==='good'?'선의 세력':'악의 세력'}</small><p>{role.description}</p></div></article>)}</div></section>
       </div>
@@ -329,7 +348,7 @@ function HelpModal({close}:{close:()=>void}){
 
 function RoleDossier({game,close}:{game:ClientGameState;close:()=>void}){
   const role=game.selfRole!;const def=ROLE_DEFINITIONS[role];
-  return <aside className={`role-dossier ${def.team}`} aria-label="내 역할 정보"><button className="dossier-close" onClick={close} aria-label="내 역할 닫기">×</button><FactionSeal team={def.team} size={34}/><small>내 비밀 역할</small><h3>{def.name}</h3><p>{def.description}</p><div className="dossier-intel"><b>능력 · 확인한 정보</b>{game.roleIntel.length?<ul>{game.roleIntel.map(item=><li key={item}>{item}</li>)}</ul>:<p>확인할 추가 정보가 없습니다.</p>}</div></aside>;
+  return <aside className={`role-dossier ${def.team}`} aria-label="내 역할 정보"><button className="dossier-close" onClick={close} aria-label="내 역할 닫기">×</button><FactionSeal team={def.team} size={34}/><small>내 비밀 역할</small><h3>{def.name}</h3><p>{def.description}</p>{game.hasAssassinationAbility&&role!=='assassin'&&<p className="ability-note"><DaggerIcon size={15}/> 암살 능력 보유: 선이 원정 3회에 성공하면 멀린을 지목할 수 있습니다.</p>}<div className="dossier-intel"><b>능력 · 확인한 정보</b>{game.roleIntel.length?<ul>{game.roleIntel.map(item=><li key={item}>{item}</li>)}</ul>:<p>확인할 추가 정보가 없습니다.</p>}</div></aside>;
 }
 
 function App(){
