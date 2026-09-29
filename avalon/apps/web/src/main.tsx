@@ -114,8 +114,8 @@ function Home(){
         {countPickerOpen&&<div className="count-picker-options" role="group" aria-label="게임 인원 선택">{[5,6,7,8,9,10].map(n=><button type="button" className={n===count?'selected':''} onClick={()=>{setCount(n);setCountPickerOpen(false);}} key={n}>{n}<small>명</small></button>)}</div>}
       </div>
       <div className="role-limit-card">
-        <div><FactionSeal team="good" size={28}/><span>선 <b>{balance.good}명</b></span><small>멀린 필수 · 퍼시벌 선택 가능</small></div>
-        <div><FactionSeal team="evil" size={28}/><span>악 <b>{balance.evil}명</b></span><small>선택 악 역할 {Number(opts.assassin)+evilSpecialSelected}/{balance.evil}</small></div>
+        <div><FactionSeal team="good" size={34}/><span>선 <b>{balance.good}명</b></span><small>멀린 필수 · 퍼시벌 선택 가능</small></div>
+        <div><FactionSeal team="evil" size={34}/><span>악 <b>{balance.evil}명</b></span><small>선택 악 역할 {Number(opts.assassin)+evilSpecialSelected}/{balance.evil}</small></div>
       </div>
       <div className="options">
         {ROLE_OPTION_KEYS.map(key=>{
