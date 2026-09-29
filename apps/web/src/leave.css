@@ -1,51 +1,38 @@
-.leave-fab {
-  position: fixed;
-  z-index: 20;
-  top: 16px;
-  right: 68px;
-  height: 40px;
-  padding: 0 13px;
-  border: 1px solid var(--line);
-  border-radius: 30px;
-  background: #141228cc;
-  color: #e4aaa5;
-  backdrop-filter: blur(9px);
-  cursor: pointer;
-  font-size: .72rem;
+/* 상단 컨트롤: 나가기 · 음성 대화 — 게임 화면 위에 떠 있는 유리 알약 */
+.leave-fab,.voice-fab{
+  border:1px solid var(--line);border-radius:30px;background:#141232cc;backdrop-filter:blur(10px);
+  cursor:pointer;transition:border-color .2s,background .2s,transform .15s;
 }
+.leave-fab:hover,.voice-fab:hover{border-color:var(--gold)}
+.leave-fab:active,.voice-fab:active{transform:scale(.96)}
 
-main.day .leave-fab {
-  background: #fff8e8dd;
-  color: #8a3f38;
-  border-color: #caa85e;
+.leave-fab{
+  position:fixed;z-index:20;top:max(16px,calc(env(safe-area-inset-top) + 8px));right:68px;
+  height:40px;padding:0 14px;color:#e8aca6;font-size:.72rem;
 }
+.leave-fab:hover{border-color:#d9635e;background:#d9635e1a}
 
-.voice-controls {
-  position: fixed;
-  z-index: 20;
-  top: 68px;
-  right: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+.voice-controls{
+  position:fixed;z-index:20;top:max(68px,calc(env(safe-area-inset-top) + 60px));right:16px;
+  display:flex;flex-direction:column;align-items:flex-end;gap:6px;
 }
+.voice-fab{height:36px;padding:0 12px;color:#e5dcbf;font-size:.68rem}
+.voice-fab.mute{color:#efa9a2}
 
-.voice-fab {
-  height: 36px;
-  padding: 0 11px;
-  border: 1px solid var(--line);
-  border-radius: 30px;
-  background: #141228cc;
-  color: #e5dcbf;
-  backdrop-filter: blur(9px);
-  cursor: pointer;
-  font-size: .68rem;
+/* 연결 상태: 색 점으로 한눈에 */
+.voice-status{
+  display:inline-flex;align-items:center;gap:6px;margin:2px 0;padding:4px 10px;border-radius:999px;
+  background:#141232cc;border:1px solid var(--line);font-size:.67rem;color:#c8c0db;
 }
+.voice-status:before{content:'';width:7px;height:7px;border-radius:50%;background:#c8c0db;animation:pulse 1.2s infinite}
+.voice-status.ready{color:#8fd09e}
+.voice-status.ready:before{background:#8fd09e;box-shadow:0 0 10px #8fd09e;animation:none}
+.voice-status.error{color:#efa9a2}
+.voice-status.error:before{background:#efa9a2;animation:none}
 
-.voice-fab.mute { color: #efa9a2; }
-.voice-status { display:block; margin:5px 0 2px; font-size:.67rem; text-align:center; color:#c8c0db; }
-.voice-status.ready { color:#8fd09e; }
-.voice-status.error { color:#efa9a2; }
-main.day .voice-fab { background: #fff8e8dd; border-color: #caa85e; color: #4d331f; }
-main.day .voice-fab.mute { color: #9b403a; }
+/* 낮 */
+main.day .leave-fab,main.day .voice-fab,main.day .voice-status{background:#fff8e8dd;border-color:#caa85e;color:#4a2f1a}
+main.day .leave-fab{color:#8a3f38}
+main.day .voice-fab.mute{color:#9b403a}
+main.day .voice-status.ready{color:#3d7a4b}
+main.day .voice-status.error{color:#9b403a}

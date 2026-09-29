@@ -76,7 +76,7 @@ function App() {
     }
   };
   return (
-    <main className={game?.phase === "day" ? "day" : ""}>
+    <main className={`phase-${game?.phase ?? "home"} ${game?.phase === "day" ? "day" : ""}`}>
       <div className="mist" />
       {game && (
         <>
@@ -103,9 +103,10 @@ function App() {
         <motion.div
           className="shell"
           key={game?.phase ?? "home"}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
+          initial={{ opacity: 0, y: 14, filter: "blur(10px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          exit={{ opacity: 0, filter: "blur(8px)" }}
+          transition={{ duration: 0.5 }}
         >
           {game ? <Game game={game} /> : <Home />}
         </motion.div>
@@ -778,9 +779,7 @@ function ModeratorNight({ game }: { game: ClientGameState }) {
         {role?.emoji} {role?.name}
       </h1>
       <p>{role?.description}</p>
-      <div className={remain <= 2 ? "timer danger" : "timer"}>
-        {Math.max(0, remain).toFixed(1)}
-      </div>
+      <NightTimer remain={remain} total={game.settings.actionTimeLimitSeconds} />
       {remain <= 0 && useGame.getState().transitioningActionId === action?.id && (
         <p className="transitioning">다음 역할을 준비 중…</p>
       )}
@@ -803,7 +802,7 @@ function ModeratorDay({ game }: { game: ClientGameState }) {
       <Header kicker="DAYBREAK" title="날이 밝았습니다" />
       <div className="sun-timer">
         <small>남은 토론 시간</small>
-        <b>{formatTime(remain)}</b>
+        <b className={remain <= 30 ? "urgent" : ""}>{formatTime(remain)}</b>
       </div>
       <Panel>
         <h3>이번 게임의 역할</h3>
@@ -1070,7 +1069,7 @@ function Reveal({ game }: { game: ClientGameState }) {
         <div className="card-face back">
           ✦<small>탭하여 역할 확인</small>
         </div>
-        <div className="card-face front">
+        <div className={`card-face front faction-${r?.faction ?? "village"}`}>
           <span>{r?.emoji}</span>
           <h2>{r?.name}</h2>
           <b>{r && factionName(r.faction)}</b>
@@ -1124,9 +1123,7 @@ function Night({ game }: { game: ClientGameState }) {
         {role?.emoji} {role?.name}
       </h1>
       <p>{role?.description}</p>
-      <div className={remain <= 2 ? "timer danger" : "timer"}>
-        {Math.max(0, remain).toFixed(1)}
-      </div>
+      <NightTimer remain={remain} total={game.settings.actionTimeLimitSeconds} />
       {remain <= 0 && useGame.getState().transitioningActionId === a?.id && (
         <p className="transitioning">다음 역할을 준비 중…</p>
       )}
@@ -1247,6 +1244,7 @@ function NightControls({ game }: { game: ClientGameState }) {
     const next = players.includes(id)
       ? players.filter((x) => x !== id)
       : [...players.slice(-(maxPlayers - 1)), id];
+    buzz();
     setPlayers(next);
     if (next.length === maxPlayers) submit(commandFor(next, centers));
   };
@@ -1256,6 +1254,7 @@ function NightControls({ game }: { game: ClientGameState }) {
     const next = centers.includes(i)
       ? centers.filter((x) => x !== i)
       : [...centers.slice(-(max - 1)), i];
+    buzz();
     setCenters(next);
     if (next.length === needCenter) submit(commandFor(players, next));
   };
@@ -1397,7 +1396,7 @@ function Day({ game }: { game: ClientGameState }) {
       <Header kicker="DAYBREAK" title="날이 밝았습니다" />
       <div className="sun-timer">
         <small>남은 토론 시간</small>
-        <b>{formatTime(remain)}</b>
+        <b className={remain <= 30 ? "urgent" : ""}>{formatTime(remain)}</b>
       </div>
       {game.publicReveals.map((x, i) => (
         <div className="notice" key={i}>
@@ -1453,7 +1452,7 @@ function Voting({ game }: { game: ClientGameState }) {
           .map((p) => (
             <button
               className={target === p.id ? "vote selected" : "vote"}
-              onClick={() => setTarget(p.id)}
+              onClick={() => { buzz(); setTarget(p.id); }}
               disabled={me.hasVoted}
               key={p.id}
             >
@@ -1664,6 +1663,20 @@ function Help({ close }: { close: () => void }) {
           </div>
         )}
       </motion.div>
+    </div>
+  );
+}
+const buzz = (ms = 14) => navigator.vibrate?.(ms);
+function NightTimer({ remain, total }: { remain: number; total: number }) {
+  const C = 339.3;
+  const ratio = Math.min(1, Math.max(0, remain / Math.max(1, total)));
+  return (
+    <div className={remain <= 2 ? "ring-wrap danger" : "ring-wrap"}>
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle className="ring-bg" cx="60" cy="60" r="54" />
+        <circle className="ring-fg" cx="60" cy="60" r="54" strokeDashoffset={C * (1 - ratio)} />
+      </svg>
+      <div className="timer">{Math.max(0, remain).toFixed(1)}</div>
     </div>
   );
 }
