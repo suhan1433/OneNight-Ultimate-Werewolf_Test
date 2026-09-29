@@ -1490,9 +1490,6 @@ function Result({ game }: { game: ClientGameState }) {
   const win = r.winners.length
     ? r.winners.map(factionName).join(" · ")
     : "승자 없음";
-  const voteRanking = Object.entries(r.voteCounts).sort(
-    ([, a], [, b]) => b - a,
-  );
   const winners = r.players.filter((p) =>
     r.winners.includes(ROLE_DEFINITIONS[p.currentRole].faction),
   );
@@ -1558,19 +1555,6 @@ function Result({ game }: { game: ClientGameState }) {
             </strong>
             {r.executedIds.includes(p.id) && <em>☠</em>}
           </motion.div>
-        ))}
-      </Panel>
-      <Panel>
-        <h3>득표 집계</h3>
-        {voteRanking.map(([id, count]) => (
-          <p
-            className="vote-line has-bar"
-            style={{ "--w": count / Math.max(1, voteRanking[0]![1]) } as React.CSSProperties}
-            key={id}
-          >
-            <b>{name(r, id)}</b>
-            <strong>{count}표</strong>
-          </p>
         ))}
       </Panel>
       <Panel>

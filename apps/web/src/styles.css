@@ -335,7 +335,7 @@ main.phase-night:before{opacity:.35}
 @keyframes verdict{40%{transform:scale(1.06)}}
 
 /* 결과: 제목이 어둠 속에서 떠오른다 */
-.winner h1 i{animation:titleopen 1.4s .3s cubic-bezier(.2,.8,.2,1) both}
+.winner h1 i{animation:none}
 .winner>div{animation:moonrise 1.2s both,float 5s 1.2s ease-in-out infinite}
 .notice{animation:fadeup .5s both}
 

@@ -78,10 +78,6 @@ main.day:has(.sun-timer b.urgent):after{background:radial-gradient(ellipse at 50
 .winner.faction-tanner>div{color:#d0a070;text-shadow:0 0 34px #b98a5abb}
 .winner.faction-werewolf h1 i,.winner.faction-minion h1 i{background-image:linear-gradient(180deg,#ffd6da 10%,#e0707d 55%,#8e2f47)}
 .winner.faction-village h1 i{background-image:linear-gradient(180deg,#e2f0ff 10%,#8db8e8 55%,#3a5f9a)}
-.vote-line.has-bar{position:relative;border-bottom:0;padding-bottom:10px}
-.vote-line.has-bar:after{content:'';position:absolute;left:0;bottom:0;height:2px;width:100%;border-radius:2px;
-  background:linear-gradient(90deg,var(--rose),transparent);transform-origin:left;transform:scaleX(var(--w));animation:bar-in 1s .6s cubic-bezier(.2,.8,.2,1) both}
-@keyframes bar-in{from{transform:scaleX(0)}}
 .result-row:not(.dead) strong{color:var(--gold)}
 
 @media(prefers-reduced-motion:reduce){.grain,.meteor,.dawn,.flip-burst{display:none}}
