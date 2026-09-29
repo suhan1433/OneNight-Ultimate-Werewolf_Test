@@ -229,6 +229,20 @@ main.board.tense>*{position:relative;z-index:1}
   .game-status .leader-row b{display:inline-block;max-width:min(32vw,110px);overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
   .game-status .reject-track{gap:3px;margin-left:3px}
   .game-status .reject-track i{width:5px;height:5px}
+  /* Keep the round ledger in document flow on narrow screens.  The desktop
+     popover is wider than the five-column round selector and can otherwise
+     extend past (or be hidden behind) the viewport. */
+  .round-history{flex-wrap:wrap;align-items:flex-start;gap:6px}
+  .round-history-item{flex:1 1 0;min-width:0;max-width:none}
+  .round-history-item>button{min-width:0;padding-inline:1px}
+  .round-history-item>button .round-label{font-size:9px}
+  .round-history-item>button .round-meta{font-size:10px}
+  .round-detail{position:relative;top:auto;left:auto;transform:none;order:2;flex:0 0 100%;width:100%;margin-top:6px;max-width:100%;box-shadow:0 12px 28px #000a}
+  .round-detail-head{gap:8px;padding:10px;letter-spacing:.02em}
+  .round-detail-head>span{min-width:0;overflow-wrap:anywhere}
+  .round-detail-head>b{flex:none;white-space:nowrap}
+  .round-detail-section{padding:10px}
+  .leader-chip,.member-chips>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .board{padding-bottom:0}
   .board>h2,.vote-stage>h2,.quest-stage>h2{margin:8px 0 4px}
   .table{width:min(258px,78vw);margin:24px auto}
@@ -285,6 +299,10 @@ main.board.tense>*{position:relative;z-index:1}
   .table-center{padding:34px}
   .selection-core strong{font-size:27px}
   .role-chip{padding:8px 10px}
+  .round-history{gap:4px}
+  .round-history-item>button .round-label{font-size:8px;letter-spacing:0}
+  .round-history-item>button .round-meta{font-size:9px}
+  .vote-groups{grid-template-columns:1fr}
 }
 
 @media(max-height:540px) and (orientation:landscape){
