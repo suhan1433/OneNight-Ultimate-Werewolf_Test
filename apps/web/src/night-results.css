@@ -13,6 +13,7 @@
 @keyframes sweep{to{transform:translateX(120%)}}
 .private-result>small{color:var(--gold);font-size:.7rem;letter-spacing:.06em}
 .private-result h3{margin:6px 0 14px}
+.card-reveal-hint{margin:-8px 0 12px;color:var(--gold);font-size:.75rem}
 
 /* 사람 공개 */
 .name-reveal-list{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
@@ -23,7 +24,9 @@
 .night-card-row{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;perspective:900px}
 .night-card-wrap{width:114px;color:var(--muted);font-size:.68rem}
 .night-card-wrap>small{display:block;height:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.night-role-card{position:relative;width:114px;height:154px;transform-style:preserve-3d;filter:drop-shadow(0 14px 22px #000a)}
+.night-role-card{position:relative;display:block;width:114px;height:154px;padding:0;cursor:pointer;transform-style:preserve-3d;filter:drop-shadow(0 14px 22px #000a);background:transparent;border:0}
+.night-role-card:hover{filter:drop-shadow(0 14px 22px #000a) drop-shadow(0 0 12px #dcbc6a66)}
+.night-role-card:focus-visible{border-radius:14px}
 .night-role-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #b09048;border-radius:14px;backface-visibility:hidden}
 .night-role-face:before{content:'';position:absolute;inset:5px;border-radius:9px;border:1px solid #dcbc6a55;pointer-events:none}
 .night-role-back{background:radial-gradient(circle at 50% 30%,#3a2f78,#15102e);color:var(--gold);font-size:2.1rem;text-shadow:0 0 18px #dcbc6a88}
