@@ -103,7 +103,7 @@ function QuestReveal({total,fails}:{total:number;fails:number}){
   const order=useMemo(()=>{
     const arr=Array.from({length:total},(_,i)=>i<fails);
     let s=total*31+fails*17+7;
-    for(let i=arr.length-1;i>0;i--){s=(s*9301+49297)%233280;const j=Math.floor(s/233280*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+    for(let i=arr.length-1;i>0;i--){s=(s*9301+49297)%233280;const j=Math.floor(s/233280*(i+1));const current=arr[i]!;arr[i]=arr[j]!;arr[j]=current;}
     return arr;
   },[total,fails]);
   return <div className="quest-reveal" aria-hidden="true">{order.map((fail,i)=>
@@ -300,7 +300,7 @@ function Board({game}:{game:ClientGameState}){
       {phase==='team_build'&&<>
         <h2>원정대 구성 ({game.questSize}명)</h2>
         <RoundTable
-          leaderId={game.leaderId}
+          leaderId={game.leaderId ?? undefined}
           players={game.players}
           center={<div className="selection-core"><FactionSeal team="good" size={38}/><strong>{team.length} <small>/ {game.questSize}</small></strong><span>{leader?'원정대를 지명하세요':leaderPlayer?.isBot?`${leaderName}이(가) 원정대를 고르는 중입니다`:'리더가 원정대를 구성 중입니다'}{!leader&&<Dots/>}</span></div>}
           renderSeat={p=><button disabled={!leader} className={team.includes(p.id)?'selected':''} onClick={()=>setTeam(team.includes(p.id)?team.filter(x=>x!==p.id):team.length<game.questSize?[...team,p.id]:team)} aria-pressed={team.includes(p.id)}><SeatFace name={p.nickname}/></button>}
