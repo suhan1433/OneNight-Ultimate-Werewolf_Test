@@ -7,5 +7,8 @@ COPY apps/web/package.json apps/web/package.json
 RUN npm install
 COPY packages/shared packages/shared
 COPY apps/server apps/server
-RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server
+# Build the browser app into /app/apps/web/dist as well. The Express server
+# serves this directory, so Render needs only one Web Service.
+COPY apps/web apps/web
+RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web
 CMD ["npm","run","start","-w","@werewolf/server"]
