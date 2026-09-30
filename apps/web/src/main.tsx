@@ -490,6 +490,8 @@ function Home() {
   const [count, setCount] = useState(5);
   const [roles, setRoles] = useState<RoleType[]>(PRESETS.recommended!);
   const [busy, setBusy] = useState(false);
+  const normalizeRoomCode = (value: string) =>
+    value.toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, 6);
   useEffect(() => {
     if (roles.length !== count + 3) setRoles(autoPreset(count));
   }, [count]);
@@ -576,9 +578,11 @@ function Home() {
                 maxLength={6}
                 autoCapitalize="characters"
                 autoComplete="off"
-                onChange={(e) =>
-                  setRoomCode(e.target.value.replace(/[^a-zA-Z2-9]/g, ""))
-                }
+                onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  setRoomCode(normalizeRoomCode(e.clipboardData.getData("text")));
+                }}
                 placeholder="A7K29P"
               />
             </div>
