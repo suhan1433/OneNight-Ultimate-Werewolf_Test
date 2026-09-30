@@ -45,6 +45,9 @@ const getNarrationAudio = (audioKey: string) => {
     // is served at /werewolf/, rather than at the site root.
     audio = new Audio(`${import.meta.env.BASE_URL}${audioKey.replaceAll('_', '-')}.mp3`);
     audio.preload = 'auto';
+    // Narration is an announcement, never background music. Be explicit so a
+    // recording can only play through once even if its source has loop hints.
+    audio.loop = false;
     audio.volume = .9;
     narrationAudio.set(audioKey, audio);
   }
@@ -141,19 +144,6 @@ function playNextNarration() {
   };
   audio.onended = discardCurrent;
   audio.onerror = discardCurrent;
-  // A media interruption can pause an HTMLAudioElement without ending it
-  // (notably on mobile browsers while the UI receives another Socket event).
-  // Resume the same element, and therefore the same playback position,
-  // instead of waiting for another screen tap or moving on to another line.
-  const resumeCurrent = () => {
-    if (currentNarration !== audio || audio.ended || !audio.paused || !useGame.getState().tts) return;
-    void audio.play().catch(() => {
-      // If a browser still requires a gesture, keep currentNarration intact.
-      // unlockNarration will retry this exact element at its current position.
-    });
-  };
-  audio.onpause = () => { if (!audio.ended) window.setTimeout(resumeCurrent, 0); };
-  audio.oncanplay = resumeCurrent;
   void audio.play().catch(() => {
     // Browsers (especially Safari and mobile WebViews) can reject a play()
     // started by a Socket event until the next real user gesture. Keep this
@@ -190,9 +180,12 @@ export function setNarrationEnabled(enabled: boolean) {
   playNextNarration();
 }
 
-socket.on('NARRATOR_SPEECH', ({ audioKey, actionId, stateVersion, timestamp }: { audioKey?: string; actionId?: string; stateVersion?: number; timestamp?: number }) => {
+socket.on('NARRATOR_SPEECH', ({ audioKey, actionId, stateVersion }: { audioKey?: string; actionId?: string; stateVersion?: number }) => {
   if (!useGame.getState().tts || !audioKey || !actionId || stateVersion === undefined) return;
-  const key = timestamp ? `${actionId ?? audioKey}-${timestamp}` : `${audioKey}-${Date.now()}`;
+  // A reconnect or a racing scheduler can deliver this exact announcement
+  // more than once with a different transport timestamp. Its action and room
+  // state identify the actual announcement, so deduplicate by those values.
+  const key = `${actionId}-${stateVersion}`;
   if (seenNarrations.has(key)) return;
   seenNarrations.add(key);
   const game = useGame.getState().game;
