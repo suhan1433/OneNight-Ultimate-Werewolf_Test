@@ -5,10 +5,23 @@ COPY packages/shared/package.json packages/shared/package.json
 COPY apps/server/package.json apps/server/package.json
 COPY apps/web/package.json apps/web/package.json
 RUN npm install
+COPY avalon/package*.json avalon/
+WORKDIR /app/avalon
+RUN npm ci
+WORKDIR /app
 COPY packages/shared packages/shared
 COPY apps/server apps/server
-# Build the browser app into /app/apps/web/dist as well. The Express server
-# serves this directory, so Render needs only one Web Service.
 COPY apps/web apps/web
-RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web
-CMD ["npm","run","start","-w","@werewolf/server"]
+COPY avalon avalon
+COPY game-selector game-selector
+# Both browser apps share /app/apps/web/dist: /werewolf and /avalon.
+RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web \
+  && npm --prefix avalon run build \
+  && cp game-selector/index.html apps/web/dist/index.html \
+  && cp game-selector/launcher.css apps/web/dist/launcher.css
+
+# Render exposes one public port. Nginx serves the selector and both web apps,
+# and routes each Socket.IO endpoint to its own internal game server.
+RUN apk add --no-cache nginx gettext
+COPY infra/render-nginx.conf.template /etc/nginx/http.d/default.conf.template
+CMD ["sh", "-c", "envsubst '$PORT' < /etc/nginx/http.d/default.conf.template > /etc/nginx/http.d/default.conf && RUN_STANDALONE_SERVER=true PORT=3001 node apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3002 node avalon/apps/server/dist/server.js & nginx -g 'daemon off;'"]
