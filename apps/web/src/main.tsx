@@ -1542,7 +1542,7 @@ function RoleCards({ title, cards }: { title: string; cards: CardInfo[] }) {
     <Panel className="private-result card-result">
       <small>🔒 나만 보는 정보</small>
       <h3>{title}</h3>
-      <p className="card-reveal-hint">카드를 눌러 앞면을 확인하세요.</p>
+      <p className="card-reveal-hint">카드가 자동으로 공개됩니다. 누르면 다시 가릴 수 있어요.</p>
       <div className="night-card-row">
         {cards.map((card, i) => (
           <RoleRevealCard
@@ -1557,7 +1557,9 @@ function RoleCards({ title, cards }: { title: string; cards: CardInfo[] }) {
 }
 function RoleRevealCard({ card, index }: { card: CardInfo; index: number }) {
   const role = card.role && ROLE_DEFINITIONS[card.role];
-  const [flipped, setFlipped] = useState(false);
+  // 처음부터 앞면 상태(true)로 시작 → 마운트 직후 0° → 180°로 자동 뒤집힘
+  const [flipped, setFlipped] = useState(true);
+  const firstFlip = useRef(true);
   return (
     <div className="night-card-wrap">
       <small>{card.label}</small>
@@ -1568,11 +1570,12 @@ function RoleRevealCard({ card, index }: { card: CardInfo; index: number }) {
         aria-pressed={flipped}
         onClick={() => {
           buzz(20);
+          firstFlip.current = false;
           setFlipped((value) => !value);
         }}
         initial={{ rotateY: 0 }}
         animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={{ duration: 0.55, delay: flipped ? index * 0.12 : 0 }}
+        transition={{ duration: 0.55, delay: firstFlip.current ? 0.45 + index * 0.12 : 0 }}
       >
         <div className="night-role-face night-role-back">✦</div>
         <div className="night-role-face night-role-front">
@@ -1611,7 +1614,7 @@ function PrivateResult({ data }: { data: Record<string, unknown> }) {
             index={0}
           />
         </div>
-        <p className="card-reveal-hint">내 새 카드를 눌러 확인하세요.</p>
+        <p className="card-reveal-hint">내 새 카드가 자동으로 공개됩니다. 누르면 다시 가릴 수 있어요.</p>
       </Panel>
     );
   if (data.kind === "troublemaker_swap")
