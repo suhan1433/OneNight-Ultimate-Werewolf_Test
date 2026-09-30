@@ -172,7 +172,11 @@ button.qcard.active{transform:translateY(-10px) scale(1.05)}
 /* ---------- 결과 화면 ---------- */
 .result-stage{position:relative}
 .result-stage>*:not(.rays){position:relative}
-.rays{position:absolute!important;left:50%;top:-150px;width:560px;height:560px;margin-left:-280px;pointer-events:none;background:repeating-conic-gradient(from 0deg,var(--ray) 0 5deg,transparent 5deg 18deg);-webkit-mask-image:radial-gradient(circle,#000 0,transparent 66%);mask-image:radial-gradient(circle,#000 0,transparent 66%);opacity:.32;animation:spin 70s linear infinite,fadeIn 1.4s ease both}
+/* 승리/패배 화면 상단 후광: 방사형 빛줄기 대신 부드러운 오라 + 퍼지는 원형 파동 */
+.rays{position:absolute!important;left:50%;top:-100px;width:460px;height:460px;margin-left:-230px;pointer-events:none;border-radius:50%;background:radial-gradient(circle,var(--ray) 0,transparent 62%);opacity:.22;animation:fadeIn 1.4s ease both}
+.rays::before,.rays::after{content:"";position:absolute;inset:24%;border-radius:50%;border:1px solid var(--ray);opacity:0;animation:haloPulse 5s ease-out infinite}
+.rays::after{animation-delay:-2.5s}
+@keyframes haloPulse{0%{transform:scale(.5);opacity:.7}100%{transform:scale(1.25);opacity:0}}
 .result-stage.good{--ray:#8cbdf2}.result-stage.evil{--ray:#ee6580}
 .crest{width:100px;height:100px;background:radial-gradient(circle at 35% 28%,#ffffff22,#00000055);box-shadow:0 0 44px currentColor;animation:crestIn .9s var(--ease-out) both}
 @keyframes crestIn{0%{transform:scale(.3) rotate(-30deg);opacity:0}70%{transform:scale(1.1) rotate(4deg);opacity:1}100%{transform:none}}

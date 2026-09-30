@@ -17,6 +17,8 @@ export interface Player {
   id: string; nickname: string; sessionToken: string; socketId: string | null;
   originalRole: RoleType | null; currentRole: RoleType | null; isReady: boolean;
   hasConfirmedCard: boolean; hasActedTonight: boolean; vote: string | null; connected: boolean;
+  /** Server-controlled participant used only in test bot rooms. */
+  isBot?: boolean;
   /** Server timestamp used to resolve a player who does not return after a grace period. */
   disconnectedAt?: number | null;
 }
@@ -27,32 +29,38 @@ export interface NightAction {
   startedAt: number; expiresAt: number; status: 'pending' | 'active' | 'completed' | 'timeout' | 'skipped'; copied?: boolean;
 }
 export interface NightActionLog { actionId: string; role: RoleType; playerId?: string; status: string; at: number; }
+/** A private snapshot of a night action, captured when its owner performs it. */
+export interface PrivateNightAction { role: RoleType; result: Record<string, unknown>; }
 export interface ChatMessage { id: string; playerId: string; nickname: string; text: string; at: number; }
 export interface GameResult {
   winners: Faction[]; executedIds: string[]; voteCounts: Record<string, number>;
+  /** Raw ballots each player received, before role effects such as Prince or Bodyguard. */
+  receivedVoteCounts: Record<string, number>;
   votes: Record<string, string>; players: Array<{ id: string; nickname: string; originalRole: RoleType; currentRole: RoleType }>;
 }
 export interface Room {
   roomCode: string; hostId: string; maxPlayers: number; players: Player[]; selectedRoles: RoleType[];
-  /** 실물 카드 게임의 사회자 화면만 제공하는 오프라인 방인지 여부. */
-  moderatorMode?: boolean;
+  /** A room pre-filled with server-controlled test bots. */
+  botMode?: boolean;
   centerCards: CenterCard[]; phase: Phase; nightActionQueue: NightAction[]; currentNightActionIndex: number;
   actionTimeLimitSeconds: number; dayTimeLimitSeconds: number; ttsEnabled: boolean; nightLog: NightActionLog[];
   votes: Record<string, string>; voteStartRequests: string[]; processedRequestIds: string[]; chat: ChatMessage[]; publicReveals: string[];
   privateResults: Record<string, Record<string, unknown>>;
+  /** Never broadcast: each player only receives their own entries. */
+  privateNightActions: Record<string, PrivateNightAction[]>;
   protectedPlayerId: string | null; dayExpiresAt: number | null; result: GameResult | null;
   /** Internal retention deadlines. Kept optional so rooms saved before this policy remain readable. */
   lobbyExpiresAt?: number | null; allOfflineExpiresAt?: number | null; resultExpiresAt?: number | null;
   createdAt: number; updatedAt: number;
 }
-export interface PublicPlayer { id: string; nickname: string; isReady: boolean; hasConfirmedCard: boolean; connected: boolean; isHost: boolean; hasVoted: boolean; }
+export interface PublicPlayer { id: string; nickname: string; isReady: boolean; hasConfirmedCard: boolean; connected: boolean; isHost: boolean; hasVoted: boolean; isBot: boolean; }
 export interface ClientGameState {
   roomCode: string; playerId: string; hostId: string; maxPlayers: number; phase: Phase; selfRole: RoleType | null;
   /** Monotonic-enough server revision used to discard delayed Socket packets. */
   stateVersion: number;
-  moderatorMode: boolean;
+  botMode: boolean;
   players: PublicPlayer[]; selectedRoles: RoleType[]; currentNightAction: Omit<NightAction, 'playerIds' | 'actedPlayerIds'> | null;
-  isNightActor: boolean; actionContext?: Record<string, unknown>; actionResult?: Record<string, unknown>;
+  isNightActor: boolean; actionContext?: Record<string, unknown>; actionResult?: Record<string, unknown>; nightActions: PrivateNightAction[];
   votesCompleted: number; dayVoteRequests: number; hasRequestedDayVote: boolean; totalPlayers: number; dayExpiresAt: number | null; serverNow: number; chat: ChatMessage[]; lobbyChat: ChatMessage[];
   publicReveals: string[]; settings: { actionTimeLimitSeconds: number; dayTimeLimitSeconds: number };
   result: GameResult | null;

@@ -1,0 +1,87 @@
+/* ============================================================
+   6차: 첫인상 — 홈(달빛 마을) / 로비(원탁) / 코드 타일
+   day-vote.css 뒤에 로드. 되돌리려면 import 한 줄만 지우면 된다.
+   ============================================================ */
+
+/* ---------- 홈: 달이 떠오르고, 늑대가 나타난다 (진입 시 단 한 번) ---------- */
+.hero{position:relative}
+.hero-scene{display:block;width:min(360px,100%);height:auto;margin:0 auto -34px;overflow:visible;
+  -webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent);
+  animation:scene-in 2s cubic-bezier(.2,.8,.2,1) both}
+@keyframes scene-in{from{opacity:0;transform:translateY(26px);filter:blur(8px)}}
+.hero-moon{filter:drop-shadow(0 0 28px #dcbc6a88) drop-shadow(0 0 80px #dcbc6a44);
+  transform-box:fill-box;transform-origin:center;animation:moon-rise 2.4s cubic-bezier(.2,.8,.2,1) both}
+@keyframes moon-rise{from{transform:translateY(46px)}}
+.hero-halo{transform-box:fill-box;transform-origin:center;animation:halo-pulse 6s ease-in-out infinite}
+.hero-halo.b{animation-delay:-3s}
+@keyframes halo-pulse{50%{transform:scale(1.05);opacity:.45}}
+.hero-wolf{animation:wolf-in 1.4s 1.5s ease-out both}
+@keyframes wolf-in{from{opacity:0}}
+.fog{animation:fog-drift 16s ease-in-out infinite alternate}
+.fog-b{animation-duration:22s;animation-direction:alternate-reverse}
+@keyframes fog-drift{to{transform:translateX(38px)}}
+.win{animation:win-flicker 5s steps(1) infinite}
+.win.w2{animation-delay:-1.7s}.win.w3{animation-delay:-3.1s}
+@keyframes win-flicker{0%,100%{opacity:1}44%{opacity:.55}48%{opacity:1}80%{opacity:.75}}
+.hero h1{position:relative}
+.hero h1 i{filter:drop-shadow(0 0 26px #dcbc6a55)}
+.hero-meta{margin-top:18px!important;color:var(--muted);letter-spacing:.02em}
+
+/* ---------- 코드 타일: 초대장의 인장처럼 ---------- */
+.code-tiles{display:flex;justify-content:center;gap:7px;margin:10px 0 14px}
+.code-tiles span{display:grid;place-items:center;width:46px;height:58px;border-radius:12px;
+  font:700 1.9rem var(--numeral);color:var(--moon);
+  background:linear-gradient(170deg,#2a2355,#141032);border:1px solid #dcbc6a33;
+  box-shadow:inset 0 1px 0 #ffffff14,0 8px 16px -8px #000c;
+  transition:border-color .2s,transform .25s cubic-bezier(.3,1.5,.5,1),box-shadow .25s}
+.code-tiles span.on{border-color:#dcbc6a99;box-shadow:inset 0 0 14px #dcbc6a22,0 8px 16px -8px #000c,0 0 16px #dcbc6a26}
+.code-tiles span.cur{border-color:transparent}
+.code-field{position:relative;margin-top:8px}
+.code-field .code-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;cursor:text}
+.code-field:focus-within .code-tiles span.cur{border-color:var(--gold);box-shadow:0 0 0 3px #dcbc6a26;animation:caret 1s steps(1) infinite}
+@keyframes caret{50%{border-color:#dcbc6a33;box-shadow:none}}
+.invite .code-tiles span{animation:tile-in .5s cubic-bezier(.3,1.4,.5,1) both}
+.invite .code-tiles span:nth-child(2){animation-delay:.06s}.invite .code-tiles span:nth-child(3){animation-delay:.12s}
+.invite .code-tiles span:nth-child(4){animation-delay:.18s}.invite .code-tiles span:nth-child(5){animation-delay:.24s}
+.invite .code-tiles span:nth-child(6){animation-delay:.3s}
+@keyframes tile-in{from{opacity:0;transform:translateY(10px) rotateX(50deg)}}
+main.day .code-tiles span{background:#fff8e8;color:#4a2f1a;border-color:#caa85e}
+
+.copy-chip{display:inline-flex;align-items:center;gap:6px;transition:color .2s,border-color .2s}
+.copy-chip.done{color:var(--sage)!important;border-color:var(--sage)!important}
+
+/* ---------- 원탁 ---------- */
+.round-table{position:relative;width:min(340px,100%);aspect-ratio:1;margin:6px auto 22px}
+.round-table:before{content:'';position:absolute;inset:16%;border-radius:50%;
+  background:radial-gradient(circle,#3a2f7844,#15102e00 70%);border:1px dashed #dcbc6a33}
+.round-table:after{content:'';position:absolute;inset:27%;border-radius:50%;border:1px solid #dcbc6a1f}
+.table-core{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:baseline;gap:4px;
+  color:var(--moon);text-align:center}
+.table-core b{font:700 2.6rem var(--numeral);text-shadow:0 0 28px #dcbc6a66;font-variant-numeric:tabular-nums}
+.table-core small{font:600 1rem var(--numeral)}
+.seat{position:absolute;transform:translate(-50%,-50%);width:66px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  animation:seat-in .6s cubic-bezier(.3,1.4,.5,1) both}
+@keyframes seat-in{from{opacity:0;transform:translate(-50%,-50%) scale(.4)}}
+.seat b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.7rem;font-weight:700;color:var(--text)}
+.seat em{font-style:normal;font-size:.56rem;color:var(--gold);border:1px solid #66572f;border-radius:20px;padding:1px 6px}
+.seat-face{position:relative;border-radius:50%;transition:box-shadow .4s}
+.seat-face .mask-av{display:block;filter:drop-shadow(0 6px 10px #000a)}
+.seat.ready .seat-face{box-shadow:0 0 0 2px var(--sage),0 0 20px #93d6a266}
+.seat .crown-ic{position:absolute;left:50%;top:-13px;transform:translateX(-50%) rotate(-8deg);filter:drop-shadow(0 2px 4px #000a)}
+.seat .tick{position:absolute;right:-3px;bottom:-2px;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;
+  background:var(--sage);color:#0b2a14;box-shadow:0 2px 6px #0008}
+.seat.empty{animation:none}
+.seat.empty span{display:block;width:50px;height:50px;border-radius:50%;border:1.5px dashed #dcbc6a44;
+  background:radial-gradient(circle,#ffffff08,transparent 70%);animation:empty-pulse 3s ease-in-out infinite}
+@keyframes empty-pulse{50%{border-color:#dcbc6a22}}
+main.day .seat b{color:#4a2f1a}
+
+@media(max-width:380px){
+  .code-tiles span{width:40px;height:52px;font-size:1.6rem}
+  .code-tiles{gap:5px}
+  .seat{width:58px}
+  .seat-face .mask-av{width:44px;height:44px}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-scene,.hero-moon,.hero-wolf,.hero-halo,.fog,.win,.seat,.invite .code-tiles span,.seat.empty span{animation:none}
+}

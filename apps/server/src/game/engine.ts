@@ -142,7 +142,14 @@ export function applyNightAction(room: Room, playerId: string, command: NightCom
   // 플레이어에게만 저장되고 같은 action 안에서 두 번째 교환 선택으로 이어진다.
   const isWitchInspection = action.role === 'witch' && command.type === 'inspect_center' && !target;
   const queue = room.nightActionQueue.map((a, i) => i === room.currentNightActionIndex && !isWitchInspection ? { ...a, actedPlayerIds: [...a.actedPlayerIds, playerId] } : a);
-  return { room: { ...room, players, centerCards: centers, nightActionQueue: queue }, result };
+  // Keep an immutable, private snapshot at the moment the player acted. This
+  // must not be reconstructed from current cards later: other roles can alter
+  // those cards after this action has already happened.
+  const privateNightActions = {
+    ...(room.privateNightActions ?? {}),
+    [playerId]: [...(room.privateNightActions?.[playerId] ?? []), { role: action.role, result }]
+  };
+  return { room: { ...room, players, centerCards: centers, nightActionQueue: queue, privateNightActions }, result };
 }
 
 // 인물 확인 역할은 '누구인지'만 알면 된다. 역할/ID를 같이 보내면 개발자 도구나
@@ -164,6 +171,13 @@ export function calculateVotes(room: Pick<Room, 'players' | 'votes'>): Record<st
   return counts;
 }
 
+/** Counts the ballots a player actually received, without applying role effects. */
+export function calculateReceivedVotes(room: Pick<Room, 'players' | 'votes'>): Record<string, number> {
+  const counts = Object.fromEntries(room.players.map((p) => [p.id, 0]));
+  for (const targetId of Object.values(room.votes)) counts[targetId] = (counts[targetId] ?? 0) + 1;
+  return counts;
+}
+
 export function determineExecutions(counts: Record<string, number>): string[] {
   const max = Math.max(0, ...Object.values(counts));
   return max <= 1 ? [] : Object.entries(counts).filter(([, count]) => count === max).map(([id]) => id);
@@ -176,6 +190,7 @@ export function calculateResult(room: Room): GameResult {
     if (wolfVoted) cursed.currentRole = 'werewolf';
   }
   const adjusted = { ...room, players };
+  const receivedVoteCounts = calculateReceivedVotes(adjusted);
   const voteCounts = calculateVotes(adjusted);
   const executed = new Set(determineExecutions(voteCounts));
   for (const hunter of players.filter((p) => p.currentRole === 'hunter' && executed.has(p.id))) { const target = room.votes[hunter.id]; if (target) executed.add(target); }
@@ -189,7 +204,7 @@ export function calculateResult(room: Room): GameResult {
   if ((wolves.length > 0 && wolfDied) || (wolves.length === 0 && executed.size === 0)) winners.push('village');
   if (wolves.length > 0 && !wolfDied && !tannerDied) winners.push('werewolf');
   if (wolves.length === 0 && executed.size > 0 && minions.some((p) => !executed.has(p.id))) winners.push('minion');
-  return { winners: [...new Set(winners)], executedIds, voteCounts, votes: room.votes, players: players.map((p) => ({ id: p.id, nickname: p.nickname, originalRole: p.originalRole!, currentRole: p.currentRole! })) };
+  return { winners: [...new Set(winners)], executedIds, voteCounts, receivedVoteCounts, votes: room.votes, players: players.map((p) => ({ id: p.id, nickname: p.nickname, originalRole: p.originalRole!, currentRole: p.currentRole! })) };
 }
 
 export function buildPlayerGameState(room: Room, playerId: string, actionResults: Record<string, Record<string, unknown>> = {}): ClientGameState {
@@ -205,10 +220,10 @@ export function buildPlayerGameState(room: Room, playerId: string, actionResults
   }
   return {
     roomCode: room.roomCode, playerId, hostId: room.hostId, maxPlayers: room.maxPlayers, phase: room.phase, selfRole: self.originalRole, stateVersion: room.updatedAt,
-    moderatorMode: !!room.moderatorMode,
-    players: room.players.map((p) => ({ id: p.id, nickname: p.nickname, isReady: p.isReady, hasConfirmedCard: p.hasConfirmedCard, connected: p.connected, isHost: p.id === room.hostId, hasVoted: !!room.votes[p.id] })),
+    botMode: !!room.botMode,
+    players: room.players.map((p) => ({ id: p.id, nickname: p.nickname, isReady: p.isReady, hasConfirmedCard: p.hasConfirmedCard, connected: p.connected, isHost: p.id === room.hostId, hasVoted: !!room.votes[p.id], isBot: !!p.isBot })),
     selectedRoles: room.selectedRoles, currentNightAction: action ? { id: action.id, role: action.role, order: action.order, startedAt: action.startedAt, expiresAt: action.expiresAt, status: action.status, copied: action.copied } : null,
-    isNightActor: isActor, actionContext, actionResult: actionResults[playerId], votesCompleted: Object.keys(room.votes).length, dayVoteRequests: (room.voteStartRequests ?? []).length, hasRequestedDayVote: (room.voteStartRequests ?? []).includes(playerId), totalPlayers: room.players.length,
+    isNightActor: isActor, actionContext, actionResult: actionResults[playerId], nightActions: room.privateNightActions?.[playerId] ?? [], votesCompleted: Object.keys(room.votes).length, dayVoteRequests: (room.voteStartRequests ?? []).length, hasRequestedDayVote: (room.voteStartRequests ?? []).includes(playerId), totalPlayers: room.players.length,
     dayExpiresAt: room.dayExpiresAt, serverNow: Date.now(), chat: room.chat.slice(-100), lobbyChat: [], publicReveals: room.publicReveals,
     settings: { actionTimeLimitSeconds: room.actionTimeLimitSeconds, dayTimeLimitSeconds: room.dayTimeLimitSeconds }, result: room.result
   };

@@ -13,7 +13,7 @@
 @keyframes sweep{to{transform:translateX(120%)}}
 .private-result>small{color:var(--gold);font-size:.7rem;letter-spacing:.06em}
 .private-result h3{margin:6px 0 14px}
-.card-reveal-hint{margin:-8px 0 12px;color:var(--gold);font-size:.75rem}
+.card-reveal-hint{clear:both;margin:14px 0 0;color:var(--gold);font-size:.75rem;line-height:1.55}
 
 /* 사람 공개 */
 .name-reveal-list{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}

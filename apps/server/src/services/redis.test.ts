@@ -6,7 +6,7 @@ const makeRoom = (roomCode: string, lobbyExpiresAt = Date.now() + 60_000): Room 
   roomCode, hostId: 'host', maxPlayers: 3, players: [], selectedRoles: [], centerCards: [], phase: 'lobby',
   nightActionQueue: [], currentNightActionIndex: 0, actionTimeLimitSeconds: 8, dayTimeLimitSeconds: 300,
   ttsEnabled: true, nightLog: [], votes: {}, voteStartRequests: [], processedRequestIds: [], chat: [],
-  publicReveals: [], privateResults: {}, protectedPlayerId: null, dayExpiresAt: null, result: null,
+  publicReveals: [], privateResults: {}, privateNightActions: {}, protectedPlayerId: null, dayExpiresAt: null, result: null,
   lobbyExpiresAt, allOfflineExpiresAt: null, resultExpiresAt: null, createdAt: Date.now(), updatedAt: Date.now(),
 });
 

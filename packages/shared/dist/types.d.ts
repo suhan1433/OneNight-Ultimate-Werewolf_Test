@@ -26,6 +26,8 @@ export interface Player {
     hasActedTonight: boolean;
     vote: string | null;
     connected: boolean;
+    /** Server-controlled participant used only in test bot rooms. */
+    isBot?: boolean;
     /** Server timestamp used to resolve a player who does not return after a grace period. */
     disconnectedAt?: number | null;
 }
@@ -57,6 +59,11 @@ export interface NightActionLog {
     status: string;
     at: number;
 }
+/** A private snapshot of a night action, captured when its owner performs it. */
+export interface PrivateNightAction {
+    role: RoleType;
+    result: Record<string, unknown>;
+}
 export interface ChatMessage {
     id: string;
     playerId: string;
@@ -68,6 +75,8 @@ export interface GameResult {
     winners: Faction[];
     executedIds: string[];
     voteCounts: Record<string, number>;
+    /** Raw ballots each player received, before role effects such as Prince or Bodyguard. */
+    receivedVoteCounts: Record<string, number>;
     votes: Record<string, string>;
     players: Array<{
         id: string;
@@ -82,8 +91,8 @@ export interface Room {
     maxPlayers: number;
     players: Player[];
     selectedRoles: RoleType[];
-    /** 실물 카드 게임의 사회자 화면만 제공하는 오프라인 방인지 여부. */
-    moderatorMode?: boolean;
+    /** A room pre-filled with server-controlled test bots. */
+    botMode?: boolean;
     centerCards: CenterCard[];
     phase: Phase;
     nightActionQueue: NightAction[];
@@ -98,6 +107,8 @@ export interface Room {
     chat: ChatMessage[];
     publicReveals: string[];
     privateResults: Record<string, Record<string, unknown>>;
+    /** Never broadcast: each player only receives their own entries. */
+    privateNightActions: Record<string, PrivateNightAction[]>;
     protectedPlayerId: string | null;
     dayExpiresAt: number | null;
     result: GameResult | null;
@@ -116,6 +127,7 @@ export interface PublicPlayer {
     connected: boolean;
     isHost: boolean;
     hasVoted: boolean;
+    isBot: boolean;
 }
 export interface ClientGameState {
     roomCode: string;
@@ -126,13 +138,14 @@ export interface ClientGameState {
     selfRole: RoleType | null;
     /** Monotonic-enough server revision used to discard delayed Socket packets. */
     stateVersion: number;
-    moderatorMode: boolean;
+    botMode: boolean;
     players: PublicPlayer[];
     selectedRoles: RoleType[];
     currentNightAction: Omit<NightAction, 'playerIds' | 'actedPlayerIds'> | null;
     isNightActor: boolean;
     actionContext?: Record<string, unknown>;
     actionResult?: Record<string, unknown>;
+    nightActions: PrivateNightAction[];
     votesCompleted: number;
     dayVoteRequests: number;
     hasRequestedDayVote: boolean;

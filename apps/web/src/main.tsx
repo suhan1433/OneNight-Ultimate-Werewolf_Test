@@ -8,6 +8,7 @@ import {
   ROLE_LIST,
   type ClientGameState,
   type NightCommand,
+  type PrivateNightAction,
   type RoleType,
 } from "@werewolf/shared";
 import { useGame } from "./store";
@@ -26,6 +27,10 @@ import "./leave.css";
 import "./night-results.css";
 import "./night-intro.css";
 import "./immersion.css";
+import "./polish.css";
+import "./day-vote.css";
+import "./entry.css";
+import { Candle, CheckIcon, CopyIcon, CrownIcon, HeroScene, Icon, IconDefs, MaskAvatar, RoleIcon, Sigil, SunArc, WaxSeal } from "./icons";
 
 const req = (game: ClientGameState) => ({
   roomCode: game.roomCode,
@@ -55,9 +60,13 @@ const optimistic = (apply: () => void, name: string, data: unknown) => {
 
 function App() {
   const { game, tts, help, error, connectionState, setTts, setHelp, setError } = useGame();
+  const [nightRecordOpen, setNightRecordOpen] = useState(false);
+  useEffect(() => {
+    if (!game?.selfRole || game.phase === "result") setNightRecordOpen(false);
+  }, [game?.selfRole, game?.phase]);
   useEffect(() => {
     if (!error) return;
-    const timer = window.setTimeout(() => setError(null), 1_000);
+    const timer = window.setTimeout(() => setError(null), 4_000);
     return () => window.clearTimeout(timer);
   }, [error, setError]);
   const leave = async () => {
@@ -78,6 +87,7 @@ function App() {
   };
   return (
     <main className={`phase-${game?.phase ?? "home"} ${game?.phase === "day" ? "day" : ""}`}>
+      <IconDefs />
       <div className="mist" />
       <div className="meteor" aria-hidden="true" />
       <div className="grain" aria-hidden="true" />
@@ -85,15 +95,28 @@ function App() {
         <>
           <button
             className="audio-fab"
+            aria-label={tts ? "안내 음성 끄기" : "안내 음성 켜기"}
+            title={tts ? "안내 음성 끄기" : "안내 음성 켜기"}
             onClick={() => {
               const next = !tts;
               setTts(next);
               setNarrationEnabled(next);
             }}
           >
-            {tts ? "🔊" : "🔇"} 안내 음성
+            {tts ? <Icon.Sound /> : <Icon.Mute />}
           </button>
-          <VoiceChat game={game} />
+          {game.selfRole && game.phase !== "result" && (
+            <div className="night-record-controls">
+              <button
+                className="night-record-fab"
+                onClick={() => setNightRecordOpen((value) => !value)}
+                aria-expanded={nightRecordOpen}
+              >
+                ◉ 내 밤 기록
+              </button>
+              {nightRecordOpen && <NightRecord game={game} close={() => setNightRecordOpen(false)} />}
+            </div>
+          )}
           <button className="leave-fab" onClick={leave}>
             나가기
           </button>
@@ -122,6 +145,7 @@ function App() {
         {error && (
           <motion.div
             className="toast"
+            role="alert"
             onClick={() => setError(null)}
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -133,6 +157,58 @@ function App() {
         )}
       </AnimatePresence>
     </main>
+  );
+}
+
+function NightActionSummary({ action }: { action: PrivateNightAction }) {
+  const result = action.result;
+  if (result.kind === "people") {
+    const people = Array.isArray(result.people) ? result.people as PersonInfo[] : [];
+    return <p>{String(result.title ?? "확인 결과")}: {people.length ? people.map((person) => person.nickname).join(", ") : "없음"}</p>;
+  }
+  if (result.kind === "cards") {
+    const cards = Array.isArray(result.cards) ? result.cards as CardInfo[] : [];
+    return <p>{String(result.title ?? "확인 결과")}: {cards.map((card) => `${card.label} · ${card.role ? ROLE_DEFINITIONS[card.role].name : "알 수 없음"}`).join(", ")}</p>;
+  }
+  const message = {
+    copied: `${String(result.targetNickname)}님의 역할을 복사했습니다.`,
+    protected: `${String(result.nickname)}님을 보호했습니다.`,
+    alpha_swap: `${String(result.targetNickname)}님의 카드를 늑대 카드로 바꿨습니다.`,
+    robber_swap: `${String(result.targetNickname)}님과 카드를 바꿨습니다.`,
+    witch_seen: `센터 카드 ${Number(result.centerIndex) + 1}번을 확인했습니다.`,
+    witch_swap: `센터 카드와 ${String(result.targetNickname)}님의 카드를 바꿨습니다.`,
+    troublemaker_swap: `${String(result.firstNickname)}님과 ${String(result.secondNickname)}님의 카드를 바꿨습니다.`,
+    drunk_swap: `센터 카드 ${String(result.centerIndex)}번과 내 카드를 바꿨습니다.`,
+    confirmed: "능력 정보를 확인했습니다.",
+  }[String(result.kind)];
+  return <p>{message ?? "밤 행동을 완료했습니다."}</p>;
+}
+
+function NightRecord({ game, close }: { game: ClientGameState; close: () => void }) {
+  const originalRole = game.selfRole!;
+  const definition = ROLE_DEFINITIONS[originalRole];
+  return (
+    <aside className="night-record" aria-label="내 밤 기록">
+      <button className="night-record-close" onClick={close} aria-label="내 밤 기록 닫기">×</button>
+      <small>MY NIGHT RECORD</small>
+      <h3><RoleIcon id={originalRole} size={22} /> 처음 배정된 역할</h3>
+      <div className="night-original-role">
+        <b>{definition.name}</b>
+        <p>{definition.description}</p>
+      </div>
+      <div className="night-action-list">
+        <b>내가 밤에 한 행동</b>
+        {game.nightActions.length ? game.nightActions.map((action, index) => (
+          <div className="night-action" key={`${action.role}-${index}`}>
+            <span><RoleIcon id={action.role} size={24} /></span>
+            <div>
+              <strong>{ROLE_DEFINITIONS[action.role].name}</strong>
+              <NightActionSummary action={action} />
+            </div>
+          </div>
+        )) : <p className="night-action-empty">이번 밤에 직접 수행한 행동이 없습니다.</p>}
+      </div>
+    </aside>
   );
 }
 
@@ -393,13 +469,13 @@ function VoiceChat({ game }: { game: ClientGameState }) {
         className="voice-fab"
         onClick={() => setEnabled((value) => !value)}
       >
-        {enabled ? "🎙 음성 나가기" : "🎙 음성 참가"}
+        <Icon.Mic /> {enabled ? "음성 나가기" : "음성 참가"}
       </button>
       {enabled && (
         <>
           <span className={`voice-status ${voiceState}`}>{stateLabel}</span>
           <button className="voice-fab mute" onClick={toggleMute}>
-            {muted ? "🔇 마이크 켜기" : "🎤 음소거"}
+            {muted ? <Icon.MicOff /> : <Icon.Mic />} {muted ? "마이크 켜기" : "음소거"}
           </button>
         </>
       )}
@@ -428,7 +504,7 @@ function Home() {
           ? old.filter((x, i) => i !== old.lastIndexOf(id))
           : old,
     );
-  const create = async (moderatorMode = false) => {
+  const create = async (botMode = false) => {
     setBusy(true);
     const data = (await event("ROOM_CREATE", {
       nickname,
@@ -436,7 +512,7 @@ function Home() {
       selectedRoles: roles,
       actionTimeLimitSeconds: 8,
       dayTimeLimitSeconds: 300,
-      moderatorMode,
+      botMode,
     })) as
       | { roomCode: string; playerId: string; sessionToken: string }
       | undefined;
@@ -457,7 +533,7 @@ function Home() {
   if (mode === "home")
     return (
       <section className="hero">
-        <div className="moon">◐</div>
+        <HeroScene />
         <div className="eyebrow">REAL-TIME SOCIAL DEDUCTION</div>
         <h1>
           한밤의
@@ -472,6 +548,7 @@ function Home() {
         {session() && (
           <p className="tiny">이전 게임은 자동으로 재접속을 시도합니다.</p>
         )}
+        <p className="tiny hero-meta">3–10명이 각자의 기기로 함께해요</p>
       </section>
     );
   if (mode === "join")
@@ -491,15 +568,20 @@ function Home() {
           </label>
           <label>
             방 코드
-            <input
-              className="code-input"
-              value={roomCode}
-              maxLength={6}
-              onChange={(e) =>
-                setRoomCode(e.target.value.replace(/[^a-zA-Z2-9]/g, ""))
-              }
-              placeholder="A7K29P"
-            />
+            <div className="code-field">
+              <CodeTiles value={roomCode.toUpperCase()} />
+              <input
+                className="code-input"
+                value={roomCode}
+                maxLength={6}
+                autoCapitalize="characters"
+                autoComplete="off"
+                onChange={(e) =>
+                  setRoomCode(e.target.value.replace(/[^a-zA-Z2-9]/g, ""))
+                }
+                placeholder="A7K29P"
+              />
+            </div>
           </label>
         </Panel>
         <button
@@ -575,7 +657,7 @@ function Home() {
             const n = roles.filter((x) => x === r.id).length;
             return (
               <div className="role-pick" key={r.id}>
-                <span>{r.emoji}</span>
+                <span><RoleIcon id={r.id} faction={r.faction} size={26} /></span>
                 <div>
                   <b>{r.name}</b>
                   <small>{factionName(r.faction)}</small>
@@ -603,21 +685,70 @@ function Home() {
         disabled={busy || !nickname.trim() || roles.length !== count + 3}
         onClick={() => create(true)}
       >
-        방 만들기 (오프라인)
+        테스트 봇 방 만들기
       </button>
       <p className="tiny center">
-        오프라인 사회자 모드는 이 기기에서 밤 안내와 낮 타이머만 진행합니다.
+        나를 제외한 모든 자리를 테스트 봇으로 채워 실제 게임 흐름을 확인합니다.
       </p>
     </section>
   );
 }
 
+/* 코드 한 글자씩 타일로. cur = 다음에 입력될 칸 */
+function CodeTiles({ value, length = 6 }: { value: string; length?: number }) {
+  return (
+    <div className="code-tiles" aria-label={`코드 ${value}`}>
+      {Array.from({ length }, (_, i) => (
+        <span key={i} className={value[i] ? "on" : i === value.length ? "cur" : ""}>
+          {value[i] ?? ""}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* 대기실 원탁: 들어온 사람의 자리에 가면이 앉는다 */
+function RoundTable({ game }: { game: ClientGameState }) {
+  const n = game.maxPlayers;
+  return (
+    <div className="round-table" role="list" aria-label="참가자">
+      <div className="table-core">
+        <b>{game.players.length}</b>
+        <small>/ {n}</small>
+      </div>
+      {Array.from({ length: n }, (_, i) => {
+        const p = game.players[i];
+        const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+        const style = { left: `${50 + Math.cos(a) * 38}%`, top: `${50 + Math.sin(a) * 38}%` };
+        if (!p)
+          return (
+            <div className="seat empty" role="listitem" aria-label="빈 자리" style={style} key={`empty-${i}`}>
+              <span />
+            </div>
+          );
+        return (
+          <div
+            className={`seat${p.isReady ? " ready" : ""}`}
+            role="listitem"
+            aria-label={`${p.nickname}${p.isHost ? ", 방장" : ""}${p.isBot ? ", 봇" : ""}, ${p.isReady ? "준비됨" : "대기 중"}`}
+            style={style}
+            key={p.id}
+          >
+            <div className="seat-face">
+              <MaskAvatar name={p.nickname} size={50} />
+              {p.isHost && <CrownIcon />}
+              {p.isReady && <i className="tick"><CheckIcon size={11} /></i>}
+            </div>
+            <b>{p.nickname}</b>
+            {p.isBot && <em>봇</em>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Game({ game }: { game: ClientGameState }) {
-  if (game.moderatorMode) {
-    if (game.phase === "lobby") return <ModeratorLobby game={game} />;
-    if (game.phase === "night") return <ModeratorNight game={game} />;
-    if (game.phase === "day") return <ModeratorDay game={game} />;
-  }
   if (game.phase === "lobby") return <Lobby game={game} />;
   if (game.phase === "card_reveal") return <Reveal game={game} />;
   if (game.phase === "night") return <Night game={game} />;
@@ -625,221 +756,16 @@ function Game({ game }: { game: ClientGameState }) {
   if (game.phase === "voting") return <Voting game={game} />;
   return <Result game={game} />;
 }
-function ModeratorLobby({ game }: { game: ClientGameState }) {
-  const deckReady = game.selectedRoles.length === game.maxPlayers + 3;
-  const changeRole = (id: RoleType, amount: number) => {
-    const old = game.selectedRoles;
-    const next =
-      amount > 0
-        ? old.length < game.maxPlayers + 3 &&
-          old.filter((x) => x === id).length < ROLE_DEFINITIONS[id].maxCount
-          ? [...old, id]
-          : old
-        : old.includes(id)
-          ? old.filter((x, i) => i !== old.lastIndexOf(id))
-          : old;
-    if (next !== old)
-      event("ROOM_SETTINGS", {
-        ...req(game),
-        ...game.settings,
-        selectedRoles: next,
-      });
-  };
-  return (
-    <section>
-      <Header kicker="OFFLINE MODERATOR" title="오프라인 사회자 모드" />
-      <Panel className="center">
-        <p>실물 카드 게임을 위한 사회자 화면입니다.</p>
-        <small>
-          카드 배정·개별 행동·채팅·투표 없이 밤 안내와 낮 타이머만 진행합니다.
-        </small>
-      </Panel>
-      <Panel>
-        <div className="panel-head">
-          <h3>역할 구성</h3>
-          <b className={deckReady ? "ok" : "bad"}>
-            {game.selectedRoles.length} / {game.maxPlayers + 3}
-          </b>
-        </div>
-        <div className="role-grid">
-          {ROLE_LIST.map((r) => {
-            const n = game.selectedRoles.filter((x) => x === r.id).length;
-            return (
-              <div className="role-pick" key={r.id}>
-                <span>{r.emoji}</span>
-                <div>
-                  <b>{r.name}</b>
-                  <small>{factionName(r.faction)}</small>
-                </div>
-                <button
-                  className="mini"
-                  disabled={!n}
-                  onClick={() => changeRole(r.id, -1)}
-                >
-                  −
-                </button>
-                <b>{n}</b>
-                <button
-                  className="mini"
-                  disabled={
-                    n >= r.maxCount ||
-                    game.selectedRoles.length >= game.maxPlayers + 3
-                  }
-                  onClick={() => changeRole(r.id, 1)}
-                >
-                  +
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </Panel>
-      <Panel>
-        <h3>게임 설정</h3>
-        <label className="inline">
-          밤 행동 시간
-          <select
-            value={game.settings.actionTimeLimitSeconds}
-            onChange={(e) =>
-              event("ROOM_SETTINGS", {
-                ...req(game),
-                ...game.settings,
-                actionTimeLimitSeconds: +e.target.value,
-              })
-            }
-          >
-            {[8, 10, 15].map((x) => (
-              <option key={x} value={x}>
-                {x}초
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="inline">
-          낮 토론 시간
-          <select
-            value={game.settings.dayTimeLimitSeconds}
-            onChange={(e) =>
-              event("ROOM_SETTINGS", {
-                ...req(game),
-                ...game.settings,
-                dayTimeLimitSeconds: +e.target.value,
-              })
-            }
-          >
-            {[
-              [300, "5분"],
-              [600, "10분"],
-              [1200, "20분"],
-              [1800, "30분"],
-            ].map(([x, l]) => (
-              <option key={x} value={x}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
-      </Panel>
-      <button
-        disabled={!deckReady}
-        onClick={() => event("GAME_START", req(game))}
-      >
-        사회자 모드 시작
-      </button>
-    </section>
-  );
-}
-function ModeratorNight({ game }: { game: ClientGameState }) {
-  const action = game.currentNightAction;
-  const role = action && ROLE_DEFINITIONS[action.role];
-  const remain = useCountdown(action?.expiresAt, game.serverNow);
-  const syncedAction = useRef<string>();
-  useEffect(() => {
-    // The night intro and the first role deliberately share an action ID.
-    // Their deadlines are separate transitions, so deduplicating by ID alone
-    // prevents the first role from recovering when its own timer expires.
-    const transitionKey = action && `${action.id}:${action.status}:${action.expiresAt}`;
-    if (action && transitionKey && remain <= 0 && syncedAction.current !== transitionKey) {
-      syncedAction.current = transitionKey;
-      recoverExpiredAction(action.id, action.status === "active");
-    }
-  }, [action?.expiresAt, action?.id, action?.status, remain]);
-  if (action?.status === "pending")
-    return (
-      <section className="center night night-intro">
-        <div className="eclipse" aria-hidden="true" />
-        <div className="eyebrow">THE NIGHT BEGINS</div>
-        <h1>밤이 시작되었습니다.</h1>
-        <p>모두 눈을 감아주세요.</p>
-        <div className="dots">● ● ●</div>
-      </section>
-    );
-  return (
-    <section className="center night">
-      <div className="crescent">☾</div>
-      <div className="eyebrow">NIGHT · {action?.order ?? "—"}</div>
-      <h1>
-        {role?.emoji} {role?.name}
-      </h1>
-      <p>{role?.description}</p>
-      <NightTimer remain={remain} total={game.settings.actionTimeLimitSeconds} />
-      {remain <= 0 && useGame.getState().transitioningActionId === action?.id && (
-        <p className="transitioning">다음 역할을 준비 중…</p>
-      )}
-      <Panel>
-        <div className="dots">● ● ●</div>
-        <p>
-          실물 카드로 행동을 진행해주세요.
-          <br />
-          제한 시간이 끝나면 다음 역할을 안내합니다.
-        </p>
-      </Panel>
-    </section>
-  );
-}
-function ModeratorDay({ game }: { game: ClientGameState }) {
-  const remain = useCountdown(game.dayExpiresAt, game.serverNow);
-  const used = [...new Set(game.selectedRoles)];
-  return (
-    <section>
-      <Header kicker="DAYBREAK" title="날이 밝았습니다" />
-      <div className="sun-timer">
-        <small>남은 토론 시간</small>
-        <b className={remain <= 30 ? "urgent" : ""}>{formatTime(remain)}</b>
-      </div>
-      <Panel>
-        <h3>이번 게임의 역할</h3>
-        <div className="chips">
-          {used.map((id) => (
-            <span className="chip" key={id}>
-              {ROLE_DEFINITIONS[id].emoji} {ROLE_DEFINITIONS[id].name} ×
-              {game.selectedRoles.filter((x) => x === id).length}
-            </span>
-          ))}
-        </div>
-      </Panel>
-      <Panel>
-        <h3>밤 행동 순서</h3>
-        <div className="order">
-          {NIGHT_ROLES.filter((r) => used.includes(r.id)).map((r, i) => (
-            <div key={r.id}>
-              <i>{i + 1}</i>
-              <span>
-                {r.emoji} {r.name}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Panel>
-      <button onClick={() => event("GAME_RESTART", req(game))}>
-        대기실로 돌아가기
-      </button>
-    </section>
-  );
-}
 function Lobby({ game }: { game: ClientGameState }) {
   const me = game.players.find((p) => p.id === game.playerId)!;
   const full = game.players.length === game.maxPlayers;
+  const [copied, setCopied] = useState(false);
+  const copyCode = () => {
+    navigator.clipboard?.writeText(game.roomCode);
+    buzz(12);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
   const deckReady = game.selectedRoles.length === game.maxPlayers + 3;
   const canStart = full && deckReady && game.players.every((p) => p.isReady);
   const changeRole = (id: RoleType, amount: number) => {
@@ -862,15 +788,12 @@ function Lobby({ game }: { game: ClientGameState }) {
   };
   return (
     <section>
-      <Header kicker="WAITING ROOM" title="달이 뜨기 전" />
-      <Panel className="center">
+      <Header kicker={game.botMode ? "TEST BOT ROOM" : "WAITING ROOM"} title={game.botMode ? "테스트 봇과 함께하는 밤" : "달이 뜨기 전"} />
+      <Panel className="center invite">
         <small>초대 코드</small>
-        <div className="room-code">{game.roomCode}</div>
-        <button
-          className="chip"
-          onClick={() => navigator.clipboard?.writeText(game.roomCode)}
-        >
-          코드 복사
+        <CodeTiles value={game.roomCode} />
+        <button className={`chip copy-chip${copied ? " done" : ""}`} onClick={copyCode}>
+          {copied ? <CheckIcon /> : <CopyIcon />} {copied ? "복사됨" : "코드 복사"}
         </button>
       </Panel>
       <div className="section-title">
@@ -879,18 +802,7 @@ function Lobby({ game }: { game: ClientGameState }) {
           {game.players.length} / {game.maxPlayers}
         </span>
       </div>
-      <div className="players">
-        {game.players.map((p) => (
-          <div className="player" key={p.id}>
-            <div className="avatar">{p.nickname[0]}</div>
-            <b>{p.nickname}</b>
-            {p.isHost && <span>방장</span>}
-            <i className={p.isReady ? "ready" : ""}>
-              {p.isReady ? "준비됨" : "대기 중"}
-            </i>
-          </div>
-        ))}
-      </div>
+      <RoundTable game={game} />
       <ChatPanel
         game={game}
         scope="lobby"
@@ -976,7 +888,7 @@ function Lobby({ game }: { game: ClientGameState }) {
                 const n = game.selectedRoles.filter((x) => x === r.id).length;
                 return (
                   <div className="role-pick" key={r.id}>
-                    <span>{r.emoji}</span>
+                    <span><RoleIcon id={r.id} faction={r.faction} size={26} /></span>
                     <div>
                       <b>{r.name}</b>
                       <small>{factionName(r.faction)}</small>
@@ -1017,7 +929,7 @@ function Lobby({ game }: { game: ClientGameState }) {
           <div className="role-grid">
             {ROLE_LIST.filter((role) => game.selectedRoles.includes(role.id)).map((role) => (
               <div className="role-pick" key={role.id}>
-                <span>{role.emoji}</span>
+                <span><RoleIcon id={role.id} faction={role.faction} size={26} /></span>
                 <div>
                   <b>{role.name}</b>
                   <small>{factionName(role.faction)}</small>
@@ -1070,10 +982,10 @@ function Reveal({ game }: { game: ClientGameState }) {
         onClick={() => { if (!flipped) buzz(30); setFlipped(true); }}
       >
         <div className="card-face back">
-          ✦<small>탭하여 역할 확인</small>
+          <Sigil size={84} /><small>탭하여 역할 확인</small>
         </div>
         <div className={`card-face front faction-${r?.faction ?? "village"}`}>
-          <span>{r?.emoji}</span>
+          <span><RoleIcon id={game.selfRole ?? undefined} faction={r?.faction} size={76} /></span>
           <h2>{r?.name}</h2>
           <b>{r && factionName(r.faction)}</b>
           <p>{r?.description}</p>
@@ -1126,7 +1038,7 @@ function Night({ game }: { game: ClientGameState }) {
       <div className="crescent">☾</div>
       <div className="eyebrow">NIGHT · {a?.order ?? "—"}</div>
       <h1>
-        {role?.emoji} {role?.name}
+        <RoleIcon id={a?.role} faction={role?.faction} size={20} /> {role?.name}
       </h1>
       <p>{role?.description}</p>
       <NightTimer remain={remain} total={game.settings.actionTimeLimitSeconds} />
@@ -1155,19 +1067,28 @@ function NightControls({ game }: { game: ClientGameState }) {
   const [centers, setCenters] = useState<number[]>([]);
   const [seerMode, setSeerMode] = useState<"player" | "center">("player");
   const [submitting, setSubmitting] = useState(false);
+  // State updates are applied after the current event. Keep a synchronous
+  // guard too, so a quick double tap cannot submit two different requests.
+  const submittingRef = useRef(false);
   useEffect(() => {
     setPlayers([]);
     setCenters([]);
     setSubmitting(false);
+    submittingRef.current = false;
   }, [a.id, game.actionResult?.kind]);
   const submit = (command: NightCommand) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     void event("NIGHT_ACTION_SUBMIT", {
       ...req(game),
       actionId: a.id,
       command,
     }).then((result) => {
-      if (result === undefined) setSubmitting(false);
+      if (result === undefined) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     });
   };
   const others = game.players.filter(
@@ -1270,7 +1191,10 @@ function NightControls({ game }: { game: ClientGameState }) {
       {role === "seer" && (
         <div className="chips">
           <button
+            type="button"
             className="chip"
+            aria-pressed={seerMode === "player"}
+            disabled={submitting}
             onClick={() => {
               setSeerMode("player");
               setCenters([]);
@@ -1279,7 +1203,10 @@ function NightControls({ game }: { game: ClientGameState }) {
             플레이어 1명
           </button>
           <button
+            type="button"
             className="chip"
+            aria-pressed={seerMode === "center"}
+            disabled={submitting}
             onClick={() => {
               setSeerMode("center");
               setPlayers([]);
@@ -1328,7 +1255,7 @@ function NightControls({ game }: { game: ClientGameState }) {
                   disabled={submitting}
                   key={i}
                 >
-                  ✦<small>{i + 1}</small>
+                  <Sigil size={34} /><small>{i + 1}</small>
                 </button>
               ))}
             </div>
@@ -1348,10 +1275,11 @@ function ChatPanel({ game, scope, title, placeholder }: { game: ClientGameState;
   const chatFormRef = useRef<HTMLFormElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const messages = scope === 'lobby' ? game.lobbyChat : game.chat;
+  const latestMessageId = messages[messages.length - 1]?.id;
   useEffect(() => {
     const chat = chatRef.current;
     if (chat) chat.scrollTop = chat.scrollHeight;
-  }, [messages.length]);
+  }, [latestMessageId]);
   useEffect(() => {
     const dismissKeyboard = (event: PointerEvent) => {
       if (!chatFormRef.current?.contains(event.target as Node)) chatInputRef.current?.blur();
@@ -1378,7 +1306,12 @@ function ChatPanel({ game, scope, title, placeholder }: { game: ClientGameState;
     <Panel>
       <h3>{title}</h3>
       <div className="chat" ref={chatRef}>
-        {messages.map((m) => <div key={m.id}><b>{m.nickname}</b><span>{m.text}</span></div>)}
+        {messages.map((m) => (
+          <div className={`chat-message${m.playerId === game.playerId ? " mine" : ""}`} key={m.id}>
+            <b>{m.nickname}</b>
+            <span>{m.text}</span>
+          </div>
+        ))}
       </div>
       <form ref={chatFormRef} className="chat-form" onSubmit={(e) => { e.preventDefault(); sendChat(); }}>
         <input ref={chatInputRef} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} />
@@ -1390,6 +1323,9 @@ function ChatPanel({ game, scope, title, placeholder }: { game: ClientGameState;
 function Day({ game }: { game: ClientGameState }) {
   const remain = useCountdown(game.dayExpiresAt, game.serverNow);
   const synced = useRef(false);
+  const total = useRef(0);
+  if (remain > total.current) total.current = remain;
+  const [tab, setTab] = useState<"chat" | "info">("chat");
   const used = [...new Set(game.selectedRoles)];
   useEffect(() => {
     if (remain <= 0 && !synced.current) {
@@ -1397,88 +1333,184 @@ function Day({ game }: { game: ClientGameState }) {
       syncRoom();
     }
   }, [remain]);
+  const progress = total.current ? 1 - remain / total.current : 0;
+  const ratio = game.totalPlayers ? game.dayVoteRequests / game.totalPlayers : 0;
   return (
-    <section className="day-scene">
+    <section className={`day-scene${remain <= 30 ? " dusk" : ""}`}>
       <div className="dawn" aria-hidden="true" />
       <Header kicker="DAYBREAK" title="날이 밝았습니다" />
       <div className="sun-timer">
-        <small>남은 토론 시간</small>
+        <SunArc p={progress} />
         <b className={remain <= 30 ? "urgent" : ""}>{formatTime(remain)}</b>
+        <small>남은 토론 시간</small>
       </div>
       {game.publicReveals.map((x, i) => (
         <div className="notice" key={i}>
-          📰 {x}
+          <Icon.News /> {x}
         </div>
       ))}
-      <Panel>
-        <h3>이번 게임의 역할</h3>
-        <div className="chips">
-          {used.map((id) => (
-            <span className="chip" key={id}>
-              {ROLE_DEFINITIONS[id].emoji} {ROLE_DEFINITIONS[id].name} ×
-              {game.selectedRoles.filter((x) => x === id).length}
-            </span>
-          ))}
-        </div>
-      </Panel>
-      <Panel>
-        <h3>밤 행동 순서</h3>
-        <div className="order">
-          {NIGHT_ROLES.filter((r) => used.includes(r.id)).map((r, i) => (
-            <div key={r.id}>
-              <i>{i + 1}</i>
-              <span>
-                {r.emoji} {r.name}
-              </span>
+      <div className="day-tabs" role="tablist">
+        {(["chat", "info"] as const).map((k) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={tab === k}
+            className={tab === k ? "on" : ""}
+            onClick={() => setTab(k)}
+          >
+            {k === "chat" ? "마을 대화" : "게임 정보"}
+          </button>
+        ))}
+      </div>
+      {tab === "chat" ? (
+        <ChatPanel game={game} scope="day" title="마을 대화" placeholder="의심과 단서를 나누세요" />
+      ) : (
+        <>
+          <Panel>
+            <h3>이번 게임의 역할</h3>
+            <div className="chips">
+              {used.map((id) => (
+                <span className="chip" key={id}>
+                  <RoleIcon id={id} size={16} /> {ROLE_DEFINITIONS[id].name} ×
+                  {game.selectedRoles.filter((x) => x === id).length}
+                </span>
+              ))}
             </div>
-          ))}
-        </div>
-      </Panel>
-      <ChatPanel game={game} scope="day" title="마을 대화" placeholder="의심과 단서를 나누세요" />
-      <button
-        className="vote-request"
-        disabled={game.hasRequestedDayVote}
-        onClick={() => event("DAY_START", req(game))}
-      >
-        {game.hasRequestedDayVote ? "투표 동의 완료" : "투표하기 동의"} (
-        {game.dayVoteRequests} / {game.totalPlayers})
-      </button>
+          </Panel>
+          <Panel>
+            <h3>밤 행동 순서</h3>
+            <div className="order">
+              {NIGHT_ROLES.filter((r) => used.includes(r.id)).map((r, i) => (
+                <div key={r.id}>
+                  <i>{i + 1}</i>
+                  <span>
+                    <RoleIcon id={r.id} faction={r.faction} size={16} /> {r.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </>
+      )}
+      <div className="vote-dock">
+        <button
+          className="vote-request"
+          style={{ ["--p" as string]: `${ratio * 100}%` }}
+          disabled={game.hasRequestedDayVote}
+          onClick={() => event("DAY_START", req(game))}
+        >
+          <span>{game.hasRequestedDayVote ? "투표 동의 완료" : "투표하기 동의"}</span>
+          <em>
+            {game.dayVoteRequests} / {game.totalPlayers}
+          </em>
+        </button>
+      </div>
     </section>
   );
 }
+
+/* 꾹 눌러야 확정된다. 키보드(Enter/Space)는 즉시 확정 */
+function HoldConfirm({
+  disabled,
+  done,
+  label,
+  doneLabel,
+  onConfirm,
+}: {
+  disabled: boolean;
+  done: boolean;
+  label: string;
+  doneLabel: string;
+  onConfirm: () => void;
+}) {
+  const [p, setP] = useState(0);
+  const raf = useRef(0);
+  const start = useRef(0);
+  const fired = useRef(false);
+  const HOLD = 900;
+  const stop = () => {
+    cancelAnimationFrame(raf.current);
+    if (!fired.current) setP(0);
+  };
+  const tick = () => {
+    const v = Math.min(1, (performance.now() - start.current) / HOLD);
+    setP(v);
+    if (v < 1) raf.current = requestAnimationFrame(tick);
+    else if (!fired.current) {
+      fired.current = true;
+      buzz(60);
+      onConfirm();
+    }
+  };
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  const off = disabled || done;
+  return (
+    <button
+      className={`hold-confirm${p > 0 ? " holding" : ""}${done ? " done" : ""}`}
+      style={{ ["--hold" as string]: p }}
+      disabled={off}
+      onPointerDown={() => {
+        if (off) return;
+        fired.current = false;
+        start.current = performance.now();
+        buzz(10);
+        raf.current = requestAnimationFrame(tick);
+      }}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      onClick={(e) => {
+        if (e.detail === 0 && !off && !fired.current) {
+          fired.current = true;
+          onConfirm();
+        }
+      }}
+    >
+      <span>{done ? doneLabel : p > 0 ? "계속 누르세요…" : label}</span>
+    </button>
+  );
+}
+
 function Voting({ game }: { game: ClientGameState }) {
   const [target, setTarget] = useState("");
   const me = game.players.find((p) => p.id === game.playerId)!;
+  const others = game.players.filter((p) => p.id !== game.playerId);
   return (
-    <section>
+    <section className={`voting-scene${me.hasVoted ? " voted" : ""}`}>
       <Header kicker="THE VERDICT" title="운명의 투표" />
       <p>가장 의심스러운 한 명을 선택하세요. 확정 후에는 바꿀 수 없습니다.</p>
       <div className="vote-grid">
-        {game.players
-          .filter((p) => p.id !== game.playerId)
-          .map((p) => (
-            <button
-              className={target === p.id ? "vote selected" : "vote"}
-              onClick={() => { buzz(); setTarget(p.id); }}
-              disabled={me.hasVoted}
-              key={p.id}
-            >
-              <div className="avatar">{p.nickname[0]}</div>
-              <b>{p.nickname}</b>
-            </button>
-          ))}
+        {others.map((p) => (
+          <button
+            className={`suspect ${target === p.id ? "vote selected" : "vote"}`}
+            onClick={() => { buzz(); setTarget(p.id); }}
+            disabled={me.hasVoted}
+            aria-pressed={target === p.id}
+            key={p.id}
+          >
+            <MaskAvatar name={p.nickname} size={64} />
+            <b>{p.nickname}</b>
+            {target === p.id && <WaxSeal size={40} />}
+          </button>
+        ))}
       </div>
-      <button
-        disabled={!target || me.hasVoted}
-        onClick={() =>
+      <HoldConfirm
+        disabled={!target}
+        done={me.hasVoted}
+        label={target ? "꾹 눌러 확정" : "의심되는 사람을 고르세요"}
+        doneLabel="투표 완료 · 결과 대기 중"
+        onConfirm={() =>
           optimistic(() => useGame.getState().confirmVote(), "VOTE_CONFIRM", {
             ...req(game),
             targetPlayerId: target,
           })
         }
-      >
-        {me.hasVoted ? "투표 완료 · 결과 대기 중" : "이 선택으로 확정"}
-      </button>
+      />
+      <div className="candles" role="img" aria-label={`${game.votesCompleted} / ${game.totalPlayers}명 투표 완료`}>
+        {Array.from({ length: game.totalPlayers }, (_, i) => (
+          <Candle key={i} lit={i < game.votesCompleted} />
+        ))}
+      </div>
       <p className="center tiny">
         {game.votesCompleted} / {game.totalPlayers}명 투표 완료
       </p>
@@ -1499,7 +1531,7 @@ function Result({ game }: { game: ClientGameState }) {
   return (
     <section>
       <div className={`winner faction-${r.winners[0] ?? "none"}`}>
-        <div>✦</div>
+        <div><Icon.Sparkle /></div>
         <span>THE NIGHT IS OVER</span>
         <h1>
           {win}
@@ -1512,7 +1544,7 @@ function Result({ game }: { game: ClientGameState }) {
         <div className="outcome-groups">
           <div className="outcome-group winners">
             <b>
-              🏆 승리자 <small>{winners.length}명</small>
+              <Icon.Trophy /> 승리자 <small>{winners.length}명</small>
             </b>
             <div className="outcome-list">
               {winners.map((p) => (
@@ -1547,13 +1579,13 @@ function Result({ game }: { game: ClientGameState }) {
             <div className="avatar">{p.nickname[0]}</div>
             <div>
               <b>{p.nickname}</b>
-              <small>처음 {ROLE_DEFINITIONS[p.originalRole].name}</small>
+              <small>처음 {ROLE_DEFINITIONS[p.originalRole].name} · 득표 {r.receivedVoteCounts[p.id] ?? 0}표</small>
             </div>
             <strong>
-              {ROLE_DEFINITIONS[p.currentRole].emoji}{" "}
+              <RoleIcon id={p.currentRole} size={18} />{" "}
               {ROLE_DEFINITIONS[p.currentRole].name}
             </strong>
-            {r.executedIds.includes(p.id) && <em>☠</em>}
+            {r.executedIds.includes(p.id) && <em><Icon.Skull /></em>}
           </motion.div>
         ))}
       </Panel>
@@ -1643,7 +1675,7 @@ function Help({ close }: { close: () => void }) {
           <div>
             {ROLE_LIST.map((r) => (
               <div className="help-role" key={r.id}>
-                <span>{r.emoji}</span>
+                <span><RoleIcon id={r.id} faction={r.faction} size={26} /></span>
                 <div>
                   <h3>{r.name}</h3>
                   <small>
@@ -1686,7 +1718,7 @@ const Header = ({ kicker, title }: { kicker: string; title: string }) => (
   <header>
     <div className="eyebrow">{kicker}</div>
     <h1>{title}</h1>
-    <div className="rule">✦</div>
+    <div className="rule"><Icon.Sparkle /></div>
   </header>
 );
 const Back = ({ go }: { go: () => void }) => (
@@ -1728,7 +1760,7 @@ function PeopleReveal({
 }) {
   return (
     <Panel className="private-result people-reveal">
-      <small>🔒 나만 보는 정보</small>
+      <small><Icon.Lock /> 나만 보는 정보</small>
       <h3>{title}</h3>
       {people.length ? (
         <div className="name-reveal-list">
@@ -1754,9 +1786,9 @@ function PeopleReveal({
 function RoleCards({ title, cards }: { title: string; cards: CardInfo[] }) {
   return (
     <Panel className="private-result card-result">
-      <small>🔒 나만 보는 정보</small>
+      <small><Icon.Lock /> 나만 보는 정보</small>
       <h3>{title}</h3>
-      <p className="card-reveal-hint">카드를 눌러 앞면을 확인하세요.</p>
+      <p className="card-reveal-hint">카드가 자동으로 공개됩니다. 누르면 다시 가릴 수 있어요.</p>
       <div className="night-card-row">
         {cards.map((card, i) => (
           <RoleRevealCard
@@ -1771,7 +1803,9 @@ function RoleCards({ title, cards }: { title: string; cards: CardInfo[] }) {
 }
 function RoleRevealCard({ card, index }: { card: CardInfo; index: number }) {
   const role = card.role && ROLE_DEFINITIONS[card.role];
-  const [flipped, setFlipped] = useState(false);
+  // 처음부터 앞면 상태(true)로 시작 → 마운트 직후 0° → 180°로 자동 뒤집힘
+  const [flipped, setFlipped] = useState(true);
+  const firstFlip = useRef(true);
   return (
     <div className="night-card-wrap">
       <small>{card.label}</small>
@@ -1782,15 +1816,16 @@ function RoleRevealCard({ card, index }: { card: CardInfo; index: number }) {
         aria-pressed={flipped}
         onClick={() => {
           buzz(20);
+          firstFlip.current = false;
           setFlipped((value) => !value);
         }}
         initial={{ rotateY: 0 }}
         animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={{ duration: 0.55, delay: flipped ? index * 0.12 : 0 }}
+        transition={{ duration: 0.55, delay: firstFlip.current ? 0.45 + index * 0.12 : 0 }}
       >
-        <div className="night-role-face night-role-back">✦</div>
+        <div className="night-role-face night-role-back"><Sigil size={44} /></div>
         <div className="night-role-face night-role-front">
-          <span>{role?.emoji ?? "❔"}</span>
+          <span><RoleIcon id={card.role ?? undefined} faction={role?.faction} size={46} /></span>
           <b>{role?.name ?? "알 수 없음"}</b>
           <small>{role && factionName(role.faction)}</small>
         </div>
@@ -1816,7 +1851,7 @@ function PrivateResult({ data }: { data: Record<string, unknown> }) {
   if (data.kind === "robber_swap")
     return (
       <Panel className="private-result">
-        <small>🔒 도둑만 보는 결과</small>
+        <small><Icon.Lock /> 도둑만 보는 결과</small>
         <h3>카드를 바꿨습니다</h3>
         <div className="swap-arrow">⇄</div>
         <div className="night-card-row">
@@ -1825,13 +1860,13 @@ function PrivateResult({ data }: { data: Record<string, unknown> }) {
             index={0}
           />
         </div>
-        <p className="card-reveal-hint">내 새 카드를 눌러 확인하세요.</p>
+        <p className="card-reveal-hint">내 새 카드가 자동으로 공개됩니다. 누르면 다시 가릴 수 있어요.</p>
       </Panel>
     );
   if (data.kind === "troublemaker_swap")
     return (
       <Panel className="private-result">
-        <small>🔒 말썽쟁이만 보는 결과</small>
+        <small><Icon.Lock /> 말썽쟁이만 보는 결과</small>
         <h3>두 사람의 카드가 섞였습니다</h3>
         <div className="swap-animation">
           <motion.div
@@ -1873,7 +1908,7 @@ function PrivateResult({ data }: { data: Record<string, unknown> }) {
   };
   return (
     <div className="notice">
-      🔒 {messages[String(data.kind)] ?? "행동이 완료되었습니다."}
+      <Icon.Lock /> {messages[String(data.kind)] ?? "행동이 완료되었습니다."}
     </div>
   );
 }

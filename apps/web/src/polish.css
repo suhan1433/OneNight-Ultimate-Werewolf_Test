@@ -1,0 +1,82 @@
+/* ============================================================
+   4차: 마감 레이어 — 아이콘 · 깊이 · 타이포 · 접근성
+   immersion.css 뒤에 로드. 되돌리려면 import 한 줄만 지우면 된다.
+   ============================================================ */
+
+/* ---------- 아이콘: 동판화처럼 은은한 금빛 광택 ---------- */
+.ic{display:inline-block;flex:none;vertical-align:-.2em;overflow:visible}
+.role-ic{filter:drop-shadow(0 2px 6px #0008)}
+.role-ic .f{fill:currentColor;fill-opacity:0;fill:url(#ic-gold);fill-opacity:.1}
+.ui-ic{vertical-align:-.28em;margin-right:2px}
+.sigil{filter:drop-shadow(0 0 14px #dcbc6a66)}
+
+/* 리스트의 역할 아이콘: 작은 메달 안에 담는다 */
+.role-pick>span,.help-role>span,.night-action>span{
+  display:grid;place-items:center;width:38px;height:38px;border-radius:50%;
+  background:radial-gradient(circle at 35% 25%,#3a2f78,#15102e);
+  border:1px solid #dcbc6a44;box-shadow:inset 0 0 12px #dcbc6a1a,0 4px 10px #0005;
+}
+.role-pick{grid-template-columns:40px 1fr 28px 18px 28px}
+.night-action>span{width:34px;height:34px;flex:none}
+main.day .role-pick>span,main.day .help-role>span,main.day .night-action>span{
+  background:radial-gradient(circle at 35% 25%,#fff8e2,#f1d9a2);border-color:#c79a4c88;box-shadow:0 3px 8px #8a5a1a22
+}
+main.day .role-ic{filter:drop-shadow(0 1px 2px #6a451444)}
+
+/* ---------- 카드: 큰 아이콘에 후광, 뒷면 인장은 천천히 숨쉰다 ---------- */
+.card-face.front>span{display:grid;place-items:center;width:112px;height:112px;margin-bottom:2px;border-radius:50%;
+  background:radial-gradient(circle,#dcbc6a26,transparent 68%)}
+.card-face.front.faction-werewolf>span,.card-face.front.faction-minion>span{background:radial-gradient(circle,#e0707d30,transparent 68%)}
+.card-face.front.faction-village>span{background:radial-gradient(circle,#7fa8d830,transparent 68%)}
+.card-face.back .sigil{animation:sigil-breathe 4.5s ease-in-out infinite}
+@keyframes sigil-breathe{50%{transform:scale(1.06);opacity:.85}}
+.night-role-front span{display:grid;place-items:center}
+.night-role-back .sigil{opacity:.9}
+.center-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.center-card .sigil{transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .35s}
+.center-card:hover .sigil,.center-card.selected .sigil{transform:rotate(45deg) scale(1.12);filter:drop-shadow(0 0 18px #dcbc6acc)}
+
+/* ---------- 깊이: 패널에 안쪽 하이라이트와 이중 그림자 ---------- */
+.shell section,.sheet,.night-record{
+  box-shadow:inset 0 1px 0 #ffffff14,0 1px 2px #0006,0 22px 50px -18px #000c;
+}
+main.day .shell section,main.day .sheet{box-shadow:inset 0 1px 0 #fff9,0 1px 2px #7a4f1a22,0 22px 44px -22px #7a4f1a66}
+
+/* ---------- 타이포: 제목의 자간·행간을 다듬는다 ---------- */
+h1,h2,h3{text-wrap:balance;font-feature-settings:"kern","liga"}
+h1{letter-spacing:-.01em;line-height:1.18}
+p{text-wrap:pretty;word-break:keep-all}
+.eyebrow,.night-record>small,.private-result>small{font-family:var(--numeral);letter-spacing:.2em}
+.timer,.sun-timer b,.order i{font-family:var(--numeral);font-variant-numeric:tabular-nums lining-nums}
+
+/* ---------- 알림 · 결과 줄의 아이콘 정렬 ---------- */
+.notice{display:flex;align-items:center;gap:8px;justify-content:center}
+.winner>div{display:grid;place-items:center;filter:drop-shadow(0 0 22px currentColor)}
+.winner>div .ic{width:44px;height:44px;stroke-width:1.2}
+.rule{display:flex;align-items:center;justify-content:center;gap:14px;color:var(--gold)}
+.rule:before,.rule:after{content:'';height:1px;width:64px;background:linear-gradient(90deg,transparent,#dcbc6a88)}
+.rule:after{transform:scaleX(-1)}
+.result-row em{display:inline-grid;place-items:center;color:var(--rose);font-style:normal}
+.order span{display:inline-flex;align-items:center;gap:7px}
+
+/* ---------- 상단 컨트롤: 아이콘 버튼은 정사각 유리 ---------- */
+.audio-fab{display:grid;place-items:center}
+.audio-fab .ic{width:19px;height:19px;margin:0}
+.voice-fab{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+
+/* ---------- 상호작용: 눌림 · 포커스 ---------- */
+button{transition:transform .15s,filter .2s,border-color .2s,background .2s}
+button:not(:disabled):active{transform:scale(.97)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:10px}
+
+/* ---------- 모바일 ---------- */
+@media(max-width:420px){
+  .card-face.front>span{width:96px;height:96px}
+  .card-face.front>span .role-ic{width:64px;height:64px}
+  .rule:before,.rule:after{width:40px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .card-face.back .sigil{animation:none}
+  *{scroll-behavior:auto}
+}

@@ -5,6 +5,7 @@ import {useGame} from './store';
 import {emit,saveSession} from './socket';
 import './styles.css';
 import './immersive.css';
+import './premium.css';
 
 const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false};
 const ROLE_OPTION_KEYS=['assassin','percival','morgana','mordred','oberon'] as const;
@@ -396,7 +397,8 @@ function Result({game}:{game:ClientGameState}){
 function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const[draft,setDraft]=useState('');
   const latestRef=useRef<HTMLDivElement>(null);
-  useEffect(()=>{latestRef.current?.scrollIntoView({block:'end'});},[game.chat?.length]);
+  const latestMessageId=game.chat?.[game.chat.length-1]?.id;
+  useEffect(()=>{latestRef.current?.scrollIntoView({block:'end'});},[latestMessageId]);
   const send=(event:React.FormEvent)=>{event.preventDefault();const text=draft.trim();if(!text)return;setDraft('');call('CHAT_SEND',{roomCode:game.roomCode,text});};
   return <aside className="chat-panel" aria-label="원탁 채팅">
     <div className="chat-title"><span>원탁의 대화</span><small>DISCUSSION</small><button type="button" onClick={close} aria-label="채팅 닫기">×</button></div>
@@ -435,6 +437,7 @@ function App(){
   const[helpOpen,setHelpOpen]=useState(false);
   const[dossierOpen,setDossierOpen]=useState(false);
   useEffect(()=>{if(!error)return;const timer=window.setTimeout(()=>setError(null),3000);return()=>window.clearTimeout(timer);},[error,setError]);
+  useEffect(()=>{const root=document.documentElement;const move=(e:PointerEvent)=>{root.style.setProperty('--mx',`${e.clientX}px`);root.style.setProperty('--my',`${e.clientY}px`);};window.addEventListener('pointermove',move,{passive:true});return()=>window.removeEventListener('pointermove',move);},[]);
   const[confirmLeave,setConfirmLeave]=useState(false);
   const ongoing=!!game&&!['lobby','result'].includes(game.phase);
   const leave=async()=>{
