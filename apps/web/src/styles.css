@@ -272,7 +272,7 @@ main.day .chat>div b{color:#9a5a12}
 
 /* ---------- 알림 (모바일 안전 영역 유지) ---------- */
 .connection-banner{position:fixed;z-index:100;top:max(68px,calc(env(safe-area-inset-top) + 16px))!important;left:50%;transform:translateX(-50%);max-width:calc(100dvw - 32px)!important;padding:9px 16px;border:1px solid var(--line);border-radius:999px;background:#141232ee;color:var(--gold);font-size:.78rem;text-align:center!important;overflow-wrap:anywhere!important;box-shadow:0 8px 20px #0006}
-.toast{position:fixed;z-index:100;left:50%;transform:translateX(-50%);bottom:max(22px,calc(env(safe-area-inset-bottom) + 12px))!important;width:calc(100dvw - 32px)!important;max-width:480px!important;max-height:calc(100dvh - 48px)!important;padding:14px 18px;border-radius:14px;border:1px solid #d9635e;background:linear-gradient(#b8443f,#8f2f2c);color:#fff;text-align:center;box-shadow:0 12px 34px #000a;overflow:auto!important;overflow-wrap:anywhere!important;word-break:break-word!important;overscroll-behavior:contain}
+.toast{position:fixed;z-index:100;left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));bottom:max(22px,calc(env(safe-area-inset-bottom) + 12px))!important;width:auto!important;max-width:480px!important;max-height:calc(100dvh - 48px)!important;margin-inline:auto;padding:14px 18px;border-radius:14px;border:1px solid #d9635e;background:linear-gradient(#b8443f,#8f2f2c);color:#fff;text-align:center;box-shadow:0 12px 34px #000a;overflow:auto!important;overflow-wrap:anywhere!important;word-break:break-word!important;overscroll-behavior:contain}
 
 @media(min-width:480px){
   .role-grid{grid-template-columns:1fr 1fr}

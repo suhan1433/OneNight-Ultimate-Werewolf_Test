@@ -184,7 +184,11 @@ export function registerHandlers(io: Server, socket: Socket) {
   on(socket, 'GAME_START', async (raw) => mutate(io, socket, raw, async (room, playerId) => {
     if (room.hostId !== playerId) throw new Error('방장만 시작할 수 있습니다.');
     if (room.phase !== 'lobby') throw new Error('로비에서만 시작할 수 있습니다.');
-    const readiness = await getReadiness(room.roomCode); room.players = room.players.map((p) => ({ ...p, isReady: readiness[p.id] === '1' }));
+    const readiness = await getReadiness(room.roomCode);
+    // Bots are created ready and never emit PLAYER_READY, so they have no
+    // in-memory readiness entry. Preserve their automatic-ready state while
+    // continuing to load every human player's authoritative ready state.
+    room.players = room.players.map((p) => ({ ...p, isReady: p.isBot || readiness[p.id] === '1' }));
     if (room.players.length !== room.maxPlayers || !room.players.every((p) => p.isReady)) throw new Error('정원이 모두 입장하고 준비해야 합니다.');
     if (room.selectedRoles.length !== room.players.length + 3) throw new Error('역할 카드는 인원수 + 3장 모두 선택해야 시작할 수 있습니다.');
     const assigned = assignRoles(room.players, room.selectedRoles);

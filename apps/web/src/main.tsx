@@ -57,7 +57,7 @@ function App() {
   const { game, tts, help, error, connectionState, setTts, setHelp, setError } = useGame();
   useEffect(() => {
     if (!error) return;
-    const timer = window.setTimeout(() => setError(null), 1_000);
+    const timer = window.setTimeout(() => setError(null), 4_000);
     return () => window.clearTimeout(timer);
   }, [error, setError]);
   const leave = async () => {
@@ -122,6 +122,7 @@ function App() {
         {error && (
           <motion.div
             className="toast"
+            role="alert"
             onClick={() => setError(null)}
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
