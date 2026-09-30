@@ -1,4 +1,4 @@
-/* 상단 컨트롤: 나가기 · 내 밤 기록 — 게임 화면 위에 떠 있는 유리 알약 */
+/* 상단 컨트롤: 왼쪽은 나가기 · 안내 음성, 오른쪽은 내 밤 기록 · 도움말 */
 .leave-fab,.night-record-fab{
   border:1px solid var(--line);border-radius:30px;background:#141232cc;backdrop-filter:blur(10px);
   cursor:pointer;transition:border-color .2s,background .2s,transform .15s;
@@ -7,19 +7,19 @@
 .leave-fab:active,.night-record-fab:active{transform:scale(.96)}
 
 .leave-fab{
-  position:fixed;z-index:20;top:max(16px,calc(env(safe-area-inset-top) + 8px));right:68px;
+  position:fixed;z-index:20;top:max(16px,calc(env(safe-area-inset-top) + 8px));left:16px;
   height:40px;padding:0 14px;color:#e8aca6;font-size:.72rem;
 }
 .leave-fab:hover{border-color:#d9635e;background:#d9635e1a}
 
 .night-record-controls{
-  position:fixed;z-index:20;top:max(68px,calc(env(safe-area-inset-top) + 60px));right:16px;
+  position:fixed;z-index:20;top:max(16px,calc(env(safe-area-inset-top) + 8px));right:68px;
   display:flex;flex-direction:column;align-items:flex-end;gap:6px;
 }
 .night-record-fab{height:36px;padding:0 12px;color:#e5dcbf;font-size:.68rem}
 
 .night-record{
-  position:fixed;z-index:21;top:max(112px,calc(env(safe-area-inset-top) + 104px));right:16px;
+  position:fixed;z-index:21;top:max(68px,calc(env(safe-area-inset-top) + 60px));right:16px;
   width:min(340px,calc(100vw - 32px));max-height:calc(100dvh - 128px);overflow:auto;padding:17px;
   background:linear-gradient(150deg,#1d1a45fa,#0e0c28fa);border:1px solid var(--gold-deep);border-top:3px solid var(--gold);
   box-shadow:0 18px 45px #000b;backdrop-filter:blur(12px);animation:nightRecordIn .25s ease-out both;

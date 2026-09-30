@@ -256,7 +256,7 @@ main.day .chat>div b{color:#9a5a12}
 .help-fab,.audio-fab{position:fixed;z-index:20;top:16px;background:#141232cc;color:#e5dcbf;border:1px solid var(--line);backdrop-filter:blur(10px);cursor:pointer;transition:border-color .2s}
 .help-fab:hover,.audio-fab:hover{border-color:var(--gold)}
 .help-fab{right:16px;width:44px;height:44px;border-radius:50%;font:700 1rem var(--serif)}
-.audio-fab{left:16px;height:40px;border-radius:30px;padding:0 14px;font-size:.72rem}
+.audio-fab{left:88px;width:40px;height:40px;padding:0;border-radius:50%;font-size:1rem}
 .overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:#04030bcc;backdrop-filter:blur(4px)}
 .sheet{width:min(100%,560px);max-height:90vh;overflow:auto;padding:22px;color:#eee;background:linear-gradient(#1a1742,#100e26);border:1px solid var(--line);border-bottom:0;border-radius:26px 26px 0 0;box-shadow:0 -20px 60px #0009}
 .sheet-head{position:sticky;top:-22px;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:10px 0;background:#181540}

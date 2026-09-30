@@ -90,13 +90,15 @@ function App() {
         <>
           <button
             className="audio-fab"
+            aria-label={tts ? "안내 음성 끄기" : "안내 음성 켜기"}
+            title={tts ? "안내 음성 끄기" : "안내 음성 켜기"}
             onClick={() => {
               const next = !tts;
               setTts(next);
               setNarrationEnabled(next);
             }}
           >
-            {tts ? "🔊" : "🔇"} 안내 음성
+            {tts ? "🔊" : "🔇"}
           </button>
           {game.selfRole && game.phase !== "result" && (
             <div className="night-record-controls">
