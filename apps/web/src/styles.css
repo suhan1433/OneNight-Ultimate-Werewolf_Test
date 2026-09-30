@@ -232,7 +232,7 @@ main.day .chat-message.mine b{color:#7b4a13}
 main.day .chat-message.mine span{background:#e7be71;color:#4a2f1a}
 .chat-form{display:flex;gap:6px}
 .chat-form input{margin:0}
-.chat-form button{width:auto;min-height:46px;margin:0;padding:0 18px}
+.chat-form button{width:auto;min-height:46px;margin:0;padding:0 14px;flex:0 0 auto;white-space:nowrap;font-size:.82rem}
 
 /* ---------- 결과 ---------- */
 .winner{text-align:center;margin:8px 0 26px}
