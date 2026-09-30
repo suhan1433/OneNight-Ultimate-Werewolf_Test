@@ -4,10 +4,12 @@ COPY package*.json tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY apps/server/package.json apps/server/package.json
 COPY apps/web/package.json apps/web/package.json
-RUN npm install
+# The Render runtime can set NODE_ENV=production. Build tools such as Vite and
+# TypeScript are devDependencies, so explicitly include them while building.
+RUN npm ci --include=dev
 COPY avalon/package*.json avalon/
 WORKDIR /app/avalon
-RUN npm ci
+RUN npm ci --include=dev
 WORKDIR /app
 COPY packages/shared packages/shared
 COPY apps/server apps/server
