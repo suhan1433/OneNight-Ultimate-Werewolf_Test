@@ -26,6 +26,8 @@ export interface Player {
     hasActedTonight: boolean;
     vote: string | null;
     connected: boolean;
+    /** Server-controlled participant used only in test bot rooms. */
+    isBot?: boolean;
     /** Server timestamp used to resolve a player who does not return after a grace period. */
     disconnectedAt?: number | null;
 }
@@ -82,8 +84,8 @@ export interface Room {
     maxPlayers: number;
     players: Player[];
     selectedRoles: RoleType[];
-    /** 실물 카드 게임의 사회자 화면만 제공하는 오프라인 방인지 여부. */
-    moderatorMode?: boolean;
+    /** A room pre-filled with server-controlled test bots. */
+    botMode?: boolean;
     centerCards: CenterCard[];
     phase: Phase;
     nightActionQueue: NightAction[];
@@ -116,6 +118,7 @@ export interface PublicPlayer {
     connected: boolean;
     isHost: boolean;
     hasVoted: boolean;
+    isBot: boolean;
 }
 export interface ClientGameState {
     roomCode: string;
@@ -126,7 +129,7 @@ export interface ClientGameState {
     selfRole: RoleType | null;
     /** Monotonic-enough server revision used to discard delayed Socket packets. */
     stateVersion: number;
-    moderatorMode: boolean;
+    botMode: boolean;
     players: PublicPlayer[];
     selectedRoles: RoleType[];
     currentNightAction: Omit<NightAction, 'playerIds' | 'actedPlayerIds'> | null;

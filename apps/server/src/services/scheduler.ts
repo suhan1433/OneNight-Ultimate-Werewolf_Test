@@ -1,17 +1,65 @@
 import type { Server } from 'socket.io';
-import { NARRATOR_LINES, type Room } from '@werewolf/shared';
-import { advanceNight, buildNightActionQueue, calculateResult, startCurrentAction, startNightIntro } from '../game/engine.js';
+import { NARRATOR_LINES, type NightCommand, type Room } from '@werewolf/shared';
+import { advanceNight, applyNightAction, buildNightActionQueue, calculateResult, startCurrentAction, startNightIntro } from '../game/engine.js';
 import { emitActionStart, emitDayStart, emitRoomState } from '../socket/handlers.js';
-import { getRoom, getRoomCodes, saveRoom, withRoomLock } from './redis.js';
+import { getRoom, getRoomCodes, getVotes, recordVote, saveRoom, withRoomLock } from './redis.js';
 
 const DISCONNECT_GRACE_MS = 45_000;
 
 function hasDueWork(room: Awaited<ReturnType<typeof getRoom>>, now: number) {
   if (!room) return false;
-  if (room.phase === 'night') return !!room.nightActionQueue[room.currentNightActionIndex] && room.nightActionQueue[room.currentNightActionIndex]!.expiresAt <= now;
+  if (room.phase === 'night') {
+    const action = room.nightActionQueue[room.currentNightActionIndex];
+    return !!action && (action.expiresAt <= now || (action.status === 'active' && action.playerIds.some((id) => room.players.some((player) => player.id === id && player.isBot) && !action.actedPlayerIds.includes(id))));
+  }
   if (room.phase === 'day') return !!room.dayExpiresAt && room.dayExpiresAt <= now;
-  if (room.phase === 'card_reveal' || room.phase === 'voting') return room.players.some((p) => !p.connected && !!p.disconnectedAt && p.disconnectedAt + DISCONNECT_GRACE_MS <= now);
+  if (room.phase === 'voting') return room.players.some((player) => player.isBot && !room.votes[player.id]);
+  if (room.phase === 'card_reveal') return room.players.some((p) => !p.connected && !!p.disconnectedAt && p.disconnectedAt + DISCONNECT_GRACE_MS <= now);
   return false;
+}
+
+function botCommand(room: Room, playerId: string): NightCommand | null {
+  const action = room.nightActionQueue[room.currentNightActionIndex];
+  if (!action) return null;
+  const targets = room.players.filter((player) => player.id !== playerId && player.connected && player.id !== room.protectedPlayerId).map((player) => player.id);
+  const target = targets[0];
+  switch (action.role) {
+    case 'werewolf': {
+      const hasPackmate = room.players.some((player) => player.id !== playerId && ['werewolf', 'alpha_wolf', 'mystic_wolf', 'dream_wolf'].includes(player.currentRole ?? ''));
+      return hasPackmate ? { type: 'confirm' } : { type: 'inspect_center', centerIndexes: [0] };
+    }
+    case 'witch':
+      return room.privateResults[playerId]?.kind === 'witch_seen'
+        ? (target ? { type: 'swap_center', targetPlayerIds: [target], centerIndexes: [Number(room.privateResults[playerId]!.centerIndex)] } : null)
+        : { type: 'inspect_center', centerIndexes: [0] };
+    case 'troublemaker': return targets.length >= 2 ? { type: 'swap_players', targetPlayerIds: targets.slice(0, 2) } : null;
+    case 'seer': return target ? { type: 'inspect_player', targetPlayerIds: [target] } : { type: 'inspect_centers', centerIndexes: [0, 1] };
+    case 'apprentice_seer': return { type: 'inspect_center', centerIndexes: [0] };
+    case 'drunk': return { type: 'swap_center', centerIndexes: [0] };
+    case 'doppelganger': case 'shield_bearer': case 'alpha_wolf': case 'mystic_wolf': case 'journalist': case 'robber':
+      return target ? { type: 'inspect_player', targetPlayerIds: [target] } : null;
+    default: return { type: 'confirm' };
+  }
+}
+
+function runBotNightActions(room: Room): Room {
+  const action = room.nightActionQueue[room.currentNightActionIndex];
+  if (!action?.status || action.status !== 'active') return room;
+  for (const playerId of action.playerIds) {
+    const player = room.players.find((candidate) => candidate.id === playerId);
+    if (!player?.isBot || action.actedPlayerIds.includes(playerId)) continue;
+    // A witch has two consecutive choices within one action, so allow its
+    // inspection result to feed directly into its exchange choice.
+    for (let step = 0; step < 2; step += 1) {
+      const command = botCommand(room, playerId);
+      if (!command) break;
+      const applied = applyNightAction(room, playerId, command);
+      room = applied.room;
+      room.privateResults[playerId] = applied.result;
+      if (room.nightActionQueue[room.currentNightActionIndex]?.actedPlayerIds.includes(playerId)) break;
+    }
+  }
+  return room;
 }
 
 export function startScheduler(io: Server) {
@@ -50,12 +98,12 @@ export async function processExpiredRoom(io: Server, code: string): Promise<Room
           room = advanceNight(room, current.playerIds.length ? 'timeout' : 'skipped', now);
           transitioned = true; dayTransition = wasLast;
           await saveRoom(room);
+        } else if (current?.status === 'active') {
+          const updated = runBotNightActions(room);
+          if (updated !== room) { room = updated; transitioned = true; await saveRoom(room); }
         }
       } else if (room.phase === 'day' && room.dayExpiresAt && room.dayExpiresAt <= now) {
-        if (room.moderatorMode) {
-          room.players = room.players.map((p) => ({ ...p, originalRole: null, currentRole: null, isReady: false, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
-          room.centerCards = []; room.phase = 'lobby'; room.nightActionQueue = []; room.currentNightActionIndex = 0; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.publicReveals = []; room.nightLog = []; room.chat = []; room.dayExpiresAt = null; room.result = null; room.protectedPlayerId = null; room.lobbyExpiresAt = now + 60 * 60 * 1000; room.allOfflineExpiresAt = null; room.resultExpiresAt = null; room.updatedAt = now;
-        } else { room.phase = 'voting'; room.dayExpiresAt = null; room.updatedAt = now; }
+        room.phase = 'voting'; room.dayExpiresAt = null; room.updatedAt = now;
         transitioned = true;
         await saveRoom(room);
       }
@@ -68,6 +116,11 @@ export async function processExpiredRoom(io: Server, code: string): Promise<Room
           transitioned = true; await saveRoom(room);
         } else if (autoConfirmed) { transitioned = true; await saveRoom(room); }
       } else if (room.phase === 'voting') {
+        for (const bot of room.players.filter((player) => player.isBot && !room.votes[player.id])) {
+          const target = room.players.find((player) => player.id !== bot.id);
+          if (target) await recordVote(room.roomCode, bot.id, target.id);
+        }
+        room.votes = await getVotes(room.roomCode);
         const eligible = room.players.filter((player) => player.connected || !player.disconnectedAt || player.disconnectedAt + DISCONNECT_GRACE_MS > now);
         if (eligible.every((player) => !!room.votes[player.id])) {
           room.result = calculateResult(room); room.players = room.players.map((p) => ({ ...p, currentRole: room.result!.players.find((x) => x.id === p.id)!.currentRole }));

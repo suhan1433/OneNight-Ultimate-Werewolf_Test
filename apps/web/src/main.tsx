@@ -428,7 +428,7 @@ function Home() {
           ? old.filter((x, i) => i !== old.lastIndexOf(id))
           : old,
     );
-  const create = async (moderatorMode = false) => {
+  const create = async (botMode = false) => {
     setBusy(true);
     const data = (await event("ROOM_CREATE", {
       nickname,
@@ -436,7 +436,7 @@ function Home() {
       selectedRoles: roles,
       actionTimeLimitSeconds: 8,
       dayTimeLimitSeconds: 300,
-      moderatorMode,
+      botMode,
     })) as
       | { roomCode: string; playerId: string; sessionToken: string }
       | undefined;
@@ -603,239 +603,22 @@ function Home() {
         disabled={busy || !nickname.trim() || roles.length !== count + 3}
         onClick={() => create(true)}
       >
-        방 만들기 (오프라인)
+        테스트 봇 방 만들기
       </button>
       <p className="tiny center">
-        오프라인 사회자 모드는 이 기기에서 밤 안내와 낮 타이머만 진행합니다.
+        나를 제외한 모든 자리를 테스트 봇으로 채워 실제 게임 흐름을 확인합니다.
       </p>
     </section>
   );
 }
 
 function Game({ game }: { game: ClientGameState }) {
-  if (game.moderatorMode) {
-    if (game.phase === "lobby") return <ModeratorLobby game={game} />;
-    if (game.phase === "night") return <ModeratorNight game={game} />;
-    if (game.phase === "day") return <ModeratorDay game={game} />;
-  }
   if (game.phase === "lobby") return <Lobby game={game} />;
   if (game.phase === "card_reveal") return <Reveal game={game} />;
   if (game.phase === "night") return <Night game={game} />;
   if (game.phase === "day") return <Day game={game} />;
   if (game.phase === "voting") return <Voting game={game} />;
   return <Result game={game} />;
-}
-function ModeratorLobby({ game }: { game: ClientGameState }) {
-  const deckReady = game.selectedRoles.length === game.maxPlayers + 3;
-  const changeRole = (id: RoleType, amount: number) => {
-    const old = game.selectedRoles;
-    const next =
-      amount > 0
-        ? old.length < game.maxPlayers + 3 &&
-          old.filter((x) => x === id).length < ROLE_DEFINITIONS[id].maxCount
-          ? [...old, id]
-          : old
-        : old.includes(id)
-          ? old.filter((x, i) => i !== old.lastIndexOf(id))
-          : old;
-    if (next !== old)
-      event("ROOM_SETTINGS", {
-        ...req(game),
-        ...game.settings,
-        selectedRoles: next,
-      });
-  };
-  return (
-    <section>
-      <Header kicker="OFFLINE MODERATOR" title="오프라인 사회자 모드" />
-      <Panel className="center">
-        <p>실물 카드 게임을 위한 사회자 화면입니다.</p>
-        <small>
-          카드 배정·개별 행동·채팅·투표 없이 밤 안내와 낮 타이머만 진행합니다.
-        </small>
-      </Panel>
-      <Panel>
-        <div className="panel-head">
-          <h3>역할 구성</h3>
-          <b className={deckReady ? "ok" : "bad"}>
-            {game.selectedRoles.length} / {game.maxPlayers + 3}
-          </b>
-        </div>
-        <div className="role-grid">
-          {ROLE_LIST.map((r) => {
-            const n = game.selectedRoles.filter((x) => x === r.id).length;
-            return (
-              <div className="role-pick" key={r.id}>
-                <span>{r.emoji}</span>
-                <div>
-                  <b>{r.name}</b>
-                  <small>{factionName(r.faction)}</small>
-                </div>
-                <button
-                  className="mini"
-                  disabled={!n}
-                  onClick={() => changeRole(r.id, -1)}
-                >
-                  −
-                </button>
-                <b>{n}</b>
-                <button
-                  className="mini"
-                  disabled={
-                    n >= r.maxCount ||
-                    game.selectedRoles.length >= game.maxPlayers + 3
-                  }
-                  onClick={() => changeRole(r.id, 1)}
-                >
-                  +
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </Panel>
-      <Panel>
-        <h3>게임 설정</h3>
-        <label className="inline">
-          밤 행동 시간
-          <select
-            value={game.settings.actionTimeLimitSeconds}
-            onChange={(e) =>
-              event("ROOM_SETTINGS", {
-                ...req(game),
-                ...game.settings,
-                actionTimeLimitSeconds: +e.target.value,
-              })
-            }
-          >
-            {[8, 10, 15].map((x) => (
-              <option key={x} value={x}>
-                {x}초
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="inline">
-          낮 토론 시간
-          <select
-            value={game.settings.dayTimeLimitSeconds}
-            onChange={(e) =>
-              event("ROOM_SETTINGS", {
-                ...req(game),
-                ...game.settings,
-                dayTimeLimitSeconds: +e.target.value,
-              })
-            }
-          >
-            {[
-              [300, "5분"],
-              [600, "10분"],
-              [1200, "20분"],
-              [1800, "30분"],
-            ].map(([x, l]) => (
-              <option key={x} value={x}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
-      </Panel>
-      <button
-        disabled={!deckReady}
-        onClick={() => event("GAME_START", req(game))}
-      >
-        사회자 모드 시작
-      </button>
-    </section>
-  );
-}
-function ModeratorNight({ game }: { game: ClientGameState }) {
-  const action = game.currentNightAction;
-  const role = action && ROLE_DEFINITIONS[action.role];
-  const remain = useCountdown(action?.expiresAt, game.serverNow);
-  const syncedAction = useRef<string>();
-  useEffect(() => {
-    // The night intro and the first role deliberately share an action ID.
-    // Their deadlines are separate transitions, so deduplicating by ID alone
-    // prevents the first role from recovering when its own timer expires.
-    const transitionKey = action && `${action.id}:${action.status}:${action.expiresAt}`;
-    if (action && transitionKey && remain <= 0 && syncedAction.current !== transitionKey) {
-      syncedAction.current = transitionKey;
-      recoverExpiredAction(action.id, action.status === "active");
-    }
-  }, [action?.expiresAt, action?.id, action?.status, remain]);
-  if (action?.status === "pending")
-    return (
-      <section className="center night night-intro">
-        <div className="eclipse" aria-hidden="true" />
-        <div className="eyebrow">THE NIGHT BEGINS</div>
-        <h1>밤이 시작되었습니다.</h1>
-        <p>모두 눈을 감아주세요.</p>
-        <div className="dots">● ● ●</div>
-      </section>
-    );
-  return (
-    <section className="center night">
-      <div className="crescent">☾</div>
-      <div className="eyebrow">NIGHT · {action?.order ?? "—"}</div>
-      <h1>
-        {role?.emoji} {role?.name}
-      </h1>
-      <p>{role?.description}</p>
-      <NightTimer remain={remain} total={game.settings.actionTimeLimitSeconds} />
-      {remain <= 0 && useGame.getState().transitioningActionId === action?.id && (
-        <p className="transitioning">다음 역할을 준비 중…</p>
-      )}
-      <Panel>
-        <div className="dots">● ● ●</div>
-        <p>
-          실물 카드로 행동을 진행해주세요.
-          <br />
-          제한 시간이 끝나면 다음 역할을 안내합니다.
-        </p>
-      </Panel>
-    </section>
-  );
-}
-function ModeratorDay({ game }: { game: ClientGameState }) {
-  const remain = useCountdown(game.dayExpiresAt, game.serverNow);
-  const used = [...new Set(game.selectedRoles)];
-  return (
-    <section>
-      <Header kicker="DAYBREAK" title="날이 밝았습니다" />
-      <div className="sun-timer">
-        <small>남은 토론 시간</small>
-        <b className={remain <= 30 ? "urgent" : ""}>{formatTime(remain)}</b>
-      </div>
-      <Panel>
-        <h3>이번 게임의 역할</h3>
-        <div className="chips">
-          {used.map((id) => (
-            <span className="chip" key={id}>
-              {ROLE_DEFINITIONS[id].emoji} {ROLE_DEFINITIONS[id].name} ×
-              {game.selectedRoles.filter((x) => x === id).length}
-            </span>
-          ))}
-        </div>
-      </Panel>
-      <Panel>
-        <h3>밤 행동 순서</h3>
-        <div className="order">
-          {NIGHT_ROLES.filter((r) => used.includes(r.id)).map((r, i) => (
-            <div key={r.id}>
-              <i>{i + 1}</i>
-              <span>
-                {r.emoji} {r.name}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Panel>
-      <button onClick={() => event("GAME_RESTART", req(game))}>
-        대기실로 돌아가기
-      </button>
-    </section>
-  );
 }
 function Lobby({ game }: { game: ClientGameState }) {
   const me = game.players.find((p) => p.id === game.playerId)!;
@@ -862,7 +645,7 @@ function Lobby({ game }: { game: ClientGameState }) {
   };
   return (
     <section>
-      <Header kicker="WAITING ROOM" title="달이 뜨기 전" />
+      <Header kicker={game.botMode ? "TEST BOT ROOM" : "WAITING ROOM"} title={game.botMode ? "테스트 봇과 함께하는 밤" : "달이 뜨기 전"} />
       <Panel className="center">
         <small>초대 코드</small>
         <div className="room-code">{game.roomCode}</div>
@@ -885,6 +668,7 @@ function Lobby({ game }: { game: ClientGameState }) {
             <div className="avatar">{p.nickname[0]}</div>
             <b>{p.nickname}</b>
             {p.isHost && <span>방장</span>}
+            {p.isBot && <span>봇</span>}
             <i className={p.isReady ? "ready" : ""}>
               {p.isReady ? "준비됨" : "대기 중"}
             </i>
@@ -1348,10 +1132,11 @@ function ChatPanel({ game, scope, title, placeholder }: { game: ClientGameState;
   const chatFormRef = useRef<HTMLFormElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const messages = scope === 'lobby' ? game.lobbyChat : game.chat;
+  const latestMessageId = messages[messages.length - 1]?.id;
   useEffect(() => {
     const chat = chatRef.current;
     if (chat) chat.scrollTop = chat.scrollHeight;
-  }, [messages.length]);
+  }, [latestMessageId]);
   useEffect(() => {
     const dismissKeyboard = (event: PointerEvent) => {
       if (!chatFormRef.current?.contains(event.target as Node)) chatInputRef.current?.blur();
