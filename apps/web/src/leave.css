@@ -1,4 +1,5 @@
 /* 상단 컨트롤: 왼쪽은 나가기 · 안내 음성, 오른쪽은 내 밤 기록 · 도움말 */
+:root{--top-control-height:40px;--top-control-font-size:.78rem}
 .leave-fab,.night-record-fab{
   border:1px solid var(--line);border-radius:30px;background:#141232cc;backdrop-filter:blur(10px);
   cursor:pointer;transition:border-color .2s,background .2s,transform .15s;
@@ -8,7 +9,7 @@
 
 .leave-fab{
   position:fixed;z-index:20;top:max(16px,calc(env(safe-area-inset-top) + 8px));left:16px;
-  height:40px;padding:0 14px;color:#e8aca6;font-size:.72rem;
+  height:var(--top-control-height);padding:0 14px;color:#e8aca6;font-size:var(--top-control-font-size);
 }
 .leave-fab:hover{border-color:#d9635e;background:#d9635e1a}
 
@@ -16,7 +17,7 @@
   position:fixed;z-index:20;top:max(16px,calc(env(safe-area-inset-top) + 8px));right:68px;
   display:flex;flex-direction:column;align-items:flex-end;gap:6px;
 }
-.night-record-fab{height:36px;padding:0 12px;color:#e5dcbf;font-size:.68rem}
+.night-record-fab{height:var(--top-control-height);padding:0 12px;color:#e5dcbf;font-size:var(--top-control-font-size)}
 
 .night-record{
   position:fixed;z-index:21;top:max(68px,calc(env(safe-area-inset-top) + 60px));right:16px;

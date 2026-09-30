@@ -1,0 +1,104 @@
+/* ============================================================
+   5차: 낮 · 투표 화면 — 해 궤도 타이머 / 용의자 카드 / 밀랍 도장 / 촛불
+   polish.css 뒤에 로드. 되돌리려면 import 한 줄만 지우면 된다.
+   ============================================================ */
+
+/* ---------- 낮: 하늘은 시간에 따라 노을로 기운다 ---------- */
+.day-scene{position:relative;z-index:1;padding-bottom:104px}
+.day-scene:before{ /* 천천히 도는 빛줄기 */
+  content:'';position:fixed;inset:-30% -30% 30%;z-index:-1;pointer-events:none;opacity:.5;
+  background:repeating-conic-gradient(from 0deg at 50% 0,#fff6d000 0 7deg,#fff6d055 9deg,#fff6d000 12deg);
+  -webkit-mask-image:radial-gradient(ellipse 70% 80% at 50% 0,#000,transparent 75%);
+  mask-image:radial-gradient(ellipse 70% 80% at 50% 0,#000,transparent 75%);
+  animation:beams 60s linear infinite}
+@keyframes beams{to{transform:rotate(360deg)}}
+main.day:has(.day-scene.dusk){
+  background:
+    radial-gradient(circle at 50% 108%,#ffd28a 0,#f08a4c 28%,transparent 62%),
+    linear-gradient(#d9805a,#a4506a 55%,#4a2f6a)}
+main.day:has(.day-scene.dusk) .day-scene h1,
+main.day:has(.day-scene.dusk) .day-scene .eyebrow{color:#fff3d6}
+
+/* ---------- 해 궤도 타이머 ---------- */
+.day-scene .sun-timer{position:relative;margin:6px auto 14px;max-width:300px}
+.sun-arc{display:block;width:100%;height:auto;overflow:visible}
+.sun-halo{animation:halo 3s ease-in-out infinite alternate}
+@keyframes halo{to{r:26;opacity:.6}}
+.day-scene .sun-timer b{display:block;margin-top:-58px;position:relative;font-size:3.4rem}
+.day-scene .sun-timer small{margin-top:8px}
+.day-scene.dusk .sun-timer b{color:#fff3d6;text-shadow:0 0 30px #ff9a5acc}
+.day-scene.dusk .sun-timer small{color:#ffe2bd}
+
+/* ---------- 탭 ---------- */
+.day-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:8px 0 10px;border-radius:14px;
+  background:#8a4b1214;border:1px solid #c79a4c66}
+.day-tabs button{padding:9px 0;border-radius:10px;background:transparent;color:#7a5a3c;font-weight:700;font-size:.85rem;box-shadow:none}
+.day-tabs button.on{background:#fff9e6;color:#4a2f1a;box-shadow:0 2px 8px #8a4b1230}
+.day-scene.dusk .day-tabs button:not(.on){color:#ffe2bd}
+
+/* ---------- 하단 고정 투표 동의: 버튼이 게이지다 ---------- */
+.vote-dock{position:fixed;left:0;right:0;bottom:0;z-index:15;
+  padding:14px 16px max(14px,env(safe-area-inset-bottom));
+  background:linear-gradient(transparent,#f3c27acc 40%);pointer-events:none}
+.day-scene.dusk .vote-dock{background:linear-gradient(transparent,#4a2f6acc 40%)}
+.vote-dock .vote-request{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;
+  width:min(520px,100%);margin:0 auto;padding:15px 20px;position:relative;overflow:hidden;border-radius:16px;
+  background:linear-gradient(90deg,#c9853a var(--p,0%),#5a3a1e var(--p,0%));
+  color:#fff7e0;font-weight:800;border:1px solid #e6b866;
+  box-shadow:0 12px 30px -8px #4a2f1acc,inset 0 1px 0 #ffffff33;
+  transition:background .5s}
+.vote-dock .vote-request em{font:700 1rem var(--numeral);font-style:normal;font-variant-numeric:tabular-nums}
+.vote-dock .vote-request:disabled{opacity:1;filter:saturate(.9)}
+
+/* ---------- 투표: 용의자 카드 ---------- */
+.voting-scene .vote-grid{gap:12px;margin:18px 0}
+.vote-grid .vote.suspect{min-height:150px!important;gap:10px!important;padding:16px 8px!important;position:relative;
+  border-radius:18px!important;
+  background:linear-gradient(170deg,#ffffff10,#ffffff03)!important;
+  box-shadow:inset 0 1px 0 #ffffff14,0 10px 24px -12px #000c!important;
+  transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .3s,border-color .2s,box-shadow .3s}
+.vote.suspect b{font:800 .95rem var(--serif);word-break:keep-all}
+.vote.suspect .mask-av{transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .35s}
+.vote.suspect:hover:not(:disabled) .mask-av{transform:translateY(-3px)}
+.vote.suspect.selected{transform:translateY(-4px) scale(1.03)!important;opacity:1!important;
+  background:radial-gradient(circle at 50% 0,#e0707d33,#e0707d0a 70%)!important;
+  box-shadow:0 0 0 1px var(--rose),0 18px 34px -10px #e0707d88,0 0 60px #e0707d33!important}
+.vote.suspect.selected .mask-av{filter:drop-shadow(0 0 16px #e0707dcc)}
+.vote.suspect.selected:after{content:none} /* 기존 ✕ 대신 밀랍 도장 */
+.vote.suspect .wax-seal{position:absolute;right:-8px;top:-12px;filter:drop-shadow(0 6px 8px #000a);
+  animation:seal-stamp .45s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes seal-stamp{from{opacity:0;transform:scale(2.6) rotate(-30deg)}60%{transform:scale(.92) rotate(6deg)}}
+.vote-grid:has(.vote.selected) .vote:not(.selected){opacity:.42;transform:scale(.96)}
+.vote-grid:has(.vote.selected) .vote:not(.selected) .mask-av{filter:grayscale(.6)}
+
+/* ---------- 꾹 눌러 확정: 채워지는 게이지 ---------- */
+.hold-confirm{position:relative;overflow:hidden;width:100%;padding:17px;border-radius:16px;touch-action:none;
+  user-select:none;-webkit-user-select:none;font-weight:800;color:#fff3e0;
+  background:linear-gradient(90deg,#c4525f calc(var(--hold,0)*100%),#3a2350 calc(var(--hold,0)*100%));
+  border:1px solid #e0707d88;box-shadow:0 12px 28px -10px #c4525f88,inset 0 1px 0 #ffffff26;
+  transition:transform .2s,box-shadow .2s}
+.hold-confirm.holding{transform:scale(.985);box-shadow:0 0 0 3px #e0707d44,0 0 40px #e0707d66}
+.hold-confirm:disabled:not(.done){opacity:.5;background:#2a2350;border-color:var(--line);box-shadow:none}
+.hold-confirm.done{background:#2a2350;border-color:var(--gold-deep);color:var(--gold);box-shadow:none;opacity:1}
+.hold-confirm span{position:relative}
+
+/* ---------- 촛불 진행 표시 ---------- */
+.candles{display:flex;justify-content:center;align-items:flex-end;gap:10px;margin:22px 0 6px;min-height:36px}
+.candle .flame{transform-origin:9px 13px;animation:flicker 1.3s ease-in-out infinite alternate;
+  filter:drop-shadow(0 0 6px #ffd25e) drop-shadow(0 0 14px #ff9a3c)}
+@keyframes flicker{0%{transform:scale(1,1)}50%{transform:scale(.92,1.08) skewX(2deg)}100%{transform:scale(1.05,.95) skewX(-2deg)}}
+.candle.lit{animation:candle-light .5s ease-out both}
+@keyframes candle-light{from{transform:translateY(3px)}}
+
+/* ---------- 투표 후 대기: 조용히 숨 쉰다 ---------- */
+.voting-scene.voted .vote.suspect:not(.selected){opacity:.25}
+.voting-scene.voted .vote.suspect.selected{animation:wait-breathe 3.2s ease-in-out infinite}
+@keyframes wait-breathe{50%{box-shadow:0 0 0 1px var(--rose),0 18px 34px -10px #e0707d55,0 0 30px #e0707d22}}
+
+@media(max-width:420px){
+  .day-scene .sun-timer b{font-size:3rem;margin-top:-50px}
+  .vote-grid .vote.suspect{min-height:136px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .day-scene:before,.sun-halo,.candle .flame,.voting-scene.voted .vote.suspect.selected{animation:none}
+}
