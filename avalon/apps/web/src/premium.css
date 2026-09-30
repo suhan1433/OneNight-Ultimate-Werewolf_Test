@@ -1,0 +1,151 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+
+/* =========================================================
+   Avalon premium layer — "촛불 아래 놋쇠와 벨벳"
+   immersive.css 뒤에 import. 재질(놋쇠·벨벳·양피지) 언어로 통일:
+   1) 촛불이 커서를 따라오는 조명 + 필름 그레인
+   2) 각인된 놋쇠 헤어라인 / 일관된 라운드 스케일
+   3) 두께가 느껴지는 버튼·코인·타로 카드
+   ========================================================= */
+
+:root{
+  --brass-hi:#fde9b4;--brass:#dcb262;--brass-lo:#7a5726;
+  --hair:rgba(232,196,120,.2);--hair-strong:rgba(247,220,156,.55);
+  --r-s:10px;--r-m:16px;--r-l:26px;
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --numeral:'Cormorant Garamond','Noto Serif KR',serif;
+  font-family:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;
+  font-feature-settings:'tnum' 1;
+}
+*{scrollbar-width:thin;scrollbar-color:rgba(220,178,98,.35) transparent}
+::selection{background:rgba(220,178,98,.35);color:#fff}
+button,input{font-family:inherit}
+body{background:#04080d;line-height:1.6;-webkit-font-smoothing:antialiased}
+
+/* ---------- 조명 · 그레인 · 프레임 ---------- */
+body:before{inset:12px;border-radius:30px;border:1px solid rgba(232,196,120,.14);box-shadow:inset 0 0 0 5px transparent,inset 0 0 0 6px rgba(232,196,120,.05),inset 0 0 140px rgba(220,178,98,.06)}
+body:after{background:radial-gradient(ellipse 75% 65% at 50% 45%,transparent 35%,rgba(0,0,0,.72) 100%)}
+.ambient::before{content:'';position:absolute;inset:0;background:
+  radial-gradient(460px circle at var(--mx,50%) var(--my,28%),rgba(255,212,140,.13),transparent 70%),
+  radial-gradient(ellipse 85% 55% at 50% -10%,rgba(48,118,126,.55),transparent 70%),
+  radial-gradient(ellipse 70% 50% at 50% 115%,rgba(28,48,92,.5),transparent 70%);
+  animation:flicker 9s linear infinite}
+.ambient::after{content:'';position:absolute;inset:-10%;opacity:.07;mix-blend-mode:overlay;background-size:160px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation:grain 1.2s steps(1) infinite}
+@keyframes flicker{0%,100%{opacity:1}12%{opacity:.94}27%{opacity:.99}41%{opacity:.9}63%{opacity:1}78%{opacity:.95}}
+@keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}}
+@keyframes foil{0%,55%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
+
+/* ---------- 재질: 유리 위에 각인된 놋쇠 ---------- */
+.panel,.roster,.lobby-code,.lobby-players,.lobby-roles,.active-roles,.help-modal,.chat-panel,.role-dossier,.confirm-modal,.round-detail,.game-status,.role-detail,.victory-summary{
+  background:linear-gradient(180deg,rgba(22,42,52,.8),rgba(7,15,21,.9));
+  border:1px solid var(--hair);
+  box-shadow:0 0 0 1px rgba(0,0,0,.6),0 44px 80px -34px #000,inset 0 1px 0 rgba(255,255,255,.07),inset 0 0 70px rgba(220,178,98,.03);
+  backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2)}
+.panel,.roster{border-radius:var(--r-l);padding:28px;position:relative}
+.panel:before{content:'';position:absolute;left:14%;right:14%;top:-1px;height:1px;background:linear-gradient(90deg,transparent,var(--brass-hi),transparent);opacity:.75}
+.game-status,.lobby-code,.lobby-players,.help-modal,.chat-panel,.role-dossier,.confirm-modal,.round-detail,.role-detail,.victory-summary{border-radius:var(--r-m)}
+.lobby-roles,.active-roles{border-radius:var(--r-s)}
+
+/* ---------- 타이포 ---------- */
+.home h1,.lobby-code .code{
+  background:linear-gradient(180deg,#fff6d8 0%,#f3d08e 45%,#b9853a 100%);-webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;text-shadow:none;
+  filter:drop-shadow(0 0 28px rgba(220,178,98,.38)) drop-shadow(0 2px 0 rgba(58,34,6,.85))}
+.home h1{letter-spacing:.14em;margin-right:-.14em}
+.home>p{font-size:14px;letter-spacing:.2em;color:#b4ae98}
+.lobby-code .code{font-family:var(--numeral);font-weight:700;font-size:46px;letter-spacing:.24em;padding-left:.24em}
+.selection-core strong,.pips,.round-label,.tally-row{font-variant-numeric:tabular-nums lining-nums}
+.home>h1,.home>p,.home>.panel{animation:riseIn .9s var(--ease-out) both}
+.home>p{animation-delay:.18s}.home>.panel{animation-delay:.34s}
+.seal{width:112px;height:112px}
+.seal circle:first-child{stroke-width:2.6;stroke-dasharray:.1 6.1;stroke-linecap:round;transform-box:fill-box;transform-origin:center;animation:spin 90s linear infinite}
+
+/* ---------- 입력 · 버튼 ---------- */
+input{padding:15px 16px;border-radius:var(--r-m);background:rgba(3,8,12,.55);border:1px solid rgba(232,196,120,.16);box-shadow:inset 0 2px 8px rgba(0,0,0,.5)}
+input::placeholder{color:#7d8985}
+input:focus{border-color:var(--brass);box-shadow:inset 0 2px 8px rgba(0,0,0,.5),0 0 0 4px rgba(220,178,98,.16),0 0 28px -6px rgba(220,178,98,.5)}
+input[type=radio]{padding:0;background:none;box-shadow:none}
+button{border-radius:var(--r-m);border:1px solid var(--hair);
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015)),rgba(10,22,30,.72);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 8px 18px -8px #000;
+  transition:border-color .2s,background .2s,box-shadow .2s,transform .2s var(--ease-out),filter .2s}
+button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--hair-strong)}
+button:active:not(:disabled){transform:translateY(1px) scale(.985);box-shadow:inset 0 2px 8px rgba(0,0,0,.55)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--brass-hi);outline-offset:3px}
+.primary{padding:14px 22px;color:#2a1a06;border:1px solid #f7dc9c;text-shadow:0 1px 0 rgba(255,255,255,.35);
+  background:linear-gradient(180deg,#fde9b4 0%,#e3b860 48%,#b98436 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 3px 0 #74501b,0 16px 30px -10px rgba(220,178,98,.6)}
+.primary:hover:not(:disabled){background:linear-gradient(180deg,#fff2c9 0%,#ecc26c 48%,#c4903f 100%);transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 4px 0 #74501b,0 20px 34px -10px rgba(220,178,98,.7)}
+.primary:active:not(:disabled){transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 0 #74501b,0 6px 14px -6px rgba(220,178,98,.5)}
+.primary:disabled{filter:saturate(.35) brightness(.72);opacity:1}
+.role-chip{padding:10px 16px}
+.role-chip.chosen{color:var(--brass-hi);border-color:var(--hair-strong);background:linear-gradient(180deg,rgba(220,178,98,.24),rgba(220,178,98,.07));box-shadow:0 0 22px -4px rgba(220,178,98,.5),inset 0 1px 0 rgba(255,255,255,.14)}
+.role-limit-card>div,.assassination-delegation{border-radius:var(--r-m)}
+
+/* ---------- 원탁: 벨벳 · 놋쇠 인레이 · 오크 ---------- */
+.table{width:min(380px,90vw);border:0;background:
+  radial-gradient(circle closest-side,rgba(255,212,140,.12),transparent 40%),
+  radial-gradient(circle closest-side,#215058 0,#143840 46%,#0b1c22 62.5%,transparent 63%),
+  radial-gradient(circle closest-side,transparent 63%,#fde9b4 63.4%,#8f6d35 64.4%,transparent 64.9%),
+  radial-gradient(circle closest-side,transparent 65%,rgba(0,0,0,.5) 100%),
+  conic-gradient(from 30deg,#3d2c1d,#553b23,#33241a,#5f4429,#3a2a1c,#4d3620,#3d2c1d);
+  box-shadow:0 0 0 1px rgba(220,178,98,.45),0 50px 90px -20px #000,0 0 120px -30px rgba(220,178,98,.28),inset 0 0 0 2px rgba(0,0,0,.6),inset 0 0 70px #000}
+.table:before{inset:20%;border:0;animation:spin 240s linear infinite;
+  background:repeating-conic-gradient(rgba(243,208,142,.55) 0 .5deg,transparent .5deg 7.5deg);
+  -webkit-mask:radial-gradient(circle closest-side,transparent 92%,#000 93%);mask:radial-gradient(circle closest-side,transparent 92%,#000 93%)}
+.table:after{inset:26%;background:radial-gradient(circle,rgba(255,206,130,.26) 0,transparent 68%)}
+.seat .avatar{border:0;background:radial-gradient(circle at 32% 26%,#43747b,#0d1d24 72%);
+  box-shadow:0 0 0 1.5px var(--brass),0 0 0 4px #0b1418,0 0 0 5px rgba(220,178,98,.4),0 12px 18px -4px #000,inset 0 1px 1px rgba(255,255,255,.35)}
+.seat .seat-name{padding:2px 9px;border-radius:99px;background:rgba(4,9,13,.72);border:1px solid rgba(232,196,120,.14);text-shadow:none;letter-spacing:-.01em}
+.seat button.selected .avatar{border:0;box-shadow:0 0 0 1.5px var(--brass-hi),0 0 0 4px #0b1418,0 0 0 6px rgba(253,233,180,.55),0 0 34px rgba(253,233,180,.7)}
+.seat button:not(:disabled):hover .avatar{transform:translateY(-3px) scale(1.04)}
+.leader-crown{top:-16px}
+
+/* ---------- 상태 리본 · 헤더 ---------- */
+.phase-ribbon{position:relative;overflow:hidden;padding-left:22px;border:0;border-radius:var(--r-m);
+  background:linear-gradient(90deg,rgba(220,178,98,.16),rgba(10,20,28,.6) 62%);
+  box-shadow:inset 0 0 0 1px var(--hair),0 24px 40px -22px #000}
+.phase-ribbon:before{content:'';position:absolute;left:0;top:16%;bottom:16%;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(var(--brass-hi),var(--brass-lo))}
+.phase-ribbon strong{letter-spacing:-.01em}
+.round-history-item>button{border-radius:var(--r-s);border:1px solid rgba(232,196,120,.18)}
+.round-history-item>button.current{border-color:var(--brass-hi)}
+
+/* ---------- 코인 · 타로 카드 ---------- */
+.token{border:0;background:radial-gradient(circle at 34% 26%,#43747b,#0d1d24 76%);
+  box-shadow:0 0 0 2px var(--brass),0 0 0 6px #0b1418,0 0 0 7px rgba(220,178,98,.4),0 20px 30px -8px #000,inset 0 2px 2px rgba(255,255,255,.3),inset 0 -12px 22px rgba(0,0,0,.5)}
+.token.approve.active{border:0;box-shadow:0 0 0 2px var(--good-300),0 0 0 6px #0b1418,0 0 64px rgba(79,143,214,.7),inset 0 2px 2px rgba(255,255,255,.35)}
+.token.reject.active{border:0;box-shadow:0 0 0 2px var(--evil-300),0 0 0 6px #0b1418,0 0 64px rgba(184,56,79,.75),inset 0 2px 2px rgba(255,255,255,.3)}
+.qcard{border:0;border-radius:18px;
+  box-shadow:0 0 0 1.5px rgba(220,178,98,.75),0 0 0 5px #0a1418,0 0 0 6px rgba(220,178,98,.25),0 26px 40px -14px #000}
+.qcard:before{inset:9px;border-radius:11px;border-color:rgba(220,178,98,.35)}
+.qcard.success.active{box-shadow:0 0 0 1.5px var(--good-300),0 0 0 5px #0a1418,0 0 50px rgba(79,143,214,.55),0 26px 40px -14px #000}
+.qcard.fail.active{box-shadow:0 0 0 1.5px var(--evil-300),0 0 0 5px #0a1418,0 0 50px rgba(184,56,79,.6),0 26px 40px -14px #000}
+.card-back{border:0;box-shadow:0 0 0 1.5px rgba(220,178,98,.6),0 0 0 5px #0a1418,0 20px 34px -12px #000}
+.rcard-back,.rcard-front{border-radius:12px}
+
+/* ---------- 역할 카드 ---------- */
+.flip-back{background:
+  repeating-linear-gradient(45deg,rgba(220,178,98,.07) 0 1px,transparent 1px 15px),
+  repeating-linear-gradient(-45deg,rgba(220,178,98,.07) 0 1px,transparent 1px 15px),
+  radial-gradient(circle at 50% 40%,#25606a,#0a1a21 76%)}
+.flip-front:after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 32%,rgba(255,255,255,.24) 46%,transparent 60%);animation:foil 5s ease-in-out 1.4s infinite}
+.flip-front strong{letter-spacing:.04em}
+
+/* ---------- 결과 · 로비 · 모달 ---------- */
+.roster>div{border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.03);border-radius:var(--r-s)}
+.result-stage h1{letter-spacing:.06em}
+.lobby-players .plate{border-radius:var(--r-m)}
+.help-scrim{background:rgba(2,5,9,.78);backdrop-filter:blur(8px)}
+.toast{border-radius:var(--r-s);backdrop-filter:blur(8px)}
+
+@media(max-width:500px){
+  body:before{inset:7px;border-radius:24px}
+  .panel,.roster{padding:20px}
+  .lobby-code .code{font-size:34px}
+  .table{width:min(320px,88vw)}
+}
+@media(prefers-reduced-motion:reduce){
+  .ambient::before,.ambient::after,.seal circle:first-child,.table:before,.flip-front:after{animation:none}
+}

@@ -265,17 +265,28 @@ main.day .chat-message.mine span{background:#e7be71;color:#4a2f1a}
 .help-fab{right:16px;width:var(--top-control-height);height:var(--top-control-height);border-radius:50%;font:700 var(--top-control-font-size) var(--serif)}
 .audio-fab{left:88px;width:var(--top-control-height);height:var(--top-control-height);padding:0;border-radius:50%;font-size:var(--top-control-font-size)}
 .overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:#04030bcc;backdrop-filter:blur(4px)}
-.sheet{width:min(100%,560px);max-height:90vh;overflow:auto;padding:22px;color:#eee;background:linear-gradient(#1a1742,#100e26);border:1px solid var(--line);border-bottom:0;border-radius:26px 26px 0 0;box-shadow:0 -20px 60px #0009}
+.sheet{width:min(100%,560px);max-height:90vh;overflow:auto;padding:22px;color:#fff9ed;background:linear-gradient(#1a1742,#100e26);border:1px solid var(--line);border-bottom:0;border-radius:26px 26px 0 0;box-shadow:0 -20px 60px #0009;font-family:'Noto Sans KR',sans-serif}
 .sheet-head{position:sticky;top:-22px;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:10px 0;background:#181540}
+.sheet h2,.help-role h3{font-family:'Noto Sans KR',sans-serif;color:#fff9ed;font-weight:700}
 .tabs{display:flex;gap:6px;margin:12px 0}
-.tabs button{flex:1;padding:9px;border-radius:20px;background:#ffffff08;color:#aaa;cursor:pointer}
+.tabs button{flex:1;padding:9px;border-radius:20px;background:#ffffff12;color:#eee8dc;cursor:pointer}
 .tabs button.active{background:var(--gold);color:#241d0e;font-weight:700}
-.prose{padding:10px}.prose p{color:#c9c4d8}
+.prose{padding:10px}.prose p{color:#f0e9dc}
 .help-role{display:flex;gap:12px;padding:14px 3px;border-bottom:1px solid var(--line)}
-.help-role>span{font-size:1.8rem}
-.help-role h3{font-family:'Noto Sans KR';font-size:1rem}
+.help-role>span{flex:0 0 38px;width:38px;height:38px;aspect-ratio:1;border-radius:50%;font-size:1.8rem}
+.help-role>span .role-ic{width:26px;height:26px;aspect-ratio:1}
+.help-role>div{min-width:0}
+.help-role h3{font-size:1rem}
 .help-role small,.help-role p,.help-role b{font-size:.75rem}
-.help-role b{color:var(--gold)}
+.help-role small{color:#d9d2c5}.help-role p{color:#f0e9dc}.help-role b{color:#f3cf7c}
+
+main.day .sheet{color:#4a2f1a;background:linear-gradient(#fff9e9,#f4d89f);border-color:#caa85e}
+main.day .sheet-head{background:#fff9e9}
+main.day .sheet h2,main.day .help-role h3{color:#4a2f1a}
+main.day .tabs button{background:#8a5a1a16;color:#5f3b20}
+main.day .tabs button.active{background:#9a641f;color:#fffaf0}
+main.day .prose p,main.day .help-role p{color:#5f3b20}
+main.day .help-role small{color:#795534}main.day .help-role b{color:#7d4b0c}
 
 /* ---------- 알림 (모바일 안전 영역 유지) ---------- */
 .connection-banner{position:fixed;z-index:100;top:max(68px,calc(env(safe-area-inset-top) + 16px))!important;left:50%;transform:translateX(-50%);max-width:calc(100dvw - 32px)!important;padding:9px 16px;border:1px solid var(--line);border-radius:999px;background:#141232ee;color:var(--gold);font-size:.78rem;text-align:center!important;overflow-wrap:anywhere!important;box-shadow:0 8px 20px #0006}
