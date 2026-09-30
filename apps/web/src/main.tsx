@@ -1010,19 +1010,28 @@ function NightControls({ game }: { game: ClientGameState }) {
   const [centers, setCenters] = useState<number[]>([]);
   const [seerMode, setSeerMode] = useState<"player" | "center">("player");
   const [submitting, setSubmitting] = useState(false);
+  // State updates are applied after the current event. Keep a synchronous
+  // guard too, so a quick double tap cannot submit two different requests.
+  const submittingRef = useRef(false);
   useEffect(() => {
     setPlayers([]);
     setCenters([]);
     setSubmitting(false);
+    submittingRef.current = false;
   }, [a.id, game.actionResult?.kind]);
   const submit = (command: NightCommand) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     void event("NIGHT_ACTION_SUBMIT", {
       ...req(game),
       actionId: a.id,
       command,
     }).then((result) => {
-      if (result === undefined) setSubmitting(false);
+      if (result === undefined) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     });
   };
   const others = game.players.filter(
@@ -1125,7 +1134,10 @@ function NightControls({ game }: { game: ClientGameState }) {
       {role === "seer" && (
         <div className="chips">
           <button
+            type="button"
             className="chip"
+            aria-pressed={seerMode === "player"}
+            disabled={submitting}
             onClick={() => {
               setSeerMode("player");
               setCenters([]);
@@ -1134,7 +1146,10 @@ function NightControls({ game }: { game: ClientGameState }) {
             플레이어 1명
           </button>
           <button
+            type="button"
             className="chip"
+            aria-pressed={seerMode === "center"}
+            disabled={submitting}
             onClick={() => {
               setSeerMode("center");
               setPlayers([]);
