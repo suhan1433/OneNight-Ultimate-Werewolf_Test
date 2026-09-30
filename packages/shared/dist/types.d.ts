@@ -59,6 +59,11 @@ export interface NightActionLog {
     status: string;
     at: number;
 }
+/** A private snapshot of a night action, captured when its owner performs it. */
+export interface PrivateNightAction {
+    role: RoleType;
+    result: Record<string, unknown>;
+}
 export interface ChatMessage {
     id: string;
     playerId: string;
@@ -70,6 +75,8 @@ export interface GameResult {
     winners: Faction[];
     executedIds: string[];
     voteCounts: Record<string, number>;
+    /** Raw ballots each player received, before role effects such as Prince or Bodyguard. */
+    receivedVoteCounts: Record<string, number>;
     votes: Record<string, string>;
     players: Array<{
         id: string;
@@ -100,6 +107,8 @@ export interface Room {
     chat: ChatMessage[];
     publicReveals: string[];
     privateResults: Record<string, Record<string, unknown>>;
+    /** Never broadcast: each player only receives their own entries. */
+    privateNightActions: Record<string, PrivateNightAction[]>;
     protectedPlayerId: string | null;
     dayExpiresAt: number | null;
     result: GameResult | null;
@@ -136,6 +145,7 @@ export interface ClientGameState {
     isNightActor: boolean;
     actionContext?: Record<string, unknown>;
     actionResult?: Record<string, unknown>;
+    nightActions: PrivateNightAction[];
     votesCompleted: number;
     dayVoteRequests: number;
     hasRequestedDayVote: boolean;

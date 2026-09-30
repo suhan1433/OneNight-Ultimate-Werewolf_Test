@@ -8,6 +8,7 @@ import {
   ROLE_LIST,
   type ClientGameState,
   type NightCommand,
+  type PrivateNightAction,
   type RoleType,
 } from "@werewolf/shared";
 import { useGame } from "./store";
@@ -55,6 +56,10 @@ const optimistic = (apply: () => void, name: string, data: unknown) => {
 
 function App() {
   const { game, tts, help, error, connectionState, setTts, setHelp, setError } = useGame();
+  const [nightRecordOpen, setNightRecordOpen] = useState(false);
+  useEffect(() => {
+    if (!game?.selfRole || game.phase === "result") setNightRecordOpen(false);
+  }, [game?.selfRole, game?.phase]);
   useEffect(() => {
     if (!error) return;
     const timer = window.setTimeout(() => setError(null), 4_000);
@@ -93,7 +98,18 @@ function App() {
           >
             {tts ? "🔊" : "🔇"} 안내 음성
           </button>
-          <VoiceChat game={game} />
+          {game.selfRole && game.phase !== "result" && (
+            <div className="night-record-controls">
+              <button
+                className="night-record-fab"
+                onClick={() => setNightRecordOpen((value) => !value)}
+                aria-expanded={nightRecordOpen}
+              >
+                ◉ 내 밤 기록
+              </button>
+              {nightRecordOpen && <NightRecord game={game} close={() => setNightRecordOpen(false)} />}
+            </div>
+          )}
           <button className="leave-fab" onClick={leave}>
             나가기
           </button>
@@ -134,6 +150,58 @@ function App() {
         )}
       </AnimatePresence>
     </main>
+  );
+}
+
+function NightActionSummary({ action }: { action: PrivateNightAction }) {
+  const result = action.result;
+  if (result.kind === "people") {
+    const people = Array.isArray(result.people) ? result.people as PersonInfo[] : [];
+    return <p>{String(result.title ?? "확인 결과")}: {people.length ? people.map((person) => person.nickname).join(", ") : "없음"}</p>;
+  }
+  if (result.kind === "cards") {
+    const cards = Array.isArray(result.cards) ? result.cards as CardInfo[] : [];
+    return <p>{String(result.title ?? "확인 결과")}: {cards.map((card) => `${card.label} · ${card.role ? ROLE_DEFINITIONS[card.role].name : "알 수 없음"}`).join(", ")}</p>;
+  }
+  const message = {
+    copied: `${String(result.targetNickname)}님의 역할을 복사했습니다.`,
+    protected: `${String(result.nickname)}님을 보호했습니다.`,
+    alpha_swap: `${String(result.targetNickname)}님의 카드를 늑대 카드로 바꿨습니다.`,
+    robber_swap: `${String(result.targetNickname)}님과 카드를 바꿨습니다.`,
+    witch_seen: `센터 카드 ${Number(result.centerIndex) + 1}번을 확인했습니다.`,
+    witch_swap: `센터 카드와 ${String(result.targetNickname)}님의 카드를 바꿨습니다.`,
+    troublemaker_swap: `${String(result.firstNickname)}님과 ${String(result.secondNickname)}님의 카드를 바꿨습니다.`,
+    drunk_swap: `센터 카드 ${String(result.centerIndex)}번과 내 카드를 바꿨습니다.`,
+    confirmed: "능력 정보를 확인했습니다.",
+  }[String(result.kind)];
+  return <p>{message ?? "밤 행동을 완료했습니다."}</p>;
+}
+
+function NightRecord({ game, close }: { game: ClientGameState; close: () => void }) {
+  const originalRole = game.selfRole!;
+  const definition = ROLE_DEFINITIONS[originalRole];
+  return (
+    <aside className="night-record" aria-label="내 밤 기록">
+      <button className="night-record-close" onClick={close} aria-label="내 밤 기록 닫기">×</button>
+      <small>MY NIGHT RECORD</small>
+      <h3>{definition.emoji} 처음 배정된 역할</h3>
+      <div className="night-original-role">
+        <b>{definition.name}</b>
+        <p>{definition.description}</p>
+      </div>
+      <div className="night-action-list">
+        <b>내가 밤에 한 행동</b>
+        {game.nightActions.length ? game.nightActions.map((action, index) => (
+          <div className="night-action" key={`${action.role}-${index}`}>
+            <span>{ROLE_DEFINITIONS[action.role].emoji}</span>
+            <div>
+              <strong>{ROLE_DEFINITIONS[action.role].name}</strong>
+              <NightActionSummary action={action} />
+            </div>
+          </div>
+        )) : <p className="night-action-empty">이번 밤에 직접 수행한 행동이 없습니다.</p>}
+      </div>
+    </aside>
   );
 }
 
@@ -1333,7 +1401,7 @@ function Result({ game }: { game: ClientGameState }) {
             <div className="avatar">{p.nickname[0]}</div>
             <div>
               <b>{p.nickname}</b>
-              <small>처음 {ROLE_DEFINITIONS[p.originalRole].name}</small>
+              <small>처음 {ROLE_DEFINITIONS[p.originalRole].name} · 득표 {r.receivedVoteCounts[p.id] ?? 0}표</small>
             </div>
             <strong>
               {ROLE_DEFINITIONS[p.currentRole].emoji}{" "}

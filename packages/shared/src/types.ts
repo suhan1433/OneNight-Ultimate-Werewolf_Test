@@ -29,9 +29,13 @@ export interface NightAction {
   startedAt: number; expiresAt: number; status: 'pending' | 'active' | 'completed' | 'timeout' | 'skipped'; copied?: boolean;
 }
 export interface NightActionLog { actionId: string; role: RoleType; playerId?: string; status: string; at: number; }
+/** A private snapshot of a night action, captured when its owner performs it. */
+export interface PrivateNightAction { role: RoleType; result: Record<string, unknown>; }
 export interface ChatMessage { id: string; playerId: string; nickname: string; text: string; at: number; }
 export interface GameResult {
   winners: Faction[]; executedIds: string[]; voteCounts: Record<string, number>;
+  /** Raw ballots each player received, before role effects such as Prince or Bodyguard. */
+  receivedVoteCounts: Record<string, number>;
   votes: Record<string, string>; players: Array<{ id: string; nickname: string; originalRole: RoleType; currentRole: RoleType }>;
 }
 export interface Room {
@@ -42,6 +46,8 @@ export interface Room {
   actionTimeLimitSeconds: number; dayTimeLimitSeconds: number; ttsEnabled: boolean; nightLog: NightActionLog[];
   votes: Record<string, string>; voteStartRequests: string[]; processedRequestIds: string[]; chat: ChatMessage[]; publicReveals: string[];
   privateResults: Record<string, Record<string, unknown>>;
+  /** Never broadcast: each player only receives their own entries. */
+  privateNightActions: Record<string, PrivateNightAction[]>;
   protectedPlayerId: string | null; dayExpiresAt: number | null; result: GameResult | null;
   /** Internal retention deadlines. Kept optional so rooms saved before this policy remain readable. */
   lobbyExpiresAt?: number | null; allOfflineExpiresAt?: number | null; resultExpiresAt?: number | null;
@@ -54,7 +60,7 @@ export interface ClientGameState {
   stateVersion: number;
   botMode: boolean;
   players: PublicPlayer[]; selectedRoles: RoleType[]; currentNightAction: Omit<NightAction, 'playerIds' | 'actedPlayerIds'> | null;
-  isNightActor: boolean; actionContext?: Record<string, unknown>; actionResult?: Record<string, unknown>;
+  isNightActor: boolean; actionContext?: Record<string, unknown>; actionResult?: Record<string, unknown>; nightActions: PrivateNightAction[];
   votesCompleted: number; dayVoteRequests: number; hasRequestedDayVote: boolean; totalPlayers: number; dayExpiresAt: number | null; serverNow: number; chat: ChatMessage[]; lobbyChat: ChatMessage[];
   publicReveals: string[]; settings: { actionTimeLimitSeconds: number; dayTimeLimitSeconds: number };
   result: GameResult | null;

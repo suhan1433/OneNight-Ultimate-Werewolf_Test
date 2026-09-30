@@ -116,15 +116,21 @@ export async function processExpiredRoom(io: Server, code: string): Promise<Room
           transitioned = true; await saveRoom(room);
         } else if (autoConfirmed) { transitioned = true; await saveRoom(room); }
       } else if (room.phase === 'voting') {
+        let botsVoted = false;
         for (const bot of room.players.filter((player) => player.isBot && !room.votes[player.id])) {
           const target = room.players.find((player) => player.id !== bot.id);
-          if (target) await recordVote(room.roomCode, bot.id, target.id);
+          if (target) {
+            const recorded = await recordVote(room.roomCode, bot.id, target.id);
+            botsVoted ||= recorded.added;
+          }
         }
         room.votes = await getVotes(room.roomCode);
         const eligible = room.players.filter((player) => player.connected || !player.disconnectedAt || player.disconnectedAt + DISCONNECT_GRACE_MS > now);
         if (eligible.every((player) => !!room.votes[player.id])) {
           room.result = calculateResult(room); room.players = room.players.map((p) => ({ ...p, currentRole: room.result!.players.find((x) => x.id === p.id)!.currentRole }));
           room.phase = 'result'; room.resultExpiresAt = now + 30 * 60 * 1000; transitioned = true; await saveRoom(room);
+        } else if (botsVoted) {
+          room.updatedAt = now; transitioned = true; await saveRoom(room);
         }
       }
       return room;
