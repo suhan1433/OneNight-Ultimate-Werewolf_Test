@@ -219,11 +219,17 @@ main.day .player{background:#fff7;border-color:#dcb86c}
 .order i{width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:var(--gold-deep);color:#fff;font:700 .78rem var(--numeral);font-style:normal}
 main.day .order>div{border-color:#e6cd94}
 
-.chat{max-height:220px;overflow:auto;margin:8px 0}
-.chat>div{display:flex;gap:9px;padding:7px 4px}
-.chat>div b{color:var(--gold);font-size:.8rem;flex:none}
-main.day .chat>div b{color:#9a5a12}
-.chat>div span{font-size:.86rem;line-height:1.5;overflow-wrap:anywhere}
+.chat{max-height:220px;overflow:auto;margin:8px 0;display:flex;flex-direction:column;gap:8px}
+.chat-message{max-width:88%;align-self:flex-start;display:flex;flex-direction:column}
+.chat-message b{display:block;margin:0 0 3px;color:var(--gold);font-size:.8rem}
+.chat-message span{padding:7px 10px;border-radius:3px 10px 10px 10px;background:#29264f;color:var(--text);font-size:.86rem;line-height:1.5;overflow-wrap:anywhere}
+.chat-message.mine{align-self:flex-end}
+.chat-message.mine b{text-align:right;color:#c7c2ff}
+.chat-message.mine span{background:#45427d;color:#faf9ff;border-radius:10px 3px 10px 10px}
+main.day .chat-message b{color:#9a5a12}
+main.day .chat-message span{background:#f1dfbc;color:#58391f}
+main.day .chat-message.mine b{color:#7b4a13}
+main.day .chat-message.mine span{background:#e7be71;color:#4a2f1a}
 .chat-form{display:flex;gap:6px}
 .chat-form input{margin:0}
 .chat-form button{width:auto;min-height:46px;margin:0;padding:0 18px}

@@ -1234,7 +1234,12 @@ function ChatPanel({ game, scope, title, placeholder }: { game: ClientGameState;
     <Panel>
       <h3>{title}</h3>
       <div className="chat" ref={chatRef}>
-        {messages.map((m) => <div key={m.id}><b>{m.nickname}</b><span>{m.text}</span></div>)}
+        {messages.map((m) => (
+          <div className={`chat-message${m.playerId === game.playerId ? " mine" : ""}`} key={m.id}>
+            <b>{m.nickname}</b>
+            <span>{m.text}</span>
+          </div>
+        ))}
       </div>
       <form ref={chatFormRef} className="chat-form" onSubmit={(e) => { e.preventDefault(); sendChat(); }}>
         <input ref={chatInputRef} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} />
