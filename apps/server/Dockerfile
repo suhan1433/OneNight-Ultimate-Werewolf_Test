@@ -8,6 +8,9 @@ COPY apps/web/package.json apps/web/package.json
 # TypeScript are devDependencies, so explicitly include them while building.
 RUN npm ci --include=dev
 COPY avalon/package*.json avalon/
+COPY avalon/packages/shared/package.json avalon/packages/shared/package.json
+COPY avalon/apps/server/package.json avalon/apps/server/package.json
+COPY avalon/apps/web/package.json avalon/apps/web/package.json
 WORKDIR /app/avalon
 RUN npm ci --include=dev
 WORKDIR /app
