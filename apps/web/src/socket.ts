@@ -41,7 +41,9 @@ const getNarrationAudio = (audioKey: string) => {
   if (!audio) {
     // Role IDs use underscores, while the static recording files use kebab
     // case (for example shield_bearer -> shield-bearer.mp3).
-    audio = new Audio(`/${audioKey.replaceAll('_', '-')}.mp3`);
+    // Keep this relative to Vite's configured base path. In Render, this app
+    // is served at /werewolf/, rather than at the site root.
+    audio = new Audio(`${import.meta.env.BASE_URL}${audioKey.replaceAll('_', '-')}.mp3`);
     audio.preload = 'auto';
     audio.volume = .9;
     narrationAudio.set(audioKey, audio);

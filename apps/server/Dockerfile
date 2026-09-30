@@ -17,6 +17,7 @@ WORKDIR /app
 COPY packages/shared packages/shared
 COPY apps/server apps/server
 COPY apps/web apps/web
+COPY mp3 mp3
 COPY avalon avalon
 COPY game-selector game-selector
 # Both browser apps share /app/apps/web/dist: /werewolf and /avalon.
