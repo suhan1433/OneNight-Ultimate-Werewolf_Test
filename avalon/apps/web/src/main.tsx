@@ -6,6 +6,7 @@ import {emit,saveSession} from './socket';
 import './styles.css';
 import './immersive.css';
 import './premium.css';
+import './stage.css';
 
 const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false,revealVoteIdentities:true};
 const ROLE_OPTION_KEYS=['assassin','percival','morgana','mordred','oberon'] as const;
@@ -141,7 +142,7 @@ function Home(){
   const[nickname,setNickname]=useState('');
   const[code,setCode]=useState('');
   const[count,setCount]=useState(5);
-  const[countPickerOpen,setCountPickerOpen]=useState(false);
+  const[tab,setTab]=useState<'create'|'join'>('create');
   const[opts,setOpts]=useState<AvalonOptions>(base);
   const balance=TEAM_BALANCE[count]!;
   const evilSpecialLimit=balance.evil-Number(opts.assassin);
@@ -157,47 +158,70 @@ function Home(){
   };
   const create=async()=>{try{const s=await emit('ROOM_CREATE',{nickname,maxPlayers:count,options:opts});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
   const join=async()=>{try{const s=await emit('ROOM_JOIN',{roomCode:code,nickname});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
-  return <section className="home">
-    <SealIcon/>
-    <h1>아 발 론</h1>
-    <p>원탁은 하나, 충성은 둘로 갈렸다</p>
-    <div className="panel">
-      <input placeholder="내 닉네임" value={nickname} onChange={e=>setNickname(e.target.value)}/>
-      <div className="player-count-picker">
-        <span className="count-picker-label">인원:</span>
-        <button type="button" className="count-picker-trigger" onClick={()=>setCountPickerOpen(open=>!open)} aria-expanded={countPickerOpen}>
-          <b>{count}명</b><span className="count-picker-chevron">{countPickerOpen?'−':'+'}</span>
-        </button>
-        {countPickerOpen&&<div className="count-picker-options" role="group" aria-label="게임 인원 선택">{[5,6,7,8,9,10].map(n=><button type="button" className={n===count?'selected':''} onClick={()=>{setCount(n);setCountPickerOpen(false);}} key={n}>{n}<small>명</small></button>)}</div>}
+  return <section className="gate">
+    <header className="gate-hero">
+      <div className="gate-sigil"><SealIcon size={96}/></div>
+      <small className="gate-eyebrow">THE RESISTANCE · AVALON</small>
+      <h1>아 발 론</h1>
+      <p>원탁은 하나, 충성은 둘로 갈렸다</p>
+    </header>
+    <div className="gate-card">
+      <div className="gate-tabs" role="tablist" aria-label="시작 방식">
+        <button type="button" role="tab" aria-selected={tab==='create'} className={tab==='create'?'on':''} onClick={()=>setTab('create')}><ShieldIcon size={15}/> 원탁 만들기</button>
+        <button type="button" role="tab" aria-selected={tab==='join'} className={tab==='join'?'on':''} onClick={()=>setTab('join')}><SwordsIcon size={15}/> 원탁 참가</button>
+        <i className={`gate-tab-glow ${tab}`}/>
       </div>
-      <div className="role-limit-card">
-        <div><FactionSeal team="good" size={34}/><span>선 <b>{balance.good}명</b></span><small>멀린 필수 · 퍼시벌 선택 가능</small></div>
-        <div><FactionSeal team="evil" size={34}/><span>악 <b>{balance.evil}명</b></span><small>선택 악 역할 {Number(opts.assassin)+evilSpecialSelected}/{balance.evil}</small></div>
-      </div>
-      <div className="options">
-        {ROLE_OPTION_KEYS.map(key=>{
-          const on=opts[key];
-          const def=ROLE_DEFINITIONS[key];
-          const blocked=def.team==='evil'&&!on&&evilSpecialSelected>=evilSpecialLimit;
-          return <button disabled={blocked} className={`role-chip ${on?'chosen':''}`} onClick={()=>toggleRole(key)} key={key}>
-            <RoleIcon role={key} team={def.team} size={18}/><span>{def.name}</span>
-          </button>;
-        })}
-      </div>
-      {!opts.assassin&&<div className="assassination-delegation">
-        <b>암살 능력 위임</b>
-        <p>암살자가 없는 게임입니다. 선택한 악의 세력 중 멀린을 지목할 역할을 정하세요.</p>
-        {evilSpecialSelected===0?<small>먼저 모르가나, 모드레드, 오베론 중 한 역할을 선택하세요.</small>:<div role="radiogroup" aria-label="암살 능력 보유 역할">
-          {DELEGABLE_ASSASSIN_ROLES.filter(role=>opts[role]).map(role=><label key={role}><input type="radio" name="assassinationAbilityRole" checked={delegatedRole===role} onChange={()=>setOpts({...opts,assassinationAbilityRole:role})}/><RoleIcon role={role} team="evil" size={16}/>{ROLE_DEFINITIONS[role].name}</label>)}
+      <label className="gate-field"><span>기사의 이름</span><input placeholder="닉네임을 입력하세요" maxLength={12} value={nickname} onChange={e=>setNickname(e.target.value)}/></label>
+      {tab==='create'?<div className="gate-pane" key="create">
+        <div className="gate-block">
+          <div className="gate-label"><span>참가 인원</span><em>원탁에 앉을 기사의 수</em></div>
+          <div className="gate-count">
+            <div className="mini-table" aria-hidden="true">
+              {Array.from({length:count},(_,i)=><b key={i} className={i<balance.good?'good':'evil'} style={seatPos(i,count,41)}/>)}
+              <strong>{count}</strong>
+            </div>
+            <div className="gate-count-side">
+              <div className="count-seg" role="group" aria-label="게임 인원 선택">{[5,6,7,8,9,10].map(n=><button type="button" className={n===count?'selected':''} onClick={()=>setCount(n)} key={n}>{n}</button>)}</div>
+              <div className="faction-legend">
+                <span className="good"><FactionSeal team="good" size={22}/>선 <b>{balance.good}</b></span>
+                <span className="evil"><FactionSeal team="evil" size={22}/>악 <b>{balance.evil}</b></span>
+              </div>
+              <small>멀린 필수 · 선택 악 역할 {Number(opts.assassin)+evilSpecialSelected}/{balance.evil}</small>
+            </div>
+          </div>
+        </div>
+        <div className="gate-block">
+          <div className="gate-label"><span>등장 캐릭터</span><em>눌러서 추가·제외</em></div>
+          <div className="role-grid">
+            {ROLE_OPTION_KEYS.map(key=>{
+              const on=opts[key];const def=ROLE_DEFINITIONS[key];
+              const blocked=def.team==='evil'&&!on&&evilSpecialSelected>=evilSpecialLimit;
+              return <button type="button" disabled={blocked} title={def.description} aria-pressed={on} className={`role-card ${def.team}${on?' on':''}`} onClick={()=>toggleRole(key)} key={key}>
+                <span className="rc-icon"><RoleIcon role={key} team={def.team} size={22}/></span>
+                <span className="rc-name">{def.name}</span>
+                <span className="rc-team">{def.team==='good'?'선':'악'}</span>
+                <span className="rc-check"><CheckIcon size={11}/></span>
+              </button>;
+            })}
+          </div>
+        </div>
+        {!opts.assassin&&<div className="assassination-delegation">
+          <b>암살 능력 위임</b>
+          <p>암살자가 없는 게임입니다. 선택한 악의 세력 중 멀린을 지목할 역할을 정하세요.</p>
+          {evilSpecialSelected===0?<small>먼저 모르가나, 모드레드, 오베론 중 한 역할을 선택하세요.</small>:<div role="radiogroup" aria-label="암살 능력 보유 역할">
+            {DELEGABLE_ASSASSIN_ROLES.filter(role=>opts[role]).map(role=><label key={role}><input type="radio" name="assassinationAbilityRole" checked={delegatedRole===role} onChange={()=>setOpts({...opts,assassinationAbilityRole:role})}/><RoleIcon role={role} team="evil" size={16}/>{ROLE_DEFINITIONS[role].name}</label>)}
+          </div>}
         </div>}
+        <label className="gate-switch"><span><b>원정 기록 투표자 공개</b><small>찬성·반대 인원과 투표자 이름을 함께 표시합니다.</small></span><input type="checkbox" checked={opts.revealVoteIdentities} onChange={e=>setOpts({...opts,revealVoteIdentities:e.target.checked})}/><i className="knob"/></label>
+        <button className="primary gate-cta" disabled={!canCreate} onClick={create}><ShieldIcon size={17}/> 원탁 열기</button>
+        {!canCreate&&<p className="gate-hint">암살자를 포함하거나, 암살 능력을 맡길 악 역할을 골라주세요.</p>}
+      </div>:<div className="gate-pane" key="join">
+        <div className="gate-block">
+          <div className="gate-label"><span>초대 코드</span><em>방장에게 받은 코드를 입력하세요</em></div>
+          <input className="code-input" placeholder="· · · · · ·" value={code} onChange={e=>setCode(e.target.value.toUpperCase())} autoCapitalize="characters" spellCheck={false}/>
+        </div>
+        <button className="primary gate-cta" disabled={!code.trim()} onClick={join}><SwordsIcon size={17}/> 원탁에 앉기</button>
       </div>}
-      <label className="vote-history-option"><input type="checkbox" checked={opts.revealVoteIdentities} onChange={e=>setOpts({...opts,revealVoteIdentities:e.target.checked})}/><span><b>원정 기록 투표자 공개</b><small>켜면 찬성·반대 인원과 투표자 이름을 함께 표시합니다.</small></span></label>
-      <button className="primary seal-btn" disabled={!canCreate} onClick={create}><ShieldIcon size={16}/> 원탁 만들기</button>
-      <div className="divider"><span>또는</span></div>
-      <div className="join">
-        <input placeholder="초대 코드" value={code} onChange={e=>setCode(e.target.value.toUpperCase())}/>
-        <button onClick={join}>참가</button>
-      </div>
     </div>
   </section>;
 }
@@ -228,23 +252,36 @@ function Lobby({game}:{game:ClientGameState}){
   const me=game.players.find(p=>p.id===game.playerId)!;
   const[copied,setCopied]=useState(false);
   const copy=async()=>{try{await navigator.clipboard.writeText(game.roomCode);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{}};
-  return <section className="center">
-    <h2>원탁 대기실</h2>
-    <div className="lobby-layout">
-      <div className="lobby-code"><small>ROOM CODE</small><div className="code" onClick={copy}>{game.roomCode}</div><span className="copy-hint">{copied?'복사됨!':'눌러서 코드 복사'}</span><span className="muted">{game.players.length}/{game.maxPlayers}명 참가 · 준비 {game.players.filter(p=>p.ready).length}명</span></div>
-      <div className="lobby-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=>{const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} size={14}/>{ROLE_DEFINITIONS[role].name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</div></div>
-      <div className="lobby-players" style={{'--lobby-columns':Math.min(game.maxPlayers,5)} as React.CSSProperties}>
-        {Array.from({length:game.maxPlayers},(_,index)=>{
-          const player=game.players[index];
-          return player
-            ?<div className={`plate${player.ready?' ready':''}${player.isBot?' bot':''}`} key={player.id}><span className="seat-number">{index+1}</span>{player.ready?<CheckIcon size={14}/>:<i className="dot"/>}<span>{player.nickname}</span>{player.isBot&&<small>TEST BOT</small>}</div>
-            :<div className="plate empty-seat" key={`empty-${index}`}><span className="seat-number">{index+1}</span><i>+</i><small>빈 자리</small></div>;
+  const readyCount=game.players.filter(p=>p.ready).length;
+  const total=game.maxPlayers;
+  return <section className="lb">
+    <header className="lb-head"><small>WAITING HALL</small><h2>원탁 대기실</h2></header>
+    <button type="button" className="lb-code" onClick={copy} aria-label="초대 코드 복사">
+      <small>INVITE CODE</small>
+      <span className="code">{game.roomCode}</span>
+      <em className={copied?'done':''}>{copied?<><CheckIcon size={13}/> 복사되었습니다</>:'눌러서 초대 코드 복사'}</em>
+    </button>
+    <div className="lb-table-wrap">
+      <div className={`lb-table lb-t${total}`} style={{'--ready':`${(readyCount/total)*100}%`} as React.CSSProperties}>
+        <div className="lb-core"><strong>{game.players.length}<span>/{total}</span></strong><small>준비 {readyCount}명</small></div>
+        {Array.from({length:total},(_,i)=>{
+          const p=game.players[i];
+          const pos={...seatPos(i,total,41),'--i':i} as React.CSSProperties;
+          return p
+            ?<div className={`lb-seat${p.ready?' ready':''}${p.isBot?' bot':''}${p.id===game.playerId?' me':''}`} style={pos} key={p.id}>
+              {p.id===game.hostId&&<span className="lb-crown" title="방장"><CrownIcon size={14}/></span>}
+              <span className="lb-avatar">{[...p.nickname][0]??'?'}{p.ready&&<span className="lb-ok"><CheckIcon size={11}/></span>}</span>
+              <span className="lb-name">{p.id===game.playerId?'나 · ':''}{p.nickname}</span>
+              {p.isBot&&<small>TEST BOT</small>}
+            </div>
+            :<div className="lb-seat empty" style={pos} key={`e${i}`}><span className="lb-avatar"><i>{i+1}</i></span><span className="lb-name">빈 자리</span></div>;
         })}
       </div>
     </div>
-    <div className="lobby-actions">
-      <button className={`ready-button${me.ready?' is-ready':''}`} onClick={()=>call('PLAYER_READY',{roomCode:game.roomCode})}>{me.ready?<><CheckIcon size={17}/> 준비 완료됨</>:'준비 완료'}</button>
-      {game.playerId===game.hostId&&<button className="primary start-button" onClick={()=>call('GAME_START',{roomCode:game.roomCode})}><CrownIcon size={17}/> 게임 시작</button>}
+    <div className="lb-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=>{const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} size={14}/>{ROLE_DEFINITIONS[role].name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</div></div>
+    <div className="lb-actions">
+      <button className={`lb-ready${me.ready?' is-ready':''}`} onClick={()=>call('PLAYER_READY',{roomCode:game.roomCode})}>{me.ready?<><CheckIcon size={17}/> 준비 완료됨</>:'준비 완료'}</button>
+      {game.playerId===game.hostId&&<button className="primary lb-start" onClick={()=>call('GAME_START',{roomCode:game.roomCode})}><CrownIcon size={17}/> 게임 시작</button>}
     </div>
   </section>;
 }
