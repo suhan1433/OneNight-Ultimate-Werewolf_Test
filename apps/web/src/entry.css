@@ -49,20 +49,66 @@ main.day .code-tiles span{background:#fff8e8;color:#4a2f1a;border-color:#caa85e}
 .copy-chip{display:inline-flex;align-items:center;gap:6px;transition:color .2s,border-color .2s}
 .copy-chip.done{color:var(--sage)!important;border-color:var(--sage)!important}
 
-/* 참가자와 채팅 사이의 준비/시작 조작 영역 */
-.lobby-actions{display:grid;grid-template-columns:1fr;gap:10px;margin:0 0 20px}
+/* 참가자와 채팅 사이의 준비/시작 조작 영역 — 달빛 인장 스타일 */
+.lobby-actions{display:grid;grid-template-columns:1fr;gap:12px;margin:0 0 22px;padding:12px;border-radius:24px;
+  background:linear-gradient(180deg,#ffffff08,#ffffff02);border:1px solid #dcbc6a1f;
+  box-shadow:inset 0 1px 0 #ffffff0d,0 14px 34px -18px #000d}
 .lobby-actions.host{grid-template-columns:repeat(2,minmax(0,1fr))}
 .lobby-actions button{
-  min-width:0;margin:0!important;padding-inline:10px!important;border-radius:18px!important;
-  font-family:'Noto Sans KR',sans-serif;font-size:.82rem;font-weight:700;
+  position:relative;overflow:hidden;isolation:isolate;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-width:0;min-height:54px;margin:0!important;padding:0 14px!important;border-radius:16px!important;
+  font-family:'Noto Sans KR',sans-serif;font-size:.9rem;font-weight:800;letter-spacing:.04em;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:transform .18s cubic-bezier(.3,1.5,.5,1),box-shadow .25s,filter .25s,background .3s,border-color .3s,color .3s}
+.lobby-actions button:active:not(:disabled){transform:translateY(1px) scale(.97)}
+.lobby-actions button:focus-visible{outline:2px solid var(--moon,#dcbc6a);outline-offset:3px}
+.lobby-actions button svg{flex:none;filter:drop-shadow(0 1px 2px #0006)}
+
+/* 준비: 대기 중엔 은은한 달빛 유리, 완료되면 초록빛 인장 */
+.lobby-actions .lobby-ready{color:#efe8d0;
+  background:linear-gradient(180deg,#463c7a,#241f4d 85%);
+  border:1px solid #8a7cc0;
+  box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -10px 18px -10px #0007,0 8px 20px -6px #070515cc}
+.lobby-actions .lobby-ready:before{content:'';flex:none;width:7px;height:7px;border-radius:50%;
+  background:#dcbc6a;box-shadow:0 0 0 0 #dcbc6a99;animation:ready-beacon 2s ease-out infinite}
+@keyframes ready-beacon{70%,100%{box-shadow:0 0 0 9px #dcbc6a00}}
+.lobby-actions .lobby-ready:hover{border-color:#dcbc6a;transform:translateY(-1px);
+  background:linear-gradient(180deg,#54498c,#2b2559 85%);
+  box-shadow:inset 0 1px 0 #ffffff3a,0 0 0 1px #dcbc6a33,0 12px 26px -6px #070515ee,0 0 22px #dcbc6a22}
+.lobby-actions .lobby-ready.is-ready{color:#0b2a14;
+  background:linear-gradient(180deg,#b4eec0,#93d6a2 55%,#6fbb82);
+  border-color:#c4f3cf;
+  box-shadow:inset 0 1px 0 #ffffffcc,inset 0 -8px 14px -8px #2f7d4488,0 8px 22px -6px #93d6a288,0 0 26px #93d6a233}
+.lobby-actions .lobby-ready.is-ready:before{background:#0b2a14;animation:none;box-shadow:none}
+.lobby-actions .lobby-ready.is-ready:hover{filter:brightness(1.06);transform:translateY(-1px)}
+
+/* 시작: 금빛 인장 + 주기적으로 지나가는 빛줄기 */
+.lobby-actions .lobby-start{color:#2a1d06;border:1px solid #f6e3a0;
+  text-shadow:0 1px 0 #fff6;
+  background:linear-gradient(180deg,#f8e49a,#d3a947 55%,#a98436);
+  box-shadow:inset 0 1px 0 #fffa,inset 0 -9px 16px -9px #7a5a1666,0 10px 26px -6px #dcbc6a66,0 0 30px #dcbc6a2a}
+.lobby-actions .lobby-start:after{content:'';position:absolute;z-index:-1;top:0;bottom:0;left:-60%;width:40%;
+  background:linear-gradient(100deg,transparent,#ffffff77,transparent);transform:skewX(-20deg);
+  animation:start-sheen 3.8s ease-in-out infinite}
+@keyframes start-sheen{0%,55%{left:-60%}100%{left:130%}}
+.lobby-actions .lobby-start:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.07);
+  box-shadow:inset 0 1px 0 #fffc,inset 0 -9px 16px -9px #7a5a1666,0 14px 34px -6px #dcbc6a88,0 0 40px #dcbc6a44}
+/* 아직 시작할 수 없을 때: 잠긴 인장 */
+.lobby-actions .lobby-start:disabled{cursor:not-allowed;color:#9a92b8;text-shadow:none;
+  background:linear-gradient(180deg,#2a2552,#1b1738);border:1px dashed #5b5190;
+  box-shadow:inset 0 1px 0 #ffffff0d}
+.lobby-actions .lobby-start:disabled:after{display:none}
+.lobby-actions .lobby-start:disabled svg{opacity:.6;filter:none}
+
+@media(max-width:380px){
+  .lobby-actions{padding:10px;gap:10px}
+  .lobby-actions button{min-height:50px;font-size:.84rem}
 }
-.lobby-actions .lobby-ready{color:#f7f1de;background:linear-gradient(180deg,#40376f,#25204f);border:1px solid #887ab5;box-shadow:inset 0 1px 0 #ffffff22,0 7px 18px #07051588}
-.lobby-actions .lobby-ready:hover{border-color:#dcbc6a;background:linear-gradient(180deg,#4b407f,#2b255c);box-shadow:inset 0 1px 0 #ffffff2b,0 8px 22px #070515aa}
-.lobby-actions .lobby-ready.is-ready{color:#0b2a14;background:var(--sage);border-color:var(--sage);box-shadow:inset 0 1px 0 #ffffff88,0 7px 18px #93d6a255}
-.lobby-actions .lobby-ready.is-ready:hover{background:#a8e2b4;border-color:#a8e2b4;box-shadow:inset 0 1px 0 #ffffff99,0 8px 22px #93d6a277}
-/* 채팅 전송 버튼과 같은 금빛을 사용해, 시작 동작을 바로 알아볼 수 있게 한다. */
-.lobby-actions .lobby-start{color:#241a08;background:linear-gradient(180deg,#f3dc8e,#c39a40 60%,#a98436);border:0;box-shadow:inset 0 1px 0 #fff6,0 10px 28px #dcbc6a30}
-.lobby-actions .lobby-start:hover:not(:disabled){filter:brightness(1.07);box-shadow:inset 0 1px 0 #fff6,0 12px 34px #dcbc6a50}
+@media(prefers-reduced-motion:reduce){
+  .lobby-actions .lobby-ready:before,.lobby-actions .lobby-start:after{animation:none}
+  .lobby-actions button{transition:none}
+}
 
 /* ---------- 원탁 ---------- */
 .round-table{position:relative;width:min(340px,100%);aspect-ratio:1;margin:6px auto 22px}

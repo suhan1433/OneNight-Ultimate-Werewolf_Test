@@ -784,6 +784,7 @@ function Lobby({ game }: { game: ClientGameState }) {
   };
   const deckReady = game.selectedRoles.length === game.maxPlayers + 3;
   const canStart = full && deckReady && game.players.every((p) => p.isReady);
+  const readyCount = game.players.filter((p) => p.isReady).length;
   const changeRole = (id: RoleType, amount: number) => {
     const old = game.selectedRoles;
     const next =
@@ -822,6 +823,7 @@ function Lobby({ game }: { game: ClientGameState }) {
       <div className={`lobby-actions${game.hostId === game.playerId ? " host" : ""}`}>
         <button
           className={`lobby-ready${me.isReady ? " is-ready" : ""}`}
+          aria-pressed={me.isReady}
           onClick={() =>
             optimistic(
               () => useGame.getState().toggleReady(),
@@ -838,7 +840,13 @@ function Lobby({ game }: { game: ClientGameState }) {
             disabled={!canStart}
             onClick={() => event("GAME_START", req(game))}
           >
-            {!full ? "인원 대기" : !deckReady ? "카드 확인" : "시작"}
+            {!full
+              ? `인원 대기 ${game.players.length}/${game.maxPlayers}`
+              : !deckReady
+                ? "직업 구성 확인"
+                : !canStart
+                  ? `준비 대기 ${readyCount}/${game.players.length}`
+                  : "게임 시작"}
           </button>
         )}
       </div>
