@@ -52,12 +52,17 @@ main.day .code-tiles span{background:#fff8e8;color:#4a2f1a;border-color:#caa85e}
 /* 참가자와 채팅 사이의 준비/시작 조작 영역 */
 .lobby-actions{display:grid;grid-template-columns:1fr;gap:10px;margin:0 0 20px}
 .lobby-actions.host{grid-template-columns:repeat(2,minmax(0,1fr))}
-.lobby-actions button{margin:0!important;min-width:0;padding-inline:10px!important}
+.lobby-actions button{
+  min-width:0;margin:0!important;padding-inline:10px!important;border-radius:18px!important;
+  font-family:'Noto Sans KR',sans-serif;font-size:.82rem;font-weight:700;
+}
 .lobby-actions .lobby-ready{color:#f7f1de;background:linear-gradient(180deg,#40376f,#25204f);border:1px solid #887ab5;box-shadow:inset 0 1px 0 #ffffff22,0 7px 18px #07051588}
 .lobby-actions .lobby-ready:hover{border-color:#dcbc6a;background:linear-gradient(180deg,#4b407f,#2b255c);box-shadow:inset 0 1px 0 #ffffff2b,0 8px 22px #070515aa}
-.lobby-actions .lobby-ready.is-ready{color:#d8f5df;background:linear-gradient(180deg,#315e57,#1c403d);border-color:#80c9a0}
-.lobby-actions .lobby-start{color:#241806;background:linear-gradient(180deg,#ffe9a7,#dfb953 58%,#b9822d);border:1px solid #fff0bd;box-shadow:inset 0 1px 0 #fffbe0,0 8px 22px #dcbc6a66}
-.lobby-actions .lobby-start:hover:not(:disabled){filter:brightness(1.06);border-color:#fff8d7;box-shadow:inset 0 1px 0 #fffbe0,0 10px 26px #dcbc6a88}
+.lobby-actions .lobby-ready.is-ready{color:#0b2a14;background:var(--sage);border-color:var(--sage);box-shadow:inset 0 1px 0 #ffffff88,0 7px 18px #93d6a255}
+.lobby-actions .lobby-ready.is-ready:hover{background:#a8e2b4;border-color:#a8e2b4;box-shadow:inset 0 1px 0 #ffffff99,0 8px 22px #93d6a277}
+/* 채팅 전송 버튼과 같은 금빛을 사용해, 시작 동작을 바로 알아볼 수 있게 한다. */
+.lobby-actions .lobby-start{color:#241a08;background:linear-gradient(180deg,#f3dc8e,#c39a40 60%,#a98436);border:0;box-shadow:inset 0 1px 0 #fff6,0 10px 28px #dcbc6a30}
+.lobby-actions .lobby-start:hover:not(:disabled){filter:brightness(1.07);box-shadow:inset 0 1px 0 #fff6,0 12px 34px #dcbc6a50}
 
 /* ---------- 원탁 ---------- */
 .round-table{position:relative;width:min(340px,100%);aspect-ratio:1;margin:6px auto 22px}
