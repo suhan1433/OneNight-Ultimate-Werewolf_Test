@@ -207,7 +207,24 @@ button.qcard.active{transform:translateY(-10px) scale(1.05)}
 .confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .confirm-actions .danger{border-color:#ee658088;background:linear-gradient(135deg,#7a2036,#3a0d19);color:#ffe4e8}
 .confirm-actions .danger:hover:not(:disabled){background:linear-gradient(135deg,#9a2a44,#4a1220);border-color:var(--evil-300)}
-.toast{border-radius:12px;background:linear-gradient(135deg,#8a2036,#4a0f1c);border-color:#ee658088}
+/* ---------- 알림 토스트: 화면 최상단 중앙, 모든 레이어 위 ---------- */
+.toast-layer{position:fixed;left:0;right:0;top:0;z-index:2147483000;display:flex;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 0;pointer-events:none}
+.toast-layer .toast{position:relative;overflow:hidden;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:12px;width:min(440px,100%);margin:0;padding:14px 40px 16px 14px;border-radius:16px;
+  background:linear-gradient(135deg,#2a0f18f2,#0a141cf5);border:1px solid #ee658099;border-left:4px solid var(--evil-300);color:var(--parchment);
+  box-shadow:0 18px 50px #000d,0 0 0 1px #00000066,0 0 30px #b8384f55;backdrop-filter:blur(8px);animation:toastIn .4s var(--ease-out) both,toastGlow 1.6s ease-in-out .4s 2}
+.toast-layer .toast-icon{flex:none;display:grid;place-items:center}
+.toast-layer .toast-body{min-width:0;text-align:left}
+.toast-layer .toast-body small{display:block;margin-bottom:2px;font:700 12px var(--numeral);letter-spacing:.2em;color:var(--evil-300)}
+.toast-layer .toast-body p{margin:0;font:700 16px/1.45 var(--serif);color:#fff2e4;word-break:keep-all;overflow-wrap:anywhere}
+.toast-layer .toast-close{position:absolute;top:6px;right:6px;width:28px;height:28px;padding:0;border-radius:50%;border:0;background:none;box-shadow:none;color:var(--muted);font-size:20px;line-height:1}
+.toast-layer .toast-close:hover{color:var(--gold-300);background:#ffffff14}
+.toast-layer .toast-timer{position:absolute;left:0;bottom:0;height:3px;width:100%;transform-origin:left;background:linear-gradient(90deg,var(--evil-500),var(--gold-300));animation:toastTimer 4s linear forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(-24px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes toastTimer{to{transform:scaleX(0)}}
+@keyframes toastGlow{50%{box-shadow:0 18px 50px #000d,0 0 0 1px #00000066,0 0 46px #ee658099}}
+@keyframes fieldShake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.gate-field.invalid input{border-color:var(--evil-300);box-shadow:0 0 0 4px #ee658033;animation:fieldShake .4s ease}
+.gate-field.invalid span{color:var(--evil-300)}
 
 /* ---------- 모바일 / 접근성 ---------- */
 @media(max-width:500px){
@@ -220,8 +237,10 @@ button.qcard.active{transform:translateY(-10px) scale(1.05)}
   .turn-pill{padding:5px 9px;font-size:11px}
   .lobby-code .code{font-size:30px}
   .rcard{width:54px;height:80px}
+  .toast-layer .toast-body p{font-size:15px}
 }
 @media(prefers-reduced-motion:reduce){
   .ambient i,.ambient .mist,.rays{display:none}
+  .toast-layer .toast,.gate-field.invalid input{animation:none}
   .flip-card:not(.flipped) .flip-inner{animation:none}
 }

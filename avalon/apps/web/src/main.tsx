@@ -117,6 +117,16 @@ function QuestReveal({total,fails}:{total:number;fails:number}){
     </div>)}
   </div>;
 }
+function Toast({message,onClose}:{message:string;onClose:()=>void}){
+  return <div className="toast-layer" role="alert" aria-live="assertive">
+    <div className="toast" key={message} onClick={onClose}>
+      <span className="toast-icon" aria-hidden="true"><FactionSeal team="evil" size={30}/></span>
+      <div className="toast-body"><small>알림</small><p>{message}</p></div>
+      <button type="button" className="toast-close" aria-label="알림 닫기" onClick={e=>{e.stopPropagation();onClose();}}>×</button>
+      <i className="toast-timer" aria-hidden="true"/>
+    </div>
+  </div>;
+}
 function ConfirmDialog({title,body,confirmLabel,cancelLabel,onConfirm,onCancel}:{title:string;body:string;confirmLabel:string;cancelLabel:string;onConfirm:()=>void;onCancel:()=>void}){
   return <div className="help-scrim" role="alertdialog" aria-modal="true" aria-label={title} onClick={onCancel}>
     <section className="confirm-modal" onClick={event=>event.stopPropagation()}>
@@ -144,6 +154,8 @@ function Home(){
   const[count,setCount]=useState(5);
   const[tab,setTab]=useState<'create'|'join'>('create');
   const[opts,setOpts]=useState<AvalonOptions>(base);
+  const[nickError,setNickError]=useState(false);
+  const nickRef=useRef<HTMLInputElement>(null);
   const balance=TEAM_BALANCE[count]!;
   const evilSpecialLimit=balance.evil-Number(opts.assassin);
   const evilSpecialSelected=DELEGABLE_ASSASSIN_ROLES.filter(key=>opts[key]).length;
@@ -156,8 +168,14 @@ function Home(){
     if(DELEGABLE_ASSASSIN_ROLES.includes(key as DelegableAssassinRole)&&!next&&delegatedRole===key)nextOptions.assassinationAbilityRole=null;
     setOpts(nextOptions);
   };
-  const create=async()=>{try{const s=await emit('ROOM_CREATE',{nickname,maxPlayers:count,options:opts});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
-  const join=async()=>{try{const s=await emit('ROOM_JOIN',{roomCode:code,nickname});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
+  const requireNickname=()=>{
+    if(nickname.trim())return true;
+    setNickError(true);nickRef.current?.focus();
+    useGame.getState().setError('닉네임을 입력해주세요.');
+    return false;
+  };
+  const create=async()=>{if(!requireNickname())return;try{const s=await emit('ROOM_CREATE',{nickname,maxPlayers:count,options:opts});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
+  const join=async()=>{if(!requireNickname())return;try{const s=await emit('ROOM_JOIN',{roomCode:code,nickname});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
   return <section className="gate">
     <header className="gate-hero">
       <div className="gate-sigil"><SealIcon size={96}/></div>
@@ -171,7 +189,7 @@ function Home(){
         <button type="button" role="tab" aria-selected={tab==='join'} className={tab==='join'?'on':''} onClick={()=>setTab('join')}><SwordsIcon size={15}/> 원탁 참가</button>
         <i className={`gate-tab-glow ${tab}`}/>
       </div>
-      <label className="gate-field"><span>기사의 이름</span><input placeholder="닉네임을 입력하세요" maxLength={12} value={nickname} onChange={e=>setNickname(e.target.value)}/></label>
+      <label className={`gate-field${nickError?' invalid':''}`}><span>기사의 이름</span><input ref={nickRef} placeholder="닉네임을 입력하세요" maxLength={12} value={nickname} aria-invalid={nickError} onChange={e=>{setNickname(e.target.value);if(nickError)setNickError(false);}}/></label>
       {tab==='create'?<div className="gate-pane" key="create">
         <div className="gate-block">
           <div className="gate-label"><span>참가 인원</span><em>원탁에 앉을 기사의 수</em></div>
@@ -474,7 +492,7 @@ function App(){
   const[chatOpen,setChatOpen]=useState(false);
   const[helpOpen,setHelpOpen]=useState(false);
   const[dossierOpen,setDossierOpen]=useState(false);
-  useEffect(()=>{if(!error)return;const timer=window.setTimeout(()=>setError(null),3000);return()=>window.clearTimeout(timer);},[error,setError]);
+  useEffect(()=>{if(!error)return;const timer=window.setTimeout(()=>setError(null),4000);return()=>window.clearTimeout(timer);},[error,setError]);
   useEffect(()=>{const root=document.documentElement;const move=(e:PointerEvent)=>{root.style.setProperty('--mx',`${e.clientX}px`);root.style.setProperty('--my',`${e.clientY}px`);};window.addEventListener('pointermove',move,{passive:true});return()=>window.removeEventListener('pointermove',move);},[]);
   const[confirmLeave,setConfirmLeave]=useState(false);
   const ongoing=!!game&&!['lobby','result'].includes(game.phase);
@@ -503,7 +521,7 @@ function App(){
     {helpOpen&&<HelpModal close={()=>setHelpOpen(false)}/>}
     {confirmLeave&&<ConfirmDialog title={ongoing?'원탁을 떠날까요?':'방에서 나갈까요?'} body={ongoing?'진행 중인 게임입니다. 이 기기의 재접속 정보가 삭제되고, 다른 참가자에게는 연결 해제로 표시됩니다.':'대기실에서 나가면 자리가 비워집니다.'} confirmLabel="나가기" cancelLabel="계속 플레이" onConfirm={leave} onCancel={()=>setConfirmLeave(false)}/>} 
     {game?.selfRole&&dossierOpen&&<RoleDossier game={game} close={()=>setDossierOpen(false)}/>} 
-    {error&&<div className="toast" key={error} onClick={()=>setError(null)}>{error}</div>}
+    {error&&<Toast message={error} onClose={()=>setError(null)}/>}
   </>;
 }
 
