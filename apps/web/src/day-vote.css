@@ -71,7 +71,7 @@ main.day:has(.day-scene.dusk) .day-scene .eyebrow{color:#fff3d6}
 .vote-grid:has(.vote.selected) .vote:not(.selected){opacity:.42;transform:scale(.96)}
 .vote-grid:has(.vote.selected) .vote:not(.selected) .mask-av{filter:grayscale(.6)}
 
-/* ---------- 꾹 눌러 확정: 채워지는 게이지 ---------- */
+/* ---------- 한 번 탭하여 투표 확정 ---------- */
 .hold-confirm{position:relative;overflow:hidden;width:100%;padding:17px;border-radius:16px;touch-action:none;
   user-select:none;-webkit-user-select:none;font-weight:800;color:#fff3e0;
   background:linear-gradient(90deg,#c4525f calc(var(--hold,0)*100%),#3a2350 calc(var(--hold,0)*100%));

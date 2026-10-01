@@ -62,6 +62,9 @@ function App() {
   const { game, tts, help, error, connectionState, setTts, setHelp, setError } = useGame();
   const [nightRecordOpen, setNightRecordOpen] = useState(false);
   useEffect(() => {
+    if (game?.phase === "lobby") window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [game?.phase]);
+  useEffect(() => {
     if (!game?.selfRole || game.phase === "result") setNightRecordOpen(false);
   }, [game?.selfRole, game?.phase]);
   useEffect(() => {
@@ -532,6 +535,13 @@ function Home() {
     if (data) saveSession(data);
     setBusy(false);
   };
+  const pasteRoomCode = async () => {
+    try {
+      setRoomCode(normalizeRoomCode(await navigator.clipboard.readText()));
+    } catch {
+      useGame.getState().setError("클립보드에 접근할 수 없습니다. 코드 입력창을 길게 눌러 붙여넣어 주세요.");
+    }
+  };
   if (mode === "home")
     return (
       <section className="hero">
@@ -585,6 +595,9 @@ function Home() {
                 }}
                 placeholder="A7K29P"
               />
+              <button type="button" className="paste-code" onClick={pasteRoomCode}>
+                붙여넣기
+              </button>
             </div>
           </label>
         </Panel>
@@ -807,6 +820,28 @@ function Lobby({ game }: { game: ClientGameState }) {
         </span>
       </div>
       <RoundTable game={game} />
+      <div className={`lobby-actions${game.hostId === game.playerId ? " host" : ""}`}>
+        <button
+          className={me.isReady ? "ghost" : ""}
+          onClick={() =>
+            optimistic(
+              () => useGame.getState().toggleReady(),
+              "PLAYER_READY",
+              req(game),
+            )
+          }
+        >
+          {me.isReady ? "준비 취소" : "준비 완료"}
+        </button>
+        {game.hostId === game.playerId && (
+          <button
+            disabled={!canStart}
+            onClick={() => event("GAME_START", req(game))}
+          >
+            {!full ? "인원 대기" : !deckReady ? "카드 확인" : "시작"}
+          </button>
+        )}
+      </div>
       <ChatPanel
         game={game}
         scope="lobby"
@@ -943,30 +978,6 @@ function Lobby({ game }: { game: ClientGameState }) {
             ))}
           </div>
         </Panel>
-      )}
-      <button
-        className={me.isReady ? "ghost" : ""}
-        onClick={() =>
-          optimistic(
-            () => useGame.getState().toggleReady(),
-            "PLAYER_READY",
-            req(game),
-          )
-        }
-      >
-        {me.isReady ? "준비 취소" : "준비 완료"}
-      </button>
-      {game.hostId === game.playerId && (
-        <button
-          disabled={!canStart}
-          onClick={() => event("GAME_START", req(game))}
-        >
-          {!full
-            ? "모든 자리를 기다리는 중"
-            : !deckReady
-              ? "역할 카드 수를 맞춰주세요"
-              : "게임 시작"}
-        </button>
       )}
     </section>
   );
@@ -1427,50 +1438,19 @@ function HoldConfirm({
   doneLabel: string;
   onConfirm: () => void;
 }) {
-  const [p, setP] = useState(0);
-  const raf = useRef(0);
-  const start = useRef(0);
-  const fired = useRef(false);
-  const HOLD = 900;
-  const stop = () => {
-    cancelAnimationFrame(raf.current);
-    if (!fired.current) setP(0);
-  };
-  const tick = () => {
-    const v = Math.min(1, (performance.now() - start.current) / HOLD);
-    setP(v);
-    if (v < 1) raf.current = requestAnimationFrame(tick);
-    else if (!fired.current) {
-      fired.current = true;
-      buzz(60);
-      onConfirm();
-    }
-  };
-  useEffect(() => () => cancelAnimationFrame(raf.current), []);
   const off = disabled || done;
   return (
     <button
-      className={`hold-confirm${p > 0 ? " holding" : ""}${done ? " done" : ""}`}
-      style={{ ["--hold" as string]: p }}
+      className={`hold-confirm${done ? " done" : ""}`}
       disabled={off}
-      onPointerDown={() => {
-        if (off) return;
-        fired.current = false;
-        start.current = performance.now();
-        buzz(10);
-        raf.current = requestAnimationFrame(tick);
-      }}
-      onPointerUp={stop}
-      onPointerLeave={stop}
-      onPointerCancel={stop}
-      onClick={(e) => {
-        if (e.detail === 0 && !off && !fired.current) {
-          fired.current = true;
+      onClick={() => {
+        if (!off) {
+          buzz(60);
           onConfirm();
         }
       }}
     >
-      <span>{done ? doneLabel : p > 0 ? "계속 누르세요…" : label}</span>
+      <span>{done ? doneLabel : label}</span>
     </button>
   );
 }
@@ -1501,7 +1481,7 @@ function Voting({ game }: { game: ClientGameState }) {
       <HoldConfirm
         disabled={!target}
         done={me.hasVoted}
-        label={target ? "꾹 눌러 확정" : "의심되는 사람을 고르세요"}
+        label={target ? "이 선택으로 확정" : "의심되는 사람을 고르세요"}
         doneLabel="투표 완료 · 결과 대기 중"
         onConfirm={() =>
           optimistic(() => useGame.getState().confirmVote(), "VOTE_CONFIRM", {
