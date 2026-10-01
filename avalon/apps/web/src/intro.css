@@ -1,0 +1,137 @@
+/* =========================================================
+   Avalon intro layer — 스토리보드 1. 입장 인트로 (홈)
+   stage.css 뒤에 import. 타임라인(초):
+   0.0 암전·불씨 / 0.6 촛불·놋쇠 라인 / 1.6 카메라 하강 / 2.2 정적 / 2.6 타이틀 각인
+   3.4 시일·부제·패널(0.16s 간격) / 4.0 여운(먼지·빛줄기)
+   모든 시간은 --t(= --T × 1s)에 곱해 쓴다. --T:1 = 전체, --T:.25 = 건너뛰기 1초 버전.
+   ========================================================= */
+
+@property --r{syntax:'<length>';inherits:false;initial-value:0px}
+@property --cy{syntax:'<length-percentage>';inherits:false;initial-value:50%}
+@property --sa{syntax:'<angle>';inherits:false;initial-value:130deg}
+
+.gate.intro-live{--t:calc(var(--T) * 1s)}
+
+/* 3.4 전까지는 평상시 촛불 flicker 를 보류(root 의 data-intro 는 GateIntro 훅이 관리) */
+:root[data-intro="playing"] .ambient::before{animation:none}
+
+@keyframes introFade{from{opacity:0}to{opacity:1}}
+@keyframes introRise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+
+/* styles.css 의 전역 header{배경·blur·sticky} 가 .gate-hero(<header>)에 새어 들어와 네이비 박스가 보이던 문제 해제 */
+.gate .gate-hero{position:relative;width:auto;padding:0;background:none;border:0;backdrop-filter:none;-webkit-backdrop-filter:none}
+
+/* ================= 장면: 원탁 + 카메라 (최종 상태가 기본값) ================= */
+.intro-scene{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;perspective:1100px;display:grid;place-items:center}
+.intro-rig{position:relative;width:min(88vmin,720px);aspect-ratio:1;transform:translateY(14vh) rotateX(62deg);opacity:.85}
+.intro-table{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.intro-ring{stroke-linecap:butt}
+.intro-glow{position:absolute;inset:-12%;border-radius:50%;mix-blend-mode:screen;
+  background:radial-gradient(circle closest-side,rgba(255,206,130,.34),rgba(255,170,90,.12) 45%,transparent 72%);
+  transform:translate(calc(var(--lx,0)*7%),calc(var(--ly,0)*5%)) skewX(calc(var(--lx,0)*-8deg));
+  transition:transform .9s var(--ease-out)}
+.intro-sheen{position:absolute;inset:0;border-radius:50%;mix-blend-mode:screen;--sa:130deg;
+  background:conic-gradient(from var(--sa),transparent 0 38%,rgba(253,233,180,.55) 48%,rgba(255,250,230,.9) 50%,rgba(253,233,180,.55) 52%,transparent 62% 100%);
+  -webkit-mask:radial-gradient(circle closest-side,transparent 90%,#000 91%,#000 99%,transparent 100%);
+  mask:radial-gradient(circle closest-side,transparent 90%,#000 91%,#000 99%,transparent 100%)}
+
+.intro-shaft{position:absolute;top:-12%;left:var(--sx);width:var(--sw);height:140%;transform-origin:50% 0;
+  transform:translateX(-50%) rotate(var(--sr));filter:blur(10px);mix-blend-mode:screen;
+  background:linear-gradient(90deg,transparent,rgba(255,214,150,calc(var(--a)*.65)) 35%,rgba(255,226,170,var(--a)) 50%,rgba(255,214,150,calc(var(--a)*.65)) 65%,transparent);
+  -webkit-mask-image:linear-gradient(180deg,#000 0,rgba(0,0,0,.6) 45%,transparent 88%);mask-image:linear-gradient(180deg,#000 0,rgba(0,0,0,.6) 45%,transparent 88%)}
+.intro-shaft.s1{--sx:68%;--sw:30vmax;--sr:18deg;--a:.2}
+.intro-shaft.s2{--sx:30%;--sw:20vmax;--sr:13deg;--a:.12}
+.intro-dust{position:absolute;inset:0;width:100%;height:100%}
+
+/* ---- 0.6~1.6 놋쇠 라인이 안쪽부터 한 줄씩 그려진다 ---- */
+.gate.intro-live .intro-ring{stroke-dasharray:1;stroke-dashoffset:1;
+  animation:ringDraw calc(var(--t)*.45) ease-out calc(var(--t)*(.6 + var(--k)*.12 + var(--j,0)*.0042)) forwards}
+@keyframes ringDraw{to{stroke-dashoffset:0}}
+.gate.intro-live .intro-body{animation:introFade calc(var(--t)*.9) ease calc(var(--t)*1.2) both}
+.gate.intro-live .intro-glow{animation:introFade var(--t) ease calc(var(--t)*.8) both}
+
+/* ---- 1.6 카메라: 천장 시점 → 천천히 하강하며 정면으로 기울어짐. 놋쇠 반사광이 같이 흐른다 ---- */
+.gate.intro-live .intro-rig{animation:camDescend calc(var(--t)*2.4) cubic-bezier(.4,0,.2,1) calc(var(--t)*1.6) both}
+@keyframes camDescend{from{transform:translateY(0) rotateX(0deg) scale(.8)}to{transform:translateY(14vh) rotateX(62deg) scale(1)}}
+.gate.intro-live .intro-sheen{animation:sheenFlow calc(var(--t)*2.4) cubic-bezier(.4,0,.2,1) calc(var(--t)*1.6) both}
+@keyframes sheenFlow{from{--sa:20deg;opacity:0}15%{opacity:1}to{--sa:130deg;opacity:1}}
+
+/* ---- 4.0 여운: 빛줄기와 먼지 ---- */
+.gate.intro-live .intro-shaft,.gate.intro-live .intro-dust{animation:introFade calc(var(--t)*1.4) ease calc(var(--t)*4.0) both}
+
+/* ================= 0.0 암전 · 불씨 → 0.6 촛불 ================= */
+/* 촛불 반경: 0.6 에서 0 → 2.2 까지 어둠 속 모서리를 남긴 채 확장 → 2.2~2.6 정지(정적) → 2.6 타이틀과 함께 방 전체로 */
+.intro-dark{position:fixed;inset:0;z-index:40;pointer-events:none;--r:0px;
+  background:radial-gradient(circle at 50% var(--cy),transparent 0,transparent calc(var(--r)*.3),rgba(2,4,7,.55) calc(var(--r)*.62),#020407 var(--r));
+  animation:
+    lightGrow calc(var(--t)*2.8) linear calc(var(--t)*.6) both,
+    camTrack calc(var(--t)*2.4) cubic-bezier(.4,0,.2,1) calc(var(--t)*1.6) both,
+    darkOut calc(var(--t)*.6) ease calc(var(--t)*3.4) forwards}
+@keyframes lightGrow{
+  0%{--r:0px;animation-timing-function:cubic-bezier(.2,.7,.3,1)}
+  57.14%{--r:50vmin;animation-timing-function:linear}
+  71.43%{--r:50vmin;animation-timing-function:cubic-bezier(.3,.1,.2,1)}
+  100%{--r:170vmax}}
+@keyframes camTrack{from{--cy:50%}to{--cy:calc(50% + 14vh)}}
+@keyframes darkOut{to{opacity:0}}
+
+.intro-flame{position:fixed;left:50%;top:var(--cy);z-index:41;pointer-events:none;width:7px;height:7px;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle at 50% 60%,#fff6dc 0,#ffc266 38%,#ff8a2b 75%,transparent 100%);
+  box-shadow:0 0 10px 3px rgba(255,150,60,.75),0 0 36px 10px rgba(255,120,40,.35);
+  animation:
+    emberPulse calc(var(--t)*.3) ease-in-out 2,
+    flameIgnite calc(var(--t)*.5) cubic-bezier(.2,.8,.2,1) calc(var(--t)*.6) forwards,
+    flameFlicker calc(var(--t)*.8) ease-in-out calc(var(--t)*1.1) infinite,
+    camTrack calc(var(--t)*2.4) cubic-bezier(.4,0,.2,1) calc(var(--t)*1.6) both,
+    flameOut calc(var(--t)*.6) ease calc(var(--t)*3.0) forwards}
+@keyframes emberPulse{50%{box-shadow:0 0 16px 6px rgba(255,150,60,.95),0 0 52px 16px rgba(255,120,40,.5)}}
+@keyframes flameIgnite{to{width:15px;height:38px;border-radius:50% 50% 50% 50%/65% 65% 35% 35%;box-shadow:0 0 22px 8px rgba(255,160,70,.8),0 0 90px 30px rgba(255,120,40,.4)}}
+@keyframes flameFlicker{
+  0%,100%{transform:translate(-50%,-50%) scaleY(1) rotate(0)}
+  30%{transform:translate(-50%,-50%) scaleY(1.12) rotate(-2.5deg)}
+  55%{transform:translate(-50%,-50%) scaleY(.94) rotate(1.8deg)}
+  80%{transform:translate(-50%,-50%) scaleY(1.07) rotate(-1deg)}}
+@keyframes flameOut{to{opacity:0}}
+
+/* ================= 2.6 타이틀 각인 ================= */
+.gate-title{position:relative;isolation:isolate;display:grid;place-items:center}
+.gate-title h1{font-family:var(--numeral);font-weight:700}
+.gate-title:before{content:'';position:absolute;inset:-70% -35%;z-index:-1;pointer-events:none;border-radius:50%;opacity:.6;transform:scale(1.06);
+  background:radial-gradient(ellipse closest-side,rgba(255,214,150,.5),rgba(255,190,110,.18) 45%,transparent 72%)}
+.gate.intro-live .gate-title:before{animation:haloFlash calc(var(--t)*1.4) ease-out calc(var(--t)*2.6) both,introBreath 5s ease-in-out calc(var(--t)*4.0) infinite}
+@keyframes haloFlash{0%{opacity:0;transform:scale(.55)}22%{opacity:1;transform:scale(1)}100%{opacity:.6;transform:scale(1.06)}}
+@keyframes introBreath{0%,100%{opacity:.6;transform:scale(1.06)}50%{opacity:.85;transform:scale(1.1)}}
+
+.gate.intro-live .gate-title h1{
+  background:linear-gradient(100deg,transparent 40%,rgba(255,255,255,.95) 50%,transparent 60%) no-repeat,linear-gradient(180deg,#fff6d8 0%,#f3d08e 45%,#b9853a 100%);
+  background-size:260% 100%,100% 100%;background-position:130% 0,0 0;
+  -webkit-background-clip:text;background-clip:text;
+  animation:
+    titleEngrave calc(var(--t)*1.1) linear calc(var(--t)*2.6) both,
+    titleSweep calc(var(--t)*.9) ease-in-out calc(var(--t)*2.75) both}
+@keyframes titleEngrave{
+  0%{opacity:0;letter-spacing:.3em;transform:scale(1.14) translateY(-10px);filter:blur(12px) drop-shadow(0 0 0 rgba(255,214,150,0)) drop-shadow(0 2px 0 rgba(58,34,6,0));animation-timing-function:cubic-bezier(.1,.9,.2,1)}
+  9%{opacity:1;letter-spacing:.24em;transform:scale(.985) translateY(3px);filter:blur(0) drop-shadow(0 0 54px rgba(255,230,180,1)) drop-shadow(0 2px 0 rgba(58,34,6,.9));animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+  100%{opacity:1;letter-spacing:.2em;transform:none;filter:blur(0) drop-shadow(0 0 28px rgba(220,178,98,.4)) drop-shadow(0 2px 0 rgba(58,34,6,.85))}}
+@keyframes titleSweep{from{background-position:130% 0,0 0}to{background-position:-30% 0,0 0}}
+
+/* ================= 3.4 시일 회전 · 부제 · 입력 패널(0.16s 간격) ================= */
+.gate.intro-live .gate-hero{animation:none}
+.gate.intro-live .gate-sigil,.gate.intro-live .gate-eyebrow,.gate.intro-live .gate-hero p{animation:introRise calc(var(--t)*.7) var(--ease-out) calc(var(--t)*3.4) both}
+.gate.intro-live .gate-card{animation:introRise calc(var(--t)*.8) var(--ease-out) calc(var(--t)*3.56) both}
+.gate.intro-live .gate-sigil .seal circle:first-child{
+  animation:sealSpinUp calc(var(--t)*2) cubic-bezier(.42,0,1,1) calc(var(--t)*3.4) both,sealSpin 90s linear calc(var(--t)*5.4) infinite}
+@keyframes sealSpinUp{from{transform:rotate(0deg)}to{transform:rotate(4deg)}}
+@keyframes sealSpin{from{transform:rotate(4deg)}to{transform:rotate(364deg)}}
+
+/* ================= 보조 컨트롤 ================= */
+.intro-skip{position:fixed;left:0;right:0;bottom:max(26px,env(safe-area-inset-bottom));margin:auto;width:max-content;z-index:42;
+  padding:9px 18px;border-radius:99px;font-size:12px;font-weight:600;letter-spacing:.3em;text-indent:.3em;color:var(--brass);
+  background:rgba(4,9,13,.55);border:1px solid var(--hair);box-shadow:none;opacity:0;animation:introFade .5s ease .4s forwards}
+
+/* 시각 연출의 텍스트 대체(스크린리더) */
+.intro-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+@media(prefers-reduced-motion:reduce){
+  .intro-glow{transition:none}
+}

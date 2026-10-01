@@ -7,6 +7,10 @@ import './styles.css';
 import './immersive.css';
 import './premium.css';
 import './stage.css';
+import './intro.css';
+import './lobby.css';
+import {GateIntro,useGateIntro} from './GateIntro';
+import {LOBBY_TL,LobbyBackdrop,LobbyGlow,RoomCode,StartCurtain,shakeVars,useRoster,type GlowHandle} from './LobbyScene';
 
 const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false,revealVoteIdentities:true};
 const ROLE_OPTION_KEYS=['assassin','percival','morgana','mordred','oberon'] as const;
@@ -156,6 +160,7 @@ function Home(){
   const[opts,setOpts]=useState<AvalonOptions>(base);
   const[nickError,setNickError]=useState(false);
   const nickRef=useRef<HTMLInputElement>(null);
+  const intro=useGateIntro();
   const balance=TEAM_BALANCE[count]!;
   const evilSpecialLimit=balance.evil-Number(opts.assassin);
   const evilSpecialSelected=DELEGABLE_ASSASSIN_ROLES.filter(key=>opts[key]).length;
@@ -176,14 +181,15 @@ function Home(){
   };
   const create=async()=>{if(!requireNickname())return;try{const s=await emit('ROOM_CREATE',{nickname,maxPlayers:count,options:opts});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
   const join=async()=>{if(!requireNickname())return;try{const s=await emit('ROOM_JOIN',{roomCode:code,nickname});saveSession(s);}catch(e:any){useGame.getState().setError(e.message);}};
-  return <section className="gate">
-    <header className="gate-hero">
+  return <section className={`gate${intro.live?' intro-live':''}`} style={intro.live?{'--T':intro.scale} as React.CSSProperties:undefined}>
+    <GateIntro intro={intro}/>
+    <header className="gate-hero" key={`hero-${intro.runKey}`}>
       <div className="gate-sigil"><SealIcon size={96}/></div>
-      <small className="gate-eyebrow">THE RESISTANCE · AVALON</small>
-      <h1>아 발 론</h1>
+      <small className="gate-eyebrow">THE RESISTANCE</small>
+      <div className="gate-title"><h1>AVALON</h1></div>
       <p>원탁은 하나, 충성은 둘로 갈렸다</p>
     </header>
-    <div className="gate-card">
+    <div className="gate-card" key={`card-${intro.runKey}`}>
       <div className="gate-tabs" role="tablist" aria-label="시작 방식">
         <button type="button" role="tab" aria-selected={tab==='create'} className={tab==='create'?'on':''} onClick={()=>setTab('create')}><ShieldIcon size={15}/> 원탁 만들기</button>
         <button type="button" role="tab" aria-selected={tab==='join'} className={tab==='join'?'on':''} onClick={()=>setTab('join')}><SwordsIcon size={15}/> 원탁 참가</button>
@@ -266,34 +272,54 @@ function Role({game}:{game:ClientGameState}){
   </section>;
 }
 
-function Lobby({game}:{game:ClientGameState}){
+function Lobby({game,starting=false}:{game:ClientGameState;starting?:boolean}){
   const me=game.players.find(p=>p.id===game.playerId)!;
   const[copied,setCopied]=useState(false);
   const copy=async()=>{try{await navigator.clipboard.writeText(game.roomCode);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{}};
   const readyCount=game.players.filter(p=>p.ready).length;
   const total=game.maxPlayers;
-  return <section className="lb">
+  const glow=useRef<GlowHandle>(null);
+  const tableRef=useRef<HTMLDivElement>(null);
+  /* 새 플레이어가 앉으면 촛불빛이 그 좌석 쪽으로 잠깐 기울었다 돌아온다 */
+  const lean=(index:number)=>{
+    const w=tableRef.current?.offsetWidth??360;
+    const a=(index/total)*Math.PI*2-Math.PI/2;
+    glow.current?.lean(Math.cos(a)*w*.09,Math.sin(a)*w*.09);
+  };
+  const roster=useRoster(game.players,game.playerId,lean);
+  const seatAt=(i:number)=>({...seatPos(i,total,41),'--i':i} as React.CSSProperties);
+  const letter=(name:string)=>[...name][0]??'?';
+  return <section className={`lb${starting?' starting':''}`} style={{'--fill-n':game.players.length/total} as React.CSSProperties}>
+    <div className="lb-shade" aria-hidden="true"/>
+    <LobbyBackdrop/>
+    <p className="lb-sr" role="status">{starting?'게임을 시작합니다. 곧 역할이 공개됩니다.':roster.message}</p>
     <header className="lb-head"><small>WAITING HALL</small><h2>원탁 대기실</h2></header>
-    <button type="button" className="lb-code" onClick={copy} aria-label="초대 코드 복사">
+    <button type="button" className="lb-code" style={shakeVars([...game.roomCode].length)} onClick={copy} aria-label={`초대 코드 ${game.roomCode} 복사`}>
       <small>INVITE CODE</small>
-      <span className="code">{game.roomCode}</span>
+      <RoomCode code={game.roomCode}/>
       <em className={copied?'done':''}>{copied?<><CheckIcon size={13}/> 복사되었습니다</>:'눌러서 초대 코드 복사'}</em>
     </button>
     <div className="lb-table-wrap">
-      <div className={`lb-table lb-t${total}`} style={{'--ready':`${(readyCount/total)*100}%`} as React.CSSProperties}>
+      <LobbyGlow ref={glow}/>
+      <div ref={tableRef} className={`lb-table lb-t${total}`} style={{'--ready':`${(readyCount/total)*100}%`} as React.CSSProperties}>
         <div className="lb-core"><strong>{game.players.length}<span>/{total}</span></strong><small>준비 {readyCount}명</small></div>
         {Array.from({length:total},(_,i)=>{
           const p=game.players[i];
-          const pos={...seatPos(i,total,41),'--i':i} as React.CSSProperties;
+          if(!p&&roster.ghosts.some(g=>g.index===i))return null;           // 촛불이 꺼지는 동안 그 자리는 잔상이 차지한다
           return p
-            ?<div className={`lb-seat${p.ready?' ready':''}${p.isBot?' bot':''}${p.id===game.playerId?' me':''}`} style={pos} key={p.id}>
+            ?<div className={`lb-seat${p.ready?' ready':''}${p.isBot?' bot':''}${p.id===game.playerId?' me':''}${roster.fresh.includes(p.id)?' fresh':''}`} style={seatAt(i)} key={p.id}>
               {p.id===game.hostId&&<span className="lb-crown" title="방장"><CrownIcon size={14}/></span>}
-              <span className="lb-avatar">{[...p.nickname][0]??'?'}{p.ready&&<span className="lb-ok"><CheckIcon size={11}/></span>}</span>
+              <span className="lb-avatar">{letter(p.nickname)}{p.ready&&<span className="lb-ok"><CheckIcon size={11}/></span>}<i className="lb-flame" aria-hidden="true"/></span>
               <span className="lb-name">{p.id===game.playerId?'나 · ':''}{p.nickname}</span>
               {p.isBot&&<small>TEST BOT</small>}
             </div>
-            :<div className="lb-seat empty" style={pos} key={`e${i}`}><span className="lb-avatar"><i>{i+1}</i></span><span className="lb-name">빈 자리</span></div>;
+            :<div className="lb-seat empty" style={seatAt(i)} key={`e${i}`}><span className="lb-avatar"><i>{i+1}</i></span><span className="lb-name">빈 자리</span></div>;
         })}
+        {roster.ghosts.map(g=><div className="lb-seat ghost" style={seatAt(g.index)} key={g.key} aria-hidden="true">
+          <span className="lb-avatar">{letter(g.name)}<i className="lb-flame"/></span>
+          <span className="lb-name">{g.name}</span>
+          <span className="lb-smoke"><i style={{'--k':0} as React.CSSProperties}/><i style={{'--k':1} as React.CSSProperties}/><i style={{'--k':2} as React.CSSProperties}/></span>
+        </div>)}
       </div>
     </div>
     <div className="lb-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=>{const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} size={14}/>{ROLE_DEFINITIONS[role].name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</div></div>
@@ -495,6 +521,30 @@ function App(){
   useEffect(()=>{if(!error)return;const timer=window.setTimeout(()=>setError(null),4000);return()=>window.clearTimeout(timer);},[error,setError]);
   useEffect(()=>{const root=document.documentElement;const move=(e:PointerEvent)=>{root.style.setProperty('--mx',`${e.clientX}px`);root.style.setProperty('--my',`${e.clientY}px`);};window.addEventListener('pointermove',move,{passive:true});return()=>window.removeEventListener('pointermove',move);},[]);
   const[confirmLeave,setConfirmLeave]=useState(false);
+  /* 스토리보드 2 '시작 시': 서버가 role_reveal 로 바꾸는 순간 로비를 잠깐 더 붙들고(일렁임 → 조도 하강),
+     화면이 20%로 어두워진 뒤에 역할 공개 화면으로 교체한다. 이 전환은 렌더 중에 감지해 한 프레임도 깜빡이지 않게 한다. */
+  const lobbySnap=useRef<ClientGameState|null>(null);
+  const[seenPhase,setSeenPhase]=useState(game?.phase);
+  const[holdLobby,setHoldLobby]=useState(false);
+  const[curtain,setCurtain]=useState(0);
+  if(game?.phase==='lobby')lobbySnap.current=game;
+  if(game?.phase!==seenPhase){
+    setSeenPhase(game?.phase);
+    if(seenPhase==='lobby'&&game?.phase==='role_reveal'&&lobbySnap.current){setHoldLobby(true);setCurtain(Date.now());}
+  }
+  /* 정상 경로: 커튼 애니메이션의 시작 이벤트 +1.5s 에 교체, 종료 이벤트에 해제.
+     안전망: 모션 축소(커튼 없음)나 이벤트 유실 시에도 로비가 영원히 남지 않도록 타이머로 정리한다. */
+  useEffect(()=>{
+    if(!holdLobby)return;
+    const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const t=window.setTimeout(()=>setHoldLobby(false),(reduced?.4:6)*1000);
+    return()=>window.clearTimeout(t);
+  },[holdLobby]);
+  useEffect(()=>{
+    if(!curtain)return;
+    const t=window.setTimeout(()=>setCurtain(0),8000);
+    return()=>window.clearTimeout(t);
+  },[curtain]);
   const ongoing=!!game&&!['lobby','result'].includes(game.phase);
   const leave=async()=>{
     if(!game)return;
@@ -509,6 +559,7 @@ function App(){
       {game&&<button className="leave-room" onClick={()=>setConfirmLeave(true)} aria-label="방 나가기"><span>↗</span> 나가기</button>}
       <div className="utility-actions">{game?.selfRole&&game.phase!=='result'&&<button className="dossier-button" onClick={()=>setDossierOpen(value=>!value)}><EyeIcon size={15}/> 내 역할</button>}<button className="help-button" onClick={()=>setHelpOpen(true)} aria-label="게임 도움말">?</button></div>
       {!game?<Home/>
+        :holdLobby&&lobbySnap.current?<Lobby game={lobbySnap.current} starting/>
         :game.phase==='lobby'?<Lobby game={game}/>
         :game.phase==='role_reveal'?<Role game={game}/>
         :game.phase==='result'?<Result game={game}/>
@@ -518,6 +569,7 @@ function App(){
       {!chatOpen&&<button className="chat-toggle" onClick={()=>setChatOpen(true)}><span>✦</span> 원탁 채팅 {game.chat?.length?`(${game.chat.length})`:''}</button>}
       {chatOpen&&<ChatPanel game={game} close={()=>setChatOpen(false)}/>} 
     </>} 
+    {curtain>0&&<StartCurtain key={curtain} onStart={()=>{window.setTimeout(()=>setHoldLobby(false),LOBBY_TL.swap*1000);}} onEnd={()=>setCurtain(0)}/>}
     {helpOpen&&<HelpModal close={()=>setHelpOpen(false)}/>}
     {confirmLeave&&<ConfirmDialog title={ongoing?'원탁을 떠날까요?':'방에서 나갈까요?'} body={ongoing?'진행 중인 게임입니다. 이 기기의 재접속 정보가 삭제되고, 다른 참가자에게는 연결 해제로 표시됩니다.':'대기실에서 나가면 자리가 비워집니다.'} confirmLabel="나가기" cancelLabel="계속 플레이" onConfirm={leave} onCancel={()=>setConfirmLeave(false)}/>} 
     {game?.selfRole&&dossierOpen&&<RoleDossier game={game} close={()=>setDossierOpen(false)}/>} 
