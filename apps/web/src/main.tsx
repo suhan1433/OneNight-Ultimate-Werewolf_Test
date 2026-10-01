@@ -581,7 +581,6 @@ function Home() {
           <label>
             방 코드
             <div className="code-field">
-              <CodeTiles value={roomCode.toUpperCase()} />
               <input
                 className="code-input"
                 value={roomCode}
@@ -822,7 +821,7 @@ function Lobby({ game }: { game: ClientGameState }) {
       <RoundTable game={game} />
       <div className={`lobby-actions${game.hostId === game.playerId ? " host" : ""}`}>
         <button
-          className={me.isReady ? "ghost" : ""}
+          className={`lobby-ready${me.isReady ? " is-ready" : ""}`}
           onClick={() =>
             optimistic(
               () => useGame.getState().toggleReady(),
@@ -835,6 +834,7 @@ function Lobby({ game }: { game: ClientGameState }) {
         </button>
         {game.hostId === game.playerId && (
           <button
+            className="lobby-start"
             disabled={!canStart}
             onClick={() => event("GAME_START", req(game))}
           >
