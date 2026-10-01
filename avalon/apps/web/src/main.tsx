@@ -7,7 +7,7 @@ import './styles.css';
 import './immersive.css';
 import './premium.css';
 
-const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false};
+const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false,revealVoteIdentities:true};
 const ROLE_OPTION_KEYS=['assassin','percival','morgana','mordred','oberon'] as const;
 const DELEGABLE_ASSASSIN_ROLES=['morgana','mordred','oberon'] as const;
 const call=(name:string,data:any)=>emit(name,data).catch(e=>useGame.getState().setError(e.message));
@@ -191,6 +191,7 @@ function Home(){
           {DELEGABLE_ASSASSIN_ROLES.filter(role=>opts[role]).map(role=><label key={role}><input type="radio" name="assassinationAbilityRole" checked={delegatedRole===role} onChange={()=>setOpts({...opts,assassinationAbilityRole:role})}/><RoleIcon role={role} team="evil" size={16}/>{ROLE_DEFINITIONS[role].name}</label>)}
         </div>}
       </div>}
+      <label className="vote-history-option"><input type="checkbox" checked={opts.revealVoteIdentities} onChange={e=>setOpts({...opts,revealVoteIdentities:e.target.checked})}/><span><b>원정 기록 투표자 공개</b><small>켜면 찬성·반대 인원과 투표자 이름을 함께 표시합니다.</small></span></label>
       <button className="primary seal-btn" disabled={!canCreate} onClick={create}><ShieldIcon size={16}/> 원탁 만들기</button>
       <div className="divider"><span>또는</span></div>
       <div className="join">
@@ -251,13 +252,13 @@ function Lobby({game}:{game:ClientGameState}){
 function RoundHistory({game,open,setOpen,showSlots=true}:{game:ClientGameState;open:number|null;setOpen:(round:number|null)=>void;showSlots?:boolean}){
   const name=(id:string)=>game.players.find(player=>player.id===id)?.nickname??'알 수 없음';
   const record=open===null?undefined:game.roundHistory.find(item=>item.round===open);
-  const voteComplete=record&&Object.keys(record.votes).length===game.players.length;
-  const approved=record&&game.players.filter(player=>record.votes[player.id]);
-  const rejected=record&&game.players.filter(player=>record.votes[player.id]===false);
+  const voteComplete=record&&record.approveCount+record.rejectCount===game.players.length;
+  const approved=record?.votes&&game.players.filter(player=>record.votes?.[player.id]);
+  const rejected=record?.votes&&game.players.filter(player=>record.votes?.[player.id]===false);
   return <>{showSlots&&<section className="round-history" aria-label="원정 라운드 기록">{Array.from({length:5},(_,round)=>{const item=game.roundHistory.find(entry=>entry.round===round);const state=item?.success===true?'success':item?.success===false?'fail':'pending';const status=item?(item.success===undefined?'진행 중':item.success?'성공':'실패'):'대기';return <div className="round-history-item" key={round}><button type="button" disabled={!item} className={`${state} ${round===game.round?'current':''}`} onClick={()=>setOpen(open===round?null:round)} aria-expanded={open===round}><span className="round-label">ROUND {round+1}</span><span className="round-meta">{QUEST_SIZES[game.maxPlayers]?.[round]}명 · {status}</span></button></div>;})}</section>}{record&&<section className="round-detail" aria-live="polite">
     <div className="round-detail-head"><span>ROUND {record.round+1} · 원정 기록</span><b className={record.success===true?'success':record.success===false?'fail':''}>{record.success===undefined?'진행 중':record.success?'원정 성공':'원정 실패'}</b></div>
     <div className="round-detail-section expedition-detail"><div className="round-detail-label"><FactionSeal team="good" size={18}/><span>원정대</span></div><div className="expedition-content"><span className="leader-chip"><CrownIcon size={13}/> 리더 · {name(record.leaderId)}</span><div className="member-chips">{record.team.map(id=><span key={id}>{name(id)}</span>)}</div></div></div>
-    <div className="round-detail-section"><div className="round-detail-label"><ShieldIcon size={18}/><span>찬반 투표</span></div>{voteComplete?<><div className="vote-summary"><span className="approve"><CheckIcon size={13}/> 찬성 <b>{approved?.length}</b></span><span className="reject"><SwordsIcon size={13}/> 반대 <b>{rejected?.length}</b></span></div><div className="vote-groups"><div className="vote-group approve"><b><CheckIcon size={13}/> 찬성</b><div>{approved?.map(player=><span key={player.id}>{player.nickname}</span>)}</div></div><div className="vote-group reject"><b><SwordsIcon size={13}/> 반대</b><div>{rejected?.map(player=><span key={player.id}>{player.nickname}</span>)}</div></div></div></>:<div className="round-pending"><Dots/> 투표 진행 중</div>}</div>
+    <div className="round-detail-section"><div className="round-detail-label"><ShieldIcon size={18}/><span>찬반 투표</span></div>{voteComplete?<><div className="vote-summary"><span className="approve"><CheckIcon size={13}/> 찬성 <b>{record.approveCount}</b></span><span className="reject"><SwordsIcon size={13}/> 반대 <b>{record.rejectCount}</b></span></div>{game.options.revealVoteIdentities&&<div className="vote-groups"><div className="vote-group approve"><b><CheckIcon size={13}/> 찬성</b><div>{approved?.map(player=><span key={player.id}>{player.nickname}</span>)}</div></div><div className="vote-group reject"><b><SwordsIcon size={13}/> 반대</b><div>{rejected?.map(player=><span key={player.id}>{player.nickname}</span>)}</div></div></div>}</>:<div className="round-pending"><Dots/> 투표 진행 중</div>}</div>
     <div className="round-detail-section quest-detail"><div className="round-detail-label"><SwordsIcon size={18}/><span>원정 결과</span></div><div>{record.fails===undefined?<span className="round-pending"><Dots/> 원정 결과 대기 중</span>:<div className="quest-card-count"><span className="success"><ShieldIcon size={15}/> 성공 <b>{record.team.length-record.fails}</b></span><span className="fail"><SwordsIcon size={15}/> 실패 <b>{record.fails}</b></span></div>}</div></div>
   </section>}</>;
 }
