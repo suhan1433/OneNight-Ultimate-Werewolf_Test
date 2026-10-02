@@ -8,7 +8,7 @@ import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
    R+1.5       타격: 0.35초 간격으로 한 장씩 (랜덤 순서) · 마지막 한 장은 +지연(득표 상황에 따라 0.25 / 0.6 / 1.0)
    S           결과: 가결(금빛 확정 · 코인 쓸림 · 따뜻한 확장) / 부결(붉게 갈라짐 · 왕관 굴러감 · 차가운 수축)
    S+1.2       여운: '찬성 n / 반대 n' 만 각인 · 조도 복귀
-
+  
    익명성: 이 파일과 VoteStage 는 개별 플레이어의 투표(revealedVotes, record.votes)를 읽지 않는다.
    쓰는 것은 집계(approve, reject)와 공개 정보(방 코드·라운드·제안된 원정대)뿐이다. */
 export const VT={drop:.35,tremble:.5,shuffle:.7,retreat:1.0,still:.5,strike:1.5,gap:.35,afterLast:.9,summary:1.2,cont:2.0} as const;
