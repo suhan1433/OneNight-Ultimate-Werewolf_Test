@@ -9,7 +9,9 @@ import './premium.css';
 import './stage.css';
 import './intro.css';
 import './lobby.css';
-import {GateIntro,useGateIntro} from './GateIntro';
+import './reveal.css';
+import {GateIntro,Table,useGateIntro} from './GateIntro';
+import {RV,findMates,useHold} from './RoleScene';
 import {LOBBY_TL,LobbyBackdrop,LobbyGlow,RoomCode,StartCurtain,shakeVars,useRoster,type GlowHandle} from './LobbyScene';
 
 const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false,revealVoteIdentities:true};
@@ -253,22 +255,83 @@ function Home(){
 function Role({game}:{game:ClientGameState}){
   const role=game.selfRole!;
   const def=ROLE_DEFINITIONS[role];
-  const[flipped,setFlipped]=useState(false);
   const label=def.team==='good'?'선의 세력':game.hasAssassinationAbility?'악의 세력 · 암살 능력 보유':'악의 세력';
-  return <section className="center role-stage">
-    <p className="role-hint">{flipped?'다른 사람에게 화면이 보이지 않게 주의하세요':'주변을 확인한 뒤, 카드를 눌러 신분을 확인하세요'}</p>
-    <button type="button" className={`flip-card ${def.team}${flipped?' flipped':''}`} onClick={()=>setFlipped(v=>!v)} aria-pressed={flipped} aria-label={flipped?'역할 카드 가리기':'역할 카드 뒤집기'}>
-      <span className="flip-inner">
-        <span className="flip-face flip-back"><SealIcon size={92}/><small>눌러서 확인</small></span>
-        <span className="flip-face flip-front"><span className="role-glyph"><RoleIcon role={role} team={def.team} size={54}/></span><small>{label}</small><strong>{def.name}</strong></span>
-      </span>
-    </button>
-    {flipped&&<div className={`role-detail ${def.team}`}>
+  const reduced=useMemo(()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches,[]);
+  const[ready,setReady]=useState(reduced);            // 1.0s: 카드가 떠오르면 그때부터 누를 수 있다
+  const[shown,setShown]=useState(false);              // 앞면이 보이는 중
+  const[everShown,setEverShown]=useState(false);      // 한 번이라도 열렸는가 — 그 전에는 진영 정보가 DOM 에도 없다
+  const[confirmed,setConfirmed]=useState(false);
+  const[lit,setLit]=useState(false);                  // 원탁 조도 복귀
+  const[strike,setStrike]=useState(0);
+  const[fails,setFails]=useState(0);
+  const[msg,setMsg]=useState('');
+  useEffect(()=>{if(ready)return;const t=window.setTimeout(()=>{setReady(true);setMsg('카드가 준비되었습니다. 카드를 길게 눌러 신분을 확인하세요.');},RV.ready*1000);return()=>window.clearTimeout(t);},[]);
+  useEffect(()=>{const r=document.documentElement;r.toggleAttribute('data-rv-dark',!lit);return()=>r.removeAttribute('data-rv-dark');},[lit]);
+
+  const reveal=()=>{
+    setEverShown(true);setShown(true);setLit(true);setStrike(k=>k+1);
+    navigator.vibrate?.(90);                                            // 2.6s 타격: 햅틱 강 1회
+    setMsg(`당신의 역할은 ${def.name}입니다. ${label}.`);
+  };
+  const hold=useHold({enabled:ready&&!shown,onComplete:reveal,onAbort:()=>setFails(f=>f+1)});
+  const hide=()=>{setShown(false);hold.reset();};
+  const confirm=async()=>{
+    try{await emit('ROLE_CONFIRM',{roomCode:game.roomCode});setConfirmed(true);hide();setMsg('역할을 확인했습니다. 다른 기사들을 기다립니다.');}
+    catch(e:any){useGame.getState().setError(e.message);}
+  };
+  const mates=useMemo(()=>def.team==='evil'?findMates(game.roleIntel,game.players,game.playerId):new Set<string>(),[def.team,game.roleIntel.join('|'),game.players.map(p=>p.id+p.nickname).join('|'),game.playerId]);
+  const altVisible=ready&&!shown&&(reduced||fails>=3);
+  const waiting=`모든 기사의 확인을 기다리는 중 (${game.roleConfirmedCount}/${game.players.length})`;
+
+  return <section className={`rv${shown?' is-shown':''}${everShown?' was-shown':''}${lit?' is-lit':''}`} data-team={everShown?def.team:undefined}>
+    <div className="rv-dark" aria-hidden="true"/>
+    <div className="rv-beam" aria-hidden="true"/>
+    <div className="intro-scene rv-table" aria-hidden="true"><div className="intro-rig"><Table/></div></div>
+    <p className="rv-sr" role="status">{msg}</p>
+    <div className="rv-cam">
+      <div className="rv-stage">
+        {everShown&&<i className="rv-aura" aria-hidden="true"/>}
+        {strike>0&&<i className="rv-burst" key={strike} aria-hidden="true"/>}
+        <button type="button" ref={hold.el} className="rv-card" {...hold.bind} disabled={!ready||shown}
+          aria-label={shown?`역할 카드: ${def.name}`:'카드를 길게 눌러 신분 확인. 키보드는 스페이스바를 길게 누르세요.'}>
+          <span className="rv-flipper">
+            <span className="rv-face rv-back"><SealIcon size={92}/><small>AVALON</small></span>
+            <span className="rv-face rv-front" aria-hidden={!shown}>{everShown&&<>
+              <FactionSeal team={def.team} size={200}/>
+              <span className="rv-glyph"><RoleIcon role={role} team={def.team} size={Math.round(24*1.9)}/></span>
+              <small>{label}</small><strong>{def.name}</strong>
+            </>}</span>
+          </span>
+          <span className="rv-heat" aria-hidden="true"/>
+          <svg className="rv-perim" viewBox="0 0 100 150" preserveAspectRatio="none" aria-hidden="true"><rect x="0.5" y="0.5" width="99" height="149" rx="7" pathLength={1}/></svg>
+          <span className="rv-embers" aria-hidden="true">{[0,1,2,3,4,5,6].map(e=><i className="rv-ember" key={e} style={{'--e':e} as React.CSSProperties}/>)}</span>
+        </button>
+      </div>
+      {ready&&!shown&&<p className="rv-hint" key={confirmed?'w':fails?'f':'h'}>{confirmed?waiting:fails?'끝까지 누르고 계세요':'주변을 확인한 뒤, 카드를 꾹 눌러 신분을 확인하세요'}
+        <small>{confirmed?'다시 확인하려면 카드를 길게 누르세요':'손을 떼면 열이 식습니다 · 키보드는 스페이스바를 길게'}</small></p>}
+      {!ready&&<p className="rv-hint" aria-hidden="true">&nbsp;</p>}
+      {altVisible&&<button type="button" className="rv-alt" onClick={reveal}>길게 누르기 어렵다면 — 탭으로 바로 확인</button>}
+    </div>
+    {everShown&&<aside className="rv-panel" data-open={shown} aria-hidden={!shown} aria-label="내 역할 설명">
+      <span className="rv-faction">{label}</span>
+      <h3>{def.name}</h3>
       <p>{def.description}</p>
       {game.hasAssassinationAbility&&role!=='assassin'&&<p className="ability-note"><DaggerIcon size={15}/> 암살 능력: 선이 원정 3회에 성공하면 멀린을 지목할 수 있습니다.</p>}
-      {game.roleIntel.length>0&&<div className="intel"><b>확인한 정보</b>{game.roleIntel.map(x=><div key={x}>{x}</div>)}</div>}
-    </div>}
-    <button className="primary" disabled={!flipped} onClick={()=>call('ROLE_CONFIRM',{roomCode:game.roomCode})}>역할 확인 완료 ({game.roleConfirmedCount}/{game.players.length})</button>
+      {(game.roleIntel.length>0||mates.size>0)&&<div className="rv-intel-row">
+        {game.roleIntel.length>0&&<div className="intel"><b>확인한 정보</b>{game.roleIntel.map(x=><div key={x}>{x}</div>)}</div>}
+        {def.team==='evil'&&mates.size>0&&<div className="rv-seats" aria-hidden="true">{game.players.map((p,i)=>{
+          const isMate=mates.has(p.id);
+          const k=isMate?[...mates].indexOf(p.id):0;
+          const pos=seatPos(i,game.players.length,38);
+          return <span key={p.id} className={`rv-seat${p.id===game.playerId?' me':''}${isMate?' mate':''}`} style={{...pos,'--k':k} as React.CSSProperties}>{[...p.nickname][0]??'?'}</span>;
+        })}</div>}
+      </div>}
+      <div className="rv-actions">
+        {confirmed
+          ?<button type="button" onClick={hide}>카드 가리기</button>
+          :<button type="button" className="primary" onClick={confirm}>역할 확인 완료 ({game.roleConfirmedCount}/{game.players.length})</button>}
+      </div>
+    </aside>}
   </section>;
 }
 
@@ -557,7 +620,7 @@ function App(){
     {game&&<PhaseBanner game={game}/>}
     <div className="app" data-phase={game?.phase??'home'}>
       {game&&<button className="leave-room" onClick={()=>setConfirmLeave(true)} aria-label="방 나가기"><span>↗</span> 나가기</button>}
-      <div className="utility-actions">{game?.selfRole&&game.phase!=='result'&&<button className="dossier-button" onClick={()=>setDossierOpen(value=>!value)}><EyeIcon size={15}/> 내 역할</button>}<button className="help-button" onClick={()=>setHelpOpen(true)} aria-label="게임 도움말">?</button></div>
+      <div className="utility-actions">{game?.selfRole&&game.phase!=='result'&&game.phase!=='role_reveal'&&<button className="dossier-button" onClick={()=>setDossierOpen(value=>!value)}><EyeIcon size={15}/> 내 역할</button>}<button className="help-button" onClick={()=>setHelpOpen(true)} aria-label="게임 도움말">?</button></div>
       {!game?<Home/>
         :holdLobby&&lobbySnap.current?<Lobby game={lobbySnap.current} starting/>
         :game.phase==='lobby'?<Lobby game={game}/>

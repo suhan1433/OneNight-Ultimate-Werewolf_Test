@@ -101,11 +101,12 @@
 @keyframes lbGlowSurge{0%{filter:brightness(1)}40%{filter:brightness(2.3) saturate(1.2)}100%{filter:brightness(1.5)}}
 .lb.starting .lb-shade{opacity:0}
 .lb-curtain{position:fixed;inset:0;z-index:60;pointer-events:none}
-.lb-curtain i{position:absolute;inset:0;background:rgba(2,4,7,.8);opacity:0;animation:lbCurtain 3.9s linear both}
-/* 0.6s 하강 시작 → 1.5s 20% 도달(이 시점에 역할 공개 화면으로 교체) → 2.3s 까지 유지 → 3.9s 에 걷힘(장면 3 이 이어받기 전의 임시 해제) */
+.lb-curtain i{position:absolute;inset:0;background:rgba(2,4,7,.8);opacity:0;animation:lbCurtain 3s linear both}
+/* 0.6s 하강 시작 → 1.5s 20% 도달(이 시점에 역할 공개 화면으로 교체) → 1.8s 까지 유지 → 3.0s 에 걷힘.
+   걷힌 자리에는 장면 3 의 암전(스포트라이트 한 점)이 이미 깔려 있어, 밝아지는 게 아니라 '카드 한 장만 남는다' */
 @keyframes lbCurtain{
-  0%,15.38%{opacity:0;animation-timing-function:cubic-bezier(.5,0,.8,.4)}
-  38.46%,58.97%{opacity:1;animation-timing-function:ease-in-out}
+  0%,20%{opacity:0;animation-timing-function:cubic-bezier(.5,0,.8,.4)}
+  50%,60%{opacity:1;animation-timing-function:ease-in-out}
   100%{opacity:0}}
 
 @media(prefers-reduced-motion:reduce){

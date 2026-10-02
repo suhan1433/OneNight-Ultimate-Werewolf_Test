@@ -10,7 +10,7 @@ import {Table} from './GateIntro';
 export const LOBBY_TL={
   codeStart:.8,stamp:.14,stampImpact:.225,          // 글자 i 의 타격 시각 = codeStart + i*stamp + stampImpact
   rise:1.2,joinFx:2.6,leaveFx:2.4,
-  surge:.6,swap:1.5,curtainEnd:3.9,                  // 시작: 일렁임 0.6s → 조도 하강 → 1.5s 에 역할 공개로 교체 → 3.9s 에 커튼 해제
+  surge:.6,swap:1.5,curtainEnd:3.0,                  // 시작: 일렁임 0.6s → 조도 하강 → 1.5s 에 역할 공개로 교체 → 3.9s 에 커튼 해제
 } as const;
 
 /* ---------- 방 코드: 놋쇠 활자 ---------- */
