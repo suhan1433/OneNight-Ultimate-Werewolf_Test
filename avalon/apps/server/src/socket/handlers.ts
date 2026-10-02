@@ -7,11 +7,12 @@ const code=()=>Array.from({length:6},()=> 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Mat
 const channel=(id:string)=>`player:${id}`; const roomChannel=(id:string)=>`game:${id}`;
 const BOT_TEAM_SELECTION_DELAY_MS=1_400;
 const pendingBotTeamSelections=new Set<string>();
+const pendingAssassinations=new Map<string,string>();
 const ack=<T>(socket:Socket,event:string,fn:(data:any)=>Promise<T>)=>socket.on(event,async(data:any,cb?:(x:Ack<T>)=>void)=>{try{cb?.({ok:true,data:await fn(data)});}catch(e){const error=e instanceof Error?e.message:'요청을 처리하지 못했습니다.';cb?.({ok:false,error});socket.emit('ERROR',{message:error});}});
 const session=(s:Socket,c:string)=>{if(s.data.roomCode!==c||!s.data.playerId)throw Error('유효한 게임 세션이 아닙니다.');return s.data.playerId as string;};
-export async function emitRoomState(io:Server,room:Room){for(const p of room.players)io.to(channel(p.id)).emit('ROOM_STATE',clientState(room,p.id));}
+export async function emitRoomState(io:Server,room:Room){for(const p of room.players)io.to(channel(p.id)).emit('ROOM_STATE',clientState(room,p.id));if(room.phase==='assassination')io.to(roomChannel(room.roomCode)).emit('ASSASSIN_AIM',{roomCode:room.roomCode,actorId:room.players.find(p=>p.hasAssassinationAbility)?.id,targetId:pendingAssassinations.get(room.roomCode)??null,locked:pendingAssassinations.has(room.roomCode)});}
 function bind(s:Socket,r:Room,id:string){s.data.roomCode=r.roomCode;s.data.playerId=id;s.join(roomChannel(r.roomCode));s.join(channel(id));}
-function resetRound(room:Room){room.proposedTeam=[];room.teamVotes={};room.questCards={};room.continueConfirmations={};room.voteResult=undefined;room.questResult=undefined;}
+function resetRound(room:Room){room.proposedTeam=[];room.teamVotes={};room.questCards={};room.continueConfirmations={};room.voteResult=undefined;room.questResult=undefined;room.assassinTarget=undefined;}
 function validateRoleOptions(maxPlayers:number,options:AvalonOptions){const special=['morgana','mordred','oberon'].filter(role=>options[role as keyof AvalonOptions]).length;const evilRoles=special+Number(options.assassin);if(evilRoles>COUNT_TABLE[maxPlayers]!.evil)throw Error('선택한 악 역할이 인원수보다 많습니다.');if(!options.assassin&&(!options.assassinationAbilityRole||!options[options.assassinationAbilityRole]))throw Error('암살자가 없으면 선택한 악의 세력 중 암살 능력 보유자를 지정해야 합니다.');if(options.assassin&&options.assassinationAbilityRole)throw Error('암살자를 포함한 게임에서는 암살 능력을 위임할 수 없습니다.');}
 function saveRoundRecord(room:Room, update:Partial<Room['roundHistory'][number]>) { room.roundHistory??=[];const current=room.roundHistory.findIndex(item=>item.round===room.round); const approveCount=Object.values(room.teamVotes).filter(Boolean).length;const base={round:room.round,leaderId:room.players[room.leaderIndex]!.id,team:[...room.proposedTeam],votes:{...room.teamVotes},approveCount,rejectCount:Object.keys(room.teamVotes).length-approveCount}; if(current<0)room.roundHistory.push({...base,...update});else room.roundHistory[current]={...room.roundHistory[current]!,...base,...update}; }
 function showVoteResult(room:Room){room.continueConfirmations={};room.phase='vote_result';}
@@ -68,6 +69,42 @@ function scheduleBotTeamSelection(io:Server, room:Room) {
   timer.unref();
 }
 export function registerHandlers(io:Server,socket:Socket){
+ // Aim is an ephemeral room-scoped visual event, never a committed game action.
+ socket.on('ASSASSIN_AIM',async(d:{roomCode?:string;targetId?:string|null})=>{
+  try{
+   if(!d||typeof d.roomCode!=='string')return;
+   const roomCode=d.roomCode.toUpperCase(),id=session(socket,roomCode);
+   if(pendingAssassinations.has(roomCode))return;
+   const now=Date.now();if(now-(socket.data.lastAssassinAimAt??0)<70)return;socket.data.lastAssassinAimAt=now;
+   const room=await getRoom(roomCode),player=room?.players.find(p=>p.id===id);
+   if(!room||room.phase!=='assassination'||!player?.hasAssassinationAbility||player.socketId!==socket.id||!player.connected)return;
+   const targetId=d.targetId??null;
+   if(targetId!==null&&(typeof targetId!=='string'||targetId===id||!room.players.some(p=>p.id===targetId)))return;
+   if(pendingAssassinations.has(roomCode))return;
+   io.to(roomChannel(roomCode)).emit('ASSASSIN_AIM',{roomCode,targetId,actorId:id,locked:false});
+  }catch{/* Pointer movement must not produce error toasts. */}
+ });
+ ack(socket,'ASSASSIN_COMMIT',async d=>{
+  const roomCode=String(d.roomCode).toUpperCase();
+  const targetId=String(d.targetId);
+  await withRoomLock(roomCode,async room=>{
+   const id=session(socket,roomCode),player=room.players.find(p=>p.id===id);
+   if(room.phase!=='assassination'||!player?.hasAssassinationAbility||player.socketId!==socket.id)throw Error('암살 능력 보유자만 대상을 확정할 수 있습니다.');
+   if(targetId===id||!room.players.some(p=>p.id===targetId))throw Error('암살 대상을 선택하세요.');
+   if(pendingAssassinations.has(roomCode))throw Error('이미 암살 대상을 확정했습니다.');
+   pendingAssassinations.set(roomCode,targetId);
+  });
+  io.to(roomChannel(roomCode)).emit('ASSASSIN_AIM',{roomCode,targetId,actorId:socket.data.playerId,locked:true});
+  // One authoritative second of stillness for every connected client.
+  const timer=setTimeout(()=>void withRoomLock(roomCode,async room=>{
+   if(room.phase!=='assassination'||pendingAssassinations.get(roomCode)!==targetId)return null;
+   const target=room.players.find(p=>p.id===targetId);if(!target)return null;
+   room.assassinTarget=targetId;room.phase='result';room.winner=target.role==='merlin'?'evil':'good';
+   room.winReason=target.role==='merlin'?`암살 능력 보유자가 멀린 ${target.nickname}님을 찾아냈습니다.`:`암살 능력 보유자가 멀린을 찾지 못했습니다. (${target.nickname}님 지목)`;
+   room.resultExpiresAt=Date.now()+30*60*1000;room.updatedAt=Date.now();await saveRoom(room);return room;
+  }).then(room=>room&&emitRoomState(io,room)).catch(()=>{io.to(roomChannel(roomCode)).emit('ASSASSIN_AIM',{roomCode,targetId,locked:false});io.to(roomChannel(roomCode)).emit('ERROR',{message:'암살 결과를 처리하지 못했습니다. 다시 확정해주세요.'});}).finally(()=>pendingAssassinations.delete(roomCode)),1000);
+  timer.unref();return {};
+ });
  ack(socket,'ROOM_CREATE',async d=>{const maxPlayers=Number(d.maxPlayers);if(!COUNT_TABLE[maxPlayers])throw Error('인원은 5~10명이어야 합니다.');const nickname=String(d.nickname??'').trim().slice(0,16);if(!nickname)throw Error('닉네임을 입력해주세요.');const delegated=['morgana','mordred','oberon'].includes(d.options?.assassinationAbilityRole)?d.options.assassinationAbilityRole:null;const options:AvalonOptions={assassin:!!d.options?.assassin,assassinationAbilityRole:delegated,percival:!!d.options?.percival,morgana:!!d.options?.morgana,mordred:!!d.options?.mordred,oberon:!!d.options?.oberon,revealVoteIdentities:d.options?.revealVoteIdentities!==false};validateRoleOptions(maxPlayers,options);let roomCode=code();while(await getRoom(roomCode))roomCode=code();const id=randomUUID(), now=Date.now();const room:Room={roomCode,hostId:id,maxPlayers,players:[{id,nickname,sessionToken:token(),socketId:socket.id,role:null,ready:false,connected:true}],phase:'lobby',options,round:0,leaderIndex:0,rejectCount:0,results:[],roundHistory:[],proposedTeam:[],teamVotes:{},questCards:{},createdAt:now,updatedAt:now,lobbyExpiresAt:now+3600000};await saveRoom(room);bind(socket,room,id);await emitRoomState(io,room);return {roomCode,playerId:id,sessionToken:room.players[0]!.sessionToken};});
  ack(socket,'ROOM_JOIN',async d=>{const room=await withRoomLock(String(d.roomCode).toUpperCase(),async room=>{const existing=d.playerId&&room.players.find(p=>p.id===d.playerId&&p.sessionToken===d.sessionToken);if(existing){existing.socketId=socket.id;existing.connected=true;existing.disconnectedAt=null;room.allOfflineExpiresAt=null;return room;}if(room.phase!=='lobby'||room.players.length>=room.maxPlayers)throw Error('참가할 수 없는 방입니다.');const nickname=String(d.nickname??'').trim().slice(0,16);if(!nickname||room.players.some(p=>p.nickname===nickname))throw Error('사용할 수 없는 닉네임입니다.');room.players.push({id:randomUUID(),nickname,sessionToken:token(),socketId:socket.id,role:null,ready:false,connected:true});room.allOfflineExpiresAt=null;room.updatedAt=Date.now();await saveRoom(room);return room;});const p=room.players.find(p=>p.socketId===socket.id)!;bind(socket,room,p.id);await emitRoomState(io,room);socket.emit('CHAT_HISTORY',await getChatHistory(room.roomCode));return {roomCode:room.roomCode,playerId:p.id,sessionToken:p.sessionToken};});
  ack(socket,'ROOM_LEAVE',async d=>{const code=String(d.roomCode).toUpperCase();const room=await withRoomLock(code,async r=>{const id=session(socket,r.roomCode);if(!['lobby','result'].includes(r.phase)){const player=r.players.find(p=>p.id===id)!;player.connected=false;player.socketId=null;player.disconnectedAt=Date.now();if(r.players.filter(p=>!p.isBot).every(p=>!p.connected))r.allOfflineExpiresAt=Date.now()+10*60*1000;r.updatedAt=Date.now();await saveRoom(r);return r;}r.players=r.players.filter(p=>p.id!==id);if(!r.players.length||r.players.every(p=>p.isBot)){await deleteRoom(r.roomCode);return r;}if(r.hostId===id)r.hostId=r.players.find(p=>!p.isBot)?.id??r.players[0]!.id;r.updatedAt=Date.now();await saveRoom(r);return r;});socket.leave(roomChannel(code));socket.leave(channel(socket.data.playerId));socket.data.roomCode=undefined;socket.data.playerId=undefined;if(room.players.length)await emitRoomState(io,room);return {};});
@@ -81,7 +118,7 @@ export function registerHandlers(io:Server,socket:Socket){
  mutate('VOTE_RESULT_CONTINUE',(r,id)=>{if(r.phase!=='vote_result'||id in (r.continueConfirmations??{}))throw Error('이미 계속을 확인했거나 결과 화면이 아닙니다.');(r.continueConfirmations??={})[id]=true;if(Object.keys(r.continueConfirmations).length===r.players.length)advanceVoteResult(r);});
  mutate('QUEST_CARD',(r,id,d)=>{if(r.phase!=='quest'||!r.proposedTeam.includes(id)||id in r.questCards)throw Error('원정대원만 한 번 제출할 수 있습니다.');const p=r.players.find(p=>p.id===id)!;const card=d.card==='fail'?'fail':'success';if(ROLE_DEFINITIONS[p.role!].team==='good'&&card==='fail')throw Error('선의 세력은 성공 카드만 낼 수 있습니다.');r.questCards[id]=card;if(Object.keys(r.questCards).length===r.proposedTeam.length){const fails=Object.values(r.questCards).filter(x=>x==='fail').length;const success=fails<(doubleFail(r)?2:1);r.questResult={fails,success};r.results.push(success?'success':'fail');saveRoundRecord(r,{fails,success});showQuestResult(r);}});
  mutate('QUEST_RESULT_CONTINUE',(r,id)=>{if(r.phase!=='quest_result'||id in (r.continueConfirmations??{}))throw Error('이미 계속을 확인했거나 결과 화면이 아닙니다.');(r.continueConfirmations??={})[id]=true;if(Object.keys(r.continueConfirmations).length===r.players.length)advanceQuestResult(r);});
- mutate('ASSASSIN_TARGET',(r,id,d)=>{if(r.phase!=='assassination'||!r.players.find(p=>p.id===id)?.hasAssassinationAbility)throw Error('암살 능력 보유자만 대상을 선택할 수 있습니다.');const target=r.players.find(p=>p.id===d.targetId);if(!target)throw Error('대상을 선택하세요.');r.assassinTarget=target.id;r.phase='result';r.winner=target.role==='merlin'?'evil':'good';r.winReason=target.role==='merlin'?`암살 능력 보유자가 멀린 ${target.nickname}님을 찾아냈습니다.`:`암살 능력 보유자가 멀린을 찾지 못했습니다. (${target.nickname}님 지목)`;r.resultExpiresAt=Date.now()+30*60*1000;});
+ mutate('ASSASSIN_TARGET',(r,id,d)=>{if(pendingAssassinations.has(r.roomCode))throw Error('이미 암살 대상을 확정했습니다.');if(r.phase!=='assassination'||!r.players.find(p=>p.id===id)?.hasAssassinationAbility)throw Error('암살 능력 보유자만 대상을 선택할 수 있습니다.');const target=r.players.find(p=>p.id===d.targetId);if(!target)throw Error('대상을 선택하세요.');r.assassinTarget=target.id;r.phase='result';r.winner=target.role==='merlin'?'evil':'good';r.winReason=target.role==='merlin'?`암살 능력 보유자가 멀린 ${target.nickname}님을 찾아냈습니다.`:`암살 능력 보유자가 멀린을 찾지 못했습니다. (${target.nickname}님 지목)`;r.resultExpiresAt=Date.now()+30*60*1000;});
  mutate('GAME_RESTART',async(r,id)=>{if(id!==r.hostId||r.phase!=='result')throw Error('방장만 새 게임을 시작할 수 있습니다.');r.players=r.players.map(p=>({...p,role:null,hasAssassinationAbility:false,ready:false,confirmed:false}));r.phase='lobby';r.round=0;r.leaderIndex=0;r.rejectCount=0;r.results=[];r.roundHistory=[];r.winner=undefined;r.winReason=undefined;r.resultExpiresAt=null;r.lobbyExpiresAt=Date.now()+60*60*1000;resetRound(r);await clearChat(r.roomCode);});
  socket.on('disconnect',async()=>{const c=socket.data.roomCode,id=socket.data.playerId;if(!c||!id)return;try{const r=await withRoomLock(c,async r=>{const p=r.players.find(p=>p.id===id);if(p&&p.socketId===socket.id){p.connected=false;p.socketId=null;p.disconnectedAt=Date.now();if(r.players.every(player=>!player.connected))r.allOfflineExpiresAt=Date.now()+10*60*1000;r.updatedAt=Date.now();await saveRoom(r);}return r;});await emitRoomState(io,r);}catch{}});
 }

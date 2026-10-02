@@ -11,6 +11,8 @@ import './intro.css';
 import './lobby.css';
 import './reveal.css';
 import './vote.css';
+import './cinematic.css';
+import {TeamScene,QuestScene,AssassinScene,EndingScene} from './CinematicScenes';
 import {GateIntro,Table,useGateIntro} from './GateIntro';
 import {RV,findMates,useHold} from './RoleScene';
 import {LOBBY_TL,LobbyBackdrop,LobbyGlow,RoomCode,StartCurtain,shakeVars,useRoster,type GlowHandle} from './LobbyScene';
@@ -86,7 +88,7 @@ const EMBERS=Array.from({length:16},(_,k)=>({k,style:{left:`${(k*37+11)%100}%`,'
 function Ambient({phase}:{phase:string}){
   return <div className="ambient" data-phase={phase} aria-hidden="true"><div className="mist m1"/><div className="mist m2"/>{EMBERS.map(e=><i key={e.k} style={e.style}/>)}</div>;
 }
-const BANNERS:Record<string,string>={team_build:'원정대 구성',team_vote:'신뢰의 투표',quest:'원정의 결단',assassination:'마지막 암살'};
+const BANNERS:Record<string,string>={team_vote:'신뢰의 투표',quest:'원정의 결단'};
 function PhaseBanner({game}:{game:ClientGameState}){
   const key=`${game.phase}:${game.round}`;
   const prev=useRef('');
@@ -108,23 +110,6 @@ function SeatFace({name}:{name:string}){
 function Pips({done,total}:{done:number;total:number}){
   return <div className="pips" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label="제출 현황">{Array.from({length:total},(_,i)=><i className={i<done?'on':''} key={i}/>)}</div>;
 }
-/* 원정 카드는 "섞어서" 공개되므로 실패 카드의 위치를 결정적으로 섞어 한 장씩 뒤집는다 */
-function QuestReveal({total,fails}:{total:number;fails:number}){
-  const order=useMemo(()=>{
-    const arr=Array.from({length:total},(_,i)=>i<fails);
-    let s=total*31+fails*17+7;
-    for(let i=arr.length-1;i>0;i--){s=(s*9301+49297)%233280;const j=Math.floor(s/233280*(i+1));const current=arr[i]!;arr[i]=arr[j]!;arr[j]=current;}
-    return arr;
-  },[total,fails]);
-  return <div className="quest-reveal" aria-hidden="true">{order.map((fail,i)=>
-    <div className={`rcard ${fail?'fail':'success'}`} style={{'--i':i} as React.CSSProperties} key={i}>
-      <div className="rcard-inner">
-        <span className="rcard-back"><SealIcon size={38}/></span>
-        <span className="rcard-front"><FactionSeal team={fail?'evil':'good'} size={40}/></span>
-      </div>
-    </div>)}
-  </div>;
-}
 function Toast({message,onClose}:{message:string;onClose:()=>void}){
   return <div className="toast-layer" role="alert" aria-live="assertive">
     <div className="toast" key={message} onClick={onClose}>
@@ -143,15 +128,6 @@ function ConfirmDialog({title,body,confirmLabel,cancelLabel,onConfirm,onCancel}:
       <p>{body}</p>
       <div className="confirm-actions"><button type="button" autoFocus onClick={onCancel}>{cancelLabel}</button><button type="button" className="danger" onClick={onConfirm}>{confirmLabel}</button></div>
     </section>
-  </div>;
-}
-
-/* ---------- shared round-table layout ---------- */
-function RoundTable({players,center,renderSeat,leaderId}:{players:any[];center:React.ReactNode;renderSeat:(p:any,i:number)=>React.ReactNode;leaderId?:string}){
-  const radius=players.length>=8?39:42;
-  return <div className={`table table--${players.length}`}>
-    <div className="table-center">{center}</div>
-    {players.map((p,i)=><div className="seat" style={{...seatPos(i,players.length,radius),'--i':i} as React.CSSProperties} key={p.id}>{p.id===leaderId&&<span className="leader-crown" title="리더"><CrownIcon size={16}/></span>}{renderSeat(p,i)}</div>)}
   </div>;
 }
 
@@ -479,10 +455,10 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
 }
 
 function Board({game}:{game:ClientGameState}){
-  const[team,setTeam]=useState<string[]>([]);
   const[approve,setApprove]=useState<boolean|null>(null);
   const[questCard,setQuestCard]=useState<'success'|'fail'|null>(null);
   const[openRound,setOpenRound]=useState<number|null>(null);
+  const[questDisclosed,setQuestDisclosed]=useState(false);
   const me=game.playerId,leader=game.leaderId===me;
   const phase=game.phase;
   const leaderPlayer=game.players.find(p=>p.id===game.leaderId);
@@ -490,11 +466,9 @@ function Board({game}:{game:ClientGameState}){
   const teamChips=(ids:string[])=><div className="team-chips">{ids.map(id=><span className="chip" key={id}>{game.players.find(p=>p.id===id)?.nickname}</span>)}</div>;
   const meP=game.players.find(p=>p.id===me);
   const myTurn=phase==='team_build'?leader:phase==='team_vote'?!meP?.hasVoted:phase==='quest'?game.proposedTeam.includes(me)&&!meP?.hasQuestCard:phase==='assassination'?!!game.hasAssassinationAbility:false;
-  const questTotal=Math.max(game.proposedTeam.length||game.questSize,game.questResult?.fails??0);
-  const questDelay=0.5+(questTotal-1)*0.55+0.9;
-  const late=(s:number)=>({'--late':`${s}s`} as React.CSSProperties);
-  useEffect(()=>{if(myTurn)navigator.vibrate?.(60);},[myTurn,phase,game.round]);
-  useEffect(()=>{setTeam([]);setApprove(null);setQuestCard(null);},[phase,game.round,game.proposedTeam.join(',')]);
+  const historyGame=phase==='quest_result'&&!questDisclosed?{...game,results:game.results.slice(0,-1),roundHistory:game.roundHistory.map(record=>record.round===game.round?{...record,fails:undefined,success:undefined}:record)}:game;
+  useEffect(()=>{if(myTurn&&['team_vote','quest'].includes(phase))navigator.vibrate?.(60);},[myTurn,phase,game.round]);
+  useEffect(()=>{setApprove(null);setQuestCard(null);},[phase,game.round,game.proposedTeam.join(',')]);
 
   return <>
     <header className="game-status" aria-label="현재 원정 현황">
@@ -502,28 +476,18 @@ function Board({game}:{game:ClientGameState}){
         <CrownIcon size={15}/><span>리더 <b>{leaderName}</b></span>
         <div className="reject-track" title="연속 부결 횟수">{Array.from({length:5}).map((_,i)=><i className={i<game.rejectCount?'used':''} key={i}/>)}</div>{game.rejectCount>0&&<small className={`reject-label${game.rejectCount>=4?' danger':''}`}>{game.rejectCount>=4?'한 번 더 부결되면 악의 승리':`부결 ${game.rejectCount}/5`}</small>}
       </div>
-      <RoundHistory game={game} open={openRound} setOpen={setOpenRound}/>
+      <RoundHistory game={historyGame} open={openRound} setOpen={setOpenRound}/>
     </header>
 
-    <main className={`board${phase==='assassination'?' tense':''}`}>
+    <main className="board">
       <PhaseRibbon game={game} turn={myTurn}/>
       <ActiveRoles game={game}/>
 
-      {phase==='team_build'&&<>
-        <h2>원정대 구성 ({game.questSize}명)</h2>
-        <RoundTable
-          leaderId={game.leaderId ?? undefined}
-          players={game.players}
-          center={<div className="selection-core"><FactionSeal team="good" size={38}/><strong>{team.length} <small>/ {game.questSize}</small></strong><span>{leader?'원정대를 지명하세요':leaderPlayer?.isBot?`${leaderName}이(가) 원정대를 고르는 중입니다`:'리더가 원정대를 구성 중입니다'}{!leader&&<Dots/>}</span></div>}
-          renderSeat={p=><button disabled={!leader} className={team.includes(p.id)?'selected':''} onClick={()=>setTeam(team.includes(p.id)?team.filter(x=>x!==p.id):team.length<game.questSize?[...team,p.id]:team)} aria-pressed={team.includes(p.id)}><SeatFace name={p.nickname}/></button>}
-        />
-        {leader&&<div className="selection-summary"><span>선택된 기사</span>{team.length?teamChips(team):<em>아직 선택된 기사가 없습니다</em>}</div>}
-        {leader&&<button className="primary seal-btn" disabled={team.length!==game.questSize} onClick={()=>call('TEAM_PROPOSE',{roomCode:game.roomCode,team})}><ShieldIcon size={16}/> 원정대 제안</button>}
-      </>}
+      {phase==='team_build'&&<TeamScene key={`${game.roomCode}:${game.round}:${game.rejectCount}:${game.leaderId}`} game={game}/>}
 
       {(phase==='team_vote'||phase==='vote_result')&&<VoteStage game={game} approve={approve} setApprove={setApprove}/>}
 
-      {phase==='quest'&&<div className="quest-stage">
+      {(phase==='quest'||phase==='quest_result')&&<QuestScene key={`${game.roomCode}:${game.round}`} game={game} onResolved={setQuestDisclosed}><div className="quest-stage">
         <h2>원정 카드 제출</h2>
         {teamChips(game.proposedTeam)}
         {game.proposedTeam.includes(me)?
@@ -536,54 +500,12 @@ function Board({game}:{game:ClientGameState}){
             </span>
           </div>{ROLE_DEFINITIONS[game.selfRole!].team==='good'&&<p className="quest-rule-note" id="fail-card-disabled-note">선의 세력은 원정 실패를 선택할 수 없습니다.</p>}<div className="quest-actions"><button className="primary seal-btn" disabled={!questCard} onClick={()=>questCard&&call('QUEST_CARD',{roomCode:game.roomCode,card:questCard})}>원정 {questCard==='success'?'성공':'실패'} 선택하기 ({game.questCardsCompleted}/{game.proposedTeam.length})</button></div></>
         :<div className="card-back"><span>원정대가 제출 중</span><Dots/></div>}
-      </div>}
+      </div></QuestScene>}
 
-      {phase==='quest_result'&&<>
-        <QuestReveal total={questTotal} fails={game.questResult?.fails??0}/>
-        <h2 className={`reveal-pop ${game.questResult?.success?'goodtext':'eviltext'}`} style={{animationDelay:`${questDelay}s`}}>{game.questResult?.success?'원정 성공!':'원정 실패'}</h2>
-        <p className="muted late" style={late(questDelay+0.2)}>실패 카드 {game.questResult?.fails}장{game.round===3&&game.maxPlayers>=7?' · 이번 원정은 실패 2장부터 실패':''}</p>
-        <button className="primary late" style={late(questDelay+0.6)} disabled={game.hasContinued} onClick={()=>call('QUEST_RESULT_CONTINUE',{roomCode:game.roomCode})}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button>
-      </>}
-
-      {phase==='assassination'&&<>
-        <h2>마지막 암살의 기회</h2>
-        <RoundTable
-          players={game.players.filter(p=>p.id!==me)}
-          center={<DaggerIcon size={30}/>}
-          renderSeat={p=>game.hasAssassinationAbility?
-            <button className="target" onClick={()=>call('ASSASSIN_TARGET',{roomCode:game.roomCode,targetId:p.id})}><SeatFace name={p.nickname}/></button>
-          :<div className="plate"><SeatFace name={p.nickname}/></div>}
-        />
-        {!game.hasAssassinationAbility&&<p className="waiting">암살 능력 보유자가 멀린을 지목하고 있습니다<Dots/></p>}
-      </>}
+      {phase==='assassination'&&<AssassinScene key={game.roomCode} game={game}/>}
 
     </main>
   </>;
-}
-
-function Result({game}:{game:ClientGameState}){
-  const winners=game.revealedRoles?.filter(item=>ROLE_DEFINITIONS[item.role].team===game.winner)??[];
-  return <section className={`center result-stage ${game.winner??'good'}`}>
-    <div className="rays" aria-hidden="true"/>
-    <div className={`crest ${game.winner==='good'?'goodtext':'eviltext'}`}>{game.winner==='good'?<ShieldIcon size={34}/>:<CrownIcon size={34}/>}</div>
-    <h1 className={game.winner==='good'?'goodtext':'eviltext'}>{game.winner==='good'?'선의 승리':'악의 승리'}</h1>
-    <p>{game.winReason}</p>
-    <div className={`victory-summary ${game.winner==='good'?'good':'evil'}`}><FactionSeal team={game.winner??'good'} size={30}/><span><b>{game.winner==='good'?'선의 세력':'악의 세력'} {winners.length}명 승리</b><small>아래 역할 공개에서 각 기사의 결과를 확인하세요.</small></span></div>
-    <div className="roster">
-      {game.players.map(p=>{
-        const role=game.revealedRoles?.find(x=>x.id===p.id)?.role;
-        const def=role?ROLE_DEFINITIONS[role]:null;
-        const won=!!def&&def.team===game.winner;
-        return <div className={won?`winner ${def?.team}`:'loser'} key={p.id}>
-          {def?<RoleIcon role={role!} team={def.team} size={18}/>:<span/>}
-          <span>{p.nickname}</span>
-          <span className="muted">{def?`${def.name}${game.revealedRoles?.find(x=>x.id===p.id)?.hasAssassinationAbility&&role!=='assassin'?' · 암살 능력':''}`:'—'}</span>
-          <strong className={`result-badge ${won?'won':'lost'}`}>{won?'승리':'패배'}</strong>
-        </div>;
-      })}
-    </div>
-    {game.playerId===game.hostId&&<button className="primary restart-button" onClick={()=>call('GAME_RESTART',{roomCode:game.roomCode})}><ShieldIcon size={17}/> 새 게임 시작</button>}
-  </section>;
 }
 
 function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
@@ -672,7 +594,7 @@ function App(){
         :holdLobby&&lobbySnap.current?<Lobby game={lobbySnap.current} starting/>
         :game.phase==='lobby'?<Lobby game={game}/>
         :game.phase==='role_reveal'?<Role game={game}/>
-        :game.phase==='result'?<Result game={game}/>
+        :game.phase==='result'?<EndingScene key={game.roomCode} game={game}/>
         :<Board game={game}/>} 
     </div>
     {game&&['lobby','team_build','team_vote','vote_result','quest_result'].includes(game.phase)&&<>
