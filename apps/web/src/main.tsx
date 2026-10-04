@@ -1920,7 +1920,7 @@ function ResultTheater({ r, stage, skip }: { r: ResultData; stage: number; skip:
   const executed = r.players.filter((p) => r.executedIds.includes(p.id));
   return (
     <InMain>
-      <div className={`theater s-${stage}${stage >= 5 ? " out" : ""}`}>
+      <div className={`theater s-${stage}${stage >= 5 ? " out" : ""}${endingOf(r) === "wolf" ? " end-wolf" : ""}`}>
         <div className="theater-backdrop" />
         {stage >= 3 && executed[0] && <ImpactFlash faction={ROLE_DEFINITIONS[executed[0].currentRole].faction} />}
         {stage < 5 && (
