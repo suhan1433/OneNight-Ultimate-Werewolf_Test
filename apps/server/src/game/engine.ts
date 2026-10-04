@@ -202,7 +202,10 @@ export function calculateResult(room: Room): GameResult {
   const winners: Faction[] = [];
   if (tannerDied) winners.push('tanner');
   if ((wolves.length > 0 && wolfDied) || (wolves.length === 0 && executed.size === 0)) winners.push('village');
-  if (wolves.length > 0 && !wolfDied && !tannerDied) winners.push('werewolf');
+  // The minion shares a werewolf victory even when they were executed.  A
+  // minion only needs to survive for its separate "no werewolves in play"
+  // victory condition below.
+  if (wolves.length > 0 && !wolfDied && !tannerDied) winners.push('werewolf', 'minion');
   if (wolves.length === 0 && executed.size > 0 && minions.some((p) => !executed.has(p.id))) winners.push('minion');
   return { winners: [...new Set(winners)], executedIds, voteCounts, receivedVoteCounts, votes: room.votes, players: players.map((p) => ({ id: p.id, nickname: p.nickname, originalRole: p.originalRole!, currentRole: p.currentRole! })) };
 }

@@ -28,6 +28,7 @@ describe('voting',()=>{
 describe('victory',()=>{
   it('village wins when a wolf dies',()=>{const r=room([player('a','werewolf'),player('b'),player('c')],{a:'b',b:'a',c:'a'});expect(calculateResult(r).winners).toContain('village')});
   it('wolves win when no wolf dies',()=>{const r=room([player('a','werewolf'),player('b'),player('c')],{a:'b',b:'c',c:'b'});expect(calculateResult(r).winners).toContain('werewolf')});
+  it('an executed minion shares a werewolf victory',()=>{const r=room([player('wolf','werewolf'),player('minion','minion'),player('villager')],{wolf:'minion',minion:'wolf',villager:'minion'});const result=calculateResult(r);expect(result.executedIds).toContain('minion');expect(result.winners).toEqual(expect.arrayContaining(['werewolf','minion']))});
   it('village wins with no wolves and no execution',()=>{const r=room([player('a'),player('b'),player('c')],{a:'b',b:'c',c:'a'});expect(calculateResult(r).winners).toContain('village')});
   it('tanner can share a village win',()=>{const r=room([player('a','werewolf'),player('b','tanner'),player('c'),player('d')],{a:'b',b:'a',c:'a',d:'b'});expect(calculateResult(r).winners).toEqual(expect.arrayContaining(['village','tanner']))});
   it('a cursed player becomes a wolf when voted by one',()=>{const r=room([player('a','werewolf'),player('b','cursed'),player('c')],{a:'b',b:'a',c:'a'});expect(calculateResult(r).players.find(p=>p.id==='b')!.currentRole).toBe('werewolf')});
