@@ -15,7 +15,7 @@
 .cs{--moon:179,220,255;--ember:235,77,102;--tone:var(--moon);position:relative;width:100%;text-align:center;isolation:isolate}
 
 /* ---------- 공용: 라운드 판 · 유리 패널 ---------- */
-.cs-caption{position:relative;z-index:2;margin:14px auto 0;max-width:560px;animation:csPlateIn .95s var(--ease-out) both}
+.cs-caption{position:relative;z-index:6;margin:14px auto 0;max-width:560px;animation:csPlateIn .95s var(--ease-out) both}
 .cs-caption small,.cs-glass>small{display:inline-flex;align-items:center;gap:12px;font:600 11px var(--numeral);letter-spacing:.28em;text-indent:.28em;color:var(--brass)}
 .cs-caption small:before,.cs-caption small:after{content:'';width:34px;height:1px;background:linear-gradient(90deg,transparent,var(--brass))}
 .cs-caption small:after{transform:scaleX(-1)}
@@ -161,16 +161,6 @@
 :root[data-cs-still] .ambient,:root[data-cs-still] .ambient *,:root[data-cs-still] .ambient:before,:root[data-cs-still] .ambient:after{animation-play-state:paused!important}
 .cs-quest.is-still .cs-flame .fl,.cs-quest.is-still .cs-flame b,.cs-quest.is-still .cs-altar-seal{animation-play-state:paused}
 
-.cs-altar-crack{position:absolute;inset:0;z-index:3;width:100%;height:100%;pointer-events:none;color:#e9667d;overflow:visible}
-.cs-altar-crack path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1}
-.cs-altar-crack path.glow{stroke-width:7;opacity:.4;filter:blur(5px)}
-.cs-quest.has-fail .cs-altar-crack path{animation:csDraw 1.1s ease var(--result-at) forwards}
-.cs-beam{position:absolute;left:16%;right:16%;top:-70%;bottom:30%;z-index:3;pointer-events:none;mix-blend-mode:screen;filter:blur(8px);transform:scaleY(0);transform-origin:50% 100%;
-  background:linear-gradient(0deg,rgba(var(--moon),.85),rgba(var(--moon),.35) 55%,transparent);clip-path:polygon(34% 100%,6% 0,94% 0,66% 100%)}
-.cs-quest.flawless .cs-beam{animation:csBeam 1.5s cubic-bezier(.2,.7,.2,1) var(--result-at) forwards}
-.cs-bloom{position:absolute;left:50%;top:50%;width:70%;aspect-ratio:1;translate:-50% -50%;border-radius:50%;z-index:3;pointer-events:none;mix-blend-mode:screen;opacity:0;
-  background:radial-gradient(circle closest-side,rgba(var(--moon),.75),rgba(var(--moon),.2) 50%,transparent 72%)}
-.cs-quest.flawless .cs-bloom{animation:csBloom 1.8s ease-out var(--result-at) forwards}
 .cs-quest.flawless.is-reveal .cs-qcard{animation:csShuffle 1.2s ease 1s forwards,csQuestStrike .5s ease var(--flip-at) forwards,csFuse .9s ease-in var(--result-at) forwards}
 .cs-field{position:absolute;pointer-events:none;z-index:5}
 .cs-quest .cs-field{left:0;width:100%;top:-45%;height:145%}
@@ -304,13 +294,6 @@
 .evil .cs-flame.end.last .cs-smoke{display:none}
 .cs-ending-sigil{position:absolute;left:34%;top:34%;width:32%;height:32%;display:grid;place-items:center;color:rgba(var(--tone),.55);filter:drop-shadow(0 0 14px rgba(var(--tone),.4))}
 .evil .cs-ending-sigil{animation:csSigilDie 1.5s ease calc(var(--ending-offset) + 1.5s) both}
-.cs-ending-cracks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
-.cs-ending-cracks path{fill:none;stroke:#f86085;stroke-width:1.6;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;filter:drop-shadow(0 0 5px #ff597d)}
-.cs-ending-cracks path.glow{stroke-width:8;opacity:.45;filter:blur(5px)}
-.good .cs-ending-cracks{display:none}
-.evil .cs-ending-cracks path{animation:csDraw 1.5s ease calc(var(--ending-offset) + 1.5s) forwards}
-.cs-ending-leak{position:absolute;left:12%;top:12%;width:76%;height:76%;border-radius:50%;opacity:0;mix-blend-mode:screen;pointer-events:none;background:radial-gradient(circle closest-side,rgba(255,60,100,.5),rgba(200,30,70,.16) 50%,transparent 74%)}
-.evil .cs-ending-leak{animation:csLeak 3.2s ease calc(var(--ending-offset) + 2.2s) both,csLeakPulse 4.5s ease-in-out calc(var(--ending-offset) + 5.4s) infinite}
 .cs-ending-ray{position:absolute;inset:-18%;border-radius:50%;background:radial-gradient(circle,rgba(var(--tone),.26),transparent 62%);transform:scale(.6);opacity:0}
 .good .cs-ending-ray{animation:csLightFill 3s ease var(--ending-offset) both}
 .evil .cs-ending-ray{background:radial-gradient(circle,rgba(137,27,52,.2),transparent 62%);opacity:.7;transform:none}
@@ -367,6 +350,107 @@
 .cs-chronicle b.fail{color:rgb(var(--ember));box-shadow:0 0 0 1.5px #e0566f,0 0 0 4px #0b1418,0 0 0 5px rgba(224,86,111,.3),0 0 18px rgba(var(--ember),.4),inset 0 1px 1px rgba(255,255,255,.25)}
 .cs-chronicle span{color:var(--parchment);font-size:12.5px}.cs-chronicle small{color:#94a6a5}.cs-chronicle em{font-style:normal;color:var(--brass-hi)}
 
+
+/* =========================================================
+   결과 연출 재설계 — 6. 원정 성공(빛) / 실패(균열) · 8. 엔딩(빛 / 균열)
+   균열은 선 한 줄이 아니라 3겹: 틈(어둠) · 열(붉은 용융, 블러) · 심(백열). 틈이 벌어지며 안에서 빛이 샌다.
+   빛은 각진 면이 아니라 3겹 기둥: 넓은 후광 · 몸통 · 백열 심. 가장자리는 전부 부드럽게 사라진다.
+   ========================================================= */
+.cs-fissure{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.cs-fissure path{fill:none;stroke-linejoin:miter;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1}
+.cs-fissure .heat path{stroke:#ff4a5e;stroke-width:7;filter:blur(3.5px)}
+.cs-fissure .gap path{stroke:#03060a;stroke-width:3.2}
+.cs-fissure .core path{stroke:#ffd4b4;stroke-width:.9;filter:drop-shadow(0 0 2px #ff7a6a)}
+.cs-fissure.altar{z-index:1}
+.cs-fissure.ending{z-index:2}
+.good .cs-fissure.ending{display:none}
+.cs-fissure .heat{animation:csHeat 3.2s ease-in-out calc(var(--result-at,0s) + 1.4s) infinite}
+.cs-quest.has-fail .cs-fissure path{animation:csCrackDraw 1.1s cubic-bezier(.3,.6,.2,1) calc(var(--result-at) + var(--bi)*.14s) forwards}
+.cs-quest.has-fail .cs-fissure .gap path{animation:csCrackDraw 1.1s cubic-bezier(.3,.6,.2,1) calc(var(--result-at) + var(--bi)*.14s) forwards,csGapOpen 1.8s ease calc(var(--result-at) + var(--bi)*.14s) forwards}
+.cs-quest.flawless .cs-fissure{display:none}
+.evil .cs-fissure.ending .heat path{stroke-width:15;filter:blur(7px)}
+.evil .cs-fissure.ending .gap path{stroke-width:5}
+.evil .cs-fissure.ending .core path{stroke-width:1.7;filter:drop-shadow(0 0 4px #ff6a6a)}
+.evil .cs-fissure.ending .heat{animation:csHeat 3.4s ease-in-out calc(var(--ending-offset) + 3.3s) infinite}
+.evil .cs-fissure.ending path{animation:csCrackDraw 1.5s cubic-bezier(.3,.6,.2,1) calc(var(--ending-offset) + 1.5s + var(--bi)*.18s) forwards}
+.evil .cs-fissure.ending .gap path{animation:csCrackDraw 1.5s cubic-bezier(.3,.6,.2,1) calc(var(--ending-offset) + 1.5s + var(--bi)*.18s) forwards,csGapOpen 2.6s ease calc(var(--ending-offset) + 1.5s + var(--bi)*.18s) forwards}
+
+/* 6. 실패: 제단이 크게 한 번 흔들리고, 틈에서 붉은 빛이 새고, 촛불이 하나씩 꺼지고, 성공 카드는 가라앉는다 */
+.cs-leak{position:absolute;inset:6%;z-index:1;border-radius:50%;pointer-events:none;mix-blend-mode:screen;opacity:0;background:radial-gradient(ellipse at 50% 52%,rgba(255,72,96,.78),rgba(220,40,70,.3) 45%,transparent 74%)}
+.cs-quest.has-fail .cs-leak{animation:csLeakIn 1.8s ease calc(var(--result-at) + .3s) forwards,csLeakPulse 3.6s ease-in-out calc(var(--result-at) + 2.1s) infinite}
+.cs-quest.has-fail.is-resolved .cs-flame.lamp .fl{animation:csExtinguish .55s ease calc(.15s + var(--lk)*.28s) forwards}
+.cs-quest.has-fail.is-resolved .cs-flame.lamp b{animation:csGlowOut .7s ease calc(.15s + var(--lk)*.28s) forwards}
+.cs-quest.has-fail.is-resolved .cs-flame.lamp .cs-smoke i{animation:csSmoke 1.7s ease-out calc(.35s + var(--lk)*.28s + var(--k)*.16s) both}
+.cs-qcard{transition:filter .9s ease}
+.cs-quest.has-fail.is-resolved .cs-qcard.success{filter:brightness(.55) saturate(.55)}
+.cs-quest.has-fail.is-resolved .cs-qcard.fail{filter:brightness(1.08) drop-shadow(0 0 16px rgba(255,74,106,.85))}
+
+/* 6. 성공: 카드가 한 점으로 융합 → 구체가 점화 → 충격 고리가 제단 위로 번지고 → 부드러운 빛기둥이 솟는다 */
+.cs-orb{position:absolute;left:50%;top:52%;width:22%;aspect-ratio:1;translate:-50% -50%;border-radius:50%;z-index:3;pointer-events:none;mix-blend-mode:screen;opacity:0;
+  background:radial-gradient(circle closest-side,#fff 0,rgba(225,242,255,.95) 28%,rgba(var(--moon),.5) 55%,transparent 75%)}
+.cs-quest.flawless .cs-orb{animation:csOrb 2.2s ease calc(var(--result-at) + .55s) forwards}
+.cs-ring{position:absolute;left:50%;top:52%;width:28%;aspect-ratio:1.5;translate:-50% -50%;border-radius:50%;z-index:3;pointer-events:none;opacity:0;
+  border:1.5px solid rgba(var(--moon),.85);box-shadow:0 0 18px rgba(var(--moon),.55),inset 0 0 18px rgba(var(--moon),.22)}
+.cs-quest.flawless .cs-ring{animation:csRingOut 2s cubic-bezier(.2,.6,.3,1) calc(var(--result-at) + .75s) forwards}
+.cs-quest.flawless .cs-ring.r2{animation-delay:calc(var(--result-at) + .98s)}
+.cs-quest.flawless .cs-ring.r3{animation-delay:calc(var(--result-at) + 1.2s)}
+.cs-beam{position:absolute;left:50%;bottom:48%;width:46%;height:140%;translate:-50% 0;z-index:4;pointer-events:none;mix-blend-mode:screen;transform-origin:50% 100%;transform:scaleY(0);opacity:0}
+.cs-beam i{position:absolute;top:0;bottom:0;-webkit-mask-image:linear-gradient(0deg,#000 14%,rgba(0,0,0,.5) 50%,transparent 82%);mask-image:linear-gradient(0deg,#000 14%,rgba(0,0,0,.5) 50%,transparent 82%)}
+.cs-beam .halo{left:0;right:0;background:linear-gradient(90deg,transparent,rgba(var(--moon),.26) 30%,rgba(var(--moon),.4) 50%,rgba(var(--moon),.26) 70%,transparent);filter:blur(14px)}
+.cs-beam .col{left:28%;right:28%;background:linear-gradient(90deg,transparent,rgba(225,242,255,.7) 50%,transparent);filter:blur(5px)}
+.cs-beam .core{left:44%;right:44%;background:linear-gradient(90deg,transparent,#fff 50%,transparent);filter:blur(1.2px)}
+.cs-quest.flawless .cs-beam{animation:csBeam 1.6s cubic-bezier(.2,.7,.2,1) calc(var(--result-at) + .6s) forwards}
+.cs-bloom{position:absolute;left:50%;top:52%;width:100%;aspect-ratio:1.5;translate:-50% -50%;border-radius:50%;z-index:3;pointer-events:none;mix-blend-mode:screen;opacity:0;
+  background:radial-gradient(ellipse closest-side,rgba(var(--moon),.6),rgba(var(--moon),.16) 55%,transparent 78%)}
+.cs-quest.flawless .cs-bloom{animation:csBloom 2.4s ease calc(var(--result-at) + .7s) forwards}
+.cs-quest.flawless .cs-altar-face{animation:csRimLit 2s ease calc(var(--result-at) + .6s) forwards}
+.cs-quest.flawless.is-resolved .cs-altar-glow{background:radial-gradient(ellipse,rgba(var(--moon),.4),transparent 68%)}
+.cs-flame.lamp.lit .fl{filter:hue-rotate(0deg) saturate(1) brightness(1) drop-shadow(0 0 6px rgba(255,190,100,.95));transition:scale .45s var(--ease-spring),filter 1.4s ease .5s}
+.cs-quest.flawless.is-resolved .cs-flame.lamp.lit .fl{filter:hue-rotate(190deg) saturate(1.5) brightness(1.4) drop-shadow(0 0 10px #9ecfff)}
+
+/* 8. 엔딩 · 선: 촛불이 켜지는 순간 충격 고리, 후광 광선이 천천히 돌고, 타이틀에 맞춰 빛기둥이 솟는다 */
+.cs-ending-shock{position:absolute;left:12%;top:12%;width:76%;height:76%;border-radius:50%;border:2px solid rgba(var(--tone),.85);opacity:0;pointer-events:none;box-shadow:0 0 30px rgba(var(--tone),.5)}
+.good .cs-ending-shock{animation:csTableShock 1.7s ease-out calc(var(--ending-offset) + .2s) forwards}
+.evil .cs-ending-shock{animation:csTableShock 1.3s ease-out calc(var(--ending-offset) + 1.5s) forwards}
+.cs-ending-rays{position:absolute;left:-30%;top:-30%;width:160%;height:160%;z-index:-1;border-radius:50%;pointer-events:none;mix-blend-mode:screen;opacity:0;
+  background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(var(--tone),.2) 0 3deg,transparent 3deg 15deg);-webkit-mask-image:radial-gradient(circle,#000 6%,transparent 58%);mask-image:radial-gradient(circle,#000 6%,transparent 58%)}
+.good .cs-ending-rays{animation:csRaysIn 3s ease calc(var(--ending-offset) + .3s) forwards,csRaysSpin 90s linear calc(var(--ending-offset) + .3s) infinite}
+.evil .cs-ending-rays{display:none}
+.cs-ending-pillar{position:absolute;left:50%;bottom:44%;width:34%;height:110%;translate:-50% 0;z-index:0;pointer-events:none;mix-blend-mode:screen;transform-origin:50% 100%;transform:scaleY(0);opacity:0}
+.cs-ending-pillar i{position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(210,232,255,.3) 35%,rgba(240,248,255,.5) 50%,rgba(210,232,255,.3) 65%,transparent);filter:blur(10px);
+  -webkit-mask-image:linear-gradient(0deg,#000 8%,transparent 100%);mask-image:linear-gradient(0deg,#000 8%,transparent 100%)}
+.good .cs-ending-pillar{animation:csPillar 2.4s cubic-bezier(.2,.7,.2,1) calc(var(--ending-offset) + 2s) forwards}
+.evil .cs-ending-pillar{display:none}
+.good .cs-ending-sigil{animation:csSigilGlow 4.2s ease-in-out calc(var(--ending-offset) + 3s) infinite}
+
+/* 8. 엔딩 · 악: 틈이 벌어지며 안에서 붉은 빛이 새고, 파편이 튀고, 가장자리가 어두워진다 */
+.cs-ending-leak{position:absolute;left:8%;top:8%;width:84%;height:84%;border-radius:50%;opacity:0;mix-blend-mode:screen;pointer-events:none;background:radial-gradient(circle closest-side,rgba(255,64,100,.62),rgba(210,34,74,.22) 50%,transparent 76%)}
+.evil .cs-ending-leak{animation:csLeak 3.2s ease calc(var(--ending-offset) + 2.1s) both,csLeakPulse 4.5s ease-in-out calc(var(--ending-offset) + 5.4s) infinite}
+.cs-debris-field{position:absolute;inset:0;pointer-events:none;z-index:4}
+.cs-debris{position:absolute;left:var(--x);top:50%;width:var(--s);height:var(--s);background:#2a1a14;border:1px solid #8a2a34;box-shadow:0 0 6px #ff4a5e;opacity:0;rotate:30deg}
+.evil .cs-debris{animation:csDebris 2.2s cubic-bezier(.2,.7,.3,1) calc(var(--ending-offset) + 2.2s + var(--dl)) forwards}
+.evil .cs-ending-world:after{content:'';position:absolute;inset:-22%;pointer-events:none;background:radial-gradient(circle closest-side,transparent 52%,rgba(2,3,6,.6) 80%,transparent 100%);opacity:0;animation:csFadeUp 3s ease calc(var(--ending-offset) + 1.5s) forwards}
+.evil .cs-ending-seat.evil.winner .cs-avatar{background:radial-gradient(circle at 32% 24%,#9a3858,#2a0d1a 74%);color:#ffd6df}
+
+/* ---------- 키프레임 (결과 연출) ---------- */
+@keyframes csCrackDraw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes csGapOpen{from{stroke-width:.8}}
+@keyframes csHeat{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes csLeakIn{from{opacity:0;scale:.5}to{opacity:.75;scale:1}}
+@keyframes csQuakeBig{0%,100%{transform:none}10%{transform:translate(-9px,5px) rotate(-.4deg)}24%{transform:translate(8px,-5px) rotate(.4deg)}40%{transform:translate(-6px,4px)}58%{transform:translate(4px,-3px)}78%{transform:translate(-2px,1px)}}
+@keyframes csOrb{0%{opacity:0;scale:.2}22%{opacity:1;scale:1.25}60%{opacity:.9;scale:.9}100%{opacity:.5;scale:1}}
+@keyframes csRingOut{0%{opacity:.9;scale:.3}100%{opacity:0;scale:3.6}}
+@keyframes csBeam{0%{transform:scaleY(0);opacity:1}100%{transform:scaleY(1);opacity:.85}}
+@keyframes csFuse{0%{filter:brightness(1)}60%{filter:brightness(1.7)}100%{transform:translateX(0) rotate(0) scale(.2);filter:brightness(3.2);opacity:0}}
+@keyframes csRimLit{from{filter:brightness(1) drop-shadow(0 30px 24px rgba(0,0,0,.6))}to{filter:brightness(1.28) drop-shadow(0 0 26px rgba(var(--moon),.45)) drop-shadow(0 30px 24px rgba(0,0,0,.5))}}
+@keyframes csTableShock{0%{opacity:.9;scale:.3}100%{opacity:0;scale:1.55}}
+@keyframes csRaysIn{from{opacity:0}to{opacity:.85}}
+@keyframes csRaysSpin{to{rotate:360deg}}
+@keyframes csPillar{0%{transform:scaleY(0);opacity:1}100%{transform:scaleY(1);opacity:.55}}
+@keyframes csSigilGlow{0%,100%{filter:drop-shadow(0 0 10px rgba(var(--tone),.35))}50%{filter:drop-shadow(0 0 22px rgba(var(--tone),.8))}}
+@keyframes csLeak{from{opacity:0;scale:.4}to{opacity:.85;scale:1}}
+@keyframes csDebris{0%{opacity:0;transform:translate(0,0)}10%{opacity:1}55%{opacity:1;transform:translate(calc(var(--dx)*.6),calc(var(--h)*-1))}100%{opacity:0;transform:translate(var(--dx),calc(var(--h)*-.3)) rotate(240deg)}}
+
 /* ---------- 키프레임 ---------- */
 @keyframes csPlateIn{from{transform:translateX(-46px);clip-path:inset(0 100% 0 0)}to{transform:none;clip-path:inset(0)}}
 @keyframes csApproach{from{transform:translateY(25px) scale(.94)}to{transform:none}}
@@ -402,9 +486,7 @@
 @keyframes csQOpen{from{--cdk:.95;--chl:min(62vmin,400px)}to{--cdk:.4;--chl:120vmax}}
 @keyframes csQClose{from{--cdk:.95;--chl:min(62vmin,400px)}to{--cdk:.97;--chl:min(40vmin,260px)}}
 @keyframes csQReturn{to{--cdk:0;--chl:150vmax}}
-@keyframes csBeam{from{transform:scaleY(0);opacity:1}60%{opacity:1}to{transform:scaleY(1);opacity:.55}}
 @keyframes csBloom{0%{opacity:0;scale:.3}25%{opacity:1}100%{opacity:.35;scale:1.5}}
-@keyframes csFuse{to{transform:translateX(0) rotate(0) scale(.25);filter:brightness(2.6);opacity:0}}
 @keyframes csPanelRise{from{transform:translateY(38px) rotateX(8deg);clip-path:inset(100% 0 0)}to{transform:none;clip-path:inset(-60px -10px -10px)}}
 @keyframes csStamp{0%{transform:scale(1.7);filter:blur(4px)}60%{transform:scale(.96);filter:none}100%{transform:none;filter:none}}
 @keyframes csSlotStamp{0%{opacity:0;transform:scale(1.5);filter:blur(4px) brightness(2)}30%{opacity:1}60%{transform:scale(.94)}100%{transform:none;filter:none}}
@@ -450,7 +532,6 @@
 @keyframes csLastEmber{0%{transform:scaleY(1);filter:drop-shadow(0 0 9px #ffd188)}40%{transform:scaleY(1.5)}100%{transform:scaleY(1.25);filter:drop-shadow(0 0 18px #ff4675) hue-rotate(-34deg) saturate(1.9) brightness(1.1)}}
 @keyframes csSmoke{0%{opacity:0;transform:translate(0,0) scaleY(.3)}25%{opacity:.8}100%{opacity:0;transform:translate(calc((var(--k) - 1)*8px),-46px) scaleY(1.8) rotate(calc((var(--k) - 1)*14deg))}}
 @keyframes csSigilDie{to{color:rgba(235,77,102,.25);filter:drop-shadow(0 0 12px rgba(235,77,102,.5))}}
-@keyframes csLeak{from{opacity:0;scale:.4}to{opacity:.6;scale:1}}
 @keyframes csLeakPulse{0%,100%{opacity:.6}50%{opacity:.9}}
 @keyframes csLightFill{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1.1)}}
 @keyframes csHalo{0%{opacity:0;transform:scale(.55)}22%{opacity:1;transform:scale(1)}100%{opacity:.6;transform:scale(1.06)}}

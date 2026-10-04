@@ -214,6 +214,9 @@ main.board.tense>*{position:relative;z-index:1}
 .qcard:before{border-radius:10px}
 .round-history-item>button{border-radius:10px}
 .role-chip.chosen:after{color:#ffe0a0}
+.role-dossier{max-height:calc(100dvh - 86px);overflow-y:auto}
+.role-dossier .active-roles{width:auto;margin:14px 0 0;padding:11px;align-items:flex-start}
+.role-dossier .active-roles>b{width:100%;margin:0}
 
 @media(max-width:500px){
   .app{align-items:center;justify-content:flex-start;padding:72px 16px calc(120px + env(safe-area-inset-bottom))}

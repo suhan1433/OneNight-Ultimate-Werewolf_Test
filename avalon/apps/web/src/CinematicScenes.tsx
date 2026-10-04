@@ -68,6 +68,15 @@ function RoundTable(){
     <circle cx="200" cy="200" r="58" fill="none" stroke="url(#cs-t-brass)" strokeWidth=".5" opacity=".55"/>
   </svg>;
 }
+/** 균열: 틈(어둠) · 열(붉은 용융) · 심(백열) 3겹. 가는 선 하나가 아니라 '갈라져서 안에서 빛이 새는' 깊이를 만든다 */
+function Fissure({paths,className=''}:{paths:string[];className?:string}){
+  return <svg className={`cs-fissure ${className}`} viewBox={className.includes('altar')?'0 0 300 200':'0 0 400 400'} aria-hidden="true">
+    {(['heat','gap','core'] as const).map(layer=><g className={layer} key={layer}>{paths.map((d,i)=><path key={i} d={d} pathLength="1" className={i?'br':'main'} style={vars({'--bi':i})}/>)}</g>)}
+  </svg>;
+}
+const ALTAR_CRACK=['M14 112 L44 103 L64 115 L90 97 L108 109 L131 90 L150 101 L171 86 L190 98 L213 83 L238 98 L256 89 L286 101','M131 90 L125 71 L136 55 L129 38','M190 98 L198 121 L187 139 L196 160 L189 178','M90 97 L82 122 L90 141','M238 98 L248 117 L241 134','M213 83 L219 63 L212 47'];
+const END_CRACK=['M58 232 L104 214 L132 236 L170 196 L196 214 L226 184 L254 210 L290 196 L342 226','M170 196 L162 150 L186 118 L176 78','M254 210 L270 252 L252 290 L268 330','M132 236 L118 272 L132 306 L124 338','M226 184 L232 140 L216 108','M104 214 L84 188 L88 160'];
+const DEBRIS=Array.from({length:14},(_,i)=>({x:22+((i*47)%56),dx:((i*29)%70)-35,h:46+((i*37)%70),s:3+(i%3),d:(i%7)*.09}));
 function Avatar({name}:{name:string}){return <span className="cs-avatar">{[...name][0]}</span>;}
 
 /* =========================================================
@@ -165,9 +174,9 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
   return <section ref={root} className={`cs cs-quest${reveal?' is-reveal':''}${resolved?' is-resolved':''}${fails?' has-fail':' flawless'}${game.questResult?.success?' quest-success':' quest-failure'}${clock.final?' cs-final':''}${still?' is-still':''}`} style={vars({'--result-at':`${resultAt}s`,'--after-at':`${end-.5}s`,'--count':total})}>
     <div className="cs-spot" aria-hidden="true"/>
     <SceneCaption eyebrow={`QUEST ${game.round+1} · THE ALTAR`} title={reveal?'원정의 진실':'중앙 제단에 카드를 봉인합니다'} body={reveal?'카드를 섞어 한 장씩 공개합니다. 누가 제출했는지는 공개되지 않습니다.':`봉인된 카드 ${count} / ${total}장 · 원정대원만 카드를 제출할 수 있습니다.`}/>
-    <div className="cs-altar-camera"><div className="cs-altar-quake" style={reveal?anim('csQuake',.5,.08):undefined}><div className="cs-altar" ref={altar}>
+    <div className="cs-altar-camera"><div className="cs-altar-quake" style={reveal&&failTimes.length?{animation:[...failTimes.map(x=>`csQuake .5s ease ${(x+.08).toFixed(2)}s both`),`csQuakeBig .9s ease ${resultAt.toFixed(2)}s both`].join(',')}:undefined}><div className="cs-altar" ref={altar}>
       <AltarFace/><div className="cs-altar-glow"/><div className="cs-altar-seal"><Sigil size={150}/></div>
-      {[15,50,85].map((left,k)=><Flame key={left} x={left} y={k===1?25:30} s={1.35} cls="lamp" style={reveal?anim('csLampDip',1.1,.04):undefined}/>)}
+      {[15,50,85].map((left,k)=><Flame key={left} x={left} y={k===1?25:30} s={1.35} cls="lamp" style={{...vars({'--lk':k}),...(reveal?anim('csLampDip',1.1,.04):{})}}>{fails>0&&<Smoke/>}</Flame>)}
       <div className="cs-failflash" style={reveal?anim('csFailLight',.8,0):undefined} aria-hidden="true"/>
       <div className="cs-quest-cards" aria-hidden="true">{Array.from({length:count},(_,index)=><div className={`cs-qcard${reveal&&order[index]?' fail':' success'}${index<revealed?' turned':''}`} style={vars({'--i':index,'--slot':index-(total-1)/2,'--pile-x':`${((index*23)%43)-21}px`,'--pile-y':`${((index*11)%31)-15}px`,'--rotation':`${index*29-30}deg`,'--flip-at':`${strike+index*gap}s`})} key={index}>
         <i className="cs-card-land"/>
@@ -178,7 +187,7 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
         <i className="cs-card-burst"/><i className="cs-card-shock"/>
         {reveal&&(order[index]?<span className="cs-sparks">{Array.from({length:9},(_,k)=><b key={k} style={vars({'--a':`${k*40+((index*17)%25)}deg`,'--d':`${46+((k*29+index*13)%34)}px`})}/>)}</span>:<i className="cs-card-flare"/>)}
       </div>)}</div>
-      {reveal&&<><div className="cs-beam"/><i className="cs-bloom"/><svg className="cs-altar-crack" viewBox="0 0 400 300" aria-hidden="true"><path className="glow" d="M0 171 78 143 113 161 161 113 186 141 226 128 249 162 302 140 340 165 400 147M161 113 157 67 191 34M249 162 270 223 247 268" pathLength="1"/><path d="M0 171 78 143 113 161 161 113 186 141 226 128 249 162 302 140 340 165 400 147M161 113 157 67 191 34M249 162 270 223 247 268" pathLength="1"/></svg>
+      {reveal&&<><div className="cs-leak"/><Fissure className="altar" paths={ALTAR_CRACK}/><div className="cs-orb"/><i className="cs-ring"/><i className="cs-ring r2"/><i className="cs-ring r3"/><div className="cs-beam"><i className="halo"/><i className="col"/><i className="core"/></div><i className="cs-bloom"/>
         {!clock.final&&<Field mode={fails?'ember':'moon'} delay={resultAt}/>}</>}
     </div></div></div>
     {reveal?<>
@@ -279,11 +288,11 @@ export function EndingScene({game}:{game:ClientGameState}){
       <i className="cs-impact-flash"/>
     </div>}
     <div className="cs-ending-world" aria-hidden="true">
-      <div className="cs-ending-ray"/>
+      <div className="cs-ending-ray"/><div className="cs-ending-rays"/><div className="cs-ending-pillar"><i/></div>
       <div className="cs-ending-camera"><div className="cs-ending-table">
         <RoundTable/>
-        <svg viewBox="0 0 400 400" className="cs-ending-cracks"><path className="glow" pathLength="1" d="m72 226 52-18 24-30 38 24 30-38 36 32 44-16 34 30M196 200l-18 52 12 46M214 164l-8-46 18-42"/><path pathLength="1" d="m72 226 52-18 24-30 38 24 30-38 36 32 44-16 34 30M196 200l-18 52 12 46M214 164l-8-46 18-42"/></svg>
-        <i className="cs-ending-leak"/>
+        <i className="cs-ending-shock"/><Fissure className="ending" paths={END_CRACK}/>
+        <i className="cs-ending-leak"/>{!good&&<div className="cs-debris-field">{DEBRIS.map((d,i)=><b key={i} className="cs-debris" style={vars({'--x':`${d.x}%`,'--dx':`${d.dx}px`,'--h':`${d.h}px`,'--s':`${d.s}px`,'--dl':`${d.d}s`})}/>)}</div>}
         <div className="cs-ending-sigil"><Sigil kind={good?'good':'evil'} size={86}/></div>
         {game.players.map((player,i)=>{const p=position(i,n,CANDLE_R);return <Flame key={`f-${player.id}`} x={p.x} y={p.y} s={good?1.3:1.1} cls={`end${!good&&snuff.rank[i]===n-1?' last':''}`} style={vars({'--i':snuff.rank[i]!})}>{!good&&<Smoke/>}</Flame>;})}
         {game.players.map((player,i)=>{const p=position(i,n);const team=teamOf(player.id);return <div className={`cs-ending-seat ${team??'good'}${team===game.winner?' winner':''}`} style={vars({left:`${p.x}%`,top:`${p.y}%`,'--i':snuff.rank[i]!})} key={`s-${player.id}`}><Avatar name={player.nickname}/></div>;})}

@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import ReactDOM from 'react-dom/client';
 import {ROLE_DEFINITIONS,type AvalonOptions,type ClientGameState,type DelegableAssassinRole} from '@werewolf/shared';
 import {useGame} from './store';
@@ -489,7 +489,6 @@ function Board({game}:{game:ClientGameState}){
 
     <main className="board">
       <PhaseRibbon game={game} turn={myTurn}/>
-      <ActiveRoles game={game}/>
 
       {phase==='team_build'&&<TeamScene key={`${game.roomCode}:${game.round}:${game.rejectCount}:${game.leaderId}`} game={game}/>}
 
@@ -550,7 +549,7 @@ function HelpModal({close}:{close:()=>void}){
 
 function RoleDossier({game,close}:{game:ClientGameState;close:()=>void}){
   const role=game.selfRole!;const def=ROLE_DEFINITIONS[role];
-  return <aside className={`role-dossier ${def.team}`} aria-label="내 역할 정보"><button className="dossier-close" onClick={close} aria-label="내 역할 닫기">×</button><FactionSeal team={def.team} size={34}/><small>내 비밀 역할</small><h3>{def.name}</h3><p>{def.description}</p>{game.hasAssassinationAbility&&role!=='assassin'&&<p className="ability-note"><DaggerIcon size={15}/> 암살 능력 보유: 선이 원정 3회에 성공하면 멀린을 지목할 수 있습니다.</p>}<div className="dossier-intel"><b>능력 · 확인한 정보</b>{game.roleIntel.length?<ul>{game.roleIntel.map(item=><li key={item}>{item}</li>)}</ul>:<p>확인할 추가 정보가 없습니다.</p>}</div></aside>;
+  return <aside className={`role-dossier ${def.team}`} aria-label="내 역할 정보"><button className="dossier-close" onClick={close} aria-label="내 역할 닫기">×</button><FactionSeal team={def.team} size={34}/><small>내 비밀 역할</small><h3>{def.name}</h3><p>{def.description}</p>{game.hasAssassinationAbility&&role!=='assassin'&&<p className="ability-note"><DaggerIcon size={15}/> 암살 능력 보유: 선이 원정 3회에 성공하면 멀린을 지목할 수 있습니다.</p>}<div className="dossier-intel"><b>능력 · 확인한 정보</b>{game.roleIntel.length?<ul>{game.roleIntel.map(item=><li key={item}>{item}</li>)}</ul>:<p>확인할 추가 정보가 없습니다.</p>}</div><ActiveRoles game={game}/></aside>;
 }
 
 function App(){
@@ -558,6 +557,13 @@ function App(){
   const[chatOpen,setChatOpen]=useState(false);
   const[helpOpen,setHelpOpen]=useState(false);
   const[dossierOpen,setDossierOpen]=useState(false);
+  useLayoutEffect(()=>{
+    if(!game||!['lobby','result'].includes(game.phase))return;
+    const scrollTop=()=>window.scrollTo(0,0);
+    scrollTop();
+    const frame=requestAnimationFrame(scrollTop);
+    return()=>cancelAnimationFrame(frame);
+  },[game?.phase,game?.roomCode]);
   useEffect(()=>{if(!error)return;const timer=window.setTimeout(()=>setError(null),4000);return()=>window.clearTimeout(timer);},[error,setError]);
   useEffect(()=>{const root=document.documentElement;const move=(e:PointerEvent)=>{root.style.setProperty('--mx',`${e.clientX}px`);root.style.setProperty('--my',`${e.clientY}px`);};window.addEventListener('pointermove',move,{passive:true});return()=>window.removeEventListener('pointermove',move);},[]);
   const[confirmLeave,setConfirmLeave]=useState(false);
