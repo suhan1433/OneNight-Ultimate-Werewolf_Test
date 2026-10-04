@@ -16,7 +16,7 @@ import {TeamScene,QuestScene,AssassinScene,EndingScene} from './CinematicScenes'
 import {GateIntro,Table,useGateIntro} from './GateIntro';
 import {RV,findMates,useHold} from './RoleScene';
 import {LOBBY_TL,LobbyBackdrop,LobbyGlow,RoomCode,StartCurtain,shakeVars,useRoster,type GlowHandle} from './LobbyScene';
-import {buildPlan,coinStyle,tintOf,useNewCoins,useReducedMotion,useRevealEffects,useTableMetrics,type Plan} from './VoteScene';
+import {buildPlan,coinStyle,readVotes,tintOf,useNewCoins,useReducedMotion,useRevealEffects,useTableMetrics,type Plan} from './VoteScene';
 
 const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false,revealVoteIdentities:true};
 const ROLE_OPTION_KEYS=['assassin','percival','morgana','mordred','oberon'] as const;
@@ -398,7 +398,14 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
   const totals=game.voteResult;
   const voteCount=isResult?(totals?.approve??0)+(totals?.reject??0):game.teamVotesCompleted;
   const seed=`${game.roomCode}|${game.round}|${[...game.proposedTeam].sort().join(',')}`;
-  const plan=useMemo<Plan|null>(()=>isResult&&totals?buildPlan(totals.approve,totals.reject,seed):null,[isResult,totals?.approve,totals?.reject,seed]);
+  const seatCount=game.players.length;
+  const leaderIndex=game.players.findIndex(player=>player.id===game.leaderId);
+  /* 방 옵션 '투표자 공개'가 켜져 있으면 자기 앞 코인 = 자기 선택(identity), 아니면 중앙에서 섞어 나눠 놓는다(shuffled).
+     옵션이 켜졌어도 서버가 개인별 표를 주지 않으면 shuffled 로 대체된다. voteKey 는 문자열이라 갱신돼도 연출이 다시 시작되지 않는다. */
+  const placement:'seat'|'pile'=game.options?.revealVoteIdentities?'seat':'pile';
+  const voteKey=isResult?(readVotes(game)?.map(value=>value?'1':'0').join('')??''):'';
+  const plan=useMemo<Plan|null>(()=>isResult&&totals?buildPlan(totals.approve,totals.reject,seed,{seats:seatCount,leaderIndex,votes:voteKey?[...voteKey].map(value=>value==='1'):null}):null,[isResult,totals?.approve,totals?.reject,seed,seatCount,leaderIndex,voteKey]);
+  const coinSeats=isResult?Array.from({length:voteCount},(_,seat)=>seat):game.players.map((player,seat)=>player.hasVoted?seat:-1).filter(seat=>seat>=0);
   const reduced=useReducedMotion();
   const initialCoins=useNewCoins(voteCount);
   useTableMetrics(tableRef,rootRef,isResult&&!reduced);
@@ -413,7 +420,7 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
   const teamPoints=game.proposedTeam.map(point).join(' ');
   const resultPassed=totals?.passed??false;
 
-  return <section ref={rootRef} className={`vt${isResult?' is-reveal':''}${isResult?(resultPassed?' ok':' no'):''}${reduced?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
+  return <section ref={rootRef} className={`vt${isResult?' is-reveal':''}${isResult?(resultPassed?' ok':' no'):''}${plan?.mode==='identity'?' identity':''}${placement==='seat'?' seat-coins':''}${reduced?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
     <span className="vt-sr">{isResult?`찬성 ${totals?.approve??0}표, 반대 ${totals?.reject??0}표`: `투표 ${voteCount}/${game.players.length}명 완료`}</span>
     {isResult&&<div className="vt-dark" aria-hidden="true"/>}
     <div className="vt-wrap">
@@ -429,10 +436,10 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
           <svg className="vt-poly" viewBox="0 0 100 100" preserveAspectRatio="none"><polygon className="vt-poly-fill" points={teamPoints}/><polygon className="vt-edge" points={teamPoints}/></svg>
           {!resultPassed&&isResult&&<span className="vt-crown" style={{'--a0':'-90deg','--a1':`${-90+360/game.players.length}deg`} as React.CSSProperties}><CrownIcon size={26}/></span>}
           <div className="vt-pool" aria-hidden="true">
-            {Array.from({length:voteCount},(_,index)=>{
-              const step=plan?.stepOf[index];
+            {coinSeats.map((seat,index)=>{
+              const step=plan?.stepOf[seat];
               const outcome=step===undefined?undefined:plan?.outcomes[step];
-              return <div className={`vt-coin${index>=initialCoins?' drop':''}${plan&&step===plan.N-1?' lastcoin':''}`} style={coinStyle(index,seed,plan)} data-v={outcome===undefined?undefined:outcome?'a':'r'} key={`${seed}-${index}`}><div className="vt-coin-in"><span className="vt-face vt-cback"><i/></span><span className="vt-face vt-cfront">{outcome?<CheckIcon size={18}/>:<SwordsIcon size={18}/>}</span></div><i className="vt-glow"/></div>;
+              return <div className={`vt-coin${index>=initialCoins?' drop':''}${plan&&step===plan.N-1?' lastcoin':''}`} style={coinStyle(seat,seed,plan,{seats:seatCount,placement})} data-v={outcome===undefined?undefined:outcome?'a':'r'} key={`${seed}-${seat}`}><div className="vt-coin-in"><span className="vt-face vt-cback"><i/></span><span className="vt-face vt-cfront">{outcome?<CheckIcon size={18}/>:<SwordsIcon size={18}/>}</span></div><i className="vt-glow"/></div>;
             })}
             {plan?.revealed.slice(1).map((tally,index)=>{
               const start=plan.ft[index]!;
@@ -445,6 +452,7 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
       </div>
     </div>
     {isResult? <>
+      {plan&&<p className="vt-note">{plan.mode==='identity'?'자리 앞의 코인이 각자의 선택입니다':'표가 섞였습니다 · 누구의 표인지는 공개되지 않습니다'}</p>}
       <div className="vt-summary" style={{zIndex:31}}><span className="a">찬성 <b>{totals?.approve??0}</b></span><i>/</i><span className="r">반대 <b>{totals?.reject??0}</b></span></div>
       <h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2>
       <div className="vt-continue"><button className="primary" disabled={game.hasContinued} onClick={()=>call('VOTE_RESULT_CONTINUE',{roomCode:game.roomCode})}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button></div>

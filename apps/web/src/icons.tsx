@@ -338,21 +338,21 @@ export function HeroScene() {
       <radialGradient id="hero-fog-g" cx=".5" cy=".5" r=".5"><stop offset="0" stopColor="#8a80c8" stopOpacity=".22"/><stop offset="1" stopColor="#8a80c8" stopOpacity="0"/></radialGradient>
       <linearGradient id="hero-hill-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2a2258"/><stop offset="1" stopColor="#171238"/></linearGradient>
       </defs>
-      <circle className="hero-halo" cx="170" cy="118" r="104" fill="none" stroke="#dcbc6a" strokeOpacity=".14"/>
-      <circle className="hero-halo b" cx="170" cy="118" r="126" fill="none" stroke="#dcbc6a" strokeOpacity=".08"/>
-      <g className="hero-moon"><circle cx="170" cy="118" r="72" fill="url(#hero-moon-g)"/>
+      <circle className="hero-halo px px-0" cx="170" cy="118" r="104" fill="none" stroke="#dcbc6a" strokeOpacity=".14"/>
+      <circle className="hero-halo b px px-0" cx="170" cy="118" r="126" fill="none" stroke="#dcbc6a" strokeOpacity=".08"/>
+      <g className="hero-moon px px-0"><circle cx="170" cy="118" r="72" fill="url(#hero-moon-g)"/>
       <circle cx="146" cy="100" r="11" fill="#a97a34" fillOpacity=".22"/><circle cx="192" cy="136" r="15" fill="#a97a34" fillOpacity=".18"/><circle cx="178" cy="88" r="6" fill="#a97a34" fillOpacity=".2"/><circle cx="150" cy="140" r="7" fill="#a97a34" fillOpacity=".16"/></g>
-      <path d="M0 300V198C60 168 120 190 180 184C250 176 300 158 360 184V300Z" fill="url(#hero-hill-g)"/>
+      <path className="px px-1" d="M0 300V198C60 168 120 190 180 184C250 176 300 158 360 184V300Z" fill="url(#hero-hill-g)"/>
       <ellipse className="fog fog-a" cx="120" cy="214" rx="150" ry="16" fill="url(#hero-fog-g)"/>
-      <path d="M0 300V232C50 206 100 224 150 228C210 234 250 206 300 210C330 213 350 225 360 222V300Z" fill="#100c2c"/>
-      <g fill="#07061a">
+      <path className="px px-2" d="M0 300V232C50 206 100 224 150 228C210 234 250 206 300 210C330 213 350 225 360 222V300Z" fill="#100c2c"/>
+      <g className="px px-2" fill="#07061a">
       <path d="M288 212v-16l10-9 10 9v16z"/><path d="M312 214v-12l8-7 8 7v12z"/><path d="M262 216v-10l7-6 7 6v10z"/><path d="M336 216v-9l6-5 6 5v9z"/>
       <path d="M300 187l4-14 4 14z"/></g>
-      <g fill="#ffd25e"><rect className="win w1" x="295" y="198" width="4" height="5"/><rect className="win w2" x="317" y="204" width="4" height="4"/><rect className="win w3" x="267" y="207" width="3" height="4"/><rect className="win w2" x="339" y="209" width="3" height="4"/></g>
+      <g className="px px-2" fill="#ffd25e"><rect className="win w1" x="295" y="198" width="4" height="5"/><rect className="win w2" x="317" y="204" width="4" height="4"/><rect className="win w3" x="267" y="207" width="3" height="4"/><rect className="win w2" x="339" y="209" width="3" height="4"/></g>
       <ellipse className="fog fog-b" cx="250" cy="238" rx="160" ry="14" fill="url(#hero-fog-g)"/>
-      <path d="M0 300V252C60 242 110 264 160 258C190 254 210 240 240 242C290 246 330 260 360 252V300Z" fill="#05040f"/>
-      <g fill="#05040f"><path d="M30 254l-11 0 11-40 11 40z"/><path d="M30 236l-9 0 9-30 9 30z"/><path d="M58 258l-9 0 9-32 9 32z"/><path d="M84 260l-8 0 8-26 8 26z"/></g>
-      <g className="hero-wolf" transform="translate(168 146) scale(.92)"><path fill="#05040f" d="M2 104C0 92 6 84 15 84C23 83 28 72 33 60C37 50 41 41 46 35C48 31 49 27 51 22L53 11L60 19C65 17 72 10 81 1L84 6C79 13 73 19 67 26C63 32 61 39 62 47C64 57 68 66 65 77L67 104Z"/><path fill="#05040f" d="M14 104C12 96 16 90 26 90C36 90 44 96 44 104Z"/></g>
+      <path className="px px-3" d="M0 300V252C60 242 110 264 160 258C190 254 210 240 240 242C290 246 330 260 360 252V300Z" fill="#05040f"/>
+      <g className="px px-3" fill="#05040f"><path d="M30 254l-11 0 11-40 11 40z"/><path d="M30 236l-9 0 9-30 9 30z"/><path d="M58 258l-9 0 9-32 9 32z"/><path d="M84 260l-8 0 8-26 8 26z"/></g>
+      <g className="hero-wolf px px-3" transform="translate(178 140) scale(1.06)"><path fill="#05040f" d="M2 5C8 8 14 12 19 16L21 14L25 0L31 15L34 6L38 22C44 30 47 40 52 52C58 64 67 70 70 84C71 92 69 98 65 100L48 100C46 96 44 91 38 88L33 88L32 100L14 100L21 98L22 62C19 56 20 50 17 45L19 43L15 39C16 32 12 26 8 20C5 16 3 11 2 5Z"/><path fill="#05040f" d="M66 93C80 97 91 89 87 74C85 82 78 86 68 85Z"/></g>
       
     </svg>
   );
@@ -361,3 +361,49 @@ export function HeroScene() {
 export const CopyIcon = () => (<svg {...base} width={15} height={15}><rect x="8.500" y="8.500" width="11.500" height="11.500" rx="2.500" /><path d="M15.500 8.500V6a2.500 2.500 0 00-2.500-2.500H6A2.500 2.500 0 003.500 6v7A2.500 2.500 0 006 15.500h2.500" /></svg>);
 export const CheckIcon = ({ size = 15 }: { size?: number }) => (<svg {...base} width={size} height={size} strokeWidth={2.2}><path d="M5 12.500l4.500 4.500L19 7.500" /></svg>);
 export const CrownIcon = () => (<svg className="ic crown-ic" width="16" height="16" viewBox="0 0 24 24" fill="url(#ic-gold)" stroke="#5a3d10" strokeWidth="1" strokeLinejoin="round" aria-hidden="true"><path d="M3 18L2 7l6 5 4-7 4 7 6-5-1 11z" /><path d="M3 21h18" fill="none" strokeLinecap="round" /></svg>);
+
+
+/* ---------- 결과 엔딩 ---------- */
+
+/* 마을 실루엣 + 창문. on: 창문이 하나씩 켜짐(마을 승리) / off: 하나씩 꺼짐(늑대 승리) */
+export function VillageStrip({ mode }: { mode: "on" | "off" }) {
+  const houses = [
+    { x: 8, w: 34, h: 28, r: 14 }, { x: 52, w: 28, h: 20, r: 12 }, { x: 92, w: 40, h: 34, r: 16 },
+    { x: 146, w: 30, h: 22, r: 12 }, { x: 190, w: 38, h: 30, r: 15 }, { x: 240, w: 28, h: 24, r: 12 },
+    { x: 282, w: 36, h: 32, r: 15 }, { x: 328, w: 26, h: 20, r: 11 },
+  ];
+  return (
+    <svg className="village-strip" viewBox="0 0 360 90" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <g fill="#05040f">
+        {houses.map((h, i) => (
+          <g key={i}>
+            <rect x={h.x} y={90 - h.h} width={h.w} height={h.h} />
+            <path d={`M${h.x - 3} ${90 - h.h}L${h.x + h.w / 2} ${90 - h.h - h.r}L${h.x + h.w + 3} ${90 - h.h}z`} />
+          </g>
+        ))}
+        <rect x="0" y="86" width="360" height="4" />
+      </g>
+      {houses.map((h, i) => (
+        <rect
+          key={i}
+          className={`vw ${mode}`}
+          style={{ ["--i" as string]: i } as React.CSSProperties}
+          x={h.x + h.w / 2 - 3}
+          y={90 - h.h + 7}
+          width="6"
+          height="7"
+        />
+      ))}
+    </svg>
+  );
+}
+
+/* 늑대 실루엣 (홈 장면의 늑대와 같은 형태) */
+export function WolfSilhouette({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="-4 -4 96 112" fill="#05040f" aria-hidden="true">
+      <path d="M2 5C8 8 14 12 19 16L21 14L25 0L31 15L34 6L38 22C44 30 47 40 52 52C58 64 67 70 70 84C71 92 69 98 65 100L48 100C46 96 44 91 38 88L33 88L32 100L14 100L21 98L22 62C19 56 20 50 17 45L19 43L15 39C16 32 12 26 8 20C5 16 3 11 2 5Z" />
+      <path d="M66 93C80 97 91 89 87 74C85 82 78 86 68 85Z" />
+    </svg>
+  );
+}

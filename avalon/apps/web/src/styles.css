@@ -15,6 +15,7 @@ body{margin:0;min-height:100vh;min-height:100dvh;overflow-x:hidden;background:ra
 body:before{content:'';position:fixed;inset:16px;border:1px solid #c9a35c33;pointer-events:none;background:linear-gradient(90deg,transparent 49.7%,#c9a35c12 50%,transparent 50.3%),linear-gradient(transparent 49.7%,#c9a35c12 50%,transparent 50.3%);mask-image:radial-gradient(circle,black 0 16%,transparent 68%)}
 body:after{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 25%,#0008 100%)}
 .app{position:relative;z-index:1;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:max(28px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(28px,env(safe-area-inset-left))}
+.app[data-phase="lobby"]{justify-content:flex-start}
 .home,.center,.board{width:min(760px,100%);text-align:center}
 
 /* ---- motion ---- */

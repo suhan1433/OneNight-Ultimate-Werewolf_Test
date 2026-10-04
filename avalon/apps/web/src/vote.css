@@ -12,7 +12,9 @@
 
    .vt{position:relative;width:100%;
      /* 공개 연출 전체의 공통 애니메이션 묶음 (코인) */
-     --a-base:vtTremble .5s linear .35s,vtShuffle .7s ease-in-out .85s forwards,vtAlign .9s cubic-bezier(.4,0,.2,1) var(--R,1.55s) forwards}
+     --a-base:vtTremble .5s linear .35s,vtShuffle 1s ease-in-out .85s forwards,vtAlign .9s cubic-bezier(.4,0,.2,1) var(--R,1.85s) forwards}
+   /* 투표자 공개(identity): 코인이 이미 각자 앞에 있다 — 섞지도 옮기지도 않고 떨림만 */
+   .vt.identity{--a-base:vtTremble .5s linear .35s;--d1:.5s}
    .vt-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
    .vt-wrap{position:relative;width:fit-content;margin:8px auto 0}
    .vt-tilt{transform:perspective(1200px) rotateX(14deg);transform-origin:50% 50%}
@@ -31,12 +33,13 @@
    :root[data-vt-still] .vt-table:before,:root[data-vt-still] .vt-table:after{animation-play-state:paused!important}
    
    /* ---------- 암전: 촛불(중앙)만 남기고 주변이 어두워진다 ---------- */
-   .vt-dark{position:fixed;inset:0;z-index:20;pointer-events:none;--dark:0;--hole:calc(var(--tw,380px)*1.6);
+   .vt-dark{position:fixed;inset:0;z-index:20;pointer-events:none;--dark:0;--cy:inherit;   /* intro.css 가 --cy 를 비상속으로 등록해서, 원탁 중심(--cy)이 오버레이에 전달되지 않던 문제 */
+     --hole:calc(var(--tw,380px)*1.6);
      background:radial-gradient(circle at var(--cx,50%) var(--cy,50%),rgba(2,4,7,0) 0,rgba(2,4,7,0) calc(var(--hole)*.35),rgba(2,4,7,calc(var(--dark)*.45)) calc(var(--hole)*.5),rgba(2,4,7,var(--dark)) calc(var(--hole)*.75))}
-   .vt.is-reveal .vt-dark{animation:vtDim1 1.2s linear .35s forwards,vtDim2 1s cubic-bezier(.4,0,.2,1) var(--R) forwards,vtLastDim .6s ease var(--ld,99s) forwards}
-   .vt.is-reveal.ok .vt-dark{animation:vtDim1 1.2s linear .35s forwards,vtDim2 1s cubic-bezier(.4,0,.2,1) var(--R) forwards,vtLastDim .6s ease var(--ld,99s) forwards,
+   .vt.is-reveal .vt-dark{animation:vtDim1 var(--d1,1.2s) linear .35s forwards,vtDim2 1s cubic-bezier(.4,0,.2,1) var(--R) forwards,vtLastDim .6s ease var(--ld,99s) forwards}
+   .vt.is-reveal.ok .vt-dark{animation:vtDim1 var(--d1,1.2s) linear .35s forwards,vtDim2 1s cubic-bezier(.4,0,.2,1) var(--R) forwards,vtLastDim .6s ease var(--ld,99s) forwards,
      vtOpen 1.4s ease var(--S) forwards,vtReturn 2s ease calc(var(--S) + 1.4s) forwards}
-   .vt.is-reveal.no .vt-dark{animation:vtDim1 1.2s linear .35s forwards,vtDim2 1s cubic-bezier(.4,0,.2,1) var(--R) forwards,vtLastDim .6s ease var(--ld,99s) forwards,
+   .vt.is-reveal.no .vt-dark{animation:vtDim1 var(--d1,1.2s) linear .35s forwards,vtDim2 1s cubic-bezier(.4,0,.2,1) var(--R) forwards,vtLastDim .6s ease var(--ld,99s) forwards,
      vtClose .9s ease var(--S) forwards,vtReturn 2s ease calc(var(--S) + 1.4s) forwards}
    @keyframes vtDim1{to{--dark:.5;--hole:calc(var(--tw,380px)*1.2)}}
    @keyframes vtDim2{from{--dark:.5;--hole:calc(var(--tw,380px)*1.2)}to{--dark:.94;--hole:calc(var(--tw,380px)*.62)}}
@@ -80,7 +83,7 @@
    .vt.is-reveal.no .vt-coin.drop{animation:vtDrop .35s cubic-bezier(.3,.7,.3,1) backwards,var(--a-base),vtFadeCoin 1.2s ease calc(var(--S) + 1.2s) forwards}
    @keyframes vtTremble{0%,100%{translate:0 0}12%{translate:1px 0}25%{translate:-1px .5px}37%{translate:.5px -1px}50%{translate:-1px 0}62%{translate:1px 1px}75%{translate:-.5px -1px}88%{translate:1px 0}}
    @keyframes vtShuffle{0%{left:var(--px);top:var(--py)}35%{left:var(--w1x);top:var(--w1y)}70%{left:var(--w2x);top:var(--w2y)}100%{left:var(--sx);top:var(--sy)}}
-   @keyframes vtAlign{from{left:var(--sx);top:var(--sy)}to{left:var(--cx);top:var(--cy);rotate:0deg}}
+   @keyframes vtAlign{from{left:var(--sx);top:var(--sy);scale:1}50%{scale:1.16}to{left:var(--cx);top:var(--cy);rotate:0deg;scale:1}}   /* 나눠 놓기: 살짝 떠올랐다가 자기 앞에 안착 */
    @keyframes vtSweep{to{left:50%;top:50%;scale:.2;opacity:0}}                                   /* 가결: 공개된 코인이 중앙으로 쓸려 사라진다 */
    @keyframes vtFadeCoin{to{opacity:0;scale:.7}}
    
@@ -147,18 +150,18 @@
    @keyframes vtSeatCrownOut{to{opacity:0}}
    
    /* ---------- 여운: 득표 요약만 각인 ---------- */
-   .vt-summary{position:absolute;left:50%;top:50%;translate:-50% -50%;display:flex;gap:12px;align-items:center;white-space:nowrap;font:700 17px var(--numeral);letter-spacing:.04em;color:var(--parchment);opacity:0;
+   .vt-summary{position:relative;z-index:31;width:fit-content;margin:18px auto 0;display:flex;gap:12px;align-items:center;white-space:nowrap;font:700 17px var(--numeral);letter-spacing:.04em;color:var(--parchment);opacity:0;
      padding:10px 22px 11px;border-radius:16px;font-variant-numeric:tabular-nums lining-nums;
      background:linear-gradient(180deg,rgba(14,28,36,.94),rgba(4,9,13,.96));border:1px solid var(--hair-strong);
      box-shadow:0 0 0 1px rgba(0,0,0,.65),0 14px 30px -8px #000,0 0 40px 8px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08);
-     animation:vtSum 1s ease calc(var(--sd)*1s) forwards}
+     animation:vtSum 1s ease var(--sd) forwards}
    .vt-summary b{font-size:30px;line-height:1;margin-left:4px;text-shadow:0 1px 2px #000,0 0 14px currentColor}
    .vt-summary .a{color:#b9d9ff}.vt-summary .r{color:#ffa3b3}.vt-summary i{color:var(--brass);font-style:normal;opacity:.8}
    @keyframes vtSum{from{opacity:0;letter-spacing:.4em;filter:blur(6px)}to{opacity:1;letter-spacing:.02em;filter:none}}
-   .vt-verdict{position:relative;z-index:31;margin:12px 0 0;text-align:center;opacity:0;animation:vtSum .9s ease calc(var(--sd)*1s) forwards}
-   .vt-continue{position:relative;z-index:31;display:grid;justify-items:center;margin-top:10px;animation:vtShow .6s ease calc(var(--cd)*1s) both}
+   .vt-verdict{position:relative;z-index:31;margin:12px 0 0;text-align:center;opacity:0;animation:vtSum .9s ease var(--sd) forwards}
+   .vt-continue{position:relative;z-index:31;display:grid;justify-items:center;margin-top:10px;animation:vtShow .6s ease var(--cd) both}
    .vt-skip{position:relative;z-index:31;display:block;margin:10px auto 0;padding:7px 14px;font-size:12px;letter-spacing:.2em;text-indent:.2em;color:var(--brass);
-     background:rgba(4,9,13,.55);border:1px solid var(--hair);border-radius:99px;box-shadow:none;animation:vtShow .5s ease calc(var(--kd)*1s) both}
+     background:rgba(4,9,13,.55);border:1px solid var(--hair);border-radius:99px;box-shadow:none;animation:vtShow .5s ease var(--kd) both}
    @keyframes vtShow{0%{opacity:0;visibility:hidden}1%{visibility:visible}100%{opacity:1;visibility:visible}}
    
    /* 바로 보기·재접속·모션 축소: 모든 애니메이션을 끝 상태로 */
@@ -169,3 +172,24 @@
    @media(prefers-reduced-motion:reduce){
      .vt:not(.is-final) .vt-coin,.vt:not(.is-final) .vt-coin-in,.vt:not(.is-final) .vt-glow{animation:none!important}
    }
+
+   /* ---------- 중앙 문구 vs 코인 겹침 해소 ----------
+      원탁 중앙(.table-center)은 코인 풀과 같은 자리다. 투표 중에는 숫자만 코인 더미 위쪽 빈 자리로 올리고,
+      공개가 시작되면 중앙 문구는 사라진다(집계 판과 결과 요약이 그 자리를 이어받는다). */
+   .vt .table-center{justify-content:flex-start;padding:21% 0 0;z-index:0}
+   .vt .selection-core .faction-seal,.vt .selection-core span{display:none}
+   .vt .selection-core strong{font-size:26px;letter-spacing:.04em;text-shadow:0 2px 0 rgba(58,34,6,.7),0 0 18px rgba(220,178,98,.3)}
+   .vt.is-reveal .table-center{animation:vtCoreOut .45s ease .15s forwards}
+   @keyframes vtCoreOut{to{opacity:0;transform:scale(.9)}}
+   .vt-pool{z-index:2}
+   .vt-coin{--S:inherit!important}                      /* 안전장치: 코인에 숫자(단위 없음)로 들어온 --S 가 있어도 .vt 의 시간 값을 쓴다 */
+
+   /* ---------- 안내 한 줄: 자리 앞 코인이 무엇을 뜻하는지 ---------- */
+   .vt-note{position:relative;z-index:31;margin:14px auto 0;text-align:center;font-size:11.5px;letter-spacing:.06em;color:#a9b3ae;opacity:0;animation:vtShow .8s ease var(--R,1.85s) both}
+   .vt.identity .vt-note{color:var(--brass-hi)}
+   .vt-note{display:flex;align-items:center;justify-content:center;gap:10px;padding:0 12px;text-wrap:balance}
+   .vt-note:before,.vt-note:after{content:'';flex:0 0 22px;height:1px;background:linear-gradient(90deg,transparent,var(--brass))}
+   .vt-note:after{transform:scaleX(-1)}
+
+   /* 코인이 각자 자리 앞(원탁 안쪽 링)에 놓이는 방: 중앙 숫자는 링 안쪽 한가운데에 둔다 */
+   .vt.seat-coins .table-center{justify-content:center;padding:0}

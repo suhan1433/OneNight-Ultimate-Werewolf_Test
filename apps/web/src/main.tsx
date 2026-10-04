@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   NIGHT_ROLES,
@@ -30,7 +31,8 @@ import "./immersion.css";
 import "./polish.css";
 import "./day-vote.css";
 import "./entry.css";
-import { Candle, CheckIcon, CopyIcon, CrownIcon, HeroScene, Icon, IconDefs, MaskAvatar, RoleIcon, Sigil, SunArc, WaxSeal } from "./icons";
+import "./storyboard.css";
+import { Candle, CheckIcon, CopyIcon, CrownIcon, HeroScene, Icon, IconDefs, MaskAvatar, RoleIcon, Sigil, SunArc, VillageStrip, WaxSeal, WolfSilhouette } from "./icons";
 
 const req = (game: ClientGameState) => ({
   roomCode: game.roomCode,
@@ -61,8 +63,32 @@ const optimistic = (apply: () => void, name: string, data: unknown) => {
 function App() {
   const { game, tts, help, error, connectionState, setTts, setHelp, setError } = useGame();
   const [nightRecordOpen, setNightRecordOpen] = useState(false);
+  // 웹폰트가 준비되기 전에는 인트로를 시작하지 않는다(타이틀이 폰트 교체로 튀는 것 방지)
+  const [fontsReady, setFontsReady] = useState(false);
   useEffect(() => {
-    if (game?.phase === "lobby") window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    const go = () => setFontsReady(true);
+    void document.fonts?.ready.then(go);
+    const t = window.setTimeout(go, 1500);
+    return () => window.clearTimeout(t);
+  }, []);
+  // 밤 → 낮으로 넘어온 순간에만 새벽 연출(fresh)을 재생한다. 재접속은 건너뛴다.
+  const prevPhase = useRef(game?.phase);
+  const [dawn, setDawn] = useState(false);
+  useEffect(() => {
+    const prev = prevPhase.current;
+    prevPhase.current = game?.phase;
+    if (game?.phase === "day" && prev === "night") {
+      setDawn(true);
+      const timer = window.setTimeout(() => setDawn(false), 6500);
+      return () => window.clearTimeout(timer);
+    }
+    if (game?.phase !== "day") setDawn(false);
+  }, [game?.phase]);
+  useEffect(() => {
+    if (game?.phase === "lobby") {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      try { sessionStorage.removeItem("ww-result-seen"); } catch { /* noop */ }
+    }
   }, [game?.phase]);
   useEffect(() => {
     if (!game?.selfRole || game.phase === "result") setNightRecordOpen(false);
@@ -89,11 +115,12 @@ function App() {
     }
   };
   return (
-    <main className={`phase-${game?.phase ?? "home"} ${game?.phase === "day" ? "day" : ""}`}>
+    <main data-ready={fontsReady ? "1" : undefined} className={`phase-${game?.phase ?? "home"} ${game?.phase === "day" ? "day" : ""}`}>
       <IconDefs />
       <div className="mist" />
       <div className="meteor" aria-hidden="true" />
       <div className="grain" aria-hidden="true" />
+      {dawn && <DawnSky />}
       {game && (
         <>
           <button
@@ -132,12 +159,16 @@ function App() {
         <motion.div
           className="shell"
           key={game?.phase ?? "home"}
-          initial={{ opacity: 0, y: 14, filter: "blur(10px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          initial={
+            game?.phase === "lobby"
+              ? { opacity: 0, scale: 1.14, filter: "blur(12px)" } // 마을에서 방 안으로 들어가는 카메라
+              : { opacity: 0, y: 14, filter: "blur(10px)" }
+          }
+          animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
           exit={{ opacity: 0, filter: "blur(8px)" }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: game?.phase === "lobby" ? 0.9 : 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
-          {game ? <Game game={game} /> : <Home />}
+          {game ? <Game game={game} dawn={dawn} /> : <Home />}
         </motion.div>
       </AnimatePresence>
       {help && <Help close={() => setHelp(false)} />}
@@ -160,6 +191,31 @@ function App() {
         )}
       </AnimatePresence>
     </main>
+  );
+}
+
+/* 고정 레이어(fixed)는 shell의 filter 때문에 갇히므로, 전체 화면 연출은 main 안으로 포털한다 */
+function InMain({ children }: { children: React.ReactNode }) {
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => setHost(document.querySelector("main")), []);
+  return host ? createPortal(children, host) : null;
+}
+
+/* 타격의 순간: 한 번의 섬광(진영 색). 흔들림은 CSS가 맡는다 */
+function ImpactFlash({ faction, delay = 0.42 }: { faction: string; delay?: number }) {
+  return (
+    <InMain>
+      <div className={`impact-flash faction-${faction}`} style={{ animationDelay: `${delay}s` }} aria-hidden="true" />
+    </InMain>
+  );
+}
+
+/* 낮 시작: 암전 → 지평선에서 해가 떠오르며 밤을 걷어낸다 */
+function DawnSky() {
+  return (
+    <div className="dawn-sky" aria-hidden="true">
+      <i className="dawn-sun" />
+    </div>
   );
 }
 
@@ -493,6 +549,20 @@ function Home() {
   const [count, setCount] = useState(5);
   const [roles, setRoles] = useState<RoleType[]>(PRESETS.recommended!);
   const [busy, setBusy] = useState(false);
+  // 재방문자는 홈 연출을 1초 안팎의 짧은 버전으로 본다
+  const [returning] = useState(() => {
+    try { return localStorage.getItem("ww-home-seen") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("ww-home-seen", "1"); } catch { /* noop */ }
+  }, []);
+  const heroRef = useRef<HTMLElement>(null);
+  const parallax = (e: React.PointerEvent) => {
+    const el = heroRef.current;
+    if (!el) return;
+    el.style.setProperty("--px", ((e.clientX / window.innerWidth - 0.5) * 2).toFixed(3));
+    el.style.setProperty("--py", ((e.clientY / window.innerHeight - 0.5) * 2).toFixed(3));
+  };
   const normalizeRoomCode = (value: string) =>
     value.toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, 6);
   useEffect(() => {
@@ -544,7 +614,7 @@ function Home() {
   };
   if (mode === "home")
     return (
-      <section className="hero">
+      <section ref={heroRef} onPointerMove={parallax} className={`hero${returning ? " returning" : ""}`}>
         <HeroScene />
         <div className="eyebrow">REAL-TIME SOCIAL DEDUCTION</div>
         <h1>
@@ -580,7 +650,8 @@ function Home() {
           </label>
           <label>
             방 코드
-            <div className="code-field">
+            <div className="code-field tiled">
+              <CodeTiles value={roomCode} />
               <input
                 className="code-input"
                 value={roomCode}
@@ -592,7 +663,7 @@ function Home() {
                   e.preventDefault();
                   setRoomCode(normalizeRoomCode(e.clipboardData.getData("text")));
                 }}
-                placeholder="A7K29P"
+                aria-label="방 코드 6자리"
               />
               <button type="button" className="paste-code" onClick={pasteRoomCode}>
                 붙여넣기
@@ -710,12 +781,12 @@ function Home() {
   );
 }
 
-/* 코드 한 글자씩 타일로. cur = 다음에 입력될 칸 */
+/* 코드 한 글자씩 타일로. cur = 다음에 입력될 칸. 글자가 바뀔 때마다 타일이 뒤집히며 채워지고, 마지막 글자에서 전부 한 번 빛난다 */
 function CodeTiles({ value, length = 6 }: { value: string; length?: number }) {
   return (
-    <div className="code-tiles" aria-label={`코드 ${value}`}>
+    <div className={`code-tiles${value.length === length ? " full" : ""}`} aria-label={`코드 ${value}`}>
       {Array.from({ length }, (_, i) => (
-        <span key={i} className={value[i] ? "on" : i === value.length ? "cur" : ""}>
+        <span key={`${i}-${value[i] ?? ""}`} className={value[i] ? "on" : i === value.length ? "cur" : ""}>
           {value[i] ?? ""}
         </span>
       ))}
@@ -726,8 +797,9 @@ function CodeTiles({ value, length = 6 }: { value: string; length?: number }) {
 /* 대기실 원탁: 들어온 사람의 자리에 가면이 앉는다 */
 function RoundTable({ game }: { game: ClientGameState }) {
   const n = game.maxPlayers;
+  const allReady = game.players.length === n && game.players.every((p) => p.isReady);
   return (
-    <div className="round-table" role="list" aria-label="참가자">
+    <div className={`round-table${allReady ? " all-ready" : ""}`} role="list" aria-label="참가자">
       <div className="table-core">
         <b>{game.players.length}</b>
         <small>/ {n}</small>
@@ -754,6 +826,7 @@ function RoundTable({ game }: { game: ClientGameState }) {
               <MaskAvatar name={p.nickname} size={50} />
               {p.isHost && <CrownIcon />}
               {p.isReady && <i className="tick"><CheckIcon size={11} /></i>}
+              <i className="seat-flame" aria-hidden="true" />
             </div>
             <b>{p.nickname}</b>
             {p.isBot && <em>봇</em>}
@@ -764,11 +837,11 @@ function RoundTable({ game }: { game: ClientGameState }) {
   );
 }
 
-function Game({ game }: { game: ClientGameState }) {
+function Game({ game, dawn }: { game: ClientGameState; dawn: boolean }) {
   if (game.phase === "lobby") return <Lobby game={game} />;
   if (game.phase === "card_reveal") return <Reveal game={game} />;
   if (game.phase === "night") return <Night game={game} />;
-  if (game.phase === "day") return <Day game={game} />;
+  if (game.phase === "day") return <Day game={game} fresh={dawn} />;
   if (game.phase === "voting") return <Voting game={game} />;
   return <Result game={game} />;
 }
@@ -776,6 +849,8 @@ function Lobby({ game }: { game: ClientGameState }) {
   const me = game.players.find((p) => p.id === game.playerId)!;
   const full = game.players.length === game.maxPlayers;
   const [copied, setCopied] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const fill = game.players.length / Math.max(1, game.maxPlayers);
   const copyCode = () => {
     navigator.clipboard?.writeText(game.roomCode);
     buzz(12);
@@ -803,8 +878,27 @@ function Lobby({ game }: { game: ClientGameState }) {
         selectedRoles: next,
       });
   };
+  const start = async () => {
+    setStarting(true); // 촛불이 일렁이고 조도가 20%로 떨어진다
+    try {
+      await emitAck("GAME_START", req(game));
+      window.setTimeout(() => setStarting(false), 6000);
+    } catch (e) {
+      setStarting(false);
+      useGame.getState().setError(e instanceof Error ? e.message : "오류가 발생했습니다.");
+    }
+  };
   return (
-    <section>
+    <section className={`lobby-scene${starting ? " starting" : ""}`}>
+      <InMain>
+        <div className="lobby-warm" style={{ opacity: 0.12 + fill * 0.88 }} aria-hidden="true" />
+        {starting && (
+          <>
+            <div className="lobby-dim" aria-hidden="true" />
+            <div className="lobby-beat" aria-hidden="true" />
+          </>
+        )}
+      </InMain>
       <Header kicker={game.botMode ? "TEST BOT ROOM" : "WAITING ROOM"} title={game.botMode ? "테스트 봇과 함께하는 밤" : "달이 뜨기 전"} />
       <Panel className="center invite">
         <small>초대 코드</small>
@@ -836,9 +930,9 @@ function Lobby({ game }: { game: ClientGameState }) {
         </button>
         {game.hostId === game.playerId && (
           <button
-            className="lobby-start"
-            disabled={!canStart}
-            onClick={() => event("GAME_START", req(game))}
+            className={`lobby-start${canStart ? " unlocked" : ""}`}
+            disabled={!canStart || starting}
+            onClick={start}
           >
             {!full
               ? `인원 대기 ${game.players.length}/${game.maxPlayers}`
@@ -990,40 +1084,156 @@ function Lobby({ game }: { game: ClientGameState }) {
     </section>
   );
 }
+const REVEAL_HOLD_MS = 1400;
+/* 카드 공개: 어둠 속 한 장 → 꾹 눌러 금빛이 차오름 → 0.45초 정적 → 뒤집힘 + 진영 색 충격파
+   진영 색은 뒤집히는 순간 전까지 DOM에 클래스로 존재하지 않는다(곁눈질 방지). */
 function Reveal({ game }: { game: ClientGameState }) {
-  const [flipped, setFlipped] = useState(false);
   const me = game.players.find((p) => p.id === game.playerId)!;
   const r = game.selfRole && ROLE_DEFINITIONS[game.selfRole];
+  const [stage, setStage] = useState<"idle" | "holding" | "hush" | "revealed">("idle");
+  const [hold, setHold] = useState(0);
+  const [tint, setTint] = useState(false);
+  const [sent, setSent] = useState(false);
+  const raf = useRef(0);
+  const hushTimer = useRef<number>();
+  const startedAt = useRef(0);
+  const tiltRef = useRef<HTMLDivElement>(null);
+  const tilt = (e: React.PointerEvent) => {
+    const el = tiltRef.current;
+    if (!el) return;
+    const b = el.getBoundingClientRect();
+    const x = (e.clientX - b.left) / b.width - 0.5;
+    const y = (e.clientY - b.top) / b.height - 0.5;
+    el.style.setProperty("--tx", `${(-y * 14).toFixed(2)}deg`);
+    el.style.setProperty("--ty", `${(x * 18).toFixed(2)}deg`);
+  };
+  const untilt = () => {
+    tiltRef.current?.style.setProperty("--tx", "0deg");
+    tiltRef.current?.style.setProperty("--ty", "0deg");
+  };
+  const locked = me.hasConfirmedCard || sent;
+  const faction = r?.faction ?? "village";
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(raf.current);
+      window.clearTimeout(hushTimer.current);
+    },
+    [],
+  );
+  useEffect(() => {
+    if (stage === "revealed") {
+      setTint(true);
+      return;
+    }
+    const t = window.setTimeout(() => setTint(false), 1000); // 다시 뒤집히는 동안은 색을 유지
+    return () => window.clearTimeout(t);
+  }, [stage]);
+  useEffect(() => {
+    if (me.hasConfirmedCard) {
+      window.clearTimeout(hushTimer.current);
+      setStage("idle");
+      setHold(0);
+    }
+  }, [me.hasConfirmedCard]);
+  const complete = () => {
+    cancelAnimationFrame(raf.current);
+    setHold(1);
+    setStage("hush");
+    hushTimer.current = window.setTimeout(() => setStage("revealed"), 450);
+  };
+  const begin = () => {
+    if (stage !== "idle" || locked) return;
+    setStage("holding");
+    startedAt.current = performance.now();
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - startedAt.current) / REVEAL_HOLD_MS);
+      setHold(p);
+      if (p >= 1) complete();
+      else raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+  };
+  const release = () => {
+    if (stage !== "holding") return;
+    cancelAnimationFrame(raf.current);
+    setStage("idle");
+    setHold(0);
+  };
+  const confirm = () => {
+    if (stage !== "revealed" || locked) return;
+    setSent(true);
+    setStage("idle"); // 카드가 다시 뒷면으로 덮인다
+    setHold(0);
+    void event("CARD_CONFIRM", req(game));
+  };
+  const up = stage === "revealed" || locked;
   return (
-    <section className="center reveal">
+    <section className={`center reveal s-${stage}${locked ? " confirmed" : ""}`}>
       <div className="moon smallmoon">☾</div>
       <Header kicker="YOUR SECRET" title={`${me.nickname}님의 카드`} />
       <p>주변에 아무도 보고 있지 않은지 확인하세요.</p>
-      <motion.div
-        className="flip"
-        animate={{ rotateY: flipped ? 180 : 0 }}
-        onClick={() => { if (!flipped) buzz(30); setFlipped(true); }}
-      >
-        <div className="card-face back">
-          <Sigil size={84} /><small>탭하여 역할 확인</small>
+      <div className="card-stage" onPointerMove={tilt} onPointerLeave={untilt} onPointerUp={untilt}>
+        <div className="card-tilt" ref={tiltRef}>
+        <motion.div
+          className="flip"
+          role="button"
+          tabIndex={0}
+          aria-label="카드를 꾹 눌러 내 역할 확인 (키보드: Enter)"
+          style={{ ["--hold" as string]: hold } as never}
+          animate={{ rotateY: stage === "revealed" ? 180 : 0 }}
+          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+            begin();
+          }}
+          onPointerUp={release}
+          onPointerCancel={release}
+          onContextMenu={(e) => e.preventDefault()}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === " ") && stage === "idle" && !locked) {
+              e.preventDefault();
+              complete();
+            }
+          }}
+        >
+          <svg className="hold-ring" viewBox="0 0 248 358" aria-hidden="true">
+            <rect x="4" y="4" width="240" height="350" rx="22" pathLength={1} strokeDasharray={`${hold} 1`} />
+          </svg>
+          <div className="card-face back">
+            <Sigil size={84} />
+            <small>{stage === "holding" ? "계속 누르세요…" : "꾹 눌러 역할 확인"}</small>
+          </div>
+          <div
+            className={`card-face front${tint ? ` faction-${faction}` : ""}`}
+            aria-hidden={stage !== "revealed"}
+          >
+            <span><RoleIcon id={game.selfRole ?? undefined} faction={r?.faction} size={76} /></span>
+            <h2 aria-label={r?.name}>
+              {[...(r?.name ?? "")].map((ch, i) => (
+                <span className="ch" style={{ ["--c" as string]: i } as React.CSSProperties} aria-hidden="true" key={i}>
+                  {ch === " " ? "\u00A0" : ch}
+                </span>
+              ))}
+            </h2>
+            <b>{r && factionName(r.faction)}</b>
+            <p>{r?.description}</p>
+          </div>
+        </motion.div>
         </div>
-        <div className={`card-face front faction-${r?.faction ?? "village"}`}>
-          <span><RoleIcon id={game.selfRole ?? undefined} faction={r?.faction} size={76} /></span>
-          <h2>{r?.name}</h2>
-          <b>{r && factionName(r.faction)}</b>
-          <p>{r?.description}</p>
-        </div>
-      </motion.div>
-      {flipped && (
-        <div className={`flip-burst faction-${r?.faction ?? "village"}`} aria-hidden="true" />
-      )}
+        {stage === "revealed" && (
+          <>
+            <div className={`flip-burst faction-${faction}`} aria-hidden="true" />
+            <ImpactFlash faction={faction} />
+          </>
+        )}
+      </div>
       <button
-        disabled={!flipped || me.hasConfirmedCard}
-        onClick={() => event("CARD_CONFIRM", req(game))}
+        className={`reveal-confirm${up ? " up" : ""}`}
+        disabled={stage !== "revealed" || locked}
+        onClick={confirm}
       >
-        {me.hasConfirmedCard
-          ? "다른 플레이어를 기다리는 중"
-          : "역할을 확인했습니다"}
+        {locked ? "다른 플레이어를 기다리는 중" : "역할을 확인했습니다"}
       </button>
       <p className="tiny">
         {game.players.filter((p) => p.hasConfirmedCard).length} /{" "}
@@ -1343,11 +1553,10 @@ function ChatPanel({ game, scope, title, placeholder }: { game: ClientGameState;
     </Panel>
   );
 }
-function Day({ game }: { game: ClientGameState }) {
+function Day({ game, fresh }: { game: ClientGameState; fresh: boolean }) {
   const remain = useCountdown(game.dayExpiresAt, game.serverNow);
   const synced = useRef(false);
-  const total = useRef(0);
-  if (remain > total.current) total.current = remain;
+  const total = Math.max(1, game.settings.dayTimeLimitSeconds);
   const [tab, setTab] = useState<"chat" | "info">("chat");
   const used = [...new Set(game.selectedRoles)];
   useEffect(() => {
@@ -1356,15 +1565,16 @@ function Day({ game }: { game: ClientGameState }) {
       syncRoom();
     }
   }, [remain]);
-  const progress = total.current ? 1 - remain / total.current : 0;
+  const progress = Math.min(1, Math.max(0, 1 - remain / total));
+  const dusk = progress >= 0.7; // 시간 후반: 하늘이 노을로 기운다
+  const urgent = remain <= 10; // 마지막 10초: 숫자가 커지고 가장자리가 붉게 맥박친다
   const ratio = game.totalPlayers ? game.dayVoteRequests / game.totalPlayers : 0;
   return (
-    <section className={`day-scene${remain <= 30 ? " dusk" : ""}`}>
-      <div className="dawn" aria-hidden="true" />
+    <section className={`day-scene${dusk ? " dusk" : ""}${urgent ? " urgent" : ""}${fresh ? " fresh" : ""}`}>
       <Header kicker="DAYBREAK" title="날이 밝았습니다" />
       <div className="sun-timer">
         <SunArc p={progress} />
-        <b className={remain <= 30 ? "urgent" : ""}>{formatTime(remain)}</b>
+        <b className={urgent ? "urgent" : ""}>{formatTime(remain)}</b>
         <small>남은 토론 시간</small>
       </div>
       {game.publicReveals.map((x, i) => (
@@ -1415,10 +1625,10 @@ function Day({ game }: { game: ClientGameState }) {
           </Panel>
         </>
       )}
-      <div className="vote-dock">
+      <div className={`vote-dock${ratio >= 1 ? " full" : ""}`}>
         <button
           className="vote-request"
-          style={{ ["--p" as string]: `${ratio * 100}%` }}
+          style={{ ["--p" as string]: `${ratio * 100}%`, ["--k" as string]: ratio } as React.CSSProperties}
           disabled={game.hasRequestedDayVote}
           onClick={() => event("DAY_START", req(game))}
         >
@@ -1427,12 +1637,15 @@ function Day({ game }: { game: ClientGameState }) {
             {game.dayVoteRequests} / {game.totalPlayers}
           </em>
         </button>
+        {ratio >= 1 && <WaxSeal size={46} />}
       </div>
     </section>
   );
 }
 
-/* 꾹 눌러야 확정된다. 키보드(Enter/Space)는 즉시 확정 */
+/* 꾹 눌러야 확정된다. 누르는 동안 게이지가 차고 화면 가장자리가 좁아진다. 키보드(Enter/Space)는 즉시 확정 */
+const VOTE_HOLD_MS = 1100;
+const setVignette = (v: number) => document.documentElement.style.setProperty("--hold-v", String(v));
 function HoldConfirm({
   disabled,
   done,
@@ -1446,19 +1659,70 @@ function HoldConfirm({
   doneLabel: string;
   onConfirm: () => void;
 }) {
+  const [p, setP] = useState(0);
+  const [holding, setHolding] = useState(false);
+  const raf = useRef(0);
+  const t0 = useRef(0);
+  const fired = useRef(false);
   const off = disabled || done;
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(raf.current);
+      setVignette(0);
+    },
+    [],
+  );
+  useEffect(() => {
+    if (done) setP(1);
+    else {
+      fired.current = false; // 서버 거절로 롤백되면 다시 누를 수 있다
+      setP(0);
+    }
+  }, [done]);
+  const stop = () => {
+    cancelAnimationFrame(raf.current);
+    setHolding(false);
+    if (!fired.current) {
+      setP(0);
+      setVignette(0);
+    }
+  };
+  const start = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (off || fired.current || e.button !== 0) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setHolding(true);
+    t0.current = performance.now();
+    const tick = (now: number) => {
+      const v = Math.min(1, (now - t0.current) / VOTE_HOLD_MS);
+      setP(v);
+      setVignette(v);
+      if (v >= 1) {
+        fired.current = true;
+        setHolding(false);
+        setVignette(0);
+        onConfirm();
+      } else raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+  };
   return (
     <button
-      className={`hold-confirm${done ? " done" : ""}`}
+      className={`hold-confirm${done ? " done" : ""}${holding ? " holding" : ""}`}
+      style={{ ["--hold" as string]: p } as React.CSSProperties}
       disabled={off}
-      onClick={() => {
-        if (!off) {
-          buzz(60);
+      onPointerDown={start}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      onContextMenu={(e) => e.preventDefault()}
+      onClick={(e) => {
+        // 키보드로 발생한 click(detail 0)만 즉시 확정. 포인터는 위의 길게 누르기로 처리
+        if (e.detail === 0 && !off && !fired.current) {
+          fired.current = true;
           onConfirm();
         }
       }}
     >
-      <span>{done ? doneLabel : label}</span>
+      <span>{done ? doneLabel : holding ? "계속 누르세요…" : label}</span>
     </button>
   );
 }
@@ -1467,29 +1731,31 @@ function Voting({ game }: { game: ClientGameState }) {
   const [target, setTarget] = useState("");
   const me = game.players.find((p) => p.id === game.playerId)!;
   const others = game.players.filter((p) => p.id !== game.playerId);
+  const allLit = game.totalPlayers > 0 && game.votesCompleted >= game.totalPlayers;
   return (
-    <section className={`voting-scene${me.hasVoted ? " voted" : ""}`}>
+    <section className={`voting-scene${me.hasVoted ? " voted" : ""}${allLit ? " all-lit" : ""}`}>
       <Header kicker="THE VERDICT" title="운명의 투표" />
       <p>가장 의심스러운 한 명을 선택하세요. 확정 후에는 바꿀 수 없습니다.</p>
       <div className="vote-grid">
-        {others.map((p) => (
-          <button
-            className={`suspect ${target === p.id ? "vote selected" : "vote"}`}
-            onClick={() => { buzz(); setTarget(p.id); }}
-            disabled={me.hasVoted}
-            aria-pressed={target === p.id}
-            key={p.id}
-          >
-            <MaskAvatar name={p.nickname} size={64} />
-            <b>{p.nickname}</b>
-            {target === p.id && <WaxSeal size={40} />}
-          </button>
+        {others.map((p, i) => (
+          <div className="suspect-wrap" style={{ ["--i" as string]: i } as React.CSSProperties} key={p.id}>
+            <button
+              className={`suspect ${target === p.id ? "vote selected" : "vote"}`}
+              onClick={() => setTarget(p.id)}
+              disabled={me.hasVoted}
+              aria-pressed={target === p.id}
+            >
+              <MaskAvatar name={p.nickname} size={64} />
+              <b>{p.nickname}</b>
+              {target === p.id && <WaxSeal size={40} />}
+            </button>
+          </div>
         ))}
       </div>
       <HoldConfirm
         disabled={!target}
         done={me.hasVoted}
-        label={target ? "이 선택으로 확정" : "의심되는 사람을 고르세요"}
+        label={target ? "꾹 눌러 이 선택으로 확정" : "의심되는 사람을 고르세요"}
         doneLabel="투표 완료 · 결과 대기 중"
         onConfirm={() =>
           optimistic(() => useGame.getState().confirmVote(), "VOTE_CONFIRM", {
@@ -1498,7 +1764,7 @@ function Voting({ game }: { game: ClientGameState }) {
           })
         }
       />
-      <div className="candles" role="img" aria-label={`${game.votesCompleted} / ${game.totalPlayers}명 투표 완료`}>
+      <div className={`candles${allLit ? " all-lit" : ""}`} role="img" aria-label={`${game.votesCompleted} / ${game.totalPlayers}명 투표 완료`}>
         {Array.from({ length: game.totalPlayers }, (_, i) => (
           <Candle key={i} lit={i < game.votesCompleted} />
         ))}
@@ -1509,29 +1775,333 @@ function Voting({ game }: { game: ClientGameState }) {
     </section>
   );
 }
+/* ============================================================
+   결과 공개 — 개표(화살) → 정적 → 처형 카드 → 승리 선언 → 정체 카드 → 요약
+   stage: 0 암전 · 1 개표 · 2 정적/카드 상승 · 3 뒤집힘 · 4 승리 선언 · 5 정체 공개 · 6 요약
+   ============================================================ */
+type ResultData = NonNullable<ClientGameState["result"]>;
+type ResultPlayer = ResultData["players"][number];
+type EndingKind = "village" | "wolf" | "tanner" | "none";
+
+const endingOf = (r: ResultData): EndingKind => {
+  const f = String(r.winners[0] ?? "none");
+  return f === "village" ? "village" : f === "werewolf" || f === "minion" ? "wolf" : f === "tanner" ? "tanner" : "none";
+};
+
+function WinnerBlock({ r, stamped }: { r: ResultData; stamped: boolean }) {
+  const f = String(r.winners[0] ?? "none");
+  const win = r.winners.length ? r.winners.map(factionName).join(" · ") : "승자 없음";
+  const iconId: Record<string, string> = { village: "villager", werewolf: "werewolf", minion: "minion", tanner: "tanner" };
+  return (
+    <div className={`winner faction-${f}${stamped ? " stamped" : ""}`}>
+      <div>{iconId[f] ? <RoleIcon id={iconId[f]} faction={f} size={56} /> : <Icon.Sparkle />}</div>
+      <span>THE NIGHT IS OVER</span>
+      <h1>
+        {win}
+        <br />
+        <i>승리</i>
+      </h1>
+    </div>
+  );
+}
+
+/* 누가 누구를 지목했는지: 아바타에서 대상으로 화살이 한 줄씩 그어지고, 밀랍 도장이 쌓인다 */
+function TallyBoard({ r }: { r: ResultData }) {
+  const n = r.players.length;
+  const pos = (i: number) => {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    return { x: 50 + Math.cos(a) * 36, y: 50 + Math.sin(a) * 36 };
+  };
+  const index = new Map(r.players.map((p, i) => [p.id, i] as const));
+  const votes = Object.entries(r.votes).filter(([from, to]) => index.has(from) && index.has(to));
+  const step = Math.min(0.45, 1.5 / Math.max(1, votes.length));
+  const landed: Record<string, number> = {};
+  const marks = votes.map(([from, to], k) => {
+    const a = pos(index.get(from)!);
+    const b = pos(index.get(to)!);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const sx = a.x + ux * 9;
+    const sy = a.y + uy * 9;
+    const ex = b.x - ux * 10.5;
+    const ey = b.y - uy * 10.5;
+    const mx = (sx + ex) / 2 - uy * 7;
+    const my = (sy + ey) / 2 + ux * 7;
+    const ang = (Math.atan2(ey - my, ex - mx) * 180) / Math.PI;
+    const j = landed[to] ?? 0;
+    landed[to] = j + 1;
+    return {
+      from,
+      to,
+      j,
+      d: `M${sx} ${sy}Q${mx} ${my} ${ex} ${ey}`,
+      head: `translate(${ex} ${ey}) rotate(${ang})`,
+      delay: 0.35 + k * step,
+      b,
+    };
+  });
+  const end = 0.35 + votes.length * step + 0.5;
+  return (
+    <div className="tally-board" role="img" aria-label="투표 집계">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        {marks.map((m) => (
+          <g key={m.from}>
+            <path className="tally-line" pathLength={1} d={m.d} style={{ animationDelay: `${m.delay}s` }} />
+            <path className="tally-head" d="M0 0L-3.4 -2L-3.4 2z" transform={m.head} style={{ animationDelay: `${m.delay + 0.42}s` }} />
+          </g>
+        ))}
+      </svg>
+      {r.players.map((p, i) => {
+        const { x, y } = pos(i);
+        return (
+          <div
+            className={`tally-node${r.executedIds.includes(p.id) ? " top" : ""}`}
+            style={{ left: `${x}%`, top: `${y}%`, ["--tdelay" as string]: `${end}s` } as React.CSSProperties}
+            key={p.id}
+          >
+            <MaskAvatar name={p.nickname} size={46} />
+            <b>{p.nickname}</b>
+          </div>
+        );
+      })}
+      {marks.map((m) => {
+        const c = r.receivedVoteCounts[m.to] ?? 1;
+        return (
+          <div
+            className="tally-seal"
+            key={`seal-${m.from}`}
+            style={{
+              left: `calc(${m.b.x}% + ${(m.j - (c - 1) / 2) * 15}px)`,
+              top: `calc(${m.b.y}% + 27px)`,
+              animationDelay: `${m.delay + 0.4}s`,
+            }}
+          >
+            <WaxSeal size={18} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* 최다 득표자 카드: 어둠 속에서 올라와 한 번 멈춘 뒤, 진영 색 충격파와 함께 뒤집힌다 */
+function ExecCard({ p, votes, flipped }: { p: ResultPlayer; votes: number; flipped: boolean }) {
+  const role = ROLE_DEFINITIONS[p.currentRole];
+  return (
+    <div className="exec-wrap">
+      <motion.div
+        className="flip exec"
+        initial={{ rotateY: 0, y: 150, opacity: 0 }}
+        animate={{ rotateY: flipped ? 180 : 0, y: 0, opacity: 1 }}
+        transition={{
+          rotateY: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
+          y: { duration: 0.8, ease: [0.16, 1, 0.3, 1] },
+          opacity: { duration: 0.6 },
+        }}
+      >
+        <div className="card-face back"><Sigil size={64} /></div>
+        <div className={`card-face front faction-${role.faction}`}>
+          <span><RoleIcon id={p.currentRole} faction={role.faction} size={56} /></span>
+          <h2>{role.name}</h2>
+          <b>{factionName(role.faction)}</b>
+        </div>
+      </motion.div>
+      {flipped && <div className={`flip-burst faction-${role.faction}`} aria-hidden="true" />}
+      <b>{p.nickname}</b>
+      <small>{votes}표</small>
+    </div>
+  );
+}
+
+function ResultTheater({ r, stage, skip }: { r: ResultData; stage: number; skip: () => void }) {
+  const executed = r.players.filter((p) => r.executedIds.includes(p.id));
+  return (
+    <InMain>
+      <div className={`theater s-${stage}${stage >= 5 ? " out" : ""}`}>
+        <div className="theater-backdrop" />
+        {stage >= 3 && executed[0] && <ImpactFlash faction={ROLE_DEFINITIONS[executed[0].currentRole].faction} />}
+        {stage < 5 && (
+          <button className="theater-skip" onClick={skip}>
+            건너뛰기
+          </button>
+        )}
+        <div className="theater-stage">
+          {stage === 0 && <p className="theater-intro">개표를 시작합니다</p>}
+          {(stage === 1 || stage === 2) && (
+            <div className={`tally-layer${stage >= 2 ? " out" : ""}`}>
+              <h3>누가 누구를 지목했을까요</h3>
+              <TallyBoard r={r} />
+            </div>
+          )}
+          {stage >= 2 && (
+            <div className="exec-layer">
+              {executed.length ? (
+                <div className={`exec-row${executed.length > 1 ? " multi" : ""}`}>
+                  {executed.map((p) => (
+                    <ExecCard key={p.id} p={p} votes={r.receivedVoteCounts[p.id] ?? 0} flipped={stage >= 3} />
+                  ))}
+                </div>
+              ) : (
+                <div className="exec-none">
+                  <Icon.Sparkle />
+                  <p>아무도 처형되지 않았습니다</p>
+                </div>
+              )}
+              <div className="theater-winner">{stage >= 4 && <WinnerBlock r={r} stamped />}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </InMain>
+  );
+}
+
+/* 승리 진영별 엔딩: 같은 장면에 색만 바꾸지 않는다 */
+function EndingSky({ kind }: { kind: EndingKind }) {
+  return (
+    <InMain>
+      <div className={`ending-sky is-${kind}`} aria-hidden="true">
+        {kind === "village" && <i className="sky-rise" />}
+        {kind === "wolf" && (
+          <>
+            <i className="sky-redmoon" />
+            <i className="sky-fog a" />
+            <i className="sky-fog b" />
+            <WolfSilhouette className="sky-wolfshape" />
+          </>
+        )}
+        {kind === "tanner" && <i className="sky-brown" />}
+        {(kind === "village" || kind === "wolf") && <VillageStrip mode={kind === "village" ? "on" : "off"} />}
+      </div>
+    </InMain>
+  );
+}
+
+/* 모든 플레이어의 정체 카드. 처음 역할 → 최종 역할이 바뀐 사람은 카드가 한 번 더 뒤집힌다 */
+function TableCards({ r, started, finished, onDone }: { r: ResultData; started: boolean; finished: boolean; onDone: () => void }) {
+  const finalStep = (p: ResultPlayer) => (p.originalRole !== p.currentRole ? 2 : 1);
+  const [steps, setSteps] = useState<number[]>(() => r.players.map((p) => (finished ? finalStep(p) : 0)));
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
+  useEffect(() => {
+    if (finished) setSteps(r.players.map(finalStep));
+  }, [finished]);
+  useEffect(() => {
+    if (!started || finished) return;
+    const timers: number[] = [];
+    const n = r.players.length;
+    const set = (i: number, v: number) => setSteps((old) => old.map((x, j) => (j === i ? Math.max(x, v) : x)));
+    r.players.forEach((_, i) => timers.push(window.setTimeout(() => set(i, 1), 150 + i * 250)));
+    const changed = r.players.map((p, i) => (p.originalRole !== p.currentRole ? i : -1)).filter((i) => i >= 0);
+    const base = 150 + (n - 1) * 250 + 900;
+    changed.forEach((i, k) => timers.push(window.setTimeout(() => set(i, 2), base + k * 650)));
+    const end = (changed.length ? base + (changed.length - 1) * 650 + 900 : base) + 600;
+    timers.push(window.setTimeout(() => doneRef.current(), Math.max(2500, end)));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [started]);
+  const winSet = new Set(r.winners.map(String));
+  const tannerWin = String(r.winners[0]) === "tanner";
+  return (
+    <div className={`table-grid${tannerWin ? " focus-tanner" : ""}`} role="list">
+      {r.players.map((p, i) => {
+        const orig = ROLE_DEFINITIONS[p.originalRole];
+        const cur = ROLE_DEFINITIONS[p.currentRole];
+        const changed = p.originalRole !== p.currentRole;
+        const step = steps[i] ?? 0;
+        const final = step === (changed ? 2 : 1);
+        const win = winSet.has(String(cur.faction));
+        const dead = r.executedIds.includes(p.id);
+        return (
+          <div
+            role="listitem"
+            aria-label={`${p.nickname}: ${changed ? `처음 ${orig.name}, 최종 ${cur.name}` : cur.name}`}
+            className={`tcard${final ? ` final faction-${cur.faction}` : ""}${win ? " is-win" : " is-lose"}${dead ? " is-dead" : ""}`}
+            key={p.id}
+          >
+            <motion.div
+              className="tcard-card"
+              aria-hidden="true"
+              initial={false}
+              animate={{ rotateY: step === 0 ? 0 : step === 1 ? 180 : 360 }}
+              transition={{ duration: 0.6, ease: [0.3, 1.2, 0.4, 1] }}
+            >
+              <div className={`tface a${step === 2 ? ` faction-${cur.faction}` : " cover"}`}>
+                {step === 2 ? (
+                  <>
+                    <RoleIcon id={p.currentRole} faction={cur.faction} size={34} />
+                    <b>{cur.name}</b>
+                  </>
+                ) : (
+                  <Sigil size={40} />
+                )}
+              </div>
+              <div className={`tface b faction-${orig.faction}`}>
+                <RoleIcon id={p.originalRole} faction={orig.faction} size={34} />
+                <b>{orig.name}</b>
+              </div>
+            </motion.div>
+            <span className="nick">
+              {dead && <Icon.Skull />}
+              {p.nickname}
+            </span>
+            {changed && step === 2 && (
+              <small className="tcard-change">
+                {orig.name} → {cur.name}
+              </small>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Result({ game }: { game: ClientGameState }) {
   const r = game.result!;
-  const win = r.winners.length
-    ? r.winners.map(factionName).join(" · ")
-    : "승자 없음";
+  const seenKey = `${game.roomCode}:${r.executedIds.join(",")}:${JSON.stringify(r.votes)}:${r.players.map((p) => p.currentRole).join(",")}`;
+  const [skipIntro] = useState(() => {
+    try {
+      return sessionStorage.getItem("ww-result-seen") === seenKey || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch {
+      return false;
+    }
+  });
+  const [stage, setStage] = useState(skipIntro ? 6 : 0);
+  const to = (s: number) => setStage((old) => Math.max(old, s));
+  useEffect(() => {
+    if (skipIntro) return;
+    const times: Array<[number, number]> = [[1000, 1], [3000, 2], [3800, 3], [5000, 4], [6500, 5]];
+    const ids = times.map(([ms, s]) => window.setTimeout(() => to(s), ms));
+    return () => ids.forEach((t) => window.clearTimeout(t));
+  }, []);
+  useEffect(() => {
+    if (stage >= 5 && !skipIntro) window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    if (stage >= 6) {
+      try { sessionStorage.setItem("ww-result-seen", seenKey); } catch { /* noop */ }
+    }
+  }, [stage]);
   const winners = r.players.filter((p) =>
     r.winners.includes(ROLE_DEFINITIONS[p.currentRole].faction),
   );
   const losers = r.players.filter(
     (p) => !r.winners.includes(ROLE_DEFINITIONS[p.currentRole].faction),
   );
+  const show = (s: number) => (stage >= s ? " show" : "");
   return (
-    <section>
-      <div className={`winner faction-${r.winners[0] ?? "none"}`}>
-        <div><Icon.Sparkle /></div>
-        <span>THE NIGHT IS OVER</span>
-        <h1>
-          {win}
-          <br />
-          <i>승리</i>
-        </h1>
+    <section className="result-scene">
+      {stage >= 4 && <EndingSky kind={endingOf(r)} />}
+      {stage < 6 && !skipIntro && <ResultTheater r={r} stage={stage} skip={() => to(6)} />}
+      <div className={`result-winner${show(5)}`}>
+        <WinnerBlock r={r} stamped={false} />
       </div>
-      <Panel className="final-result">
+      <Panel className={`table-panel${show(5)}`}>
+        <h3>정체 공개</h3>
+        <TableCards r={r} started={stage >= 5} finished={stage >= 6} onDone={() => to(6)} />
+      </Panel>
+      <Panel className={`final-result result-rise${show(6)}`}>
         <h3>최종 결과</h3>
         <div className="outcome-groups">
           <div className="outcome-group winners">
@@ -1556,18 +2126,10 @@ function Result({ game }: { game: ClientGameState }) {
           </div>
         </div>
       </Panel>
-      <Panel>
+      <Panel className={`result-rise${show(6)}`}>
         <h3>최종 역할</h3>
-        {r.players.map((p, i) => (
-          <motion.div
-            className={
-              r.executedIds.includes(p.id) ? "result-row dead" : "result-row"
-            }
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.12 }}
-            key={p.id}
-          >
+        {r.players.map((p) => (
+          <div className={r.executedIds.includes(p.id) ? "result-row dead" : "result-row"} key={p.id}>
             <div className="avatar">{p.nickname[0]}</div>
             <div>
               <b>{p.nickname}</b>
@@ -1578,23 +2140,23 @@ function Result({ game }: { game: ClientGameState }) {
               {ROLE_DEFINITIONS[p.currentRole].name}
             </strong>
             {r.executedIds.includes(p.id) && <em><Icon.Skull /></em>}
-          </motion.div>
+          </div>
         ))}
       </Panel>
-      <Panel>
+      <Panel className={`result-rise${show(6)}`}>
         <h3>개별 투표</h3>
-        {Object.entries(r.votes).map(([from, to]) => (
+        {Object.entries(r.votes).map(([from, toId]) => (
           <p className="vote-line" key={from}>
-            {name(r, from)} <span>→</span> {name(r, to)}
+            {name(r, from)} <span>→</span> {name(r, toId)}
           </p>
         ))}
       </Panel>
       {game.hostId === game.playerId ? (
-        <button onClick={() => event("GAME_RESTART", req(game))}>
+        <button className={`result-rise${show(6)}`} onClick={() => event("GAME_RESTART", req(game))}>
           모두 대기실로 돌아가기
         </button>
       ) : (
-        <p className="center tiny">
+        <p className={`center tiny result-rise${show(6)}`}>
           방장이 대기실로 이동할 때까지 기다려주세요.
         </p>
       )}

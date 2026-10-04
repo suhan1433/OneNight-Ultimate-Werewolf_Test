@@ -1,0 +1,387 @@
+/* ============================================================
+   7차: 스토리보드 연출 — 홈 · 로비 · 카드 공개 · 새벽 · 낮 · 투표 · 결과
+   entry.css 뒤에 로드. 되돌리려면 import 한 줄만 지우면 된다.
+   (소리·햅틱은 포함하지 않는다)
+   ============================================================ */
+
+:root{--ease-out:cubic-bezier(.16,1,.3,1);--ease-inout:cubic-bezier(.65,0,.35,1);--ease-spring:cubic-bezier(.34,1.56,.64,1)}
+/* 웹폰트 준비 전에는 홈 인트로를 멈춰 둔다 */
+main:not([data-ready]) .hero *{animation-play-state:paused!important}
+@keyframes rise-in{from{opacity:0;transform:translateY(22px)}}
+@keyframes dock-in{from{opacity:0;transform:translateY(100%)}}
+
+/* ============ 1. 홈: 늑대가 나타난 뒤 타이틀, 마지막에 버튼 ============ */
+.hero h1 i{
+  background-image:linear-gradient(105deg,transparent 42%,#fffbe6d9 50%,transparent 58%),linear-gradient(180deg,#fff3c6 10%,#dcbc6a 55%,#a98436);
+  background-size:260% 100%,100% 100%;background-repeat:no-repeat;background-position:130% 0,0 0;
+  animation:titleopen 1.6s .9s var(--ease-out) both,title-sweep 1.5s 2.4s ease-in-out both,title-halo 1.4s 2.4s ease-out both}
+@keyframes title-sweep{from{background-position:130% 0,0 0}to{background-position:-40% 0,0 0}}
+@keyframes title-halo{0%{filter:drop-shadow(0 6px 26px #dcbc6a44)}40%{filter:drop-shadow(0 0 48px #ffe9a0cc)}100%{filter:drop-shadow(0 6px 26px #dcbc6a44)}}
+.hero p{animation:fadeup 1s 2.8s both}
+.hero>button{animation:fadeup .9s 3.2s both}.hero>button.ghost{animation-delay:3.35s}
+/* 재방문자: 같은 장면을 1초 안팎으로 */
+.hero.returning .hero-scene{animation-duration:.7s}
+.hero.returning .hero-moon{animation-duration:.8s}
+.hero.returning .hero-wolf{animation:wolf-in .5s .3s ease-out both}
+.hero.returning h1{animation:fadeup .5s .1s both}
+.hero.returning h1 i{animation:titleopen .6s .1s var(--ease-out) both,title-sweep .8s .6s ease-in-out both}
+.hero.returning p,.hero.returning .eyebrow{animation:fadeup .4s .5s both}
+.hero.returning>button{animation:fadeup .4s .6s both}.hero.returning>button.ghost{animation-delay:.7s}
+
+/* ============ 2. 로비 ============ */
+/* 코드 입력: 글자마다 타일이 뒤집히며 채워지고, 마지막 글자에서 6개가 동시에 빛난다 */
+.code-tiles{perspective:600px}
+.code-tiles span{position:relative}
+.code-field.tiled{position:relative}
+.code-field.tiled .code-input{position:absolute;left:0;right:0;top:0;height:58px;margin:0;opacity:0;z-index:1;cursor:text;font-size:16px;caret-color:transparent}
+.code-field.tiled .paste-code{position:relative;z-index:2}
+.code-field .code-tiles span.on{animation:tile-flip .45s cubic-bezier(.3,1.4,.5,1) both}
+@keyframes tile-flip{from{transform:rotateX(-90deg) translateY(-6px);opacity:.2}60%{transform:rotateX(14deg)}}
+.code-tiles span.cur{border-color:#dcbc6a55}
+.code-tiles span.cur:before{content:'';position:absolute;bottom:11px;width:18px;height:2px;border-radius:2px;background:var(--gold);animation:caret 1s steps(1) infinite}
+@keyframes caret{50%{opacity:0}}
+.code-tiles.full span:after{content:'';position:absolute;inset:-1px;border-radius:12px;pointer-events:none;
+  box-shadow:0 0 0 1px #ffe9a0,0 0 24px #dcbc6acc;opacity:0;animation:tile-glow 1s both}
+.invite .code-tiles.full span:after{animation-delay:.8s}
+@keyframes tile-glow{30%{opacity:1}}
+
+/* 인원이 찰수록 방이 따뜻해진다 */
+.lobby-warm{position:fixed;inset:0;z-index:0;pointer-events:none;transition:opacity 1.6s ease;
+  background:radial-gradient(ellipse 90% 50% at 50% 58%,#ffb45a33,transparent 70%),radial-gradient(ellipse 70% 35% at 50% 105%,#ff8a3d2e,transparent 70%)}
+
+/* 좌석의 촛불 */
+.seat-flame{position:absolute;left:-7px;top:0;width:8px;height:13px;border-radius:50% 50% 50% 50%/65% 65% 35% 35%;
+  background:radial-gradient(circle at 50% 70%,#fff6c8,#ffc65a 55%,#ff8a3d);
+  box-shadow:0 0 8px #ffb84a,0 0 18px #ff8a3d88;transform-origin:50% 100%;
+  animation:flame-in .6s .35s cubic-bezier(.3,1.6,.5,1) both,flicker 1.3s .95s ease-in-out infinite alternate}
+@keyframes flame-in{from{opacity:0;transform:scale(.2)}}
+.starting .seat-flame{animation:flame-flare .8s ease-out both}
+@keyframes flame-flare{0%{transform:scale(1)}30%{transform:scale(2.4,2.8);box-shadow:0 0 18px #ffd25e,0 0 40px #ff8a3d}100%{transform:scale(1.3)}}
+
+/* 준비 완료: 링이 채워지고 체크가 찍힌다 */
+@property --ring{syntax:'<angle>';inherits:false;initial-value:0deg}
+.seat.ready .seat-face{box-shadow:0 0 20px #93d6a255}
+.seat.ready .seat-face:before{content:'';position:absolute;inset:-5px;border-radius:50%;pointer-events:none;
+  background:conic-gradient(var(--sage) var(--ring),#93d6a222 0);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));
+  mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));
+  animation:ring-fill .7s cubic-bezier(.3,.7,.3,1) both}
+@keyframes ring-fill{to{--ring:360deg}}
+.seat.ready .tick{animation:tick-pop .45s .55s cubic-bezier(.3,1.9,.5,1) both}
+@keyframes tick-pop{from{transform:scale(0)}}
+
+/* 전원 준비: 테이블 중심이 밝아지고, 시작 버튼의 잠금이 풀리며 빛이 지나간다 */
+.round-table.all-ready:before{background:radial-gradient(circle,#ffd98a55,#15102e00 70%);border-color:#dcbc6a88}
+.round-table.all-ready .table-core b{color:#fff3c6;animation:core-glow 2.4s ease-in-out infinite alternate}
+@keyframes core-glow{to{text-shadow:0 0 46px #ffd25ecc,0 0 16px #ffe9a0}}
+.lobby-actions .lobby-start.unlocked{animation:unlock-pop .6s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes unlock-pop{0%{transform:scale(.94)}60%{transform:scale(1.04)}}
+.lobby-actions .lobby-start.unlocked:after{width:55%;background:linear-gradient(100deg,transparent,#fffffff0,transparent);
+  animation:unlock-sheen 1.1s .05s ease-out 1 both,start-sheen 3.8s 1.6s ease-in-out infinite}
+@keyframes unlock-sheen{from{left:-60%}to{left:140%}}
+
+/* 시작: 조도 20%로 하강, 심장박동 3회 */
+.lobby-dim{position:fixed;inset:0;z-index:35;pointer-events:none;background:#02010a;opacity:0;animation:lobby-dim 1.9s .15s ease-in forwards}
+@keyframes lobby-dim{to{opacity:.82}}
+.lobby-beat{position:fixed;inset:0;z-index:36;pointer-events:none;animation:beat3 .64s ease-out 3}
+@keyframes beat3{0%{box-shadow:inset 0 0 0 0 #c4525f00}25%{box-shadow:inset 0 0 140px 24px #c4525f66}100%{box-shadow:inset 0 0 140px 0 #c4525f00}}
+
+/* ============ 3. 카드 공개: 어둠 속 한 장 ============ */
+.reveal .card-stage{position:relative;z-index:2;width:240px;height:350px;margin:26px auto;perspective:1200px}
+.reveal .card-stage .flip{margin:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+/* 스포트라이트: 카드 주변만 남기고 모든 것을 어둡게 */
+.reveal .card-stage:before{content:'';position:absolute;z-index:-1;left:50%;top:50%;width:250px;height:360px;
+  transform:translate(-50%,-50%);border-radius:28px;box-shadow:0 0 0 150vmax #02010add;opacity:.8;pointer-events:none;transition:opacity .8s}
+.reveal .card-stage:after{content:'';position:absolute;z-index:-1;inset:-50px -70px;pointer-events:none;
+  background:radial-gradient(ellipse,#dcbc6a22,transparent 65%)}
+.reveal.s-holding .card-stage:before{opacity:.9}
+.reveal.s-hush .card-stage:before{opacity:.98}
+.reveal.s-revealed .card-stage:before{opacity:0;transition:opacity 1.6s 1.1s}
+.reveal.confirmed .card-stage:before{opacity:.55}
+/* 꾹 누르는 동안 테두리에 금빛이 차오른다 */
+.hold-ring{position:absolute;left:-4px;top:-4px;width:calc(100% + 8px);height:calc(100% + 8px);overflow:visible;pointer-events:none;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:translateZ(2px)}
+.hold-ring rect{fill:none;stroke:var(--gold);stroke-width:3;stroke-linecap:butt;filter:drop-shadow(0 0 8px #dcbc6a);transition:stroke-dasharray .35s ease-out}
+.reveal.s-holding .hold-ring rect{transition:none}
+.reveal.s-hush .hold-ring rect{stroke:#fff6d0;filter:drop-shadow(0 0 14px #fff6d0)}
+.reveal.s-revealed .hold-ring{display:none}
+.reveal.s-holding .card-face.back{animation:none;
+  box-shadow:0 26px 60px #000a,0 0 calc(50px + var(--hold,0)*90px) rgba(220,188,106,calc(.12 + var(--hold,0)*.5))}
+/* 직전 정적 0.45초: 모든 빛과 움직임이 멈춘다 */
+.reveal.s-hush *,.reveal.s-hush *:before,.reveal.s-hush *:after{animation-play-state:paused!important}
+/* 뒤집히는 순간 이후에만: 아이콘 → 이름 각인 → 설명 */
+.reveal .card-face.front>span,.reveal .card-face.front h2{animation:none}
+.reveal.s-revealed .card-face.front>span{animation:emblem 1.1s .45s var(--ease-out) both}
+.reveal.s-revealed .card-face.front h2{animation:role-name 1.1s .75s var(--ease-out) both}
+.reveal.s-revealed .card-face.front b,.reveal.s-revealed .card-face.front p{animation:fadeup .9s 1.5s both}
+.shell section>button.reveal-confirm{opacity:0;transform:translateY(18px);pointer-events:none;
+  transition:opacity .9s 1.7s,transform .9s 1.7s,filter .2s,box-shadow .2s}
+.shell section>button.reveal-confirm.up{opacity:1;transform:none;pointer-events:auto}
+.shell section>button.reveal-confirm.up:disabled{opacity:.5}
+
+/* ============ 6. 새벽: 암전 1초 → 해가 떠오르며 밤을 걷어낸다 ============ */
+@property --sun{syntax:'<percentage>';inherits:false;initial-value:-35%}
+.dawn-sky{position:fixed;inset:0;z-index:60;pointer-events:none;
+  background:radial-gradient(circle farthest-corner at 50% 100%,transparent calc(var(--sun) - 20%),#ffb257 calc(var(--sun) - 6%),#4a2a5e var(--sun),#010108 calc(var(--sun) + 28%));
+  animation:dawn-wipe 2.9s cubic-bezier(.4,0,.3,1) both}
+@keyframes dawn-wipe{0%,36%{--sun:-35%;opacity:1}88%{--sun:150%;opacity:1}100%{--sun:160%;opacity:0;visibility:hidden}}
+.dawn-sun{position:absolute;left:50%;bottom:0;width:min(60vw,320px);aspect-ratio:1;border-radius:50%;transform:translate(-50%,110%);
+  background:radial-gradient(circle,#fffbe0 0,#ffe08a 35%,#ffb257 60%,#ff8a3d00 72%);filter:blur(2px);
+  animation:dawn-sun 2.9s cubic-bezier(.4,0,.3,1) both}
+@keyframes dawn-sun{0%,34%{transform:translate(-50%,110%);opacity:1}80%{transform:translate(-50%,32%);opacity:1}100%{transform:translate(-50%,10%);opacity:0}}
+/* 타이틀 → 해 궤도 타이머 → 탭·채팅·도크가 차례로 */
+.day-scene:not(.fresh) h1{animation-delay:.1s}
+.day-scene.fresh h1{animation:titleopen 1.4s 2.5s var(--ease-out) both}
+.day-scene.fresh header .eyebrow,.day-scene.fresh header .rule{animation:fadeup 1s 2.7s both}
+.day-scene.fresh:before{animation:beams 60s linear infinite,beams-in 2.4s 1.6s ease-out both}
+@keyframes beams-in{from{opacity:0}}
+.day-scene.fresh .sun-timer{animation:arc-in 1.3s 2.5s var(--ease-out) both}
+@keyframes arc-in{from{opacity:0;transform:translateY(14px) scale(.94)}}
+.day-scene.fresh .day-tabs,.day-scene.fresh .panel,.day-scene.fresh .notice{animation:rise-in .9s 3.3s var(--ease-out) both}
+.day-scene.fresh .vote-dock{animation:dock-in .9s 3.9s var(--ease-out) both}
+
+/* ============ 7. 낮 토론 ============ */
+.chat-message{animation:msg-in .5s var(--ease-out) both}
+@keyframes msg-in{from{opacity:0;transform:translateY(10px);filter:blur(4px)}}
+/* 투표 동의 도크: 채워질수록 금빛이 번지고, 게이지 끝에 빛이 맺힌다 */
+.vote-dock .vote-request{
+  box-shadow:0 12px 30px -8px #4a2f1acc,inset 0 1px 0 #ffffff33,0 0 calc(var(--k,0)*40px) rgb(255 205 110/calc(var(--k,0)*.6))}
+.vote-dock .vote-request:before{content:'';position:absolute;top:0;bottom:0;left:var(--p,0%);width:26px;transform:translateX(-100%);
+  pointer-events:none;background:linear-gradient(90deg,transparent,#ffe9a0aa);opacity:calc(var(--k,0)*2)}
+.vote-dock .vote-request span,.vote-dock .vote-request em{position:relative}
+/* 전원 동의: 도크가 위로 올라오며 확정 도장이 찍힌다 */
+.vote-dock.full{animation:dock-lift .8s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes dock-lift{40%{transform:translateY(-18px)}}
+.vote-dock .wax-seal{position:absolute;left:calc(50% + min(260px,50% - 6px) - 40px);top:-26px;
+  filter:drop-shadow(0 6px 8px #000a);animation:seal-stamp .5s cubic-bezier(.3,1.5,.5,1) both}
+/* 마지막 10초: 숫자가 커지며 맥박치고, 화면 가장자리가 붉게 조여온다 */
+.day-scene.urgent .sun-timer b{animation:tick-pulse 1s ease-in-out infinite;color:#b8321f}
+.day-scene.dusk.urgent .sun-timer b{color:#ffd0b0}
+@keyframes tick-pulse{0%,100%{transform:scale(1.14)}50%{transform:scale(1.3)}}
+main.day:has(.day-scene.urgent):after{background:radial-gradient(ellipse at 50% 42%,transparent 34%,#b8321fa6 100%);animation:urgent-beat 1s ease-in-out infinite}
+@keyframes urgent-beat{50%{opacity:.45}}
+
+/* ============ 8. 투표: 노을 보라, 길게 누르면 시야가 좁아진다 ============ */
+main.phase-voting{
+  background:
+    radial-gradient(ellipse 120% 50% at 50% 112%,#d9703f66,transparent 62%),
+    radial-gradient(ellipse 70% 45% at 50% -8%,#5a3a8a 0,transparent 70%),
+    linear-gradient(#2e1a4e,#170d34 62%,#0a0620)}
+main.phase-voting:after{
+  background:radial-gradient(ellipse at 50% 45%,transparent calc(58% - var(--hold-v,0)*42%),rgb(2 1 12/calc(.55 + var(--hold-v,0)*.4)) 100%)}
+.suspect-wrap{display:flex;animation:rise-in .7s calc(.15s + var(--i,0)*.08s) var(--ease-out) both}
+.suspect-wrap>.vote{width:100%}
+.vote.suspect.selected:before{content:'';position:absolute;inset:0;border-radius:18px;border:2px solid var(--rose);pointer-events:none;animation:shock .6s ease-out both}
+@keyframes shock{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(1.35)}}
+.hold-confirm{cursor:pointer}
+/* 마지막 촛불이 켜지면 모든 것이 멈추고 불꽃만 환하다 */
+.candles.all-lit{animation:all-lit-flash .7s ease-out both}
+@keyframes all-lit-flash{from{filter:brightness(2.2)}}
+.candles.all-lit .flame{animation-play-state:paused;filter:drop-shadow(0 0 10px #ffe9a0) drop-shadow(0 0 26px #ffb84a)}
+.voting-scene.all-lit .vote-grid,.voting-scene.all-lit h1{opacity:.55;transition:opacity .5s}
+
+/* ============ 9. 결과 공개 ============ */
+.result-scene{position:relative}
+.shell .result-rise{opacity:0;transform:translateY(20px);pointer-events:none;transition:opacity .9s,transform .9s}
+.shell .result-rise.show{opacity:1;transform:none;pointer-events:auto}
+.result-winner{opacity:0;transition:opacity .9s}.result-winner.show{opacity:1}
+.table-panel{opacity:0;transform:translateY(14px);transition:opacity .8s,transform .8s}
+.table-panel.show{opacity:1;transform:none}
+
+/* 극장: 전체 화면 암전 위에서 개표 → 처형 카드 → 승리 선언 */
+.theater{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:24px 20px;overflow:hidden;transition:opacity .9s}
+.theater.out{opacity:0;pointer-events:none}
+.theater-backdrop{position:absolute;inset:0;background:radial-gradient(ellipse 70% 55% at 50% 45%,#150f3a 0,#04030c 70%);opacity:.97;transition:opacity 1.4s}
+.theater.s-4 .theater-backdrop{opacity:.35}
+.theater.s-5 .theater-backdrop{opacity:0}
+.theater-skip{position:absolute;z-index:2;right:16px;top:max(16px,calc(env(safe-area-inset-top) + 8px));padding:8px 14px;border-radius:30px;
+  background:#141232aa;color:#c9c2e0;border:1px solid var(--line);font-size:.74rem;cursor:pointer;backdrop-filter:blur(8px)}
+.theater-skip:hover{border-color:var(--gold);color:var(--moon)}
+.theater-stage{position:relative;width:min(100%,440px);height:min(86vh,640px)}
+.theater-stage>p,.tally-layer,.exec-layer{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0}
+.theater-intro{font:600 .95rem var(--numeral);letter-spacing:.4em;color:var(--gold)!important;animation:intro-in 1s both}
+
+/* 개표 */
+.tally-layer{transition:opacity .6s,transform .6s}
+.tally-layer.out{opacity:0;transform:scale(.94)}
+.tally-layer>h3{margin:0 0 14px;color:var(--gold);font:600 .95rem var(--serif);letter-spacing:.06em;animation:intro-in .8s both}
+.tally-board{position:relative;width:min(340px,100%);aspect-ratio:1;margin:0 auto}
+.tally-board>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.tally-line{fill:none;stroke:var(--rose);stroke-width:.9;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;
+  filter:drop-shadow(0 0 1.5px #e0707d);animation:arrow-draw .5s ease-out both}
+@keyframes arrow-draw{to{stroke-dashoffset:0}}
+.tally-head{fill:var(--rose);opacity:0;animation:head-in .15s both}
+@keyframes head-in{to{opacity:1}}
+.tally-node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;width:64px;
+  animation:seat-in .6s cubic-bezier(.3,1.4,.5,1) both}
+.tally-node b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.68rem;color:var(--text)}
+.tally-node .mask-av{filter:drop-shadow(0 6px 10px #000a)}
+.tally-node.top .mask-av{animation:top-glow 1s var(--tdelay,2s) ease-out both}
+@keyframes top-glow{to{filter:drop-shadow(0 0 14px #e0707d) drop-shadow(0 0 28px #e0707d88)}}
+.tally-seal{position:absolute;margin-left:-9px;animation:seal-stamp .45s cubic-bezier(.3,1.5,.5,1) both;filter:drop-shadow(0 3px 4px #000a)}
+
+/* 처형 카드 */
+.exec-layer{gap:16px}
+.exec-row{display:flex;justify-content:center;gap:16px}
+.exec-wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;perspective:1200px}
+.flip.exec{width:172px;height:250px;margin:0;cursor:default;z-index:1}
+.exec .card-face{padding:16px}
+.exec .card-face.front>span{width:84px;height:84px}
+.exec .card-face.front .role-ic{width:56px;height:56px}
+.exec .card-face.front h2{font-size:1.2rem}
+.exec .card-face.front p{display:none}
+.exec-row.multi .flip.exec{width:140px;height:204px}
+.exec-wrap>b{font:800 1rem var(--serif);color:var(--text);animation:fadeup .8s .6s both}
+.exec-wrap>small{color:var(--rose);animation:fadeup .8s .7s both}
+.exec-none{display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--gold);animation:intro-in 1s both}
+.exec-none p{margin:0;color:var(--moon)}
+.theater-winner{min-height:210px;display:flex;align-items:center;justify-content:center}
+.theater .winner{margin:0}
+.theater .winner h1{font-size:1.2rem}
+.theater .winner h1 i{font-size:3.4rem}
+@media(max-height:700px){.flip.exec{width:140px;height:204px}.theater-winner{min-height:180px}}
+
+/* 승리 선언: 진영 색으로 각인 */
+.winner{position:relative;--wc:var(--gold)}
+.winner.faction-werewolf,.winner.faction-minion{--wc:#e0707d}
+.winner.faction-village{--wc:#8db8e8}
+.winner.faction-tanner{--wc:#d0a070}
+.winner>div .role-ic{width:60px;height:60px}
+.winner.stamped>div{animation:moonrise 1s both,float 5s 1s ease-in-out infinite}
+.winner.stamped>span,.winner.stamped h1{animation:fadeup .8s both}
+.winner.stamped h1 i{animation:winner-stamp 1.1s cubic-bezier(.2,1.1,.3,1) both}
+@keyframes winner-stamp{0%{opacity:0;transform:scale(2.4);filter:blur(14px)}55%{opacity:1;transform:scale(.94);filter:blur(0)}100%{transform:scale(1)}}
+.winner.stamped:before{content:'';position:absolute;left:50%;top:62%;width:240px;height:240px;margin:-120px 0 0 -120px;border-radius:50%;
+  border:2px solid var(--wc);box-shadow:0 0 50px var(--wc),inset 0 0 50px var(--wc);opacity:0;pointer-events:none;
+  animation:burst 1.3s .35s cubic-bezier(.2,.7,.2,1) both}
+
+/* 정체 카드: 한 장씩 뒤집힌다 */
+.table-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:18px 10px;justify-items:center;margin-top:14px}
+.tcard{--fc:#dcbc6a;position:relative;width:88px;display:flex;flex-direction:column;align-items:center;gap:6px;perspective:800px;transition:opacity 1s}
+.tcard.faction-werewolf,.tcard.faction-minion{--fc:#e0707d}
+.tcard.faction-village{--fc:#8db8e8}
+.tcard.faction-tanner{--fc:#d0a070}
+.tcard-card{position:relative;width:76px;height:106px;transform-style:preserve-3d}
+/* ※ preserve-3d 요소에는 filter/opacity 금지: 빛은 box-shadow로 */
+.tface{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:11px;
+  border:1px solid #b09048;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 10px 16px #000a;text-align:center;
+  background:radial-gradient(circle at 50% 28%,#4a3c88,#171331 75%)}
+.tface:before{content:'';position:absolute;inset:4px;border-radius:7px;border:1px solid #dcbc6a44;pointer-events:none}
+.tface.b{transform:rotateY(180deg)}
+.tface.cover{background:radial-gradient(circle at 50% 30%,#3a2f78,#15102e)}
+.tface b{font:900 .72rem var(--serif);word-break:keep-all;color:#fbf0cf;padding:0 4px}
+.tface .role-ic{width:34px;height:34px}
+.tface.faction-werewolf,.tface.faction-minion{border-color:#c4525f;background:radial-gradient(circle at 50% 28%,#6a2140,#1c0d1e 72%)}
+.tface.faction-village{border-color:#7fa8d8;background:radial-gradient(circle at 50% 28%,#2a4a7a,#101a33 72%)}
+.tface.faction-tanner{border-color:#b98a5a;background:radial-gradient(circle at 50% 28%,#5a3c22,#1b120c 72%)}
+.tcard.final.is-win .tface{box-shadow:0 10px 16px #000a,0 0 20px var(--fc)}
+.tcard.final.is-lose{opacity:.62}
+.tcard .nick{display:inline-flex;align-items:center;gap:3px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.72rem;font-weight:700}
+.tcard .nick .ic{color:var(--rose);width:13px;height:13px}
+.tcard-change{font-size:.6rem;line-height:1.3;text-align:center;color:var(--gold);animation:fadeup .6s both}
+/* 처형자 엔딩: 모두가 흐려지고 처형자만 홀로 빛난다 */
+.table-grid.focus-tanner .tcard.final:not(.is-win){opacity:.28}
+.table-grid.focus-tanner .tcard.final.is-win .tface{box-shadow:0 10px 16px #000a,0 0 38px #d0a070,0 0 70px #d0a07066}
+
+/* 승리 진영별 하늘 */
+.ending-sky{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.ending-sky .village-strip{position:absolute;left:0;right:0;bottom:0;width:100%;height:auto;max-height:120px}
+.vw{fill:#ffd25e;filter:drop-shadow(0 0 4px #ffb84a)}
+.vw.on{opacity:0;animation:vw-on .5s calc(.8s + var(--i)*.4s) both}
+.vw.off{animation:vw-off .6s calc(.8s + var(--i)*.4s) both}
+@keyframes vw-on{to{opacity:1}}
+@keyframes vw-off{to{opacity:0}}
+@keyframes fade-glow{from{opacity:0}to{opacity:1}}
+/* 마을: 푸른 빛이 아래에서 위로 차오른다 */
+.sky-rise{position:absolute;inset:0;transform:translateY(100%);animation:sky-rise 2.6s .1s cubic-bezier(.3,.6,.3,1) forwards;
+  background:linear-gradient(0deg,#6fa6e8cc 0,#3a68b066 38%,#2a4a7a22 62%,transparent 85%)}
+@keyframes sky-rise{to{transform:translateY(0)}}
+.is-village:after{content:'';position:absolute;left:50%;bottom:-20%;width:140%;aspect-ratio:1;transform:translateX(-50%);
+  background:radial-gradient(circle,#cfe6ff66,transparent 60%);animation:fade-glow 2.6s .4s both}
+/* 늑대: 달이 붉게 물들고, 안개가 걷히며, 늑대 실루엣이 화면을 채운다 */
+.is-wolf:before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0,#c4525f55,transparent 70%),linear-gradient(#2a0a1a00,#2a0a1acc);animation:fade-glow 2s both}
+.sky-redmoon{position:absolute;left:50%;top:7%;width:min(52vw,230px);aspect-ratio:1;transform:translateX(-50%);border-radius:50%;
+  background:radial-gradient(circle at 38% 30%,#fff6c8,#e9cd78 45%,#a97a34);box-shadow:0 0 70px #dcbc6a88;animation:moon-redden 2.4s .2s ease-in-out both}
+@keyframes moon-redden{to{filter:hue-rotate(-60deg) saturate(1.8) brightness(.95);box-shadow:0 0 100px #e0405acc,0 0 220px #c4525f66}}
+.sky-fog{position:absolute;left:-20%;width:140%;height:240px;background:radial-gradient(ellipse,#8a80c866,transparent 70%);animation:fog-clear 3s ease-in forwards}
+.sky-fog.a{bottom:12%}.sky-fog.b{bottom:30%;animation-delay:.3s}
+@keyframes fog-clear{to{opacity:0;transform:translateX(26%)}}
+.sky-wolfshape{position:absolute;left:50%;bottom:-2%;width:min(120vw,620px);transform:translateX(-50%) translateY(14%) scale(.9);opacity:0;
+  animation:wolf-fill 2.6s 1s var(--ease-out) forwards}
+@keyframes wolf-fill{to{opacity:.6;transform:translateX(-50%) scale(1.15)}}
+/* 처형자: 갈색 빛 속 짧은 정적 */
+.is-tanner{background:radial-gradient(ellipse 70% 55% at 50% 50%,#b98a5a22,#1b120ccc 100%);animation:tanner-hush 2.4s both}
+@keyframes tanner-hush{0%{opacity:0}35%{opacity:1;filter:brightness(.55)}100%{filter:none}}
+.sky-brown{position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,#d0a07044,transparent 55%);animation:fade-glow 2s 1.2s both}
+.is-none{background:radial-gradient(ellipse at 50% 0,#dcbc6a22,transparent 60%)}
+
+@media(prefers-reduced-motion:reduce){
+  .dawn-sky,.theater,.lobby-dim,.lobby-beat{display:none}
+}
+
+/* ============ QA 후 수정 ============ */
+/* 전역 .back(돌아가기 버튼) 규칙이 카드 뒷면에 새어 들어와 뒷면이 22px 짧았다 */
+.card-face.back{margin:0;padding:26px;cursor:inherit}
+/* 확정 버튼: .shell section>button 의 금색 기본 스타일이 장밋빛 게이지를 덮고 있었다 */
+.shell section>button.hold-confirm{margin-top:10px;min-height:58px;padding:17px;border-radius:16px;color:#fff3e0;letter-spacing:.02em;
+  background:linear-gradient(90deg,#c4525f calc(var(--hold,0)*100%),#3a2350 calc(var(--hold,0)*100%));
+  border:1px solid #e0707d88;box-shadow:0 12px 28px -10px #c4525f88,inset 0 1px 0 #ffffff26;filter:none}
+.shell section>button.hold-confirm:hover{filter:none}
+.shell section>button.hold-confirm.holding{box-shadow:0 0 0 3px #e0707d44,0 0 calc(20px + var(--hold,0)*40px) #e0707d99}
+.shell section>button.hold-confirm:disabled:not(.done){opacity:.5;background:#2a2350;border-color:var(--line);box-shadow:none}
+.shell section>button.hold-confirm.done{opacity:1;background:#2a2350;border-color:var(--gold-deep);color:var(--gold);box-shadow:none}
+.hold-confirm:after{display:none!important}
+.hold-confirm:before{content:'';position:absolute;top:0;bottom:0;left:calc(var(--hold,0)*100%);width:34px;transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,#ffc2c8aa);opacity:calc(var(--hold,0)*4);pointer-events:none}
+/* 촛불: 글로우가 SVG 경계에서 잘리지 않게, 박자는 제각각으로 */
+.candle{overflow:visible}
+.candles .candle:nth-child(3n+1) .flame{animation-delay:-.45s}
+.candles .candle:nth-child(3n+2) .flame{animation-delay:-.9s;animation-duration:1.1s}
+.candles .candle:nth-child(3n) .flame{animation-delay:-.2s;animation-duration:1.5s}
+.seat:nth-child(odd) .seat-flame{animation-delay:.35s,.4s}
+.seat:nth-child(3n) .seat-flame{animation-delay:.35s,1.1s;animation-duration:.6s,1.05s}
+.seat:nth-child(3n+2) .seat-flame{animation-delay:.35s,.2s;animation-duration:.6s,1.5s}
+/* 새벽: 밤 화면이 서서히 검정으로 잠긴 뒤 해가 뜬다 */
+@keyframes dawn-wipe{0%{--sun:-35%;opacity:0}14%{opacity:1}36%{--sun:-35%;opacity:1}88%{--sun:150%;opacity:1}100%{--sun:160%;opacity:0;visibility:hidden}}
+.dawn-sun:after{content:'';position:absolute;left:-90%;right:-90%;top:48%;height:3px;border-radius:3px;
+  background:linear-gradient(90deg,transparent,#9fc4ffaa 30%,#fff 50%,#9fc4ffaa 70%,transparent);filter:blur(1px);opacity:.8}
+/* 결과: 극장 → 페이지 교차 시 제목이 이중으로 보이지 않게 */
+.result-winner{transition:opacity .9s .55s}
+.theater.out{transition-duration:.6s}
+
+/* 타격: 한 번의 섬광 + 화면 흔들림 (진영 색) */
+.impact-flash{position:fixed;inset:0;z-index:45;pointer-events:none;opacity:0;mix-blend-mode:screen;--fl:#dcbc6a;
+  background:radial-gradient(circle at 50% 46%,#fff 0,#fffa 10%,var(--fl) 36%,transparent 72%);animation:impact-flash .8s ease-out both}
+.impact-flash.faction-werewolf,.impact-flash.faction-minion{--fl:#e0707d}
+.impact-flash.faction-village{--fl:#7fa8d8}
+.impact-flash.faction-tanner{--fl:#b98a5a}
+@keyframes impact-flash{0%{opacity:0}10%{opacity:.62}100%{opacity:0}}
+@keyframes impact-shake{0%,100%{translate:0 0}15%{translate:-6px 3px}30%{translate:5px -4px}45%{translate:-3px 2px}60%{translate:2px -1px}}
+.reveal.s-revealed{animation:impact-shake .5s .42s}
+.theater.s-3 .theater-stage{animation:impact-shake .5s .42s}
+
+/* 시네마 레터박스: 처형 카드 → 승리 선언 동안만 */
+.theater:before,.theater:after{content:'';position:absolute;left:0;right:0;z-index:1;height:9vh;background:#000;pointer-events:none;
+  transform:scaleY(0);transition:transform .9s var(--ease-inout)}
+.theater:before{top:0;transform-origin:top}
+.theater:after{bottom:0;transform-origin:bottom}
+.theater.s-2:before,.theater.s-2:after,.theater.s-3:before,.theater.s-3:after,.theater.s-4:before,.theater.s-4:after{transform:scaleY(1)}
+
+/* 카드가 손끝을 따라 기운다 */
+.card-tilt{width:240px;height:350px;transform-style:preserve-3d;transform:rotateX(var(--tx,0deg)) rotateY(var(--ty,0deg));
+  transition:transform .35s var(--ease-out)}
+
+/* 역할 이름: 한 글자씩 각인 */
+.reveal.s-revealed .card-face.front h2 .ch{display:inline-block;animation:char-in .9s calc(.75s + var(--c,0)*.11s) var(--ease-out) both}
+@keyframes char-in{from{opacity:0;transform:translateY(.45em) scale(1.7);filter:blur(8px)}}
+.reveal .card-face.front h2 .ch{animation:none}
+.reveal.s-revealed .card-face.front h2{animation:none}
+
+/* 홈: 레이어마다 다른 깊이로 포인터를 따라 움직인다 */
+.hero-scene .px{transition:translate .6s var(--ease-out)}
+.hero-scene .px-0{translate:calc(var(--px,0)*-5px) calc(var(--py,0)*-3px)}
+.hero-scene .px-1{translate:calc(var(--px,0)*-9px) calc(var(--py,0)*-3px)}
+.hero-scene .px-2{translate:calc(var(--px,0)*-14px) calc(var(--py,0)*-4px)}
+.hero-scene .px-3{translate:calc(var(--px,0)*-22px) calc(var(--py,0)*-6px)}
+
+@media(prefers-reduced-motion:reduce){.impact-flash{display:none}.reveal.s-revealed,.theater.s-3 .theater-stage{animation:none}}

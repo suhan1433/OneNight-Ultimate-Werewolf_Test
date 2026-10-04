@@ -1,18 +1,25 @@
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 
 /* 스토리보드 5. 투표 공개 — 타임라인(초). vote.css 의 변수(--R, --S, --ft …)와 같은 기준입니다.
-   [예고]      각자 비공개로 투표 → 모두 같은 뒷면 코인이 원탁 '중앙 투표 영역'에 쌓인다 (좌석과 연결 없음)
-   [마지막 투표] 0.0 마지막 코인이 떨어짐 · 0.35 모든 코인 1px 떨림 · 0.85 셔플(대응 관계 제거) · 조도 서서히 하강
-   [공개 트리거] R=1.55  카메라가 수직 시점으로 후퇴 · 코인이 원형으로 정렬 · 촛불만 남기고 암전
+   두 가지 흐름 (방 옵션 revealVoteIdentities = "원정 기록 투표자 공개"):
+   [켜짐 · identity]  각자 자리 앞에 놓인 코인이 곧 그 사람의 선택이다. 투표하면 자기 앞에 뒷면 코인이 놓이고,
+                      공개 때는 그 코인이 그대로 뒤집힌다 (섞지 않는다).
+   [꺼짐 · shuffled]  코인은 중앙에 쌓이고, 개표 직전에 실제로 섞인 뒤 각자 앞으로 나뉘어 놓인다.
+                      자리 앞 코인은 '섞인 표'일 뿐 그 사람의 선택이 아니다 (대응 관계 제거).
+   이후 공통:
+   [마지막 투표] 0.0 마지막 코인이 떨어짐 · 0.35 모든 코인 1px 떨림 · (shuffled) 0.85~1.85 셔플 · 조도 서서히 하강
+   [공개 트리거] R  카메라가 수직 시점으로 후퇴 · (shuffled) 코인이 각자 앞으로 놓임 · 촛불만 남기고 암전
+                    R = identity 0.85 / shuffled 1.85
    R+1.0       정적 0.5초
-   R+1.5       타격: 0.35초 간격으로 한 장씩 (랜덤 순서) · 마지막 한 장은 +지연(득표 상황에 따라 0.25 / 0.6 / 1.0)
+   R+1.5       타격: 리더 다음 좌석부터 시계방향으로 0.35초 간격 · 마지막 한 장은 +지연(득표 상황에 따라 0.25 / 0.6 / 1.0)
    S           결과: 가결(금빛 확정 · 코인 쓸림 · 따뜻한 확장) / 부결(붉게 갈라짐 · 왕관 굴러감 · 차가운 수축)
    S+1.2       여운: '찬성 n / 반대 n' 만 각인 · 조도 복귀
-  
-   익명성: 이 파일과 VoteStage 는 개별 플레이어의 투표(revealedVotes, record.votes)를 읽지 않는다.
-   쓰는 것은 집계(approve, reject)와 공개 정보(방 코드·라운드·제안된 원정대)뿐이다. */
-export const VT={drop:.35,tremble:.5,shuffle:.7,retreat:1.0,still:.5,strike:1.5,gap:.35,afterLast:.9,summary:1.2,cont:2.0} as const;
-export const PRELUDE=VT.drop+VT.tremble+VT.shuffle;                 // = 1.55 → 공개 트리거 R
+
+   익명성: identity 흐름에서만 개인별 투표를 읽는다(readVotes). 옵션이 꺼져 있으면 개별 투표(revealedVotes, record.votes)는
+   읽지 않으며, 집계(approve, reject)와 공개 정보(방 코드·라운드·제안된 원정대·리더 위치)만 쓴다. */
+export const VT={drop:.35,tremble:.5,shuffle:1.0,retreat:1.0,still:.5,strike:1.5,gap:.35,afterLast:.9,summary:1.2,cont:2.0} as const;
+export const PRELUDE=VT.drop+VT.tremble+VT.shuffle;                 // = 1.85 : shuffled 의 공개 트리거 R
+export const PRELUDE_IDENTITY=VT.drop+VT.tremble;                   // = 0.85 : identity 의 공개 트리거 R
 
 /* ---------- 결정적 난수 (모든 클라이언트가 같은 순서를 본다. 좌석·플레이어와는 무관) ---------- */
 function hash(s:string){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
@@ -28,54 +35,82 @@ export function lastDelay(a:number,r:number){
   return{extra:.25,tier:'decided' as const};                           // 이미 확정 — 불필요한 긴장을 줄인다
 }
 
+export type VoteMode='identity'|'shuffled';
 export type Plan={
-  N:number;key:string;outcomes:boolean[];            // outcomes[k] = k번째로 뒤집히는 코인의 값(true=찬성)
-  perm:number[];stepOf:number[];                      // perm[k] = k번째로 뒤집히는 코인의 인덱스 / stepOf[i] = 코인 i 의 뒤집힘 순서
+  N:number;key:string;mode:VoteMode;outcomes:boolean[];  // outcomes[k] = k번째로 뒤집히는 코인의 값(true=찬성)
+  perm:number[];stepOf:number[];                      // perm[k] = k번째로 뒤집히는 코인(=좌석)의 인덱스 / stepOf[i] = 코인 i 의 뒤집힘 순서
   ft:number[];R:number;S:number;extra:number;tier:'pivotal'|'close'|'decided';
   revealed:Array<{a:number;r:number}>;                // revealed[k] = k장을 뒤집은 직후까지 공개된 표
 };
-export function buildPlan(approve:number,reject:number,seedKey:string):Plan{
+export type PlanOpts={seats?:number;leaderIndex?:number;votes?:boolean[]|null};
+
+/** 방 옵션이 '투표자 공개'일 때만 좌석 순서의 개인별 투표를 돌려준다. 서버가 주지 않으면 null (→ shuffled 로 대체).
+    찾는 위치: game.voteResult.votes → game.revealedVotes → roundHistory[현재 라운드].votes  (모두 {플레이어id: 찬성여부}) */
+export function readVotes(game:any):boolean[]|null{
+  if(!game?.options?.revealVoteIdentities)return null;
+  const record=game.roundHistory?.find((item:any)=>item.round===game.round);
+  const map=game.voteResult?.votes??game.revealedVotes??record?.votes;
+  if(!map||typeof map!=='object')return null;
+  const arr=game.players.map((player:any)=>map[player.id]);
+  return arr.every((value:unknown)=>typeof value==='boolean')?arr as boolean[]:null;
+}
+
+export function buildPlan(approve:number,reject:number,seedKey:string,opts:PlanOpts={}):Plan{
   const N=approve+reject;
+  const seats=Math.max(N,opts.seats??N);
+  const lead=opts.leaderIndex??-1;
   const key=`${seedKey}|${approve}|${reject}`;
-  const outcomes=shuffled([...Array(approve).fill(true),...Array(reject).fill(false)] as boolean[],rng(hash(`o|${key}`)));
-  const perm=shuffled(Array.from({length:N},(_,i)=>i),rng(hash(`p|${key}`)));
+  /* 공개 순서: 리더 다음 좌석부터 시계방향 (스토리보드 5). 순서는 공개 정보(리더 위치)로만 정해진다 */
+  const perm:number[]=[];
+  for(let k=1;k<=seats&&perm.length<N;k++){const seat=(lead+k+seats)%seats;if(seat<N)perm.push(seat);}
   const stepOf=Array(N).fill(0);perm.forEach((coin,k)=>{stepOf[coin]=k;});
+  /* identity: 실제 투표를 좌석에 그대로 / shuffled: 집계만으로 만든 시드 셔플을 좌석에 배분 */
+  const votes=opts.votes;
+  const real=!!votes&&votes.length>=N&&votes.slice(0,N).filter(Boolean).length===approve&&votes.slice(0,N).filter(v=>!v).length===reject;
+  const mode:VoteMode=real?'identity':'shuffled';
+  const outcomes=real
+    ?perm.map(seat=>votes![seat]!)
+    :shuffled([...Array(approve).fill(true),...Array(reject).fill(false)] as boolean[],rng(hash(`o|${key}`)));
   const lastIsA=outcomes[N-1];
   const a0=approve-(lastIsA?1:0),r0=reject-(lastIsA?0:1);
   const{extra,tier}=lastDelay(a0,r0);
-  const R=PRELUDE,first=R+VT.strike;
+  const R=mode==='identity'?PRELUDE_IDENTITY:PRELUDE,first=R+VT.strike;
   const ft:number[]=[];
   for(let k=0;k<N-1;k++)ft.push(first+k*VT.gap);
   ft.push((ft[N-2]??first)+VT.gap+extra);
   const S=ft[N-1]!+VT.afterLast;
   const revealed:Array<{a:number;r:number}>=[{a:0,r:0}];
   let a=0,r=0;for(let k=0;k<N;k++){if(outcomes[k])a++;else r++;revealed.push({a,r});}
-  return{N,key,outcomes,perm,stepOf,ft,R,S,extra,tier,revealed};
+  return{N,key,mode,outcomes,perm,stepOf,ft,R,S,extra,tier,revealed};
 }
 
-/* ---------- 코인 기하: 쌓임 → 셔플 경유점 → 새 쌓임 → 원형 ---------- */
+/* ---------- 코인 기하: 쌓임 → (shuffled) 셔플 경유점 → 각자 좌석 앞 ---------- */
 export type Geom={pile:Array<{x:number;y:number;rot:number}>};
+export type CoinLayout={seats:number;placement:'seat'|'pile'};       // placement: 투표 직후 코인이 놓이는 곳 (옵션 켜짐=자기 앞 / 꺼짐=중앙 더미)
 const pct=(n:number)=>`${(50+n*100).toFixed(2)}%`;
 export function pileOf(i:number,seedKey:string){
   const r=rng(hash(`pile|${seedKey}|${i}`));
   const ang=r()*Math.PI*2,rad=.03+r()*.2;
   return{x:Math.cos(ang)*rad,y:Math.sin(ang)*rad,rot:Math.round(r()*360)};
 }
-export function coinStyle(i:number,seedKey:string,plan:Plan|null){
+/** 좌석 i 의 '자기 앞' 위치: 같은 각도, 원탁 안쪽 링 (투표 영역 폭 기준 비율) */
+export function seatFront(i:number,seats:number){const a=i/seats*Math.PI*2-Math.PI/2;return{x:Math.cos(a)*.4,y:Math.sin(a)*.4};}
+export function coinStyle(i:number,seedKey:string,plan:Plan|null,layout?:CoinLayout){
+  const seats=layout?.seats??plan?.N??1;
+  const front=seatFront(i,seats);
   const p=pileOf(i,seedKey);
-  const st:Record<string,string|number>={'--px':pct(p.x),'--py':pct(p.y),'--rot':`${p.rot}deg`};
+  const start=layout?.placement==='seat'?front:p;
+  const st:Record<string,string|number>={'--px':pct(start.x),'--py':pct(start.y),'--rot':layout?.placement==='seat'?'0deg':`${p.rot}deg`};
   if(plan){
     const r=rng(hash(`shuf|${plan.key}|${i}`));
     const pt=(rad:number)=>{const a=r()*Math.PI*2,d=r()*rad;return[Math.cos(a)*d,Math.sin(a)*d] as const;};
     const w1=pt(.3),w2=pt(.3),s=pt(.2);
-    const slot=shuffled(Array.from({length:plan.N},(_,k)=>k),rng(hash(`slot|${plan.key}`)))[i]!;
-    const ang=(slot/plan.N)*Math.PI*2-Math.PI/2;
     st['--w1x']=pct(w1[0]);st['--w1y']=pct(w1[1]);st['--w2x']=pct(w2[0]);st['--w2y']=pct(w2[1]);
     st['--sx']=pct(s[0]);st['--sy']=pct(s[1]);
-    st['--cx']=pct(Math.cos(ang)*.38);st['--cy']=pct(Math.sin(ang)*.38);
+    st['--cx']=pct(front.x);st['--cy']=pct(front.y);                 // 도착점 = 자기 앞
     const step=plan.stepOf[i]!;
     st['--ft']=plan.ft[step]!.toFixed(3);
-    st['--S']=plan.S.toFixed(3);
+    st['--S']=`${plan.S.toFixed(3)}s`;                              // 시간 값(단위 필수)
     if(step===plan.N-1)st['--lw']=((plan.ft[plan.N-2]??plan.R)+VT.gap).toFixed(3);      // 마지막 미공개 표가 숨죽이기 시작하는 시각
   }
   return st as React.CSSProperties;
