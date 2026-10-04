@@ -394,7 +394,7 @@
 .cs-quest.flawless .cs-ring{animation:csRingOut 2s cubic-bezier(.2,.6,.3,1) calc(var(--result-at) + .75s) forwards}
 .cs-quest.flawless .cs-ring.r2{animation-delay:calc(var(--result-at) + .98s)}
 .cs-quest.flawless .cs-ring.r3{animation-delay:calc(var(--result-at) + 1.2s)}
-.cs-beam{position:absolute;left:50%;bottom:48%;width:46%;height:140%;translate:-50% 0;z-index:4;pointer-events:none;mix-blend-mode:screen;transform-origin:50% 100%;transform:scaleY(0);opacity:0}
+.cs-beam{position:absolute;left:27%;bottom:48%;width:46%;height:140%;z-index:4;pointer-events:none;mix-blend-mode:screen;transform-origin:50% 100%;transform:scaleY(0);opacity:0}
 .cs-beam i{position:absolute;top:0;bottom:0;-webkit-mask-image:linear-gradient(0deg,#000 14%,rgba(0,0,0,.5) 50%,transparent 82%);mask-image:linear-gradient(0deg,#000 14%,rgba(0,0,0,.5) 50%,transparent 82%)}
 .cs-beam .halo{left:0;right:0;background:linear-gradient(90deg,transparent,rgba(var(--moon),.26) 30%,rgba(var(--moon),.4) 50%,rgba(var(--moon),.26) 70%,transparent);filter:blur(14px)}
 .cs-beam .col{left:28%;right:28%;background:linear-gradient(90deg,transparent,rgba(225,242,255,.7) 50%,transparent);filter:blur(5px)}
