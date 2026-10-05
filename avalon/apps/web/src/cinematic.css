@@ -368,6 +368,10 @@
 .cs-quest.has-fail .cs-fissure path{animation:csCrackDraw 1.1s cubic-bezier(.3,.6,.2,1) calc(var(--result-at) + var(--bi)*.14s) forwards}
 .cs-quest.has-fail .cs-fissure .gap path{animation:csCrackDraw 1.1s cubic-bezier(.3,.6,.2,1) calc(var(--result-at) + var(--bi)*.14s) forwards,csGapOpen 1.8s ease calc(var(--result-at) + var(--bi)*.14s) forwards}
 .cs-quest.flawless .cs-fissure{display:none}
+/* 제단 균열은 결과 확정(is-resolved) 시점에 처음 마운트된다 → 그 전에는 DOM 에 없어 어떤 브라우저에서도 점이 남지 않는다. 지연값은 마운트 시점 기준으로 재계산 */
+.cs-quest.has-fail.is-resolved .cs-fissure.altar path{animation-delay:calc(var(--bi)*.14s)}
+.cs-quest.has-fail.is-resolved .cs-fissure.altar .gap path{animation-delay:calc(var(--bi)*.14s),calc(var(--bi)*.14s)}
+.cs-quest.has-fail.is-resolved .cs-fissure.altar .heat{animation-delay:1.4s}
 .evil .cs-fissure.ending .heat path{stroke-width:15;filter:blur(7px)}
 .evil .cs-fissure.ending .gap path{stroke-width:5}
 .evil .cs-fissure.ending .core path{stroke-width:1.7;filter:drop-shadow(0 0 4px #ff6a6a)}

@@ -187,7 +187,7 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
         <i className="cs-card-burst"/><i className="cs-card-shock"/>
         {reveal&&(order[index]?<span className="cs-sparks">{Array.from({length:9},(_,k)=><b key={k} style={vars({'--a':`${k*40+((index*17)%25)}deg`,'--d':`${46+((k*29+index*13)%34)}px`})}/>)}</span>:<i className="cs-card-flare"/>)}
       </div>)}</div>
-      {reveal&&<><div className="cs-leak"/><Fissure className="altar" paths={ALTAR_CRACK}/><div className="cs-orb"/><i className="cs-ring"/><i className="cs-ring r2"/><i className="cs-ring r3"/><div className="cs-beam"><i className="halo"/><i className="col"/><i className="core"/></div><i className="cs-bloom"/>
+      {reveal&&<><div className="cs-leak"/>{fails>0&&resolved&&<Fissure className="altar" paths={ALTAR_CRACK}/>}<div className="cs-orb"/><i className="cs-ring"/><i className="cs-ring r2"/><i className="cs-ring r3"/><div className="cs-beam"><i className="halo"/><i className="col"/><i className="core"/></div><i className="cs-bloom"/>
         {!clock.final&&<Field mode={fails?'ember':'moon'} delay={resultAt}/>}</>}
     </div></div></div>
     {reveal?<>
