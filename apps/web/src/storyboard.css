@@ -306,7 +306,7 @@ main.phase-voting:after{
 .sky-fog{position:absolute;left:-20%;width:140%;height:240px;background:radial-gradient(ellipse,#8a80c866,transparent 70%);animation:fog-clear 2s ease-in forwards}
 .sky-fog.a{bottom:12%}.sky-fog.b{bottom:30%;animation-delay:.2s}
 @keyframes fog-clear{to{opacity:0;transform:translateX(26%)}}
-.sky-wolfshape{position:absolute;left:50%;bottom:-6%;width:min(150vw,720px);transform:translateX(-50%) translateY(18%) scale(.9);opacity:0;
+.sky-wolfshape{position:absolute;left:50%;bottom:-3%;width:min(125vw,620px);transform:translateX(-50%) translateY(18%) scale(.9);opacity:0;
   animation:wolf-fill 1.5s .15s var(--ease-out) forwards}
 @keyframes wolf-fill{to{opacity:.94;transform:translateX(-50%) scale(1.1)}}
 .is-wolf:after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 90% 50% at 50% 100%,#c4525f77,transparent 70%);animation:fade-glow 1.4s both}
