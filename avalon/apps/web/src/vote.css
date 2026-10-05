@@ -33,7 +33,7 @@
    :root[data-vt-still] .vt-table:before,:root[data-vt-still] .vt-table:after{animation-play-state:paused!important}
    
    /* ---------- 암전: 촛불(중앙)만 남기고 주변이 어두워진다 ---------- */
-   .vt-dark{position:fixed;inset:0;z-index:20;pointer-events:none;--dark:0;--cy:inherit;   /* intro.css 가 --cy 를 비상속으로 등록해서, 원탁 중심(--cy)이 오버레이에 전달되지 않던 문제 */
+   .vt-dark{position:fixed;inset:0;z-index:20;pointer-events:none;--dark:0;
      --hole:calc(var(--tw,380px)*1.6);
      background:radial-gradient(circle at var(--cx,50%) var(--cy,50%),rgba(2,4,7,0) 0,rgba(2,4,7,0) calc(var(--hole)*.35),rgba(2,4,7,calc(var(--dark)*.45)) calc(var(--hole)*.5),rgba(2,4,7,var(--dark)) calc(var(--hole)*.75))}
    .vt.is-reveal .vt-dark{animation:vtDim1 var(--d1,1.2s) linear .35s forwards,vtDim2 1s cubic-bezier(.4,0,.2,1) var(--R) forwards,vtLastDim .6s ease var(--ld,99s) forwards}

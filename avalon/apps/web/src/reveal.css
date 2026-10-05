@@ -99,7 +99,7 @@
 .rv-glyph{position:relative;display:grid;place-items:center;width:calc(var(--cw)*.42);aspect-ratio:1;border-radius:50%;border:1.5px solid currentColor;
   box-shadow:0 0 34px currentColor,inset 0 0 22px rgba(255,255,255,.08)}
 .rv-front small{position:relative;font-size:calc(var(--cw)*.05);letter-spacing:.2em;text-indent:.2em;color:var(--parchment);opacity:.9}
-.rv-front strong{position:relative;font:900 calc(var(--cw)*.125) var(--serif);letter-spacing:.06em;color:#fff6dc;text-shadow:0 0 22px currentColor}
+.rv-front strong{position:relative;font:900 calc(var(--cw)*.125) var(--serif);letter-spacing:.06em;color:#fff6dc;text-align:center;word-break:keep-all;text-shadow:0 0 22px currentColor}
 .rv-front:after{content:'';position:absolute;inset:0;pointer-events:none;transform:translateX(-130%);
   background:linear-gradient(115deg,transparent 32%,rgba(255,255,255,.34) 46%,transparent 60%)}
 

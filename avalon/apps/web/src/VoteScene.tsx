@@ -131,14 +131,21 @@ export function useReducedMotion(){
   return useMemo(()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches,[]);
 }
 
-/** 원탁 중심·너비를 CSS 변수로 내려준다 (암전 오버레이의 구멍 위치) */
+/** 원탁 중심·너비를 개표 암전 레이어에 직접 내려준다.
+    --cy는 전역 등록값에서 상속되지 않으므로, 부모에만 두면 화면 중앙으로 되돌아갈 수 있다. */
 export function useTableMetrics(ref:React.RefObject<HTMLElement>,root:React.RefObject<HTMLElement>,active:boolean){
   useLayoutEffect(()=>{
     const upd=()=>{
       const t=ref.current,r=root.current;if(!t||!r)return;
       const b=t.getBoundingClientRect();
-      r.style.setProperty('--cx',`${(b.left+b.width/2).toFixed(1)}px`);
-      r.style.setProperty('--cy',`${(b.top+b.height/2).toFixed(1)}px`);
+      const cx=`${(b.left+b.width/2).toFixed(1)}px`;
+      const cy=`${(b.top+b.height/2).toFixed(1)}px`;
+      // fixed 레이어는 원탁의 실제 화면상 중심을 기준으로 삼아야 한다.
+      const spotlight=r.querySelector<HTMLElement>('.vt-dark');
+      spotlight?.style.setProperty('--cx',cx);
+      spotlight?.style.setProperty('--cy',cy);
+      r.style.setProperty('--cx',cx);
+      r.style.setProperty('--cy',cy);
       r.style.setProperty('--tw',`${t.offsetWidth}px`);
     };
     upd();
