@@ -6,8 +6,8 @@
    ============================================================ */
 
 /* ---------- 대화 목록 ---------- */
-.chat-list-wrap{position:relative}
-.chat-list{display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:4px 2px}
+.chat-list-wrap{position:relative;width:100%;min-width:0;align-self:stretch}
+.chat-list{display:flex;flex-direction:column;width:100%;min-width:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:4px 2px}
 .chat-list-wrap.inline .chat-list{
   margin:8px 0;
   /* 고정 260px 상한 제거: 화면 높이에 비례해 채팅방을 넉넉하게 사용 (dvh 미지원 브라우저는 vh 로 대체) */
@@ -20,7 +20,8 @@
 .chat-msg{display:flex;align-items:flex-end;gap:8px;max-width:86%;align-self:flex-start;margin-top:2px}
 .chat-msg.first{margin-top:10px}
 .chat-msg:first-child{margin-top:0}
-.chat-msg.mine{align-self:flex-end}
+.chat-msg.mine{align-self:flex-end;margin-left:auto}
+.chat-msg:not(.mine){margin-right:auto}
 .chat-avatar{flex:0 0 30px;width:30px;height:30px;align-self:flex-start;display:grid;place-items:center;border-radius:50%;background:#2d2a5c;color:var(--gold);font:700 .8rem var(--serif);font-style:normal}
 .chat-avatar:empty{background:none}
 .chat-msg-main{min-width:0;display:flex;flex-direction:column;gap:3px}
@@ -45,7 +46,7 @@ main.day .chat-bubble-row time,main.day .chat-empty{color:#8f6b3d}
 main.day .chat-new{background:#8a4b12;color:#fff8e6}
 
 /* ---------- 입력창 ---------- */
-.chat-composer{display:flex;align-items:flex-end;gap:8px;margin:0}
+.chat-composer{display:flex;align-items:flex-end;gap:8px;width:100%;margin:0}
 .chat-composer textarea{flex:1;min-width:0;min-height:44px;max-height:120px;margin:0;padding:11px 16px;resize:none;overflow-y:auto;border-radius:22px;border:1px solid var(--line);background:#0a082066;color:var(--text);font:inherit;font-size:16px; /* 16px 미만이면 iOS 가 확대함 */line-height:22px;outline:none;transition:border-color .2s,box-shadow .2s}
 .chat-composer textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px #dcbc6a22}
 .chat-composer textarea::placeholder{color:#7d7799}
