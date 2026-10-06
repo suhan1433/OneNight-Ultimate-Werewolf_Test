@@ -1,0 +1,48 @@
+/* ============================================================
+   프로필 캐릭터 — 원탁 / 채팅 아바타 / 프로필 수정 팝업
+   ============================================================ */
+
+/* 공통 캐릭터 아바타 */
+.char-avatar{display:inline-grid;place-items:center;flex:none;border-radius:50%;line-height:1;font-style:normal;box-shadow:inset 0 0 0 2px #ffffff26,0 2px 8px #0005;user-select:none}
+
+/* 원탁: 내 자리는 눌러서 프로필을 고친다 */
+.seat.me{cursor:pointer}
+.seat.me .seat-face .char-avatar{box-shadow:inset 0 0 0 2px #ffffff26,0 0 0 2px var(--gold),0 2px 10px #0006}
+.seat-edit{all:unset;position:absolute;left:-5px;bottom:-3px;z-index:3;box-sizing:border-box;width:22px;height:22px;display:grid;place-items:center;border-radius:50%;background:var(--gold);color:#1b1440;font-size:.72rem;font-weight:700;cursor:pointer;box-shadow:0 2px 6px #0007}
+.seat-edit:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.profile-hint{margin:2px 0 10px;text-align:center;color:var(--muted);font-size:.78rem}
+
+/* 채팅: 캐릭터 아바타 + 닉네임 옆 캐릭터 이름 */
+.chat-avatar.has-char{font:normal 1rem/1 system-ui,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;box-shadow:inset 0 0 0 1.5px #ffffff26}
+.chat-msg-main b small{margin-left:5px;color:var(--muted);font-size:.68rem;font-weight:500}
+main.day .chat-avatar.has-char{box-shadow:inset 0 0 0 1.5px #0000001f}
+main.day .chat-msg-main b small{color:#8f6b3d}
+
+/* 프로필 수정 팝업 */
+.profile-backdrop{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:16px;background:#05041299;backdrop-filter:blur(3px);animation:profilefade .18s ease both}
+.profile-dialog{box-sizing:border-box;width:min(100%,420px);max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;padding:20px 18px 16px;border-radius:20px;border:1px solid var(--line);background:linear-gradient(#1a1640,#0f0d2b);color:var(--text);box-shadow:0 20px 60px #000a;animation:profilepop .22s cubic-bezier(.2,.8,.2,1) both}
+.profile-dialog h3{margin:0 0 14px;font:700 1.1rem var(--serif);text-align:center}
+.profile-preview{display:flex;align-items:center;justify-content:center;gap:14px}
+.profile-preview div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.profile-preview b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1.05rem}
+.profile-preview small{color:var(--gold);font-size:.82rem}
+.profile-sub{margin:10px 0 14px;text-align:center;color:var(--muted);font-size:.8rem}
+.profile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.profile-option{all:unset;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 2px 6px;border-radius:14px;border:1.5px solid transparent;background:#ffffff0d;color:var(--text);font-size:.72rem;cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
+.profile-option:hover:not(:disabled){background:#ffffff18}
+.profile-option:active:not(:disabled){transform:scale(.95)}
+.profile-option.on{border-color:var(--gold);background:#dcbc6a22}
+.profile-option:disabled{opacity:.4;cursor:not-allowed}
+.profile-option:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.profile-actions{display:flex;gap:10px;margin-top:16px}
+.profile-actions button{all:unset;box-sizing:border-box;flex:1;min-height:44px;display:grid;place-items:center;border-radius:22px;font-weight:700;font-size:.95rem;cursor:pointer}
+.profile-cancel{background:#ffffff14;color:var(--text)}
+.profile-save{background:linear-gradient(#f3dd91,#dcbc6a);color:#1b1440}
+.profile-actions button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+@keyframes profilefade{from{opacity:0}}
+@keyframes profilepop{from{opacity:0;transform:translateY(16px) scale(.97)}}
+@media (max-width:360px){.profile-grid{grid-template-columns:repeat(3,1fr)}}
+
+/* 결과 화면 승리/패배자 칩: 작은 캐릭터 + 이름 */
+.outcome-list span{display:inline-flex;align-items:center;gap:6px}
+.outcome-list span .char-avatar{box-shadow:inset 0 0 0 1px #ffffff26}

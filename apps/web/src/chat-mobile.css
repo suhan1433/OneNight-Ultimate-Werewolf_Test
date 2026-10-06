@@ -8,7 +8,13 @@
 /* ---------- 대화 목록 ---------- */
 .chat-list-wrap{position:relative}
 .chat-list{display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:4px 2px}
-.chat-list-wrap.inline .chat-list{min-height:96px;max-height:260px;margin:8px 0}
+.chat-list-wrap.inline .chat-list{
+  margin:8px 0;
+  /* 고정 260px 상한 제거: 화면 높이에 비례해 채팅방을 넉넉하게 사용 (dvh 미지원 브라우저는 vh 로 대체) */
+  height:clamp(300px,55vh,640px);
+  height:clamp(300px,55dvh,640px);
+  min-height:300px;max-height:none;
+}
 .chat-empty{margin:auto;padding:24px 0;text-align:center;color:var(--muted);font-size:.86rem;line-height:1.6}
 
 .chat-msg{display:flex;align-items:flex-end;gap:8px;max-width:86%;align-self:flex-start;margin-top:2px}
@@ -86,3 +92,16 @@ main.day .chat-sheet-timer{background:#8a4b1214;color:#8a4b12}
 .chat-sheet .chat-list{position:absolute;inset:0;padding:10px 12px 14px}
 .chat-sheet-foot{flex:none;padding:8px 10px 10px;border-top:1px solid var(--line);background:inherit}
 main.day .chat-sheet-head,main.day .chat-sheet-foot{border-color:#e0c27f}
+
+/* ---------- 가로 모드 (화면 높이가 낮을 때) ---------- */
+@media (orientation:landscape) and (max-height:520px){
+  /* 세로 모드용 최소 300px 이 화면 전체를 덮지 않도록 낮춘다 */
+  .chat-list-wrap.inline .chat-list{height:clamp(140px,45dvh,240px);min-height:140px;margin:6px 0}
+  /* 시트: 머리글/입력창을 얇게 해서 메시지 영역을 확보하고, 노치 안전영역을 좌우로 피한다 */
+  .chat-sheet{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  .chat-sheet-head{min-height:44px;padding-top:max(2px,env(safe-area-inset-top));padding-bottom:2px}
+  .chat-sheet-foot{padding:6px 10px}
+  .chat-composer textarea{min-height:40px;max-height:80px;padding:9px 16px}
+  .chat-send{width:40px;height:40px}
+  .chat-msg{max-width:70%}
+}

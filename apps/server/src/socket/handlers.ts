@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
-import { NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type ClientGameState, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
+import { AVATAR_IDS, NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type ClientGameState, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
 import { appendChat, appendLobbyChat, canCreateRoom, clearChat, clearLobbyChat, clearReadiness, clearVotes, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, removeVotesForPlayer, saveRoom, sweepExpiredRooms, toggleReady, withRoomLock } from '../services/redis.js';
@@ -9,6 +9,7 @@ import { processExpiredRoom } from '../services/scheduler.js';
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
 const nicknameSchema = z.string().trim().min(1).max(16);
 const requestSchema = z.object({ roomCode: codeSchema, requestId: z.string().min(8).max(100) });
+const avatarSchema = z.enum(AVATAR_IDS);
 const roomChannel = (code: string) => `game:${code}`;
 const voiceChannel = (code: string) => `voice:${code}`;
 const playerChannel = (id: string) => `player:${id}`;
@@ -166,6 +167,12 @@ export function registerHandlers(io: Server, socket: Socket) {
     io.to(roomChannel(data.roomCode)).emit('READY_PROGRESS', { playerId, isReady });
     return { isReady };
   });
+  on(socket, 'PROFILE_UPDATE', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => {
+    const { avatar } = safe(z.object({ avatar: avatarSchema }), payload);
+    const alreadyUsed = room.players.some((player) => player.id !== playerId && player.avatar === avatar);
+    if (alreadyUsed) throw new Error('다른 플레이어가 사용 중인 캐릭터입니다.');
+    room.players.find((player) => player.id === playerId)!.avatar = avatar;
+  }));
   on(socket, 'ROOM_SETTINGS', async (raw) => mutate(io, socket, raw, (room, playerId, payload) => {
     if (room.hostId !== playerId || room.phase !== 'lobby') throw new Error('방장만 설정할 수 있습니다.');
     // Accept a legacy room's old 3/5-second value once, then migrate it to

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Player, RoleType, Room } from '@werewolf/shared';
-import { advanceNight, applyNightAction, assignRoles, buildNightActionQueue, calculateResult, calculateReceivedVotes, calculateVotes, determineExecutions, shuffleRoles, startCurrentAction, startNightIntro, validateNightAction } from './engine.js';
+import { advanceNight, applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, calculateReceivedVotes, calculateVotes, determineExecutions, shuffleRoles, startCurrentAction, startNightIntro, validateNightAction } from './engine.js';
 
 const player = (id: string, role: RoleType = 'villager'): Player => ({ id, nickname: id, sessionToken: id, socketId: id, originalRole: role, currentRole: role, isReady: true, hasConfirmedCard: true, hasActedTonight: false, vote: null, connected: true });
 const room = (players: Player[], votes: Record<string,string> = {}): Room => ({ roomCode:'ABC234',hostId:players[0]!.id,maxPlayers:players.length,players,selectedRoles:[],centerCards:[],phase:'voting',nightActionQueue:[],currentNightActionIndex:0,actionTimeLimitSeconds:5,dayTimeLimitSeconds:300,ttsEnabled:true,nightLog:[],votes,processedRequestIds:[],chat:[],publicReveals:[],privateResults:{},privateNightActions:{},protectedPlayerId:null,dayExpiresAt:null,result:null,createdAt:0,updatedAt:0 });
@@ -10,6 +10,13 @@ describe('role assignment', () => {
   it.each([3,5,10])('%i players require player count + 3 cards', (count) => { const ps=Array.from({length:count},(_,i)=>player(String(i))); const roles=Array.from({length:count+3},()=> 'villager' as RoleType); const result=assignRoles(ps,roles,()=>.5); expect(result.players).toHaveLength(count); expect(result.centerCards).toHaveLength(3); });
   it('rejects a malformed deck',()=>expect(()=>assignRoles([player('a')],['villager'])).toThrow());
   it('does not mutate input while shuffling',()=>{const source=[1,2,3];expect(shuffleRoles(source,()=>.2)).not.toBe(source);expect(source).toEqual([1,2,3])});
+});
+describe('public game state', () => {
+  it('includes each player profile avatar', () => {
+    const players = [player('a'), player('b')];
+    players[0]!.avatar = 'fox';
+    expect(buildPlayerGameState(room(players), 'a').players).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'a', avatar: 'fox' })]));
+  });
 });
 describe('night queue',()=>{
   it('uses canonical order and includes roles with no owner',()=>{const q=buildNightActionQueue(['seer','mason','werewolf','shield_bearer','doppelganger','drunk','villager'],[player('a','seer')]);expect(q.map(x=>x.role)).toEqual(['shield_bearer','doppelganger','werewolf','mason','seer','drunk']);expect(q[0]!.playerIds).toEqual([])});

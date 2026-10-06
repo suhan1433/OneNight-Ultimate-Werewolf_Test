@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import ReactDOM from "react-dom/client";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -33,7 +33,8 @@ import "./day-vote.css";
 import "./entry.css";
 import "./storyboard.css";
 import "./chat-mobile.css";
-import { Candle, CheckIcon, CopyIcon, CrownIcon, HeroScene, Icon, IconDefs, MaskAvatar, RoleIcon, Sigil, SunArc, VillageStrip, WaxSeal, WolfSilhouette } from "./icons";
+import "./profile.css";
+import { Candle, CheckIcon, CopyIcon, CrownIcon, HeroScene, Icon, IconDefs, RoleIcon, Sigil, SunArc, VillageStrip, WaxSeal, WolfSilhouette } from "./icons";
 
 const req = (game: ClientGameState) => ({
   roomCode: game.roomCode,
@@ -60,6 +61,147 @@ const optimistic = (apply: () => void, name: string, data: unknown) => {
       );
   });
 };
+
+/* ============================================================
+   프로필 캐릭터 — 로비에서 고르면 원탁 · 채팅에 같은 캐릭터로 나온다
+   · 선택값은 이 브라우저(localStorage)에 저장되고 서버(PROFILE_UPDATE)로도 보낸다
+   · 서버가 players[].avatar 를 내려주면 모든 참가자에게 같은 캐릭터가 보인다
+   ============================================================ */
+type Character = { id: string; name: string; emoji: string; bg: string };
+const CHARACTERS: Character[] = [
+  { id: "wolf", name: "늑대", emoji: "🐺", bg: "linear-gradient(135deg,#6b7280,#374151)" },
+  { id: "fox", name: "여우", emoji: "🦊", bg: "linear-gradient(135deg,#f59e0b,#b45309)" },
+  { id: "owl", name: "올빼미", emoji: "🦉", bg: "linear-gradient(135deg,#a78b6d,#6b4f3a)" },
+  { id: "cat", name: "고양이", emoji: "🐱", bg: "linear-gradient(135deg,#f9a8d4,#be5a8f)" },
+  { id: "rabbit", name: "토끼", emoji: "🐰", bg: "linear-gradient(135deg,#e9d5ff,#9d7bd8)" },
+  { id: "bear", name: "곰", emoji: "🐻", bg: "linear-gradient(135deg,#b4783c,#6e4421)" },
+  { id: "bat", name: "박쥐", emoji: "🦇", bg: "linear-gradient(135deg,#6d5aa8,#2d2457)" },
+  { id: "deer", name: "사슴", emoji: "🦌", bg: "linear-gradient(135deg,#d6a86a,#8a6030)" },
+  { id: "frog", name: "개구리", emoji: "🐸", bg: "linear-gradient(135deg,#6ee7a0,#2f8f5b)" },
+  { id: "lion", name: "사자", emoji: "🦁", bg: "linear-gradient(135deg,#fcd34d,#c2831a)" },
+  { id: "panda", name: "판다", emoji: "🐼", bg: "linear-gradient(135deg,#e5e7eb,#7b8191)" },
+  { id: "octopus", name: "문어", emoji: "🐙", bg: "linear-gradient(135deg,#fb7185,#a8304a)" },
+  { id: "raccoon", name: "너구리", emoji: "🦝", bg: "linear-gradient(135deg,#9ca3af,#4b5563)" },
+  { id: "penguin", name: "펭귄", emoji: "🐧", bg: "linear-gradient(135deg,#7dd3fc,#2a6f97)" },
+  { id: "boar", name: "멧돼지", emoji: "🐗", bg: "linear-gradient(135deg,#a8805a,#5c3f26)" },
+  { id: "turtle", name: "거북이", emoji: "🐢", bg: "linear-gradient(135deg,#86efac,#3b7d4f)" },
+];
+const PROFILE_KEY = "ww-profile-avatar";
+const characterById = (id?: string | null) => CHARACTERS.find((c) => c.id === id);
+const characterFallback = (key: string) => {
+  let h = 0;
+  for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return CHARACTERS[h % CHARACTERS.length]!;
+};
+
+let myAvatarId: string | null = (() => {
+  try { return localStorage.getItem(PROFILE_KEY); } catch { return null; }
+})();
+const profileListeners = new Set<() => void>();
+const setMyAvatarId = (id: string) => {
+  myAvatarId = id;
+  try { localStorage.setItem(PROFILE_KEY, id); } catch { /* noop */ }
+  profileListeners.forEach((fn) => fn());
+};
+const useMyAvatarId = () =>
+  useSyncExternalStore(
+    (fn) => { profileListeners.add(fn); return () => profileListeners.delete(fn); },
+    () => myAvatarId,
+    () => null,
+  );
+// 서버가 players[].avatar 를 내려주면 그 값을 쓴다(아직 없으면 undefined).
+const serverAvatarId = (p?: unknown) => (p as { avatar?: string } | undefined)?.avatar;
+const syncAvatar = (game: ClientGameState, avatar: string) => {
+  void emitAck("PROFILE_UPDATE", { ...req(game), avatar }).catch(() => { /* 서버 미지원이어도 로컬 프로필은 유지 */ });
+};
+/* playerId → 캐릭터. 내 것은 로컬 선택이 우선, 그 외는 서버 값, 없으면 playerId 기반 고정 기본값.
+   players/myId 를 안 넘겨도 현재 게임 상태(store)에서 찾아 쓴다 → 어느 화면에서든 같은 캐릭터 */
+function useCharacterResolver(players?: { id: string }[], myId?: string) {
+  const mine = useMyAvatarId();
+  const game = useGame((s) => s.game);
+  const me = myId ?? game?.playerId;
+  return (playerId: string): Character => {
+    const server =
+      serverAvatarId(game?.players.find((x) => x.id === playerId)) ?? serverAvatarId(players?.find((x) => x.id === playerId));
+    const id = playerId === me ? mine ?? server : server;
+    return characterById(id) ?? characterFallback(playerId);
+  };
+}
+const CharacterAvatar = ({ c, size = 40 }: { c: Character; size?: number }) => (
+  <span className="char-avatar" style={{ width: size, height: size, fontSize: size * 0.56, background: c.bg }} aria-hidden="true">
+    {c.emoji}
+  </span>
+);
+
+/* 어느 화면에서든 playerId(또는 닉네임)만 주면 그 사람의 프로필 캐릭터를 그려준다 */
+function PlayerAvatar({ playerId, nickname, size = 40 }: { playerId?: string; nickname?: string; size?: number }) {
+  const resolve = useCharacterResolver();
+  const game = useGame((s) => s.game);
+  const key = playerId ?? game?.players.find((p) => p.nickname === nickname)?.id ?? nickname ?? "";
+  return <CharacterAvatar c={resolve(key)} size={size} />;
+}
+
+function ProfileDialog({ game, onClose }: { game: ClientGameState; onClose: () => void }) {
+  const me = game.players.find((p) => p.id === game.playerId);
+  const resolve = useCharacterResolver(game.players, game.playerId);
+  const current = resolve(game.playerId);
+  const [picked, setPicked] = useState(current.id);
+  const taken = new Set(
+    game.players.filter((p) => p.id !== game.playerId).map((p) => serverAvatarId(p)).filter(Boolean) as string[],
+  );
+  const chosen = characterById(picked) ?? current;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const save = () => {
+    setMyAvatarId(picked);
+    syncAvatar(game, picked);
+    buzz(12);
+    onClose();
+  };
+  return createPortal(
+    <div className="profile-backdrop" onClick={onClose}>
+      <div className="profile-dialog" role="dialog" aria-modal="true" aria-label="프로필 수정" onClick={(e) => e.stopPropagation()}>
+        <h3>프로필 수정</h3>
+        <div className="profile-preview">
+          <CharacterAvatar c={chosen} size={76} />
+          <div>
+            <b>{me?.nickname ?? ""}</b>
+            <small>{chosen.name}</small>
+          </div>
+        </div>
+        <p className="profile-sub">채팅과 원탁에서 이 캐릭터로 표시돼요.</p>
+        <div className="profile-grid" role="radiogroup" aria-label="캐릭터 선택">
+          {CHARACTERS.map((c) => {
+            const used = taken.has(c.id);
+            return (
+              <button
+                type="button"
+                key={c.id}
+                role="radio"
+                aria-checked={picked === c.id}
+                aria-label={`${c.name}${used ? " (사용 중)" : ""}`}
+                className={`profile-option${picked === c.id ? " on" : ""}`}
+                disabled={used}
+                onClick={() => setPicked(c.id)}
+              >
+                <CharacterAvatar c={c} size={46} />
+                <span>{used ? "사용 중" : c.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="profile-actions">
+          <button type="button" className="profile-cancel" onClick={onClose}>취소</button>
+          <button type="button" className="profile-save" onClick={save}>저장</button>
+        </div>
+      </div>
+    </div>,
+    document.querySelector("main") ?? document.body,
+  );
+}
 
 function App() {
   const { game, tts, help, error, connectionState, setTts, setHelp, setError } = useGame();
@@ -796,8 +938,9 @@ function CodeTiles({ value, length = 6 }: { value: string; length?: number }) {
 }
 
 /* 대기실 원탁: 들어온 사람의 자리에 가면이 앉는다 */
-function RoundTable({ game }: { game: ClientGameState }) {
+function RoundTable({ game, onEditMe }: { game: ClientGameState; onEditMe: () => void }) {
   const n = game.maxPlayers;
+  const resolve = useCharacterResolver(game.players, game.playerId);
   const allReady = game.players.length === n && game.players.every((p) => p.isReady);
   return (
     <div className={`round-table${allReady ? " all-ready" : ""}`} role="list" aria-label="참가자">
@@ -815,19 +958,27 @@ function RoundTable({ game }: { game: ClientGameState }) {
               <span />
             </div>
           );
+        const isMe = p.id === game.playerId;
+        const ch = resolve(p.id);
         return (
           <div
-            className={`seat${p.isReady ? " ready" : ""}`}
+            className={`seat${p.isReady ? " ready" : ""}${isMe ? " me" : ""}`}
             role="listitem"
-            aria-label={`${p.nickname}${p.isHost ? ", 방장" : ""}${p.isBot ? ", 봇" : ""}, ${p.isReady ? "준비됨" : "대기 중"}`}
+            aria-label={`${p.nickname}, ${ch.name}${p.isHost ? ", 방장" : ""}${p.isBot ? ", 봇" : ""}, ${p.isReady ? "준비됨" : "대기 중"}`}
             style={style}
             key={p.id}
+            onClick={isMe ? onEditMe : undefined}
           >
             <div className="seat-face">
-              <MaskAvatar name={p.nickname} size={50} />
+              <CharacterAvatar c={ch} size={50} />
               {p.isHost && <CrownIcon />}
               {p.isReady && <i className="tick"><CheckIcon size={11} /></i>}
               <i className="seat-flame" aria-hidden="true" />
+              {isMe && (
+                <button type="button" className="seat-edit" aria-label="내 프로필 수정" onClick={(e) => { e.stopPropagation(); onEditMe(); }}>
+                  ✎
+                </button>
+              )}
             </div>
             <b>{p.nickname}</b>
             {p.isBot && <em>봇</em>}
@@ -851,6 +1002,27 @@ function Lobby({ game }: { game: ClientGameState }) {
   const full = game.players.length === game.maxPlayers;
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  // 입장하면 아직 안 쓰인 캐릭터를 자동 배정하고(저장된 선택이 있으면 그대로), 서버에 알린다.
+  const lastSynced = useRef("");
+  const avatarSig = game.players.map((p) => `${p.id}:${serverAvatarId(p) ?? ""}`).join(",");
+  useEffect(() => {
+    const taken = new Set(
+      game.players.filter((p) => p.id !== game.playerId).map((p) => serverAvatarId(p)).filter(Boolean) as string[],
+    );
+    let id = myAvatarId;
+    if (!characterById(id) || taken.has(id!)) {
+      const free = CHARACTERS.filter((c) => !taken.has(c.id));
+      const pool = free.length ? free : CHARACTERS;
+      id = pool[Math.floor(Math.random() * pool.length)]!.id;
+      setMyAvatarId(id);
+    }
+    const key = `${game.roomCode}:${id}`;
+    if (serverAvatarId(me) !== id && lastSynced.current !== key) {
+      lastSynced.current = key;
+      syncAvatar(game, id!);
+    }
+  }, [avatarSig, game.roomCode]); // eslint-disable-line react-hooks/exhaustive-deps
   const fill = game.players.length / Math.max(1, game.maxPlayers);
   const copyCode = () => {
     navigator.clipboard?.writeText(game.roomCode);
@@ -914,7 +1086,9 @@ function Lobby({ game }: { game: ClientGameState }) {
           {game.players.length} / {game.maxPlayers}
         </span>
       </div>
-      <RoundTable game={game} />
+      <RoundTable game={game} onEditMe={() => setProfileOpen(true)} />
+      <p className="profile-hint">내 자리를 눌러 캐릭터를 바꿀 수 있어요</p>
+      {profileOpen && <ProfileDialog game={game} onClose={() => setProfileOpen(false)} />}
       <div className={`lobby-actions${game.hostId === game.playerId ? " host" : ""}`}>
         <button
           className={`lobby-ready${me.isReady ? " is-ready" : ""}`}
@@ -1469,7 +1643,7 @@ function NightControls({ game }: { game: ClientGameState }) {
                   disabled={submitting}
                   key={p.id}
                 >
-                  <div className="avatar">{p.nickname[0]}</div>
+                  <PlayerAvatar playerId={p.id} size={40} />
                   {p.nickname}
                 </button>
               ))}
@@ -1527,7 +1701,8 @@ function useChatMobile() {
   return mobile;
 }
 
-function ChatMessages({ messages, myId, inline, onTap }: { messages: ChatMsg[]; myId: string; inline?: boolean; onTap?: () => void }) {
+function ChatMessages({ messages, myId, players, inline, onTap }: { messages: ChatMsg[]; myId: string; players: ClientGameState["players"]; inline?: boolean; onTap?: () => void }) {
+  const resolve = useCharacterResolver(players, myId);
   const listRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const seen = useRef(messages.length);
@@ -1572,9 +1747,13 @@ function ChatMessages({ messages, myId, inline, onTap }: { messages: ChatMsg[]; 
           const last = !next || !joins(m, next) || formatChatTime(next.at) !== formatChatTime(m.at);
           return (
             <div key={m.id} className={`chat-msg${mine ? " mine" : ""}${first ? " first" : ""}${last ? " last" : ""}`}>
-              {!mine && <i className="chat-avatar" aria-hidden="true">{first ? [...m.nickname][0] : ""}</i>}
+              {!mine && (
+                <i className={`chat-avatar${first ? " has-char" : ""}`} style={first ? { background: resolve(m.playerId).bg } : undefined} aria-hidden="true">
+                  {first ? resolve(m.playerId).emoji : ""}
+                </i>
+              )}
               <div className="chat-msg-main">
-                {!mine && first && <b>{m.nickname}</b>}
+                {!mine && first && <b>{m.nickname}<small>{resolve(m.playerId).name}</small></b>}
                 <div className="chat-bubble-row">
                   <span className="chat-bubble">{m.text}</span>
                   {last && <time>{formatChatTime(m.at)}</time>}
@@ -1719,7 +1898,7 @@ function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGa
   return (
     <Panel className="chat-panel">
       <h3>{title}</h3>
-      <ChatMessages messages={messages} myId={game.playerId} inline onTap={isMobile ? () => openSheet(false) : undefined} />
+      <ChatMessages messages={messages} myId={game.playerId} players={game.players} inline onTap={isMobile ? () => openSheet(false) : undefined} />
       {isMobile ? (
         <button type="button" className="chat-fake-input" onClick={() => openSheet(true)}>
           <span>{placeholder}</span>
@@ -1737,7 +1916,7 @@ function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGa
             <strong className="chat-sheet-title">{title}</strong>
             {status}
           </div>
-          <ChatMessages messages={messages} myId={game.playerId} onTap={() => inputRef.current?.blur()} />
+          <ChatMessages messages={messages} myId={game.playerId} players={game.players} onTap={() => inputRef.current?.blur()} />
           <div className="chat-sheet-foot">
             <ChatComposer text={text} setText={setText} placeholder={placeholder} onSend={sendChat} inputRef={inputRef} autoFocus={focusOnOpen.current} />
           </div>
@@ -1945,7 +2124,7 @@ function Voting({ game }: { game: ClientGameState }) {
               disabled={me.hasVoted}
               aria-pressed={target === p.id}
             >
-              <MaskAvatar name={p.nickname} size={64} />
+              <PlayerAvatar playerId={p.id} size={64} />
               <b>{p.nickname}</b>
               {target === p.id && <WaxSeal size={40} />}
             </button>
@@ -2062,7 +2241,7 @@ function TallyBoard({ r }: { r: ResultData }) {
             style={{ left: `${x}%`, top: `${y}%`, ["--tdelay" as string]: `${end}s` } as React.CSSProperties}
             key={p.id}
           >
-            <MaskAvatar name={p.nickname} size={46} />
+            <PlayerAvatar playerId={p.id} size={46} />
             <b>{p.nickname}</b>
           </div>
         );
@@ -2310,7 +2489,7 @@ function Result({ game }: { game: ClientGameState }) {
             </b>
             <div className="outcome-list">
               {winners.map((p) => (
-                <span key={p.id}>{p.nickname}</span>
+                <span key={p.id}><PlayerAvatar playerId={p.id} size={18} />{p.nickname}</span>
               ))}
             </div>
           </div>
@@ -2320,7 +2499,7 @@ function Result({ game }: { game: ClientGameState }) {
             </b>
             <div className="outcome-list">
               {losers.map((p) => (
-                <span key={p.id}>{p.nickname}</span>
+                <span key={p.id}><PlayerAvatar playerId={p.id} size={18} />{p.nickname}</span>
               ))}
             </div>
           </div>
@@ -2330,7 +2509,7 @@ function Result({ game }: { game: ClientGameState }) {
         <h3>최종 역할</h3>
         {r.players.map((p) => (
           <div className={r.executedIds.includes(p.id) ? "result-row dead" : "result-row"} key={p.id}>
-            <div className="avatar">{p.nickname[0]}</div>
+            <PlayerAvatar playerId={p.id} size={40} />
             <div>
               <b>{p.nickname}</b>
               <small>처음 {ROLE_DEFINITIONS[p.originalRole].name} · 득표 {r.receivedVoteCounts[p.id] ?? 0}표</small>
@@ -2526,7 +2705,7 @@ function PeopleReveal({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.12 }}
             >
-              <div className="avatar">{person.nickname[0]}</div>
+              <PlayerAvatar nickname={person.nickname} size={40} />
               <b>{person.nickname}</b>
             </motion.div>
           ))}

@@ -2,6 +2,9 @@ export type RoleType = 'werewolf' | 'alpha_wolf' | 'mystic_wolf' | 'dream_wolf' 
 export type Faction = 'village' | 'werewolf' | 'minion' | 'tanner';
 export type Phase = 'lobby' | 'card_reveal' | 'night' | 'day' | 'voting' | 'result';
 export type NightActionKind = 'none' | 'inspect_player' | 'inspect_center' | 'inspect_players' | 'swap_player' | 'swap_players' | 'swap_center' | 'protect' | 'confirm';
+/** Profile character IDs accepted by the server and shared with every client. */
+export declare const AVATAR_IDS: readonly ["wolf", "fox", "owl", "cat", "rabbit", "bear", "bat", "deer", "frog", "lion", "panda", "octopus", "raccoon", "penguin", "boar", "turtle"];
+export type AvatarId = (typeof AVATAR_IDS)[number];
 export interface RoleDefinition {
     id: RoleType;
     name: string;
@@ -26,6 +29,8 @@ export interface Player {
     hasActedTonight: boolean;
     vote: string | null;
     connected: boolean;
+    /** Selected profile character. Optional for rooms saved before profiles existed. */
+    avatar?: AvatarId;
     /** Server-controlled participant used only in test bot rooms. */
     isBot?: boolean;
     /** Server timestamp used to resolve a player who does not return after a grace period. */
@@ -122,6 +127,7 @@ export interface Room {
 export interface PublicPlayer {
     id: string;
     nickname: string;
+    avatar?: AvatarId;
     isReady: boolean;
     hasConfirmedCard: boolean;
     connected: boolean;

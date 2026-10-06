@@ -9,6 +9,13 @@ export type Faction = 'village' | 'werewolf' | 'minion' | 'tanner';
 export type Phase = 'lobby' | 'card_reveal' | 'night' | 'day' | 'voting' | 'result';
 export type NightActionKind = 'none' | 'inspect_player' | 'inspect_center' | 'inspect_players' | 'swap_player' | 'swap_players' | 'swap_center' | 'protect' | 'confirm';
 
+/** Profile character IDs accepted by the server and shared with every client. */
+export const AVATAR_IDS = [
+  'wolf', 'fox', 'owl', 'cat', 'rabbit', 'bear', 'bat', 'deer',
+  'frog', 'lion', 'panda', 'octopus', 'raccoon', 'penguin', 'boar', 'turtle',
+] as const;
+export type AvatarId = (typeof AVATAR_IDS)[number];
+
 export interface RoleDefinition {
   id: RoleType; name: string; emoji: string; description: string; faction: Faction;
   nightOrder: number | null; nightAction: NightActionKind; winCondition: string; canActAtNight: boolean; maxCount: number;
@@ -17,6 +24,8 @@ export interface Player {
   id: string; nickname: string; sessionToken: string; socketId: string | null;
   originalRole: RoleType | null; currentRole: RoleType | null; isReady: boolean;
   hasConfirmedCard: boolean; hasActedTonight: boolean; vote: string | null; connected: boolean;
+  /** Selected profile character. Optional for rooms saved before profiles existed. */
+  avatar?: AvatarId;
   /** Server-controlled participant used only in test bot rooms. */
   isBot?: boolean;
   /** Server timestamp used to resolve a player who does not return after a grace period. */
@@ -53,7 +62,7 @@ export interface Room {
   lobbyExpiresAt?: number | null; allOfflineExpiresAt?: number | null; resultExpiresAt?: number | null;
   createdAt: number; updatedAt: number;
 }
-export interface PublicPlayer { id: string; nickname: string; isReady: boolean; hasConfirmedCard: boolean; connected: boolean; isHost: boolean; hasVoted: boolean; isBot: boolean; }
+export interface PublicPlayer { id: string; nickname: string; avatar?: AvatarId; isReady: boolean; hasConfirmedCard: boolean; connected: boolean; isHost: boolean; hasVoted: boolean; isBot: boolean; }
 export interface ClientGameState {
   roomCode: string; playerId: string; hostId: string; maxPlayers: number; phase: Phase; selfRole: RoleType | null;
   /** Monotonic-enough server revision used to discard delayed Socket packets. */
