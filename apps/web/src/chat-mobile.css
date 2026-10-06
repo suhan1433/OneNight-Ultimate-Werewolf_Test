@@ -1,0 +1,88 @@
+/* ============================================================
+   채팅 — 모바일 메신저 UX (카카오톡 · iMessage · 텔레그램 · 디스코드 패턴)
+   · 말풍선 / 연속 메시지 묶음 / 시간은 묶음 끝에만
+   · 둥근 입력창 + 동그란 전송 버튼, 자동 높이 조절
+   · 모바일: 전체 화면 채팅 시트 (키보드 위에 입력창 고정)
+   ============================================================ */
+
+/* ---------- 대화 목록 ---------- */
+.chat-list-wrap{position:relative}
+.chat-list{display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:4px 2px}
+.chat-list-wrap.inline .chat-list{min-height:96px;max-height:260px;margin:8px 0}
+.chat-empty{margin:auto;padding:24px 0;text-align:center;color:var(--muted);font-size:.86rem;line-height:1.6}
+
+.chat-msg{display:flex;align-items:flex-end;gap:8px;max-width:86%;align-self:flex-start;margin-top:2px}
+.chat-msg.first{margin-top:10px}
+.chat-msg:first-child{margin-top:0}
+.chat-msg.mine{align-self:flex-end}
+.chat-avatar{flex:0 0 30px;width:30px;height:30px;align-self:flex-start;display:grid;place-items:center;border-radius:50%;background:#2d2a5c;color:var(--gold);font:700 .8rem var(--serif);font-style:normal}
+.chat-avatar:empty{background:none}
+.chat-msg-main{min-width:0;display:flex;flex-direction:column;gap:3px}
+.chat-msg.mine .chat-msg-main{align-items:flex-end}
+.chat-msg-main b{margin-left:2px;color:var(--gold);font-size:.76rem;font-weight:600}
+.chat-bubble-row{display:flex;align-items:flex-end;gap:6px;min-width:0}
+.chat-msg.mine .chat-bubble-row{flex-direction:row-reverse}
+.chat-bubble{min-width:0;padding:8px 12px;border-radius:16px;background:#29264f;color:var(--text);font-size:.95rem;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-msg:not(.mine).first .chat-bubble{border-top-left-radius:4px}
+.chat-msg.mine.first .chat-bubble{border-top-right-radius:4px}
+.chat-msg.mine .chat-bubble{background:#5a56a8;color:#faf9ff}
+.chat-bubble-row time{flex:none;padding-bottom:2px;color:var(--muted);font-size:.66rem;white-space:nowrap}
+
+main.day .chat-avatar{background:#ecd29a;color:#7b4a13}
+main.day .chat-msg-main b{color:#9a5a12}
+main.day .chat-bubble{background:#f1dfbc;color:#58391f}
+main.day .chat-msg.mine .chat-bubble{background:#e7be71;color:#4a2f1a}
+main.day .chat-bubble-row time,main.day .chat-empty{color:#8f6b3d}
+
+/* 새 메시지 알림: 위쪽을 읽는 중일 때만 표시 */
+.chat-new{position:absolute;left:50%;bottom:10px;translate:-50% 0;z-index:2;padding:7px 14px;border-radius:999px;background:var(--gold);color:#1b1440;font-size:.82rem;font-weight:700;box-shadow:0 6px 18px #0006;cursor:pointer}
+main.day .chat-new{background:#8a4b12;color:#fff8e6}
+
+/* ---------- 입력창 ---------- */
+.chat-composer{display:flex;align-items:flex-end;gap:8px;margin:0}
+.chat-composer textarea{flex:1;min-width:0;min-height:44px;max-height:120px;margin:0;padding:11px 16px;resize:none;overflow-y:auto;border-radius:22px;border:1px solid var(--line);background:#0a082066;color:var(--text);font:inherit;font-size:16px; /* 16px 미만이면 iOS 가 확대함 */line-height:22px;outline:none;transition:border-color .2s,box-shadow .2s}
+.chat-composer textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px #dcbc6a22}
+.chat-composer textarea::placeholder{color:#7d7799}
+.chat-send{flex:none;width:44px;height:44px;padding:0;display:grid;place-items:center;border-radius:50%;background:linear-gradient(#f3dd91,#dcbc6a);color:#1b1440;cursor:pointer;transition:background .2s,color .2s,transform .1s}
+.chat-send svg{width:20px;height:20px}
+.chat-send:active:not(:disabled){transform:scale(.92)}
+.chat-send:disabled{background:#ffffff14;color:#8a85a8;cursor:default}
+main.day .chat-composer textarea{color:#4a2f1a;background:#fffdf5;border-color:#caa85e}
+main.day .chat-composer textarea::placeholder{color:#a08a64}
+main.day .chat-send{background:linear-gradient(#f4cf80,#e0a93f);color:#4a2f1a}
+main.day .chat-send:disabled{background:#0000000d;color:#b79d6c}
+
+/* 모바일 미리보기 상태의 가짜 입력창: 누르면 채팅 시트가 열린다 */
+.chat-fake-input{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:46px;margin:0;padding:0 5px 0 16px;border-radius:23px;border:1px solid var(--line);background:#0a082066;color:#7d7799;font-size:.95rem;text-align:left;cursor:text}
+.chat-fake-input span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-fake-input i{flex:none;width:36px;height:36px;display:grid;place-items:center;border-radius:50%;background:#ffffff14;color:#8a85a8}
+.chat-fake-input svg{width:18px;height:18px}
+main.day .chat-fake-input{background:#fffdf5;border-color:#caa85e;color:#a08a64}
+main.day .chat-fake-input i{background:#0000000d;color:#b79d6c}
+
+/* ---------- 모바일 전체 화면 채팅 시트 ---------- */
+html.chat-open,html.chat-open body{overflow:hidden;overscroll-behavior:none}
+.chat-sheet{
+  position:fixed;left:0;right:0;z-index:70;
+  top:var(--chat-top,0px);height:var(--chat-h,100dvh); /* JS 가 visualViewport(키보드 제외 영역)로 갱신 */
+  display:flex;flex-direction:column;overscroll-behavior:contain;
+  padding-bottom:env(safe-area-inset-bottom);
+  background:linear-gradient(#14112f,#0b0a22);color:var(--text);
+  animation:chatsheet .22s cubic-bezier(.2,.8,.2,1) both;
+}
+.chat-sheet[data-keyboard="true"]{padding-bottom:0}
+main.day .chat-sheet{background:linear-gradient(#fff9ea,#f6e6bd);color:#4a2f1a}
+@keyframes chatsheet{from{opacity:0;transform:translateY(24px)}}
+
+.chat-sheet-head{flex:none;display:flex;align-items:center;gap:6px;min-height:52px;padding:max(6px,env(safe-area-inset-top)) 14px 6px 6px;border-bottom:1px solid var(--line);background:inherit}
+.chat-sheet-back{flex:none;width:40px;height:40px;padding:0;display:grid;place-items:center;border-radius:50%;background:none;color:inherit;cursor:pointer}
+.chat-sheet-back svg{width:24px;height:24px}
+.chat-sheet-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:700 1.02rem var(--serif)}
+.chat-sheet-timer{flex:none;padding:5px 11px;border-radius:999px;background:#ffffff12;color:var(--gold);font:700 .95rem var(--numeral);font-variant-numeric:tabular-nums}
+main.day .chat-sheet-timer{background:#8a4b1214;color:#8a4b12}
+.chat-sheet-timer.urgent{color:#e0554a;animation:pulse 1s infinite}
+
+.chat-sheet .chat-list-wrap{flex:1 1 auto;min-height:0}
+.chat-sheet .chat-list{position:absolute;inset:0;padding:10px 12px 14px}
+.chat-sheet-foot{flex:none;padding:8px 10px 10px;border-top:1px solid var(--line);background:inherit}
+main.day .chat-sheet-head,main.day .chat-sheet-foot{border-color:#e0c27f}

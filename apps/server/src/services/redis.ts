@@ -70,6 +70,8 @@ function append(store: Map<string, ChatMessage[]>, code: string, message: ChatMe
 }
 export async function appendChat(code: string, message: ChatMessage) { return append(chats, code, message); }
 export async function appendLobbyChat(code: string, message: ChatMessage) { return append(lobbyChats, code, message); }
+/** Day discussion belongs to one game, not to later rematches in the same room. */
+export async function clearChat(code: string) { chats.delete(code); }
 export async function clearLobbyChat(code: string) { lobbyChats.delete(code); }
 
 export async function withRoomLock<T>(code: string, fn: (room: Room, alreadyProcessed: boolean) => Promise<T> | T, requestId?: string): Promise<T> {
@@ -108,6 +110,22 @@ export async function recordVote(code: string, playerId: string, targetPlayerId:
   if (added) roomVotes.set(playerId, targetPlayerId); votes.set(code, roomVotes); return { added, count: roomVotes.size };
 }
 export async function getVotes(code: string): Promise<Record<string, string>> { return Object.fromEntries(votes.get(code) ?? []); }
+/**
+ * Ballots live outside the Room document so concurrent vote submissions can be
+ * recorded independently. A rematch keeps player IDs, therefore its ballots
+ * must be explicitly discarded before the new game begins.
+ */
+export async function clearVotes(code: string) { votes.delete(code); }
+/** Remove a departed player both as a voter and as a vote target. */
+export async function removeVotesForPlayer(code: string, playerId: string): Promise<Record<string, string>> {
+  const roomVotes = votes.get(code);
+  if (!roomVotes) return {};
+  for (const [voterId, targetId] of roomVotes) {
+    if (voterId === playerId || targetId === playerId) roomVotes.delete(voterId);
+  }
+  if (!roomVotes.size) votes.delete(code);
+  return Object.fromEntries(roomVotes);
+}
 export async function toggleReady(code: string, playerId: string, requestId: string) {
   if (getProcessed(code, requestId) > Date.now()) return ready.get(code)?.get(playerId) ?? false;
   setProcessed(code, requestId); const players = ready.get(code) ?? new Map<string, boolean>(); const next = !players.get(playerId);

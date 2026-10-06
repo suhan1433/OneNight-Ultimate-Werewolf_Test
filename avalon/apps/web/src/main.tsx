@@ -12,6 +12,7 @@ import './lobby.css';
 import './reveal.css';
 import './vote.css';
 import './cinematic.css';
+import './chat-mobile.css';
 import {TeamScene,QuestScene,AssassinScene,EndingScene} from './CinematicScenes';
 import {GateIntro,Table,useGateIntro} from './GateIntro';
 import {RV,findMates,useHold} from './RoleScene';
@@ -515,20 +516,123 @@ function Board({game}:{game:ClientGameState}){
   </>;
 }
 
+/* ------------------------------------------------------------------
+   채팅 — 모바일 메신저 UX
+   · 모바일: 전체 화면 채팅 화면(키보드 바로 위에 입력창 고정, 대화만 스크롤)
+   · 데스크톱: 기존처럼 우하단 플로팅 패널
+   · 말풍선 묶음/시간 표시, 위로 읽는 중 자동 스크롤 중단 + "새 메시지" 버튼
+   ------------------------------------------------------------------ */
+const CHAT_MOBILE_QUERY='(max-width: 640px), (pointer: coarse) and (max-width: 900px)';
+const CHAT_GROUP_MS=3*60_000;
+type ChatMsg=NonNullable<ClientGameState['chat']>[number];
+const chatAt=(m:ChatMsg)=>(m as {at?:number}).at;
+const chatTime=(at?:number)=>at?new Date(at).toLocaleTimeString('ko-KR',{hour:'numeric',minute:'2-digit'}):'';
+let chatDraft=''; // 채팅을 닫았다 열어도 쓰던 글 유지
+
+function useChatMobile(){
+  const[mobile,setMobile]=useState(()=>window.matchMedia(CHAT_MOBILE_QUERY).matches);
+  useEffect(()=>{const mq=window.matchMedia(CHAT_MOBILE_QUERY);const update=()=>setMobile(mq.matches);mq.addEventListener('change',update);return()=>mq.removeEventListener('change',update);},[]);
+  return mobile;
+}
+
 function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
-  const[draft,setDraft]=useState('');
-  const latestRef=useRef<HTMLDivElement>(null);
-  const latestMessageId=game.chat?.[game.chat.length-1]?.id;
-  useEffect(()=>{latestRef.current?.scrollIntoView({block:'end'});},[latestMessageId]);
-  const send=(event:React.FormEvent)=>{event.preventDefault();const text=draft.trim();if(!text)return;setDraft('');call('CHAT_SEND',{roomCode:game.roomCode,text});};
-  return <aside className="chat-panel" aria-label="원탁 채팅">
-    <div className="chat-title"><span>원탁의 대화</span><small>DISCUSSION</small><button type="button" onClick={close} aria-label="채팅 닫기">×</button></div>
-    <div className="chat-log" aria-live="polite">
-      {game.chat?.length?game.chat.map(message=><div className={`chat-message ${message.playerId===game.playerId?'mine':''}`} key={message.id}><b>{message.nickname}</b><p>{message.text}</p></div>):<div className="chat-empty">아직 대화가 없습니다.<br/>원정대를 논의해보세요.</div>}<div ref={latestRef}/>
+  const[draft,setDraftState]=useState(chatDraft);
+  const[unread,setUnread]=useState(0);
+  const mobile=useChatMobile();
+  const messages=game.chat??[];
+  const panelRef=useRef<HTMLElement>(null);
+  const listRef=useRef<HTMLDivElement>(null);
+  const inputRef=useRef<HTMLTextAreaElement>(null);
+  const stick=useRef(true);
+  const seen=useRef(messages.length);
+  const closeRef=useRef(close);closeRef.current=close;
+  const setDraft=(value:string)=>{chatDraft=value;setDraftState(value);};
+  const toBottom=(smooth=false)=>{const el=listRef.current;if(el)el.scrollTo({top:el.scrollHeight,behavior:smooth?'smooth':'auto'});};
+
+  useLayoutEffect(()=>{toBottom();},[]);
+  useLayoutEffect(()=>{
+    const added=messages.length-seen.current;seen.current=messages.length;
+    if(added<=0)return;
+    // 내가 보냈거나 맨 아래를 보고 있으면 따라가고, 위쪽을 읽는 중이면 위치를 지킨다.
+    if(stick.current||messages[messages.length-1]?.playerId===game.playerId){toBottom();setUnread(0);}
+    else setUnread(n=>n+added);
+  },[messages.length]);
+  useEffect(()=>{
+    // 키보드가 열리거나 입력창이 늘어나 목록 높이가 바뀌어도 맨 아래를 유지한다.
+    const el=listRef.current;if(!el||typeof ResizeObserver==='undefined')return;
+    const ro=new ResizeObserver(()=>{if(stick.current)toBottom();});ro.observe(el);return()=>ro.disconnect();
+  },[]);
+
+  // 모바일: 배경 스크롤 잠금 + 키보드를 제외한 보이는 영역(visualViewport)에 높이 맞춤
+  useEffect(()=>{
+    if(!mobile)return;
+    const root=document.documentElement;root.classList.add('chat-open');
+    const vv=window.visualViewport;const panel=panelRef.current;
+    const fit=()=>{
+      if(!panel)return;
+      const h=vv?.height??window.innerHeight;
+      panel.style.setProperty('--chat-h',`${h}px`);
+      panel.style.setProperty('--chat-top',`${vv?.offsetTop??0}px`);
+      panel.dataset.keyboard=String(window.innerHeight-h>120);
+    };
+    fit();vv?.addEventListener('resize',fit);vv?.addEventListener('scroll',fit);window.addEventListener('resize',fit);
+    return()=>{vv?.removeEventListener('resize',fit);vv?.removeEventListener('scroll',fit);window.removeEventListener('resize',fit);root.classList.remove('chat-open');};
+  },[mobile]);
+  // 모바일: 기기 뒤로가기로 채팅 화면만 닫는다
+  useEffect(()=>{
+    if(!mobile)return;
+    history.pushState({chatSheet:true},'');
+    const onPop=()=>closeRef.current();window.addEventListener('popstate',onPop);
+    return()=>{window.removeEventListener('popstate',onPop);if(history.state?.chatSheet)history.back();};
+  },[mobile]);
+  useLayoutEffect(()=>{ // 줄 수에 따라 입력창 높이 자동 조절(최대 약 4줄)
+    const el=inputRef.current;if(!el)return;el.style.height='auto';el.style.height=`${Math.min(el.scrollHeight,112)}px`;
+  },[draft]);
+
+  const onScroll=()=>{const el=listRef.current;if(!el)return;stick.current=el.scrollHeight-el.scrollTop-el.clientHeight<80;if(stick.current)setUnread(0);};
+  const send=(event?:React.FormEvent)=>{
+    event?.preventDefault();const text=draft.trim();if(!text)return;
+    setDraft('');call('CHAT_SEND',{roomCode:game.roomCode,text});
+    inputRef.current?.focus(); // 전송 후에도 키보드 유지
+  };
+  const coarse=window.matchMedia('(pointer: coarse)').matches;
+  const joins=(a?:ChatMsg,b?:ChatMsg)=>{
+    if(!a||!b||a.playerId!==b.playerId)return false;
+    const ta=chatAt(a),tb=chatAt(b);return ta&&tb?tb-ta<CHAT_GROUP_MS:true;
+  };
+  return <aside ref={panelRef} className="chat-panel" aria-label="원탁 채팅">
+    <div className="chat-title">
+      <button type="button" className="ac-back" onClick={close} aria-label="채팅 닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <span>원탁의 대화</span><small>DISCUSSION</small>
+      <button type="button" className="ac-close" onClick={close} aria-label="채팅 닫기">×</button>
     </div>
-    <form className="chat-compose" onSubmit={send}>
-      <input value={draft} maxLength={300} onChange={event=>setDraft(event.target.value)} placeholder="원탁에 메시지 보내기" aria-label="채팅 메시지"/>
-      <button type="submit" disabled={!draft.trim()} aria-label="전송"><SpearIcon size={17}/></button>
+    <div className="ac-list-wrap">
+      <div className="ac-list" ref={listRef} onScroll={onScroll} onClick={()=>{if(mobile)inputRef.current?.blur();}} role="log" aria-live="polite">
+        {messages.length===0&&<div className="ac-empty">아직 대화가 없습니다.<br/>원정대를 논의해보세요.</div>}
+        {messages.map((m,i)=>{
+          const prev=messages[i-1],next=messages[i+1];const mine=m.playerId===game.playerId;
+          const first=!joins(prev,m);
+          const last=!next||!joins(m,next)||chatTime(chatAt(next))!==chatTime(chatAt(m));
+          return <div key={m.id} className={`ac-msg${mine?' mine':''}${first?' first':''}${last?' last':''}`}>
+            {!mine&&<i className="ac-avatar" aria-hidden="true">{first?[...m.nickname][0]:''}</i>}
+            <div className="ac-msg-main">
+              {!mine&&first&&<b>{m.nickname}</b>}
+              <div className="ac-bubble-row"><span className="ac-bubble">{m.text}</span>{last&&chatTime(chatAt(m))&&<time>{chatTime(chatAt(m))}</time>}</div>
+            </div>
+          </div>;
+        })}
+      </div>
+      {unread>0&&<button type="button" className="ac-new" onClick={()=>{toBottom(true);setUnread(0);}}>새 메시지 {unread>1?`${unread}개 `:''}↓</button>}
+    </div>
+    <form className="ac-compose" onSubmit={send}>
+      <textarea ref={inputRef} rows={1} value={draft} maxLength={300} autoComplete="off" placeholder="원탁에 메시지 보내기" aria-label="채팅 메시지"
+        onChange={event=>setDraft(event.target.value)}
+        onKeyDown={event=>{
+          // 데스크톱: Enter 전송 / Shift+Enter 줄바꿈. 모바일: Enter 는 줄바꿈, 전송은 버튼.
+          // 한글 조합 중 Enter 는 무시해 마지막 글자가 중복 전송되지 않게 한다.
+          if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing&&!coarse){event.preventDefault();send();}
+        }}/>
+      <button type="submit" className="ac-send" disabled={!draft.trim()} aria-label="전송" onMouseDown={event=>event.preventDefault()}><SpearIcon size={19}/></button>
     </form>
   </aside>;
 }
@@ -555,6 +659,7 @@ function RoleDossier({game,close}:{game:ClientGameState;close:()=>void}){
 function App(){
   const{game,error,setError,setGame}=useGame();
   const[chatOpen,setChatOpen]=useState(false);
+  const[seenChatId,setSeenChatId]=useState<string|null>(null);
   const[helpOpen,setHelpOpen]=useState(false);
   const[dossierOpen,setDossierOpen]=useState(false);
   useLayoutEffect(()=>{
@@ -612,8 +717,8 @@ function App(){
         :<Board game={game}/>} 
     </div>
     {game&&['lobby','team_build','team_vote','vote_result','quest_result'].includes(game.phase)&&<>
-      {!chatOpen&&<button className="chat-toggle" onClick={()=>setChatOpen(true)}><span>✦</span> 원탁 채팅 {game.chat?.length?`(${game.chat.length})`:''}</button>}
-      {chatOpen&&<ChatPanel game={game} close={()=>setChatOpen(false)}/>} 
+      {!chatOpen&&<button className="chat-toggle" onClick={()=>{setSeenChatId(game.chat?.[game.chat.length-1]?.id??null);setChatOpen(true);}}><span>✦</span> 원탁 채팅 {(()=>{const list=game.chat??[];const idx=seenChatId?list.findIndex(item=>item.id===seenChatId):-1;const unread=seenChatId&&idx>=0?list.length-1-idx:list.length;return unread>0?<em className="ac-badge">{unread>99?'99+':unread}</em>:null;})()}</button>}
+      {chatOpen&&<ChatPanel game={game} close={()=>{setSeenChatId(game.chat?.[game.chat.length-1]?.id??null);setChatOpen(false);}}/>} 
     </>} 
     {curtain>0&&<StartCurtain key={curtain} onStart={()=>{window.setTimeout(()=>setHoldLobby(false),LOBBY_TL.swap*1000);}} onEnd={()=>setCurtain(0)}/>}
     {helpOpen&&<HelpModal close={()=>setHelpOpen(false)}/>}

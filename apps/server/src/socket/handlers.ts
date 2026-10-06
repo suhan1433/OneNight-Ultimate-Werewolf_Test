@@ -3,7 +3,7 @@ import type { Server, Socket } from 'socket.io';
 import { NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type ClientGameState, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
 import { z } from 'zod';
 import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
-import { appendChat, appendLobbyChat, canCreateRoom, clearLobbyChat, clearReadiness, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, saveRoom, sweepExpiredRooms, toggleReady, withRoomLock } from '../services/redis.js';
+import { appendChat, appendLobbyChat, canCreateRoom, clearChat, clearLobbyChat, clearReadiness, clearVotes, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, removeVotesForPlayer, saveRoom, sweepExpiredRooms, toggleReady, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 
 const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/);
@@ -139,8 +139,10 @@ export function registerHandlers(io: Server, socket: Socket) {
       if (alreadyProcessed) return room;
       room.players = room.players.filter((p) => p.id !== playerId);
       room.nightActionQueue = room.nightActionQueue.map((action) => ({ ...action, playerIds: action.playerIds.filter((id) => id !== playerId), actedPlayerIds: action.actedPlayerIds.filter((id) => id !== playerId) }));
-      delete room.votes[playerId];
-      for (const [voterId, targetId] of Object.entries(room.votes)) if (targetId === playerId) delete room.votes[voterId];
+      // The ballot map is stored outside the Room for atomic vote submission.
+      // Keep it in sync when a player leaves so departed ballots cannot affect
+      // a later tally for the remaining players.
+      room.votes = await removeVotesForPlayer(room.roomCode, playerId);
       delete room.privateResults[playerId];
       if (room.hostId === playerId && room.players.length) room.hostId = room.players.find((p) => p.connected)?.id ?? room.players[0]!.id;
       if (room.phase === 'card_reveal' && room.players.length && room.players.every((p) => p.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startNightIntro(room)); }
@@ -192,6 +194,10 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (room.players.length !== room.maxPlayers || !room.players.every((p) => p.isReady)) throw new Error('정원이 모두 입장하고 준비해야 합니다.');
     if (room.selectedRoles.length !== room.players.length + 3) throw new Error('역할 카드는 인원수 + 3장 모두 선택해야 시작할 수 있습니다.');
     const assigned = assignRoles(room.players, room.selectedRoles);
+    // Votes are stored separately from the room for atomic confirmations.
+    // Starting a rematch reuses player IDs, so retaining this map would make
+    // last game's ballots look like instant votes in the new voting phase.
+    await clearVotes(room.roomCode);
     room.players = assigned.players.map((player) => ({ ...player, vote: null, hasConfirmedCard: !!player.isBot })); room.centerCards = assigned.centerCards; room.phase = 'card_reveal'; room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
     await clearLobbyChat(room.roomCode);
   }, 'GAME_STARTED'));
@@ -295,11 +301,12 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (completed.phase === 'result') { await emitRoomState(io, completed); io.to(roomChannel(completed.roomCode)).emit('GAME_RESULT', completed.result); }
     return { votesCompleted };
   });
-  on(socket, 'GAME_RESTART', async (raw) => mutate(io, socket, raw, (room, playerId) => {
+  on(socket, 'GAME_RESTART', async (raw) => mutate(io, socket, raw, async (room, playerId) => {
     if (room.hostId !== playerId || room.phase !== 'result') throw new Error('방장만 대기실로 돌아갈 수 있습니다.');
     room.players = room.players.map((p) => ({ ...p, originalRole: null, currentRole: null, isReady: !!p.isBot, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
     room.centerCards = []; room.phase = 'lobby'; room.nightActionQueue = []; room.currentNightActionIndex = 0; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.publicReveals = []; room.nightLog = []; room.chat = []; room.dayExpiresAt = null; room.result = null; room.protectedPlayerId = null; room.lobbyExpiresAt = Date.now() + LOBBY_TTL_MS; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
-  }, 'PHASE_CHANGED', (room) => { void clearReadiness(room.roomCode); }));
+    await Promise.all([clearChat(room.roomCode), clearReadiness(room.roomCode), clearVotes(room.roomCode)]);
+  }, 'PHASE_CHANGED'));
 
   socket.on('disconnect', async () => {
     const code = socket.data.roomCode as string | undefined; const playerId = socket.data.playerId as string | undefined; if (!code || !playerId) return;

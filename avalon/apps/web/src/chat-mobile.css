@@ -1,0 +1,70 @@
+/* ============================================================
+   아발론 채팅 — 모바일 메신저 UX
+   · 모바일: 전체 화면 채팅 (키보드 위에 입력창 고정, 대화만 스크롤)
+   · 데스크톱: 우하단 플로팅 패널 유지 (말풍선·입력창만 개선)
+   ============================================================ */
+
+/* ---------- 토글 버튼: 안 읽은 메시지 배지 ---------- */
+.chat-toggle{display:inline-flex;align-items:center;gap:6px}
+.ac-badge{min-width:18px;height:18px;padding:0 5px;display:inline-grid;place-items:center;border-radius:999px;background:var(--evil-300);color:#fff;font:700 11px/1 'Noto Sans KR',sans-serif;font-style:normal}
+
+/* ---------- 패널 (데스크톱 기본) ---------- */
+aside.chat-panel{width:min(340px,calc(100vw - 36px));height:min(460px,calc(100dvh - 120px));overflow:hidden}
+.chat-title .ac-back{display:none}
+.chat-title .ac-close{width:26px;height:26px;padding:0;border:0;background:transparent;color:var(--muted);font-size:22px;line-height:1;cursor:pointer}
+.chat-title .ac-close:hover{color:var(--gold-300);background:transparent}
+
+/* ---------- 대화 목록 ---------- */
+.ac-list-wrap{position:relative;flex:1 1 auto;min-height:0}
+.ac-list{position:absolute;inset:0;display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:10px 12px 12px;scrollbar-width:thin;scrollbar-color:#c9a35c66 transparent}
+.ac-empty{margin:auto;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
+
+.ac-msg{display:flex;align-items:flex-end;gap:8px;max-width:88%;align-self:flex-start;margin-top:2px}
+.ac-msg.first{margin-top:10px}
+.ac-msg:first-child{margin-top:0}
+.ac-msg.mine{align-self:flex-end}
+.ac-avatar{flex:0 0 28px;width:28px;height:28px;align-self:flex-start;display:grid;place-items:center;border-radius:50%;background:#1c2740;border:1px solid #c9a35c55;color:var(--gold-300);font:700 12px 'Noto Sans KR',sans-serif;font-style:normal}
+.ac-avatar:empty{background:none;border-color:transparent}
+.ac-msg-main{min-width:0;display:flex;flex-direction:column;gap:3px}
+.ac-msg.mine .ac-msg-main{align-items:flex-end}
+.ac-msg-main b{margin-left:2px;color:var(--gold-300);font-size:11px;font-weight:600}
+.ac-bubble-row{display:flex;align-items:flex-end;gap:6px;min-width:0}
+.ac-msg.mine .ac-bubble-row{flex-direction:row-reverse}
+.ac-bubble{min-width:0;padding:8px 12px;border-radius:16px;background:#263653;color:var(--parchment);font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.ac-msg:not(.mine).first .ac-bubble{border-top-left-radius:4px}
+.ac-msg.mine.first .ac-bubble{border-top-right-radius:4px}
+.ac-msg.mine .ac-bubble{background:#315884;color:#f4f8ff}
+.ac-bubble-row time{flex:none;padding-bottom:2px;color:var(--muted);font-size:10px;white-space:nowrap}
+
+/* 위쪽을 읽는 중 새 메시지가 오면 표시 */
+.ac-new{position:absolute;left:50%;bottom:10px;translate:-50% 0;z-index:2;padding:7px 14px;border:0;border-radius:999px;background:var(--gold-300);color:#1b1304;font:700 12px 'Noto Sans KR',sans-serif;box-shadow:0 6px 18px #0009;cursor:pointer}
+
+/* ---------- 입력창 ---------- */
+.ac-compose{flex:none;display:flex;align-items:flex-end;gap:8px;padding:9px 10px;border-top:1px solid #c9a35c33}
+.ac-compose textarea{flex:1;min-width:0;min-height:42px;max-height:112px;margin:0;padding:10px 15px;resize:none;overflow-y:auto;border-radius:21px;border:1px solid #c9a35c55;background:#0a1020aa;color:var(--parchment);font:inherit;font-size:16px; /* 16px 미만이면 iOS 가 확대함 */line-height:22px;outline:none;transition:border-color .2s,box-shadow .2s}
+.ac-compose textarea:focus{border-color:var(--gold-300);box-shadow:0 0 0 3px #f0d18a22}
+.ac-compose textarea::placeholder{color:#7d8699}
+.ac-send{flex:none;width:42px;height:42px;padding:0;display:grid;place-items:center;border:0;border-radius:50%;background:linear-gradient(#f6dc98,#c9a35c);color:#1b1304;cursor:pointer;transition:background .2s,color .2s,transform .1s}
+.ac-send:active:not(:disabled){transform:scale(.92)}
+.ac-send:disabled{background:#ffffff14;color:#7d8699;cursor:default}
+
+/* ---------- 모바일: 전체 화면 채팅 ---------- */
+html.chat-open,html.chat-open body{overflow:hidden;overscroll-behavior:none}
+@media (max-width:640px),(pointer:coarse) and (max-width:900px){
+  aside.chat-panel{
+    left:0;right:0;bottom:auto;width:auto;max-width:none;border:0;border-radius:0;z-index:40;
+    top:var(--chat-top,0px);height:var(--chat-h,100dvh); /* JS 가 visualViewport(키보드 제외 영역)로 갱신 */
+    padding-bottom:env(safe-area-inset-bottom);overscroll-behavior:contain;
+    background:linear-gradient(#0f192c,#070c17);backdrop-filter:none;box-shadow:none;
+    animation:acSheet .22s cubic-bezier(.2,.8,.2,1) both;
+  }
+  aside.chat-panel[data-keyboard="true"]{padding-bottom:0}
+  .chat-title{flex:none;min-height:52px;padding:max(6px,env(safe-area-inset-top)) 14px 6px 6px;font-size:14px}
+  .chat-title .ac-back{width:40px;height:40px;padding:0;display:grid;place-items:center;border:0;border-radius:50%;background:none;color:var(--gold-300);cursor:pointer}
+  .chat-title .ac-back svg{width:24px;height:24px}
+  .chat-title .ac-close{display:none}
+  .ac-list{padding:10px 12px 14px}
+  .ac-bubble{font-size:15px}
+  .ac-compose{padding:8px 10px 10px}
+}
+@keyframes acSheet{from{opacity:0;transform:translateY(24px)}}

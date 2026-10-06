@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -32,6 +32,7 @@ import "./polish.css";
 import "./day-vote.css";
 import "./entry.css";
 import "./storyboard.css";
+import "./chat-mobile.css";
 import { Candle, CheckIcon, CopyIcon, CrownIcon, HeroScene, Icon, IconDefs, MaskAvatar, RoleIcon, Sigil, SunArc, VillageStrip, WaxSeal, WolfSilhouette } from "./icons";
 
 const req = (game: ClientGameState) => ({
@@ -1501,55 +1502,248 @@ function NightControls({ game }: { game: ClientGameState }) {
     </>
   );
 }
-function ChatPanel({ game, scope, title, placeholder }: { game: ClientGameState; scope: 'day' | 'lobby'; title: string; placeholder: string }) {
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const chatRef = useRef<HTMLDivElement>(null);
-  const chatFormRef = useRef<HTMLFormElement>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
-  const messages = scope === 'lobby' ? game.lobbyChat : game.chat;
-  const latestMessageId = messages[messages.length - 1]?.id;
+/* ------------------------------------------------------------------
+   채팅 UI — 모바일 메신저(카카오톡·iMessage·텔레그램·디스코드) 패턴
+   · 모바일에서 입력창/대화를 누르면 전체 화면 채팅 시트로 확장
+   · 시트 높이는 visualViewport 에 맞춰 키보드 바로 위에 입력창을 고정
+   · 대화 목록만 스크롤, 헤더·입력창은 항상 제자리
+   · 읽던 위치 보호(위로 스크롤 시 자동 스크롤 중단 + "새 메시지" 버튼)
+   · 같은 사람의 연속 메시지는 묶어서 표시, 시간은 묶음 마지막에만 표시
+   ------------------------------------------------------------------ */
+const CHAT_MOBILE_QUERY = "(max-width: 640px), (pointer: coarse) and (max-width: 900px)";
+const CHAT_GROUP_MS = 3 * 60_000;
+type ChatMsg = ClientGameState["chat"][number];
+const formatChatTime = (at: number) =>
+  new Date(at).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+
+function useChatMobile() {
+  const [mobile, setMobile] = useState(() => window.matchMedia(CHAT_MOBILE_QUERY).matches);
   useEffect(() => {
-    const chat = chatRef.current;
-    if (chat) chat.scrollTop = chat.scrollHeight;
-  }, [latestMessageId]);
-  useEffect(() => {
-    const dismissKeyboard = (event: PointerEvent) => {
-      if (!chatFormRef.current?.contains(event.target as Node)) chatInputRef.current?.blur();
-    };
-    document.addEventListener("pointerdown", dismissKeyboard);
-    return () => document.removeEventListener("pointerdown", dismissKeyboard);
+    const mq = window.matchMedia(CHAT_MOBILE_QUERY);
+    const update = () => setMobile(mq.matches);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
   }, []);
+  return mobile;
+}
+
+function ChatMessages({ messages, myId, inline, onTap }: { messages: ChatMsg[]; myId: string; inline?: boolean; onTap?: () => void }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+  const seen = useRef(messages.length);
+  const [unread, setUnread] = useState(0);
+  const toBottom = (smooth = false) => {
+    const el = listRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  };
+  useLayoutEffect(() => { toBottom(); }, []);
+  useLayoutEffect(() => {
+    const added = messages.length - seen.current;
+    seen.current = messages.length;
+    if (added <= 0) return;
+    // 내가 보냈거나 맨 아래를 보고 있으면 따라가고, 위쪽을 읽는 중이면 위치를 지킨다.
+    if (stick.current || messages[messages.length - 1]?.playerId === myId) { toBottom(); setUnread(0); }
+    else setUnread((n) => n + added);
+  }, [messages.length]);
+  useEffect(() => {
+    // 키보드가 열리거나 입력창이 늘어나 목록 높이가 바뀌어도 맨 아래를 유지한다.
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => { if (stick.current) toBottom(); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const onScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (stick.current) setUnread(0);
+  };
+  const joins = (a?: ChatMsg, b?: ChatMsg) => !!a && !!b && a.playerId === b.playerId && b.at - a.at < CHAT_GROUP_MS;
+  return (
+    <div className={`chat-list-wrap${inline ? " inline" : ""}`}>
+      <div className="chat-list" ref={listRef} onScroll={onScroll} onClick={onTap} role="log" aria-live="polite">
+        {messages.length === 0 && <p className="chat-empty">아직 대화가 없습니다.<br />첫 마디를 건네보세요.</p>}
+        {messages.map((m, i) => {
+          const prev = messages[i - 1];
+          const next = messages[i + 1];
+          const mine = m.playerId === myId;
+          const first = !joins(prev, m);
+          const last = !next || !joins(m, next) || formatChatTime(next.at) !== formatChatTime(m.at);
+          return (
+            <div key={m.id} className={`chat-msg${mine ? " mine" : ""}${first ? " first" : ""}${last ? " last" : ""}`}>
+              {!mine && <i className="chat-avatar" aria-hidden="true">{first ? [...m.nickname][0] : ""}</i>}
+              <div className="chat-msg-main">
+                {!mine && first && <b>{m.nickname}</b>}
+                <div className="chat-bubble-row">
+                  <span className="chat-bubble">{m.text}</span>
+                  {last && <time>{formatChatTime(m.at)}</time>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {unread > 0 && (
+        <button type="button" className="chat-new" onClick={() => { toBottom(true); setUnread(0); }}>
+          새 메시지 {unread > 1 ? `${unread}개 ` : ""}↓
+        </button>
+      )}
+    </div>
+  );
+}
+
+const SendArrow = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" />
+  </svg>
+);
+
+function ChatComposer({ text, setText, placeholder, onSend, inputRef, autoFocus }: {
+  text: string;
+  setText: (value: string) => void;
+  placeholder: string;
+  onSend: () => void;
+  inputRef: React.RefObject<HTMLTextAreaElement>;
+  autoFocus?: boolean;
+}) {
+  useLayoutEffect(() => {
+    // 줄이 늘어나면 입력창도 최대 약 4줄까지 함께 커진다.
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [text]);
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  return (
+    <form className="chat-composer" onSubmit={(e) => { e.preventDefault(); onSend(); }}>
+      <textarea
+        ref={inputRef}
+        rows={1}
+        value={text}
+        autoFocus={autoFocus}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        autoComplete="off"
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          // 데스크톱: Enter 전송 / Shift+Enter 줄바꿈. 모바일: Enter 는 줄바꿈, 전송은 버튼.
+          // 한글 조합 중 Enter(isComposing)는 마지막 글자가 두 번 보내지지 않도록 무시한다.
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !coarse) {
+            e.preventDefault();
+            onSend();
+          }
+        }}
+      />
+      <button
+        type="submit"
+        className="chat-send"
+        aria-label="전송"
+        disabled={!text.trim()}
+        // 전송 버튼을 눌러도 입력창 포커스(= 키보드)가 내려가지 않게 한다.
+        onMouseDown={(e) => e.preventDefault()}
+      >
+        <SendArrow />
+      </button>
+    </form>
+  );
+}
+
+function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGameState; scope: 'day' | 'lobby'; title: string; placeholder: string; status?: React.ReactNode }) {
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  const focusOnOpen = useRef(false);
+  const isMobile = useChatMobile();
+  const sheetOpen = isMobile && open;
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const messages = scope === 'lobby' ? game.lobbyChat : game.chat;
+
+  const openSheet = (withKeyboard: boolean) => { focusOnOpen.current = withKeyboard; setOpen(true); };
+  const closeSheet = () => { inputRef.current?.blur(); setOpen(false); };
+
+  // 시트가 열려 있는 동안: 배경 스크롤 잠금 + 키보드를 뺀 보이는 영역에 높이 맞춤.
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const root = document.documentElement;
+    root.classList.add("chat-open");
+    const vv = window.visualViewport;
+    const sheet = sheetRef.current;
+    const fit = () => {
+      if (!sheet) return;
+      const h = vv?.height ?? window.innerHeight;
+      sheet.style.setProperty("--chat-h", `${h}px`);
+      sheet.style.setProperty("--chat-top", `${vv?.offsetTop ?? 0}px`);
+      sheet.dataset.keyboard = String(window.innerHeight - h > 120);
+    };
+    fit();
+    vv?.addEventListener("resize", fit);
+    vv?.addEventListener("scroll", fit);
+    window.addEventListener("resize", fit);
+    return () => {
+      vv?.removeEventListener("resize", fit);
+      vv?.removeEventListener("scroll", fit);
+      window.removeEventListener("resize", fit);
+      root.classList.remove("chat-open");
+    };
+  }, [sheetOpen]);
+
+  // 안드로이드 뒤로가기 버튼 / iOS 스와이프 뒤로가기로 시트만 닫는다.
+  useEffect(() => {
+    if (!sheetOpen) return;
+    history.pushState({ chatSheet: true }, "");
+    const onPop = () => setOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (history.state?.chatSheet) history.back();
+    };
+  }, [sheetOpen]);
+
   const sendChat = () => {
     const value = text.trim();
-    if (!value || sending) return;
+    if (!value) return;
     const message = { id: crypto.randomUUID(), playerId: game.playerId, nickname: game.players.find((p) => p.id === game.playerId)?.nickname ?? "", text: value, at: Date.now() };
     setText("");
-    requestAnimationFrame(() => chatInputRef.current?.focus());
-    setSending(true);
+    // 보낸 뒤에도 키보드를 유지해 연속으로 바로 입력할 수 있게 한다.
+    inputRef.current?.focus();
     useGame.getState().addChat(message, scope);
     void emitAck("CHAT_SEND", { ...req(game), messageId: message.id, text: value })
       .catch((error) => {
         useGame.getState().removeChat(message.id, scope);
         useGame.getState().setError(error instanceof Error ? error.message : "채팅을 보내지 못했습니다.");
-      })
-      .finally(() => setSending(false));
+      });
   };
+
+  const host = document.querySelector("main") ?? document.body;
   return (
-    <Panel>
+    <Panel className="chat-panel">
       <h3>{title}</h3>
-      <div className="chat" ref={chatRef}>
-        {messages.map((m) => (
-          <div className={`chat-message${m.playerId === game.playerId ? " mine" : ""}`} key={m.id}>
-            <b>{m.nickname}</b>
-            <span>{m.text}</span>
+      <ChatMessages messages={messages} myId={game.playerId} inline onTap={isMobile ? () => openSheet(false) : undefined} />
+      {isMobile ? (
+        <button type="button" className="chat-fake-input" onClick={() => openSheet(true)}>
+          <span>{placeholder}</span>
+          <i aria-hidden="true"><SendArrow /></i>
+        </button>
+      ) : (
+        <ChatComposer text={text} setText={setText} placeholder={placeholder} onSend={sendChat} inputRef={inputRef} />
+      )}
+      {sheetOpen && createPortal(
+        <div className="chat-sheet" ref={sheetRef} role="dialog" aria-label={title}>
+          <div className="chat-sheet-head">
+            <button type="button" className="chat-sheet-back" onClick={closeSheet} aria-label="채팅 닫기">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+            </button>
+            <strong className="chat-sheet-title">{title}</strong>
+            {status}
           </div>
-        ))}
-      </div>
-      <form ref={chatFormRef} className="chat-form" onSubmit={(e) => { e.preventDefault(); sendChat(); }}>
-        <input ref={chatInputRef} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} />
-        <button disabled={sending}>{sending ? "전송 중" : "전송"}</button>
-      </form>
+          <ChatMessages messages={messages} myId={game.playerId} onTap={() => inputRef.current?.blur()} />
+          <div className="chat-sheet-foot">
+            <ChatComposer text={text} setText={setText} placeholder={placeholder} onSend={sendChat} inputRef={inputRef} autoFocus={focusOnOpen.current} />
+          </div>
+        </div>,
+        host,
+      )}
     </Panel>
   );
 }
@@ -1596,7 +1790,13 @@ function Day({ game, fresh }: { game: ClientGameState; fresh: boolean }) {
         ))}
       </div>
       {tab === "chat" ? (
-        <ChatPanel game={game} scope="day" title="마을 대화" placeholder="의심과 단서를 나누세요" />
+        <ChatPanel
+          game={game}
+          scope="day"
+          title="마을 대화"
+          placeholder="의심과 단서를 나누세요"
+          status={<span className={`chat-sheet-timer${urgent ? " urgent" : ""}`}>☀ {formatTime(remain)}</span>}
+        />
       ) : (
         <>
           <Panel>
