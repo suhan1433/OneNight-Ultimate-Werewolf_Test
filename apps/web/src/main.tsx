@@ -1753,7 +1753,7 @@ function ChatMessages({ messages, myId, players, inline, onTap }: { messages: Ch
                 </i>
               )}
               <div className="chat-msg-main">
-                {!mine && first && <b>{m.nickname}<small>{resolve(m.playerId).name}</small></b>}
+                {!mine && first && <b>{m.nickname}</b>}
                 <div className="chat-bubble-row">
                   <span className="chat-bubble">{m.text}</span>
                   {last && <time>{formatChatTime(m.at)}</time>}
