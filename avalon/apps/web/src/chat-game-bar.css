@@ -112,3 +112,43 @@
 }
 @keyframes acMiniIn{from{opacity:0;transform:translateY(8px)}}
 @media (prefers-reduced-motion:reduce){.ac-mini-row{animation:none}}
+
+/* ============================================================
+   행동 도크 (.ac-act) — 채팅을 떠나지 않고 '준비 · 투표 · 계속'을 바로 누른다
+   · mini / half / full 모두에서 '내 차례'일 때만 나타난다
+   · 투표는 실수 방지를 위해 2단계(선택 → 확정). 계속은 투표 공개 연출이 끝난 뒤에만 활성화
+   ============================================================ */
+.ac-act{flex:none;display:flex;align-items:center;gap:10px;margin:4px 10px 0;padding:6px 8px 6px 12px;min-height:56px;
+  border-radius:14px;border:1px solid var(--gold-300);background:linear-gradient(90deg,#f0d18a38,#f0d18a14);
+  animation:acGameFlash .7s ease-out both,acGamePulse 1.8s ease-in-out .7s infinite}
+.ac-act-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ac-act-txt small{font-size:11px;font-weight:700;color:var(--gold-300);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-act-txt b{font-size:13px;font-weight:600;color:var(--parchment);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-act-btns{flex:none;display:flex;gap:6px}
+.ac-act-btns button{min-width:56px;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid transparent;
+  font-size:14px;font-weight:700;line-height:1;cursor:pointer;box-shadow:none;transform:none;white-space:nowrap;touch-action:manipulation}
+.ac-act-btns button:active:not(:disabled){transform:scale(.95)}
+.ac-act-btns button:disabled{opacity:.45;cursor:default}
+.ac-act-go{background:linear-gradient(#f6dc98,#c9a35c);color:#1b1304}
+.ac-act-yes{background:#6eaaff26;border-color:#6eaaff;color:#d6e6ff}
+.ac-act-no{background:#ee546826;border-color:#ee5468;color:#ffd6dc}
+.ac-act-yes.on{background:#6eaaff;color:#07142b}
+.ac-act-no.on{background:#ee5468;color:#2b0710}
+.ac-act-sub{background:none;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.ac-act{animation:none}}
+
+/* 키보드가 올라와 화면이 낮을 땐 행동 줄을 얇게 */
+.chat-panel[data-keyboard="true"] .ac-act{min-height:48px;padding-top:3px;padding-bottom:3px}
+.chat-panel[data-keyboard="true"] .ac-act-btns button{min-height:40px}
+.chat-panel[data-keyboard="true"] .ac-act-txt small{display:none}
+aside.chat-panel[data-size="half"] .ac-act{min-height:52px}
+
+/* ---------- 공개 연출 중: 채팅은 입력창만 남기고 흐리게 — 코인·카드·판결이 가려지지 않게 ---------- */
+aside.chat-panel{transition:opacity .3s ease}
+aside.chat-panel[data-reveal="true"]{opacity:.72}
+aside.chat-panel[data-reveal="true"] .ac-mini-feed{display:none}
+aside.chat-panel[data-reveal="true"] .ac-compose:focus-within{opacity:1}
+
+/* ---------- mini 에서 놓친 새 메시지 수 ---------- */
+.ac-mini-head{position:relative}
+.ac-mini-badge{position:absolute;right:14px;top:50%;translate:0 -50%;pointer-events:none}
