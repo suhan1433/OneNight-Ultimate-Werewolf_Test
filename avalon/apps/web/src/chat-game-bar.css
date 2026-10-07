@@ -1,0 +1,40 @@
+/* ============================================================
+   게임 진행 상태 배너 (모바일 전체화면 채팅 상단)
+   main.tsx 에서 chat-mobile.css 바로 다음에 import
+   · 채팅 중에도 지금 게임이 어디까지 왔는지, 내가 눌러야 하는지 항상 보인다
+   · 탭하면 채팅을 접고 게임 화면으로 돌아간다 (작성 중인 글은 유지)
+   ============================================================ */
+.chat-panel .ac-game{
+  flex:none;display:flex;align-items:center;gap:10px;width:calc(100% - 20px);margin:8px 10px 0;padding:9px 12px;min-height:48px;
+  text-align:left;border-radius:14px;border:1px solid #c9a35c33;background:#ffffff0d;color:var(--parchment);
+  box-shadow:none;transform:none;cursor:pointer}
+.chat-panel .ac-game:hover:not(:disabled){transform:none;border-color:#c9a35c66}
+.chat-panel .ac-game:active:not(:disabled){transform:scale(.99);box-shadow:none}
+.ac-game-dot{flex:none;width:8px;height:8px;border-radius:50%;background:#7d8699}
+.ac-game-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ac-game-txt small{font-size:11px;color:var(--muted);letter-spacing:.02em}
+.ac-game-txt b{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-game-go{flex:none;font-size:12px;font-weight:700;color:var(--gold-300)}
+.chat-panel .ac-game.mine{
+  border-color:var(--gold-300);background:linear-gradient(90deg,#f0d18a38,#f0d18a14);
+  animation:acGameFlash .7s ease-out both,acGamePulse 1.8s ease-in-out .7s infinite}
+.ac-game.mine .ac-game-dot{background:var(--gold-300);box-shadow:0 0 8px var(--gold-300)}
+.ac-game.mine .ac-game-txt small{color:var(--gold-300);font-weight:700}
+.ac-game.mine .ac-game-go{padding:6px 12px;border-radius:999px;background:linear-gradient(#f6dc98,#c9a35c);color:#1b1304}
+@keyframes acGameFlash{0%{transform:scale(.96);filter:brightness(1.8)}100%{transform:none;filter:none}}
+@keyframes acGamePulse{0%,100%{box-shadow:0 0 0 0 #f0d18a55}50%{box-shadow:0 0 0 6px #f0d18a00}}
+@media (prefers-reduced-motion:reduce){.chat-panel .ac-game.mine{animation:none}}
+
+/* 키보드가 올라와 화면이 낮을 땐 한 줄로 줄여 대화 영역을 지킨다 */
+.chat-panel[data-keyboard="true"] .ac-game{min-height:36px;padding:5px 12px}
+.chat-panel[data-keyboard="true"] .ac-game-txt small{display:none}
+
+/* 채팅 버튼(고정)이 하단의 게임 버튼(투표·계속·준비 완료 등)을 가리지 않게 여백 확보 */
+@media (max-width:640px),(pointer:coarse) and (max-width:900px){
+  .app .board,.app .lb{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+}
+
+/* ---------- 채팅 목록: 말풍선이 눌려 찌그러지거나 높이 계산이 어긋나지 않게 ---------- */
+.ac-list>*{flex:none}
+.ac-list>.ac-empty{flex:0 0 auto}
+.ac-list{overflow-anchor:none}

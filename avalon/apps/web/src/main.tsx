@@ -13,6 +13,7 @@ import './reveal.css';
 import './vote.css';
 import './cinematic.css';
 import './chat-mobile.css';
+import './chat-game-bar.css';
 import './profile.css';
 import {CHARACTERS,characterById,myAvatarId,setMyAvatarId,serverAvatarId,syncAvatar,useCharacterResolver,PlayerAvatar,PlayerEmoji,ProfileDialog,type Character} from './profile';
 import {TeamScene,QuestScene,AssassinScene,EndingScene} from './CinematicScenes';
@@ -573,6 +574,36 @@ function useChatMobile(){
   return mobile;
 }
 
+/* 채팅 화면 위에 항상 보여줄 '게임 진행 상태'. mine=true 이면 내가 눌러야 게임이 진행된다 */
+const CHAT_PHASES=['lobby','team_build','team_vote','vote_result','quest_result'];
+function chatGameStatus(game:ClientGameState):{label:string;text:string;count:string;mine:boolean}{
+  const n=game.players.length;
+  const me=game.players.find(p=>p.id===game.playerId);
+  const leader=game.players.find(p=>p.id===game.leaderId)?.nickname??'리더';
+  switch(game.phase){
+    case 'lobby':{
+      const ready=game.players.filter(p=>p.ready).length,host=game.playerId===game.hostId;
+      if(!me?.ready)return{label:'대기실',text:'준비 완료를 눌러주세요',count:`${ready}/${n}`,mine:true};
+      if(host&&ready===n)return{label:'대기실',text:'모두 준비됐어요. 게임을 시작하세요',count:`${ready}/${n}`,mine:true};
+      return{label:'대기실',text:'다른 기사를 기다리는 중',count:`${ready}/${n}`,mine:false};
+    }
+    case 'team_build':
+      return game.leaderId===game.playerId
+        ?{label:'원정대 구성',text:'내가 리더예요. 원정대를 지명하세요',count:'',mine:true}
+        :{label:'원정대 구성',text:`${leader}님이 원정대를 고르는 중`,count:'',mine:false};
+    case 'team_vote':
+      return !me?.hasVoted
+        ?{label:'신뢰의 투표',text:'찬성 · 반대를 선택하세요',count:`${game.teamVotesCompleted}/${n}`,mine:true}
+        :{label:'신뢰의 투표',text:'다른 기사를 기다리는 중',count:`${game.teamVotesCompleted}/${n}`,mine:false};
+    case 'vote_result':
+      return !game.hasContinued
+        ?{label:'원탁의 판결',text:"결과를 보고 '계속'을 눌러주세요",count:`${game.continueConfirmedCount}/${n}`,mine:true}
+        :{label:'원탁의 판결',text:'다른 기사를 기다리는 중',count:`${game.continueConfirmedCount}/${n}`,mine:false};
+    default:
+      return{label:'원정 보고',text:'결과를 확인하는 중',count:'',mine:false};
+  }
+}
+
 function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const[draft,setDraftState]=useState(chatDraft);
   const[unread,setUnread]=useState(0);
@@ -583,19 +614,41 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const listRef=useRef<HTMLDivElement>(null);
   const inputRef=useRef<HTMLTextAreaElement>(null);
   const stick=useRef(true);
-  const seen=useRef(messages.length);
+  const lastId=useRef(messages[messages.length-1]?.id); // 길이가 아니라 '마지막 메시지 id'로 새 메시지를 감지 (서버가 오래된 메시지를 잘라내면 길이가 그대로라 놓침)
   const closeRef=useRef(close);closeRef.current=close;
   const setDraft=(value:string)=>{chatDraft=value;setDraftState(value);};
+  /* 게임 상태가 바뀌어 '내가 할 일'이 생기면: 진동 + 상단 배너 번쩍.
+     글을 쓰는 중이 아니면(입력창 포커스 없음·초안 없음) 잠시 뒤 채팅을 접어 게임 화면을 보여준다. */
+  const st=chatGameStatus(game);
+  const alertKey=`${game.phase}:${game.round}:${game.rejectCount}:${st.mine}`;
+  const prevKey=useRef(alertKey);
+  useEffect(()=>{
+    if(!mobile||prevKey.current===alertKey)return;
+    prevKey.current=alertKey;
+    if(!st.mine)return;
+    navigator.vibrate?.([40,60,40]);
+    const typing=document.activeElement===inputRef.current||chatDraft.trim().length>0;
+    if(typing)return;
+    const t=window.setTimeout(()=>closeRef.current(),1100);
+    return()=>window.clearTimeout(t);
+  },[alertKey,mobile]);
   const toBottom=(smooth=false)=>{const el=listRef.current;if(el)el.scrollTo({top:el.scrollHeight,behavior:smooth?'smooth':'auto'});};
 
   useLayoutEffect(()=>{toBottom();},[]);
+  const curLastId=messages[messages.length-1]?.id;
   useLayoutEffect(()=>{
-    const added=messages.length-seen.current;seen.current=messages.length;
+    const prevId=lastId.current;
+    if(curLastId===prevId)return;
+    lastId.current=curLastId;
+    const idx=prevId==null?-1:messages.findIndex(m=>m.id===prevId);
+    const added=idx>=0?messages.length-1-idx:messages.length;   // 이전 마지막 메시지가 목록에서 밀려났으면 전부 새 메시지
     if(added<=0)return;
     // 내가 보냈거나 맨 아래를 보고 있으면 따라가고, 위쪽을 읽는 중이면 위치를 지킨다.
-    if(stick.current||messages[messages.length-1]?.playerId===game.playerId){toBottom();setUnread(0);}
-    else setUnread(n=>n+added);
-  },[messages.length]);
+    if(stick.current||messages[messages.length-1]?.playerId===game.playerId){
+      stick.current=true;toBottom();setUnread(0);
+      requestAnimationFrame(()=>{if(stick.current)toBottom();}); // 글꼴·이모지 로딩/줄바꿈으로 높이가 늦게 확정돼도 맨 아래 유지
+    }else setUnread(n=>n+added);
+  },[curLastId]);
   useEffect(()=>{
     // 키보드가 열리거나 입력창이 늘어나 목록 높이가 바뀌어도 맨 아래를 유지한다.
     const el=listRef.current;if(!el||typeof ResizeObserver==='undefined')return;
@@ -632,6 +685,7 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const send=(event?:React.FormEvent)=>{
     event?.preventDefault();const text=draft.trim();if(!text)return;
     setDraft('');call('CHAT_SEND',{roomCode:game.roomCode,text});
+    stick.current=true;setUnread(0);toBottom();
     inputRef.current?.focus(); // 전송 후에도 키보드 유지
   };
   const coarse=window.matchMedia('(pointer: coarse)').matches;
@@ -645,6 +699,11 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
       <span>원탁의 대화</span><small>DISCUSSION</small>
       <button type="button" className="ac-close" onClick={close} aria-label="채팅 닫기">×</button>
     </div>
+    {mobile&&<button type="button" key={alertKey} className={`ac-game${st.mine?' mine':''}`} onClick={close} aria-label={`게임 화면으로 돌아가기. ${st.label}: ${st.text}`}>
+      <i className="ac-game-dot" aria-hidden="true"/>
+      <span className="ac-game-txt"><small>{st.mine?'내 차례':st.label}{st.count&&` · ${st.count}`}</small><b>{st.text}</b></span>
+      <span className="ac-game-go" aria-hidden="true">{st.mine?'게임으로':'게임 보기'} ›</span>
+    </button>}
     <div className="ac-list-wrap">
       <div className="ac-list" ref={listRef} onScroll={onScroll} onClick={()=>{if(mobile)inputRef.current?.blur();}} role="log" aria-live="polite">
         {messages.length===0&&<div className="ac-empty">아직 대화가 없습니다.<br/>원정대를 논의해보세요.</div>}
@@ -701,6 +760,9 @@ function App(){
   const[seenChatId,setSeenChatId]=useState<string|null>(null);
   const[helpOpen,setHelpOpen]=useState(false);
   const[dossierOpen,setDossierOpen]=useState(false);
+  /* 채팅이 열린 채로 원정/암살 단계를 지나면 chatOpen 이 true 로 남아, 다음 라운드에서 채팅이 저절로 전체화면으로 다시 뜨던 문제 방지 */
+  const chatAllowed=!!game&&CHAT_PHASES.includes(game.phase);
+  useEffect(()=>{if(!chatAllowed&&chatOpen){setSeenChatId(game?.chat?.[game.chat.length-1]?.id??null);setChatOpen(false);}},[chatAllowed,chatOpen]);
   useLayoutEffect(()=>{
     if(!game||!['lobby','result'].includes(game.phase))return;
     const scrollTop=()=>window.scrollTo(0,0);
@@ -755,7 +817,7 @@ function App(){
         :game.phase==='result'?<EndingScene key={game.roomCode} game={game}/>
         :<Board game={game}/>} 
     </div>
-    {game&&['lobby','team_build','team_vote','vote_result','quest_result'].includes(game.phase)&&<>
+    {game&&chatAllowed&&<>
       {!chatOpen&&<button className="chat-toggle" onClick={()=>{setSeenChatId(game.chat?.[game.chat.length-1]?.id??null);setChatOpen(true);}}><span>✦</span> 원탁 채팅 {(()=>{const list=game.chat??[];const idx=seenChatId?list.findIndex(item=>item.id===seenChatId):-1;const unread=seenChatId&&idx>=0?list.length-1-idx:list.length;return unread>0?<em className="ac-badge">{unread>99?'99+':unread}</em>:null;})()}</button>}
       {chatOpen&&<ChatPanel game={game} close={()=>{setSeenChatId(game.chat?.[game.chat.length-1]?.id??null);setChatOpen(false);}}/>} 
     </>} 
