@@ -568,10 +568,24 @@ const chatAt=(m:ChatMsg)=>(m as {at?:number}).at;
 const chatTime=(at?:number)=>at?new Date(at).toLocaleTimeString('ko-KR',{hour:'numeric',minute:'2-digit'}):'';
 let chatDraft=''; // 채팅을 닫았다 열어도 쓰던 글 유지
 type ChatSize='mini'|'half'|'full';
-const CHAT_MINI_H=144; // 모바일 하단 고정 채팅(mini)의 높이(px, 안전영역 제외)
-const CHAT_MINI_REVEAL_H=82; // 공개 연출 중: 대화 줄을 숨기고 입력창만 남겨 연출을 가리지 않는다
-const CHAT_MINI_ACT_H=170; // '내가 눌러야 할 행동'이 있을 때는 행동 줄(+메시지 1줄)이 추가된 높이
+// 모바일 채팅은 '독(mini)'과 '시트(half)' 두 단계뿐이다. (예전 mini→half→full 3단계는 체감상 너무 자주 바뀌었다)
+//  독   : 게임 위에 항상 떠 있다. 대화 말풍선(최근 3개)은 게임 위에 겹쳐 보이되 터치는 통과, 입력창·행동 버튼만 눌린다.
+//  시트 : 지난 대화를 읽을 때만 연다. 높이 78% — 위쪽에 게임이 살짝 보이고, 거기를 탭하거나 ⌄ 를 누르면 독으로 돌아간다.
+const CHAT_COMPOSE_H=60;                 // 입력창 줄 높이(px)
+const CHAT_ACT_H=56;                     // 행동 줄(준비·투표·계속) 높이
+const CHAT_FEED_ROW_H=34;                // 말풍선 한 줄 높이. 줄 수는 화면 높이에 맞춰 1~3개(키보드·가로모드에서는 줄임)
+const CHAT_FEED_TTL=45_000;              // 새 말풍선이 독에 떠 있는 시간. 조용해지면 사라져 게임 화면이 깨끗해진다(지난 대화는 ⌃ 시트에 그대로)
 
+
+function useVisualHeight(){
+  const[h,setH]=useState(()=>Math.round(window.visualViewport?.height??window.innerHeight));
+  useEffect(()=>{
+    const vv=window.visualViewport;const u=()=>setH(Math.round(vv?.height??window.innerHeight));
+    vv?.addEventListener('resize',u);window.addEventListener('resize',u);
+    return()=>{vv?.removeEventListener('resize',u);window.removeEventListener('resize',u);};
+  },[]);
+  return h;
+}
 function useChatMobile(){
   const[mobile,setMobile]=useState(()=>window.matchMedia(CHAT_MOBILE_QUERY).matches);
   useEffect(()=>{const mq=window.matchMedia(CHAT_MOBILE_QUERY);const update=()=>setMobile(mq.matches);mq.addEventListener('change',update);return()=>mq.removeEventListener('change',update);},[]);
@@ -667,6 +681,8 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const[draft,setDraftState]=useState(chatDraft);
   const[unread,setUnread]=useState(0);
   const mobile=useChatMobile();
+  const vh=useVisualHeight();
+  const feedRows=vh<430?1:vh<560?2:3;   // 키보드가 올라오거나 가로모드로 화면이 낮으면 말풍선을 줄여 게임을 지킨다
   const messages=game.chat??[];
   const resolve=useCharacterResolver(game.players,game.playerId);
   const panelRef=useRef<HTMLElement>(null);
@@ -701,9 +717,18 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const curLastId=messages[messages.length-1]?.id;
   const seenRef=useRef<string|undefined>(curLastId);   // mini 에서 놓친 새 메시지 수 계산용: 펼쳐 봤거나 내가 보낸 시점까지는 '본 것'
   useEffect(()=>{if(!isMini)seenRef.current=curLastId;},[isMini,curLastId]);
-  const miniRows=showAct?1:2;
-  const hiddenUnseen=(()=>{if(!isMini)return 0;const i=seenRef.current?messages.findIndex(m=>m.id===seenRef.current):-1;const tail=i>=0?messages.slice(i+1):messages;return Math.max(0,tail.filter(m=>m.playerId!==game.playerId).length-miniRows);})();
-  const miniH=isMini?(revealing?CHAT_MINI_REVEAL_H:showAct?CHAT_MINI_ACT_H:CHAT_MINI_H):CHAT_MINI_H;
+  /* 독의 말풍선: '이 기기에서 새로 도착한' 메시지만 TTL 동안 보여 준다. (서버 시각이 아니라 도착 시각 기준 → 기기 시계가 달라도 안전)
+     입장 시점에 이미 있던 대화는 숨기고, 지난 대화는 ⌃ 로 연다. */
+  const arrivals=useRef(new Map<string,number>());
+  const firstPaint=useRef(true);
+  for(const m of messages)if(!arrivals.current.has(m.id))arrivals.current.set(m.id,firstPaint.current?0:Date.now());
+  useEffect(()=>{firstPaint.current=false;},[]);
+  const[,tick]=useState(0);
+  useEffect(()=>{if(!isMini)return;const iv=window.setInterval(()=>tick(x=>x+1),4000);return()=>window.clearInterval(iv);},[isMini]);
+  const feed=isMini&&!revealing?messages.slice(-feedRows).filter(m=>Date.now()-(arrivals.current.get(m.id)??0)<CHAT_FEED_TTL):[];
+  const hiddenUnseen=(()=>{if(!isMini)return 0;const i=seenRef.current?messages.findIndex(m=>m.id===seenRef.current):-1;const tail=i>=0?messages.slice(i+1):messages;const shown=new Set(feed.map(m=>m.id));return tail.filter(m=>m.playerId!==game.playerId&&!shown.has(m.id)).length;})();
+  const dockSolid=CHAT_COMPOSE_H+(showAct?CHAT_ACT_H:0);          // 실제로 눌리는 영역 = 게임 화면이 비워 줘야 하는 높이
+  const dockTotal=dockSolid+(revealing?0:feedRows*CHAT_FEED_ROW_H);            // 겹쳐 보이는 말풍선까지 포함한 패널 전체 높이 (공개 연출 중엔 말풍선을 숨긴다)
   const toBottom=(smooth=false)=>{const el=listRef.current;if(el)el.scrollTo({top:el.scrollHeight,behavior:smooth?'smooth':'auto'});};
 
   useLayoutEffect(()=>{toBottom();},[]);
@@ -742,9 +767,9 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
       let h:string,top:string,pad:string;
       if(mode==='mini'){
         const safe=kb?'0px':'env(safe-area-inset-bottom,0px)';
-        h=`calc(${miniH}px + ${safe})`;top=`calc(${top0+vvH}px - ${miniH}px - ${safe})`;pad=h;
+        h=`calc(${dockTotal}px + ${safe})`;top=`calc(${top0+vvH}px - ${dockTotal}px - ${safe})`;pad=`calc(${dockTotal}px + ${safe})`;
       }else{
-        const hh=mode==='full'?vvH:Math.min(vvH,Math.max(260,Math.round(vvH*.5)));
+        const hh=kb||mode==='full'?vvH:Math.min(vvH,Math.max(320,Math.round(vvH*.78)));
         h=`${hh}px`;top=`${top0+vvH-hh}px`;pad=mode==='full'?'0px':h;
       }
       panel.style.setProperty('--chat-h',h);
@@ -756,19 +781,15 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
     };
     fit();vv?.addEventListener('resize',fit);vv?.addEventListener('scroll',fit);window.addEventListener('resize',fit);
     return()=>{vv?.removeEventListener('resize',fit);vv?.removeEventListener('scroll',fit);window.removeEventListener('resize',fit);root.classList.remove('chat-open','chat-half');root.style.removeProperty('--chat-pad');};
-  },[mobile,size,miniH]);
+  },[mobile,size,dockSolid,dockTotal]);
   // 핸들/제목줄: 탭 = 펼치기(mini→half), 위로 끌기 = 크게, 아래로 끌기 = 작게(키보드가 열려 있으면 키보드부터 내림)
   const onSheetDown=(e:React.PointerEvent)=>{
     const y0=e.clientY;
     const up=(ev:PointerEvent)=>{
       window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);
-      const dy=ev.clientY-y0;
-      if(Math.abs(dy)<10){if(size==='mini')setSize('half');return;}
-      if(dy>48){
-        if(inputRef.current&&document.activeElement===inputRef.current){inputRef.current.blur();return;}
-        if(size==='full')setSize('half');else if(size==='half')setSize('mini');
-      }else if(dy<-48){
-        if(size==='mini')setSize(dy<-180?'full':'half');else if(size==='half')setSize('full');
+      if(ev.clientY-y0>48){
+        if(inputRef.current&&document.activeElement===inputRef.current){inputRef.current.blur();return;}   // 키보드가 열려 있으면 키보드부터
+        setSize('mini');
       }
     };
     window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);
@@ -813,21 +834,19 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   };
   return <aside ref={panelRef} className="chat-panel" data-reveal={revealing&&isMini?'true':undefined} aria-label="원탁 채팅">
     {isMini?<>
-      <div className="ac-mini-head" onPointerDown={onSheetDown} role="button" aria-label="채팅 펼치기"><i className="ac-grip" aria-hidden="true"/>{hiddenUnseen>0&&<em className="ac-badge ac-mini-badge">+{hiddenUnseen}</em>}</div>
-      {showAct&&<ChatAction game={game} st={st} toGame={()=>closeRef.current()}/>}
-      <div className="ac-mini-feed" onClick={()=>setSize('half')} role="log" aria-live="polite">
-        {messages.length===0&&<div className="ac-mini-empty">원탁에 한마디 남겨보세요</div>}
-        {messages.slice(-miniRows).map(m=>{
+      <div className="ac-mini-feed" role="log" aria-live="polite">
+        {feed.map(m=>{
           const mine=m.playerId===game.playerId,c=resolve(m.playerId);
           return <div key={m.id} className={`ac-mini-row${mine?' mine':''}`}><i className="ac-avatar has-char" style={{background:c.bg}} aria-hidden="true">{c.emoji}</i><span><b>{mine?'나':m.nickname}</b>{m.text}</span></div>;
         })}
       </div>
+      {showAct&&<ChatAction game={game} st={st} toGame={()=>closeRef.current()}/>}
     </>:<>
     <div className="chat-title" onPointerDown={mobile?onSheetDown:undefined}>
       {mobile&&<i className="ac-grip" aria-hidden="true"/>}
       <button type="button" className="ac-back" onClick={()=>closeRef.current()} aria-label="채팅 접기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
       <span>원탁의 대화</span><small>DISCUSSION</small>
-      <button type="button" className="ac-size" onClick={()=>setSize(size==='full'?'half':'full')} aria-label={size==='full'?'채팅 작게 보기':'채팅 크게 보기'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={size==='full'?'M6 9l6 6 6-6':'M6 15l6-6 6 6'}/></svg></button>
+      <button type="button" className="ac-size" onClick={()=>setSize('mini')} aria-label="채팅 접기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
       <button type="button" className="ac-close" onClick={close} aria-label="채팅 닫기">×</button>
     </div>
     {mobile&&(showAct?<ChatAction game={game} st={st} toGame={()=>closeRef.current()}/>:<button type="button" key={alertKey} className={`ac-game${st.mine?' mine':''}`} onClick={()=>closeRef.current()} aria-label={`게임 화면으로 돌아가기. ${st.label}: ${st.text}`}>
@@ -855,6 +874,7 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
     </div>
     </>}
     <form className="ac-compose" onSubmit={send}>
+      {isMini&&<button type="button" className="ac-expand" onClick={()=>setSize('half')} aria-label={hiddenUnseen>0?`지난 대화 보기, 새 메시지 ${hiddenUnseen}개`:'지난 대화 보기'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>{hiddenUnseen>0&&<em className="ac-badge">{hiddenUnseen>99?'99+':hiddenUnseen}</em>}</button>}
       <textarea ref={inputRef} rows={1} value={draft} maxLength={300} autoComplete="off" placeholder="원탁에 메시지 보내기" aria-label="채팅 메시지"
         onChange={event=>setDraft(event.target.value)}
         onKeyDown={event=>{

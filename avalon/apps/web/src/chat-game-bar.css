@@ -88,28 +88,49 @@
 @media (prefers-reduced-motion:reduce){.chat-peek{animation:none}}
 
 /* ============================================================
-   하단 도킹 채팅 (mini) — 채팅이 '열고 닫는 화면'이 아니라 게임 아래에 항상 붙어 있는 영역
-   · mini: 최근 2줄 + 입력창. 게임이 거의 그대로 보이고, 키보드가 올라와도 그 바로 위에 붙는다
-   · 탭/위로 끌기 → half → full,  아래로 끌기/뒤로가기 → 다시 mini
+   하단 도킹 채팅 — 두 단계뿐: 독(mini) ↔ 시트(half)
+   · 독  : 카드 모양 패널이 아니다. 최근 대화 3개가 말풍선으로 게임 위에 '겹쳐' 보이고(터치는 통과),
+           눌리는 것은 입력창과 행동 버튼(준비·투표·계속)뿐이다. 게임 화면은 그 두 줄만큼만 비켜 준다.
+   · 시트: 지난 대화를 읽을 때만 연다. 위쪽 게임을 탭하거나 ⌄ / 아래로 끌기 / 뒤로가기 → 독
    ============================================================ */
 @media (max-width:640px),(pointer:coarse) and (max-width:900px){
   aside.chat-panel{box-sizing:border-box}
-  /* mini/half 는 게임 모달(도움말·역할·나가기 확인)보다 아래에 둔다. full 만 기존처럼 최상단 */
+  /* 독/시트는 게임 모달(도움말·역할·나가기 확인)보다 아래 */
   aside.chat-panel[data-size="mini"],aside.chat-panel[data-size="half"]{z-index:11}
   html.chat-half .app .board,html.chat-half .app .lb{padding-bottom:calc(var(--chat-pad,0px) + 16px)}
 
-  .ac-mini-head{flex:none;height:22px;display:grid;place-items:center;touch-action:none;cursor:pointer}
-  .ac-mini-head .ac-grip{position:static;translate:none}
-  .ac-mini-feed{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;cursor:pointer}
-  .ac-mini-row{flex:none;height:32px;display:flex;align-items:center;gap:8px;padding:0 14px;animation:acMiniIn .3s ease-out both}
-  .ac-mini-row .ac-avatar{flex:0 0 22px;width:22px;height:22px;font-size:13px}
-  .ac-mini-row span{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:var(--parchment)}
+  /* 독: 배경·테두리 없는 투명 레이어. 하단 안전영역만 어둡게 채운다 */
+  aside.chat-panel[data-size="mini"]{
+    background:linear-gradient(to top,#070c17fa env(safe-area-inset-bottom,0px),transparent env(safe-area-inset-bottom,0px));
+    border:0;border-radius:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+    pointer-events:none;animation:none}
+  aside.chat-panel[data-size="mini"] .ac-act,
+  aside.chat-panel[data-size="mini"] .ac-compose{pointer-events:auto}
+
+  /* 겹쳐 보이는 대화: 최신이 아래, 오래될수록 흐리게. 길면 2줄까지 */
+  .ac-mini-feed{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;overflow:hidden;padding:0 10px 6px;pointer-events:none}
+  .ac-mini-row{flex:none;max-width:90%;align-self:flex-start;display:flex;align-items:flex-start;gap:7px;padding:4px 12px 4px 4px;
+    border-radius:16px;border:1px solid #c9a35c33;background:#0b1220e6;color:var(--parchment);
+    box-shadow:0 4px 14px #0007;animation:acMiniIn .3s ease-out both}
+  .ac-mini-row:nth-last-child(2){opacity:.82}
+  .ac-mini-row:nth-last-child(3){opacity:.6}
+  .ac-mini-row.mine{align-self:flex-end;background:#1c3a60e6;border-color:#9cc4ff44}
+  .ac-mini-row .ac-avatar{flex:0 0 24px;width:24px;height:24px;font-size:13px}
+  .ac-mini-row span{min-width:0;flex:1;font-size:14px;line-height:1.35;overflow:hidden;overflow-wrap:anywhere;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;align-self:center}
   .ac-mini-row b{margin-right:7px;font-size:12px;font-weight:700;color:var(--gold-300)}
   .ac-mini-row.mine b{color:#9cc4ff}
-  .ac-mini-empty{height:32px;display:flex;align-items:center;padding:0 16px;font-size:13px;color:var(--muted)}
-  aside.chat-panel[data-size="mini"] .ac-compose{padding:6px 10px 8px}
+
+  /* 독의 입력줄: 불투명 바. 왼쪽 ⌃ 로 지난 대화(시트)를 연다 */
+  aside.chat-panel[data-size="mini"] .ac-compose{padding:9px 10px;min-height:60px;background:linear-gradient(#0b1220f4,#070c17fa);border-top:1px solid #c9a35c44;box-sizing:border-box}
   aside.chat-panel[data-size="mini"] .ac-compose textarea{max-height:66px}
+  aside.chat-panel[data-size="half"] .chat-title .ac-size{margin-left:auto}
 }
+.ac-expand{position:relative;flex:none;width:42px;height:42px;padding:0;display:grid;place-items:center;border-radius:50%;
+  border:1px solid #c9a35c55;background:#0a1020aa;color:var(--gold-300);box-shadow:none;transform:none;cursor:pointer;touch-action:manipulation}
+.ac-expand:active:not(:disabled){transform:scale(.92)}
+.ac-expand svg{width:20px;height:20px}
+.ac-expand .ac-badge{position:absolute;top:-6px;right:-6px;pointer-events:none}
 @keyframes acMiniIn{from{opacity:0;transform:translateY(8px)}}
 @media (prefers-reduced-motion:reduce){.ac-mini-row{animation:none}}
 
@@ -142,13 +163,10 @@
 .chat-panel[data-keyboard="true"] .ac-act-btns button{min-height:40px}
 .chat-panel[data-keyboard="true"] .ac-act-txt small{display:none}
 aside.chat-panel[data-size="half"] .ac-act{min-height:52px}
+aside.chat-panel[data-size="mini"] .ac-act{margin:0 10px 6px;min-height:50px;background:linear-gradient(90deg,#3a2f14f2,#1c1a14f2)}
 
 /* ---------- 공개 연출 중: 채팅은 입력창만 남기고 흐리게 — 코인·카드·판결이 가려지지 않게 ---------- */
 aside.chat-panel{transition:opacity .3s ease}
 aside.chat-panel[data-reveal="true"]{opacity:.72}
 aside.chat-panel[data-reveal="true"] .ac-mini-feed{display:none}
 aside.chat-panel[data-reveal="true"] .ac-compose:focus-within{opacity:1}
-
-/* ---------- mini 에서 놓친 새 메시지 수 ---------- */
-.ac-mini-head{position:relative}
-.ac-mini-badge{position:absolute;right:14px;top:50%;translate:0 -50%;pointer-events:none}
