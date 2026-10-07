@@ -54,3 +54,15 @@
 .team-chips .chip,.member-chips>span,.vote-group>div>span,.leader-chip{display:inline-flex;align-items:center;gap:6px;vertical-align:middle}
 .leader-row .pf-avatar{box-shadow:inset 0 0 0 1px #ffffff26}
 .team-chips .pf-avatar,.member-chips .pf-avatar,.vote-group .pf-avatar,.leader-chip .pf-avatar{box-shadow:inset 0 0 0 1px #ffffff26}
+
+/* ---------- 시네마틱 장면(원정대 구성 · 암살 · 엔딩) ---------- */
+/* .cs-avatar 의 링·그림자·호버·선택 연출은 cinematic.css 그대로. 안에 들어가는 글자만 캐릭터 이모지로 바뀐다 */
+.cs-avatar.has-char,.cs-impact-seat>span.has-char{font-family:system-ui,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-style:normal;line-height:1}
+/* 원정대 구성: 캐릭터 고유 색 배경 */
+.cs-team .cs-avatar.has-char{background:var(--pf-bg)}
+/* 암살 장면: 어두운 분위기를 지키되 지목 · 암살자는 캐릭터가 또렷하게 */
+.cs-assassin .cs-avatar.has-char{filter:saturate(.55) brightness(.8)}
+.cs-assassin .targeted .cs-avatar.has-char,.cs-assassin .assassin .cs-avatar.has-char,.cs-assassin .is-chosen .cs-avatar.has-char{filter:none}
+/* 선택된 기사 칩 */
+.cs-selection>div>span{display:inline-flex;align-items:center;gap:6px}
+.cs-selection .pf-avatar{padding:0;border:0;border-radius:50%;animation:none;color:inherit;box-shadow:inset 0 0 0 1px #ffffff26}
