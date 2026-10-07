@@ -193,3 +193,11 @@
 
    /* 코인이 각자 자리 앞(원탁 안쪽 링)에 놓이는 방: 중앙 숫자는 링 안쪽 한가운데에 둔다 */
    .vt.seat-coins .table-center{justify-content:center;padding:0}
+
+   /* ---------- 투표자 공개(ON): 코인이 뒤집히는 순간 그 좌석에 찬성/반대 표식이 새겨진다 ---------- */
+   .vt-mark{position:absolute;left:50%;top:calc(100% + 2px);translate:-50% 0;z-index:3;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;
+     padding:2px 7px 3px;border-radius:99px;font:700 11px/1.1 var(--numeral);letter-spacing:.04em;opacity:0;
+     background:rgba(4,9,13,.82);border:1px solid currentColor;box-shadow:0 0 10px -1px currentColor,0 3px 8px -2px #000;
+     animation:vtMarkIn .45s cubic-bezier(.2,.8,.3,1.2) calc(var(--ft)*1s + .3s) forwards}
+   .vt-mark[data-v=a]{color:#9fcbff}.vt-mark[data-v=r]{color:#ff9aa9}
+   @keyframes vtMarkIn{from{opacity:0;scale:.6;translate:-50% -6px}to{opacity:1;scale:1;translate:-50% 0}}

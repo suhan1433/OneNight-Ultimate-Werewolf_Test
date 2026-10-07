@@ -415,8 +415,10 @@ function ActiveRoles({game}:{game:ClientGameState}){
   return <section className="active-roles"><b>사용 캐릭터</b>{game.activeRoles.map((role,index)=>{const def=ROLE_DEFINITIONS[role];const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span className={def.team} key={`${role}-${index}`} title={delegated?`${def.description} 암살 능력을 함께 가집니다.`:def.description}><RoleIcon role={role} team={def.team} size={14}/>{def.name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</section>;
 }
 
-/* 투표자는 좌석의 완료 점으로만 표시하고, 코인과 결과는 오직 합계로 만든다.
-   따라서 이 화면은 revealedVotes처럼 개인과 선택을 연결하는 정보를 읽지 않는다. */
+/* 방 옵션 '원정 기록 투표자 공개'
+   OFF: 코인은 중앙에 쌓였다가 섞인 뒤 나뉜다. 개인별 투표는 읽지 않고 합계만 쓴다 (익명).
+   ON : 섞지 않는다. 각자 자리 앞에 놓인 코인이 그 사람의 선택이며, 공개 때 그 코인이 그대로 뒤집히고 좌석에 '찬성/반대' 표식이 남는다.
+        서버가 개인별 투표를 아직 주지 않았으면(readVotes=null) 잠깐 대기하고, 끝내 안 오면 안전하게 섞기 연출로 대체한다. */
 function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boolean|null;setApprove:(value:boolean)=>void}){
   const rootRef=useRef<HTMLDivElement>(null);
   const tableRef=useRef<HTMLDivElement>(null);
@@ -428,14 +430,23 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
   const leaderIndex=game.players.findIndex(player=>player.id===game.leaderId);
   /* 방 옵션 '투표자 공개'가 켜져 있으면 자기 앞 코인 = 자기 선택(identity), 아니면 중앙에서 섞어 나눠 놓는다(shuffled).
      옵션이 켜졌어도 서버가 개인별 표를 주지 않으면 shuffled 로 대체된다. voteKey 는 문자열이라 갱신돼도 연출이 다시 시작되지 않는다. */
-  const placement:'seat'|'pile'=game.options?.revealVoteIdentities?'seat':'pile';
-  const voteKey=isResult?(readVotes(game)?.map(value=>value?'1':'0').join('')??''):'';
-  const plan=useMemo<Plan|null>(()=>isResult&&totals?buildPlan(totals.approve,totals.reject,seed,{seats:seatCount,leaderIndex,votes:voteKey?[...voteKey].map(value=>value==='1'):null}):null,[isResult,totals?.approve,totals?.reject,seed,seatCount,leaderIndex,voteKey]);
+  const identityOn=!!game.options?.revealVoteIdentities;
+  const placement:'seat'|'pile'=identityOn?'seat':'pile';
+  const voteKey=isResult&&identityOn?(readVotes(game)?.map(value=>value?'1':'0').join('')??''):'';
+  const[voteWaitOver,setVoteWaitOver]=useState(false);
+  useEffect(()=>{
+    if(!isResult||!identityOn||voteKey){setVoteWaitOver(false);return;}
+    const id=window.setTimeout(()=>setVoteWaitOver(true),1500);
+    return()=>window.clearTimeout(id);
+  },[isResult,identityOn,voteKey]);
+  const holdPlan=isResult&&identityOn&&!voteKey&&!voteWaitOver;              // ON 인데 개인별 투표가 아직 안 왔다: 섞지 말고 기다린다
+  const plan=useMemo<Plan|null>(()=>isResult&&totals&&!holdPlan?buildPlan(totals.approve,totals.reject,seed,{seats:seatCount,leaderIndex,votes:voteKey?[...voteKey].map(value=>value==='1'):null}):null,[isResult,holdPlan,totals?.approve,totals?.reject,seed,seatCount,leaderIndex,voteKey]);
+  const revealing=isResult&&!!plan;
   const coinSeats=isResult?Array.from({length:voteCount},(_,seat)=>seat):game.players.map((player,seat)=>player.hasVoted?seat:-1).filter(seat=>seat>=0);
   const reduced=useReducedMotion();
   const initialCoins=useNewCoins(voteCount);
-  useTableMetrics(tableRef,rootRef,isResult&&!reduced);
-  useRevealEffects(plan,isResult&&!reduced);
+  useTableMetrics(tableRef,rootRef,revealing&&!reduced);
+  useRevealEffects(plan,revealing&&!reduced);
 
   const style=plan?{'--R':`${plan.R}s`,'--S':`${plan.S}s`,'--ld':`${plan.ft[plan.N-1]!-.25}s`,'--sd':`${plan.S+1.2}s`,'--cd':`${plan.S+2}s`,'--kd':`${plan.S+.4}s`} as React.CSSProperties:undefined;
   const point=(id:string)=>{
@@ -446,16 +457,18 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
   const teamPoints=game.proposedTeam.map(point).join(' ');
   const resultPassed=totals?.passed??false;
 
-  return <section ref={rootRef} className={`vt${isResult?' is-reveal':''}${isResult?(resultPassed?' ok':' no'):''}${plan?.mode==='identity'?' identity':''}${placement==='seat'?' seat-coins':''}${reduced?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
+  return <section ref={rootRef} className={`vt${revealing?' is-reveal':''}${revealing?(resultPassed?' ok':' no'):''}${plan?.mode==='identity'?' identity':''}${placement==='seat'?' seat-coins':''}${reduced?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
     <span className="vt-sr">{isResult?`찬성 ${totals?.approve??0}표, 반대 ${totals?.reject??0}표`: `투표 ${voteCount}/${game.players.length}명 완료`}</span>
-    {isResult&&<div className="vt-dark" aria-hidden="true"/>}
+    {revealing&&<div className="vt-dark" aria-hidden="true"/>}
     <div className="vt-wrap">
       <div className="vt-tilt vt-tilt--table">
         <div ref={tableRef} className={`table vt-table table--${game.players.length}`}>
           <div className="table-center"><div className="selection-core"><FactionSeal team="good" size={36}/><strong>{isResult?'투표 공개':`${voteCount} / ${game.players.length}`}</strong><span>{isResult?'원탁의 판결을 확인합니다':'찬성 또는 반대를 비밀리에 선택하세요'}</span></div></div>
           {game.players.map((player,index)=><div className="seat vt-seat" style={{...seatPos(index,game.players.length,game.players.length>=8?39:42),'--i':index} as React.CSSProperties} key={player.id}>
             {player.id===game.leaderId&&<span className={`leader-crown${isResult&&!resultPassed?' vt-crown-seat':''}`} title="리더"><CrownIcon size={16}/></span>}
-            <div className="plate"><SeatFace name={player.nickname} playerId={player.id}/>{player.hasVoted&&<i className="vt-voted" aria-label="투표 완료"/>}</div>
+            {(()=>{const step=plan?.mode==='identity'?plan.stepOf[index]:undefined;const v=step===undefined?undefined:plan?.outcomes[step];
+              return <div className="plate"><SeatFace name={player.nickname} playerId={player.id}/>{player.hasVoted&&!revealing&&<i className="vt-voted" aria-label="투표 완료"/>}
+                {v!==undefined&&<span className="vt-mark" data-v={v?'a':'r'} style={{'--ft':plan!.ft[step!]!.toFixed(3)} as React.CSSProperties}>{v?<CheckIcon size={11}/>:<SwordsIcon size={11}/>}{v?'찬성':'반대'}</span>}</div>;})()}
           </div>)}
         </div>
         <div className="vt-tilt--top" aria-hidden="true">
@@ -477,12 +490,12 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
         </div>
       </div>
     </div>
-    {isResult? <>
-      {plan&&<p className="vt-note">{plan.mode==='identity'?'자리 앞의 코인이 각자의 선택입니다':'표가 섞였습니다 · 누구의 표인지는 공개되지 않습니다'}</p>}
+    {isResult? (plan?<>
+      {plan&&<p className="vt-note">{plan.mode==='identity'?'자리 앞의 코인이 각자의 선택입니다 · 뒤집힌 코인이 곧 그 사람의 표':'표가 섞였습니다 · 누구의 표인지는 공개되지 않습니다'}</p>}
       <div className="vt-summary" style={{zIndex:31}}><span className="a">찬성 <b>{totals?.approve??0}</b></span><i>/</i><span className="r">반대 <b>{totals?.reject??0}</b></span></div>
       <h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2>
       <div className="vt-continue"><button className="primary" disabled={game.hasContinued} onClick={()=>call('VOTE_RESULT_CONTINUE',{roomCode:game.roomCode})}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button></div>
-    </> : <div className="vote-stage">
+    </>:null) : <div className="vote-stage">
       <h2>원정대 투표</h2><div className="team-chips">{game.proposedTeam.map(id=><span className="chip" key={id}><PlayerAvatar playerId={id} size={18}/>{game.players.find(player=>player.id===id)?.nickname}</span>)}</div>
       {game.players.find(player=>player.id===game.playerId)?.hasVoted?<><Pips done={game.teamVotesCompleted} total={game.players.length}/><p className="waiting">다른 기사를 기다리는 중<Dots/></p></>:<><div className="vote-tokens"><button className={`token approve${approve===true?' active':''}`} onClick={()=>setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button><button className={`token reject${approve===false?' active':''}`} onClick={()=>setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button></div><button className="primary seal-btn" disabled={approve===null} onClick={()=>approve!==null&&call('TEAM_VOTE',{roomCode:game.roomCode,approve})}>원정 투표하기 ({game.teamVotesCompleted}/{game.players.length})</button></>}</div>}
   </section>;
