@@ -2,6 +2,7 @@ import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {ROLE_DEFINITIONS,type ClientGameState} from '@werewolf/shared';
 import {emit,socket,getAssassinAim,type AssassinAimState} from './socket';
 import {useGame} from './store';
+import {PlayerAvatar,useCharacterResolver} from './profile';
 
 /* 스토리보드 4(팀 구성) · 6(퀘스트 결과) · 7(암살) · 8(엔딩). 소리·햅틱 없음 — 시각 언어만.
    3·5번 장면과 같은 문법: 놋쇠 인레이 원탁 · 스포트라이트 암전 · 정적 → 타격 → 여운 · 캔버스 입자.
@@ -77,7 +78,9 @@ function Fissure({paths,className=''}:{paths:string[];className?:string}){
 const ALTAR_CRACK=['M14 112 L44 103 L64 115 L90 97 L108 109 L131 90 L150 101 L171 86 L190 98 L213 83 L238 98 L256 89 L286 101','M131 90 L125 71 L136 55 L129 38','M190 98 L198 121 L187 139 L196 160 L189 178','M90 97 L82 122 L90 141','M238 98 L248 117 L241 134','M213 83 L219 63 L212 47'];
 const END_CRACK=['M58 232 L104 214 L132 236 L170 196 L196 214 L226 184 L254 210 L290 196 L342 226','M170 196 L162 150 L186 118 L176 78','M254 210 L270 252 L252 290 L268 330','M132 236 L118 272 L132 306 L124 338','M226 184 L232 140 L216 108','M104 214 L84 188 L88 160'];
 const DEBRIS=Array.from({length:14},(_,i)=>({x:22+((i*47)%56),dx:((i*29)%70)-35,h:46+((i*37)%70),s:3+(i%3),d:(i%7)*.09}));
-function Avatar({name}:{name:string}){return <span className="cs-avatar">{[...name][0]}</span>;}
+/* 기존 .cs-avatar(링·호버·선택 연출)는 그대로 두고, 글자 대신 프로필 캐릭터를 넣는다 */
+function Avatar({playerId}:{playerId:string}){const ch=useCharacterResolver()(playerId);return <span className="cs-avatar has-char" style={vars({'--pf-bg':ch.bg})} aria-hidden="true">{ch.emoji}</span>;}
+function SeatEmoji({playerId}:{playerId:string}){return <>{useCharacterResolver()(playerId).emoji}</>;}
 
 /* =========================================================
    4. 팀 구성 — 일부러 절제한다. 5번(투표 공개)과 대비되는 구간
@@ -114,10 +117,10 @@ export function TeamScene({game}:{game:ClientGameState}){
       </div>
       {game.players.map((player,index)=>{const p=position(index,n);return <div className={`cs-seat${team.includes(player.id)?' selected':''}${player.id===game.leaderId?' leader':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
         {player.id===game.leaderId&&<span className="cs-crown"><Sigil kind="crown" size={24}/></span>}
-        <button type="button" disabled={!leader||submitting||(!team.includes(player.id)&&ready)} aria-pressed={team.includes(player.id)} onClick={()=>toggle(player.id)}><Avatar name={player.nickname}/><span className="cs-name">{player.nickname}</span></button>
+        <button type="button" disabled={!leader||submitting||(!team.includes(player.id)&&ready)} aria-pressed={team.includes(player.id)} onClick={()=>toggle(player.id)}><Avatar playerId={player.id}/><span className="cs-name">{player.nickname}</span></button>
       </div>;})}
     </div></div>
-    <div className="cs-selection" aria-live="polite"><small>선택된 기사 · {team.length}/{game.questSize}</small><div>{selected.length?selected.map(player=><span key={player.id}>{player.nickname}</span>):<em>아직 선택된 기사가 없습니다</em>}</div></div>
+    <div className="cs-selection" aria-live="polite"><small>선택된 기사 · {team.length}/{game.questSize}</small><div>{selected.length?selected.map(player=><span key={player.id}><PlayerAvatar playerId={player.id} size={18}/>{player.nickname}</span>):<em>아직 선택된 기사가 없습니다</em>}</div></div>
     {leader&&<button className="primary cs-propose" disabled={!ready||submitting} onClick={propose}><Sigil kind="crown" size={20}/>{submitting?'원정대를 제안하고 있습니다':'원정대 제안'}</button>}
   </section>;
 }
@@ -241,7 +244,7 @@ export function AssassinScene({game}:{game:ClientGameState}){
       </svg>
       <div className="cs-core"><i className="cs-heart"/><span className="cs-core-dagger"><Sigil kind="dagger" size={50}/></span><small>{locked?'운명이 결정됩니다':'마지막 암살'}</small></div>
       {game.players.map((player,index)=>{const p=position(index,n);const targeted=aim===player.id;return <div data-seat-index={index} className={`cs-seat${targeted?' targeted':''}${chosen===player.id?' is-chosen':''}${player.id===actor?' assassin':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
-        <button type="button" disabled={!authority||!ready||locked||player.id===game.playerId} aria-pressed={chosen===player.id} onPointerEnter={()=>sendAim(player.id)} onPointerLeave={()=>sendAim(chosen)} onFocus={()=>sendAim(player.id)} onBlur={()=>sendAim(chosen)} onClick={()=>{setChosen(player.id);sendAim(player.id);}}><Avatar name={player.nickname}/><span className="cs-name">{player.nickname}</span><i className="cs-target-ring"/></button>
+        <button type="button" disabled={!authority||!ready||locked||player.id===game.playerId} aria-pressed={chosen===player.id} onPointerEnter={()=>sendAim(player.id)} onPointerLeave={()=>sendAim(chosen)} onFocus={()=>sendAim(player.id)} onBlur={()=>sendAim(chosen)} onClick={()=>{setChosen(player.id);sendAim(player.id);}}><Avatar playerId={player.id}/><span className="cs-name">{player.nickname}</span><i className="cs-target-ring"/></button>
       </div>;})}
     </div></div>
     <p className="cs-progress" role="status">{aim?`조준 중: ${game.players.find(player=>player.id===aim)?.nickname??'기사'}`:'아직 조준 대상이 없습니다.'}</p>
@@ -276,7 +279,7 @@ export function EndingScene({game}:{game:ClientGameState}){
       <div className="cs-impact-table" aria-hidden="true">
         <RoundTable/>
         {game.players.map((player,i)=>{const p=position(i,n,CANDLE_R);return <Flame key={`f-${player.id}`} x={p.x} y={p.y} cls={player.id===game.assassinTarget?'is-target':player.id===merlin?.id?'is-merlin':''}/>;})}
-        {game.players.map((player,i)=>{const p=position(i,n);return <div className={`cs-impact-seat${player.id===game.assassinTarget?' is-target':''}${player.id===merlin?.id?' is-merlin':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}><span>{[...player.nickname][0]}</span><small>{player.nickname}</small></div>;})}
+        {game.players.map((player,i)=>{const p=position(i,n);return <div className={`cs-impact-seat${player.id===game.assassinTarget?' is-target':''}${player.id===merlin?.id?' is-merlin':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}><span className="has-char"><SeatEmoji playerId={player.id}/></span><small>{player.nickname}</small></div>;})}
         <div className="cs-impact-fx" style={{left:`${tpos.x}%`,top:`${tpos.y}%`}}>
           <i className="cs-dagger"/><i className="cs-hitring"/><i className="cs-hitring r2"/>
           {shards.map((s,i)=><b className="cs-shard" style={vars({'--dx':`${s.dx}px`,'--dy':`${s.dy}px`,'--s':`${s.s}px`,'--lag':`${s.lag}s`})} key={i}/>)}
@@ -295,7 +298,7 @@ export function EndingScene({game}:{game:ClientGameState}){
         <i className="cs-ending-leak"/>{!good&&<div className="cs-debris-field">{DEBRIS.map((d,i)=><b key={i} className="cs-debris" style={vars({'--x':`${d.x}%`,'--dx':`${d.dx}px`,'--h':`${d.h}px`,'--s':`${d.s}px`,'--dl':`${d.d}s`})}/>)}</div>}
         <div className="cs-ending-sigil"><Sigil kind={good?'good':'evil'} size={86}/></div>
         {game.players.map((player,i)=>{const p=position(i,n,CANDLE_R);return <Flame key={`f-${player.id}`} x={p.x} y={p.y} s={good?1.3:1.1} cls={`end${!good&&snuff.rank[i]===n-1?' last':''}`} style={vars({'--i':snuff.rank[i]!})}>{!good&&<Smoke/>}</Flame>;})}
-        {game.players.map((player,i)=>{const p=position(i,n);const team=teamOf(player.id);return <div className={`cs-ending-seat ${team??'good'}${team===game.winner?' winner':''}`} style={vars({left:`${p.x}%`,top:`${p.y}%`,'--i':snuff.rank[i]!})} key={`s-${player.id}`}><Avatar name={player.nickname}/></div>;})}
+        {game.players.map((player,i)=>{const p=position(i,n);const team=teamOf(player.id);return <div className={`cs-ending-seat ${team??'good'}${team===game.winner?' winner':''}`} style={vars({left:`${p.x}%`,top:`${p.y}%`,'--i':snuff.rank[i]!})} key={`s-${player.id}`}><Avatar playerId={player.id}/></div>;})}
       </div></div>
       {!clock.final&&<Field mode={good?'gold':'ember'} delay={offset+(good?1.5:3)}/>}
     </div>
