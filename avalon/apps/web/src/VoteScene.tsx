@@ -45,11 +45,11 @@ export type Plan={
 export type PlanOpts={seats?:number;leaderIndex?:number;votes?:boolean[]|null};
 
 /** 방 옵션이 '투표자 공개'일 때만 좌석 순서의 개인별 투표를 돌려준다. 서버가 주지 않으면 null (→ shuffled 로 대체).
-    찾는 위치: game.voteResult.votes → game.revealedVotes → roundHistory[현재 라운드].votes  (모두 {플레이어id: 찬성여부}) */
+    찾는 위치: game.voteResult.votes → roundHistory[현재 라운드].votes  (모두 {플레이어id: 찬성여부}) */
 export function readVotes(game:any):boolean[]|null{
   if(!game?.options?.revealVoteIdentities)return null;
   const record=game.roundHistory?.find((item:any)=>item.round===game.round);
-  const map=game.voteResult?.votes??game.revealedVotes??record?.votes;
+  const map=game.voteResult?.votes??record?.votes;
   if(!map||typeof map!=='object')return null;
   const arr=game.players.map((player:any)=>map[player.id]);
   return arr.every((value:unknown)=>typeof value==='boolean')?arr as boolean[]:null;
