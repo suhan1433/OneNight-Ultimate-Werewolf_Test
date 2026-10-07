@@ -781,6 +781,20 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
     const onPop=()=>closeRef.current();window.addEventListener('popstate',onPop);
     return()=>{window.removeEventListener('popstate',onPop);if(history.state?.chatSheet)history.back();};
   },[expanded]);
+  // 모바일 half(중간) 상태: 채팅 밖(게임 화면)을 탭하면 mini 로 내려간다 — 핸들을 잡고 내리지 않아도 된다.
+  // click 캡처 단계에서 감지하므로 스크롤·드래그(click 이 발생하지 않음)는 영향이 없고,
+  // 탭한 게임 버튼은 막지 않고 그대로 동작한다(접히기와 동시에 눌림). 키보드가 열려 있으면 함께 내린다.
+  useEffect(()=>{
+    if(!mobile||size!=='half')return;
+    const onTapOutside=(e:MouseEvent)=>{
+      const t=e.target as Element|null;
+      if(t?.closest?.('.chat-panel'))return;
+      inputRef.current?.blur();
+      closeRef.current();
+    };
+    document.addEventListener('click',onTapOutside,true);
+    return()=>document.removeEventListener('click',onTapOutside,true);
+  },[mobile,size]);
   useLayoutEffect(()=>{ // 줄 수에 따라 입력창 높이 자동 조절(최대 약 4줄)
     const el=inputRef.current;if(!el)return;el.style.height='auto';el.style.height=`${Math.min(el.scrollHeight,112)}px`;
   },[draft]);
