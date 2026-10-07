@@ -9,4 +9,5 @@ describe('Avalon rules',()=>{
  it('requires two failures only in round four with 7+ players',()=>{const r=room(7);r.round=3;expect(doubleFail(r)).toBe(true);expect(questSize(r)).toBe(4);r.maxPlayers=6;expect(doubleFail(r)).toBe(false);});
  it('does not show Mordred to Merlin',()=>{const r=room();r.players[0]!.role='merlin';r.players[1]!.role='mordred';r.players[2]!.role='assassin';expect(intel(r,r.players[0]!)).toEqual(['P2님은 악의 세력입니다.']);});
  it('hides vote identities from round history when the room option is off',()=>{const r=room();r.options.revealVoteIdentities=false;r.roundHistory=[{round:0,leaderId:'0',team:['0','1'],votes:{'0':true,'1':false,'2':true,'3':false,'4':true}}];const history=clientState(r,'0').roundHistory[0]!;expect(history).toMatchObject({approveCount:3,rejectCount:2});expect(history.votes).toBeUndefined();});
+ it('includes each player avatar in public room state',()=>{const r=room();r.players[0]!.avatar='wizard';expect(clientState(r,'0').players[0]).toMatchObject({id:'0',avatar:'wizard'});});
 });

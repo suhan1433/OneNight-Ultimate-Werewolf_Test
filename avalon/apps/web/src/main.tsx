@@ -1,6 +1,7 @@
-import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import React,{useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
+import {createPortal} from 'react-dom';
 import ReactDOM from 'react-dom/client';
-import {ROLE_DEFINITIONS,type AvalonOptions,type ClientGameState,type DelegableAssassinRole} from '@werewolf/shared';
+import {ROLE_DEFINITIONS,type AvatarId,type AvalonOptions,type ClientGameState,type DelegableAssassinRole} from '@werewolf/shared';
 import {useGame} from './store';
 import {emit,saveSession} from './socket';
 import './styles.css';
@@ -13,6 +14,7 @@ import './reveal.css';
 import './vote.css';
 import './cinematic.css';
 import './chat-mobile.css';
+import './profile.css';
 import {TeamScene,QuestScene,AssassinScene,EndingScene} from './CinematicScenes';
 import {GateIntro,Table,useGateIntro} from './GateIntro';
 import {RV,findMates,useHold} from './RoleScene';
@@ -105,8 +107,9 @@ function PhaseBanner({game}:{game:ClientGameState}){
   if(!shown)return null;
   return <div className="phase-banner" key={shown} aria-hidden="true"><small>{game.round+1}번째 원정</small><strong>{BANNERS[game.phase]}</strong></div>;
 }
-function SeatFace({name}:{name:string}){
-  return <><span className="avatar">{[...name][0]?.toUpperCase()??'?'}</span><span className="seat-name">{name}</span></>;
+function SeatFace({name,playerId}:{name:string;playerId:string}){
+  const c=useCharacterResolver()(playerId);
+  return <><span className="avatar has-char" style={{background:c.bg,textTransform:'none'}} aria-hidden="true">{c.emoji}</span><span className="seat-name">{name}</span></>;
 }
 function Pips({done,total}:{done:number;total:number}){
   return <div className="pips" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label="제출 현황">{Array.from({length:total},(_,i)=><i className={i<done?'on':''} key={i}/>)}</div>;
@@ -302,7 +305,7 @@ function Role({game}:{game:ClientGameState}){
           const isMate=mates.has(p.id);
           const k=isMate?[...mates].indexOf(p.id):0;
           const pos=seatPos(i,game.players.length,38);
-          return <span key={p.id} className={`rv-seat${p.id===game.playerId?' me':''}${isMate?' mate':''}`} style={{...pos,'--k':k} as React.CSSProperties}>{[...p.nickname][0]??'?'}</span>;
+          return <span key={p.id} className={`rv-seat${p.id===game.playerId?' me':''}${isMate?' mate':''}`} style={{...pos,'--k':k} as React.CSSProperties}><PlayerEmoji playerId={p.id}/></span>;
         })}</div>}
       </div>}
       <div className="rv-actions">
@@ -312,6 +315,86 @@ function Role({game}:{game:ClientGameState}){
       </div>
     </aside>}
   </section>;
+}
+
+/* ============================================================
+   프로필 캐릭터 — 로비에서 고르면 원탁 좌석 · 채팅에 같은 캐릭터로 나온다
+   · 선택값은 이 브라우저(localStorage)에 저장하고 서버(PROFILE_UPDATE)에도 알린다
+   · 서버가 players[].avatar 를 내려주면 모든 참가자에게 같은 캐릭터가 보인다
+   ============================================================ */
+type Character={id:AvatarId;name:string;emoji:string;bg:string};
+const CHARACTERS:Character[]=[
+  {id:'king',name:'왕',emoji:'🤴',bg:'linear-gradient(135deg,#f6dc98,#a8782a)'},
+  {id:'queen',name:'여왕',emoji:'👸',bg:'linear-gradient(135deg,#f5a9c8,#a8456f)'},
+  {id:'wizard',name:'마법사',emoji:'🧙',bg:'linear-gradient(135deg,#8f86e8,#3b2f8f)'},
+  {id:'elf',name:'엘프',emoji:'🧝',bg:'linear-gradient(135deg,#8fe0b0,#2f7d57)'},
+  {id:'fairy',name:'요정',emoji:'🧚',bg:'linear-gradient(135deg,#b6e3ff,#4a85c4)'},
+  {id:'dragon',name:'용',emoji:'🐉',bg:'linear-gradient(135deg,#ff9a7a,#a63a24)'},
+  {id:'unicorn',name:'유니콘',emoji:'🦄',bg:'linear-gradient(135deg,#f0c8ff,#8a5cc4)'},
+  {id:'wolf',name:'늑대',emoji:'🐺',bg:'linear-gradient(135deg,#9ca3af,#3f4756)'},
+  {id:'eagle',name:'독수리',emoji:'🦅',bg:'linear-gradient(135deg,#d6b27a,#6b4a22)'},
+  {id:'lion',name:'사자',emoji:'🦁',bg:'linear-gradient(135deg,#fcd34d,#b8791a)'},
+  {id:'fox',name:'여우',emoji:'🦊',bg:'linear-gradient(135deg,#f59e0b,#a8470f)'},
+  {id:'owl',name:'올빼미',emoji:'🦉',bg:'linear-gradient(135deg,#b59a7a,#5d4630)'},
+  {id:'bear',name:'곰',emoji:'🐻',bg:'linear-gradient(135deg,#b4783c,#5f3a1c)'},
+  {id:'archer',name:'궁수',emoji:'🏹',bg:'linear-gradient(135deg,#86c98f,#2f6b3c)'},
+  {id:'knight',name:'기사',emoji:'🛡️',bg:'linear-gradient(135deg,#7da7e0,#2a4d86)'},
+  {id:'swordsman',name:'검사',emoji:'⚔️',bg:'linear-gradient(135deg,#cbd5e1,#59657a)'},
+];
+const PROFILE_KEY='avalon-profile-avatar';
+const characterById=(id?:string|null)=>CHARACTERS.find(c=>c.id===id);
+const characterFallback=(key:string)=>{let h=0;for(const ch of key)h=(h*31+ch.charCodeAt(0))>>>0;return CHARACTERS[h%CHARACTERS.length]!;};
+let myAvatarId:string|null=(()=>{try{return localStorage.getItem(PROFILE_KEY);}catch{return null;}})();
+const profileListeners=new Set<()=>void>();
+const setMyAvatarId=(id:string)=>{myAvatarId=id;try{localStorage.setItem(PROFILE_KEY,id);}catch{}profileListeners.forEach(fn=>fn());};
+const useMyAvatarId=()=>useSyncExternalStore(fn=>{profileListeners.add(fn);return()=>{profileListeners.delete(fn);};},()=>myAvatarId,()=>null);
+// 서버가 players[].avatar 를 내려주면 그 값을 쓴다(아직 없으면 undefined)
+const serverAvatarId=(p?:unknown)=>(p as {avatar?:string}|undefined)?.avatar;
+// 서버가 아직 이 이벤트를 몰라도 오류 토스트 없이 로컬 프로필만 유지한다
+const syncAvatar=(roomCode:string,avatar:string)=>{emit('PROFILE_UPDATE',{roomCode,avatar}).catch(()=>{});};
+/* playerId → 캐릭터: 내 것은 로컬 선택 우선, 그 외는 서버 값, 없으면 playerId 기반 고정 기본값 */
+function useCharacterResolver(players?:ClientGameState['players'],myId?:string){
+  const mine=useMyAvatarId();
+  const g=useGame(s=>s.game); // players/myId 를 안 넘겨도 현재 게임 상태에서 찾는다 → 어느 화면에서든 같은 캐릭터
+  const list=players??g?.players??[];const me=myId??g?.playerId;
+  return(playerId:string):Character=>{
+    const server=serverAvatarId(list.find(p=>p.id===playerId));
+    const id=playerId===me?mine??server:server;
+    return characterById(id)??characterFallback(playerId);
+  };
+}
+function CharacterAvatar({c,size=40}:{c:Character;size?:number}){
+  return <span className="pf-avatar" style={{width:size,height:size,fontSize:size*.56,background:c.bg}} aria-hidden="true">{c.emoji}</span>;
+}
+/* playerId 만 주면 그 사람의 프로필 캐릭터를 그려준다 */
+function PlayerAvatar({playerId,size=20}:{playerId:string;size?:number}){const resolve=useCharacterResolver();return <CharacterAvatar c={resolve(playerId)} size={size}/>;}
+function PlayerEmoji({playerId}:{playerId:string}){const resolve=useCharacterResolver();return <>{resolve(playerId).emoji}</>;}
+function ProfileDialog({game,close}:{game:ClientGameState;close:()=>void}){
+  const me=game.players.find(p=>p.id===game.playerId);
+  const resolve=useCharacterResolver(game.players,game.playerId);
+  const current=resolve(game.playerId);
+  const[picked,setPicked]=useState(current.id);
+  const taken=new Set(game.players.filter(p=>p.id!==game.playerId).map(p=>serverAvatarId(p)).filter(Boolean) as string[]);
+  const chosen=characterById(picked)??current;
+  useEffect(()=>{
+    const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape')close();};
+    window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);
+  },[close]);
+  const save=()=>{setMyAvatarId(picked);syncAvatar(game.roomCode,picked);close();};
+  return createPortal(
+    <div className="pf-scrim" onClick={close}>
+      <section className="pf-dialog" role="dialog" aria-modal="true" aria-label="프로필 수정" onClick={e=>e.stopPropagation()}>
+        <small>PROFILE</small>
+        <h3>프로필 수정</h3>
+        <div className="pf-preview"><CharacterAvatar c={chosen} size={76}/><div><b>{me?.nickname??''}</b><em>{chosen.name}</em></div></div>
+        <p className="pf-sub">원탁과 채팅에서 이 캐릭터로 표시돼요.</p>
+        <div className="pf-grid" role="radiogroup" aria-label="캐릭터 선택">
+          {CHARACTERS.map(c=>{const used=taken.has(c.id);return <button type="button" key={c.id} role="radio" aria-checked={picked===c.id} aria-label={`${c.name}${used?' (사용 중)':''}`} className={`pf-option${picked===c.id?' on':''}`} disabled={used} onClick={()=>setPicked(c.id)}><CharacterAvatar c={c} size={46}/><span>{used?'사용 중':c.name}</span></button>;})}
+        </div>
+        <div className="pf-actions"><button type="button" className="pf-cancel" onClick={close}>취소</button><button type="button" className="pf-save" onClick={save}>저장</button></div>
+      </section>
+    </div>,
+    document.body);
 }
 
 function Lobby({game,starting=false}:{game:ClientGameState;starting?:boolean}){
@@ -329,6 +412,25 @@ function Lobby({game,starting=false}:{game:ClientGameState;starting?:boolean}){
     glow.current?.lean(Math.cos(a)*w*.09,Math.sin(a)*w*.09);
   };
   const roster=useRoster(game.players,game.playerId,lean);
+  const[profileOpen,setProfileOpen]=useState(false);
+  const resolve=useCharacterResolver(game.players,game.playerId);
+  // 퇴장하는 사람(ghost 좌석)도 떠나기 직전의 캐릭터로 촛불이 꺼지도록 닉네임별로 기억해 둔다
+  const seenChars=useRef(new Map<string,Character>());
+  game.players.forEach(p=>seenChars.current.set(p.nickname,resolve(p.id)));
+  useEffect(()=>{if(starting)setProfileOpen(false);},[starting]); // 게임이 시작되면 팝업을 닫는다
+  // 입장하면 아직 안 쓰인 캐릭터를 자동 배정하고(저장된 선택이 있으면 그대로) 서버에 알린다
+  const lastSynced=useRef('');
+  const avatarSig=game.players.map(p=>`${p.id}:${serverAvatarId(p)??''}`).join(',');
+  useEffect(()=>{
+    const taken=new Set(game.players.filter(p=>p.id!==game.playerId).map(p=>serverAvatarId(p)).filter(Boolean) as string[]);
+    let id=myAvatarId;
+    if(!characterById(id)||taken.has(id!)){
+      const free=CHARACTERS.filter(c=>!taken.has(c.id));const pool=free.length?free:CHARACTERS;
+      id=pool[Math.floor(Math.random()*pool.length)]!.id;setMyAvatarId(id);
+    }
+    const key=`${game.roomCode}:${id}`;
+    if(serverAvatarId(me)!==id&&lastSynced.current!==key){lastSynced.current=key;syncAvatar(game.roomCode,id!);}
+  },[avatarSig,game.roomCode]);
   const seatAt=(i:number)=>({...seatPos(i,total,41),'--i':i} as React.CSSProperties);
   const letter=(name:string)=>[...name][0]??'?';
   return <section className={`lb${starting?' starting':''}`} style={{'--fill-n':game.players.length/total} as React.CSSProperties}>
@@ -349,21 +451,24 @@ function Lobby({game,starting=false}:{game:ClientGameState;starting?:boolean}){
           const p=game.players[i];
           if(!p&&roster.ghosts.some(g=>g.index===i))return null;           // 촛불이 꺼지는 동안 그 자리는 잔상이 차지한다
           return p
-            ?<div className={`lb-seat${p.ready?' ready':''}${p.isBot?' bot':''}${p.id===game.playerId?' me':''}${roster.fresh.includes(p.id)?' fresh':''}`} style={seatAt(i)} key={p.id}>
+            ?<div className={`lb-seat${p.ready?' ready':''}${p.isBot?' bot':''}${p.id===game.playerId?' me':''}${roster.fresh.includes(p.id)?' fresh':''}`} style={seatAt(i)} key={p.id}
+              {...(p.id===game.playerId?{role:'button',tabIndex:0,'aria-label':`내 프로필 수정 (${p.nickname}, ${resolve(p.id).name})`,onClick:()=>setProfileOpen(true),onKeyDown:(e:React.KeyboardEvent)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setProfileOpen(true);}}}:{})}>
               {p.id===game.hostId&&<span className="lb-crown" title="방장"><CrownIcon size={14}/></span>}
-              <span className="lb-avatar">{letter(p.nickname)}{p.ready&&<span className="lb-ok"><CheckIcon size={11}/></span>}<i className="lb-flame" aria-hidden="true"/></span>
-              <span className="lb-name">{p.id===game.playerId?'나 · ':''}{p.nickname}</span>
+              <span className="lb-avatar has-char" style={{'--pf-bg':resolve(p.id).bg} as React.CSSProperties}>{resolve(p.id).emoji}{p.ready&&<span className="lb-ok"><CheckIcon size={11}/></span>}<i className="lb-flame" aria-hidden="true"/></span>
+              <span className="lb-name">{p.id===game.playerId?'나 · ':''}{p.nickname}{p.id===game.playerId&&<span className="lb-edit" aria-hidden="true"> ✎</span>}</span>
               {p.isBot&&<small>TEST BOT</small>}
             </div>
             :<div className="lb-seat empty" style={seatAt(i)} key={`e${i}`}><span className="lb-avatar"><i>{i+1}</i></span><span className="lb-name">빈 자리</span></div>;
         })}
         {roster.ghosts.map(g=><div className="lb-seat ghost" style={seatAt(g.index)} key={g.key} aria-hidden="true">
-          <span className="lb-avatar">{letter(g.name)}<i className="lb-flame"/></span>
+          {(()=>{const gc=seenChars.current.get(g.name);return <span className={`lb-avatar${gc?' has-char':''}`} style={gc?{'--pf-bg':gc.bg} as React.CSSProperties:undefined}>{gc?gc.emoji:letter(g.name)}<i className="lb-flame"/></span>;})()}
           <span className="lb-name">{g.name}</span>
           <span className="lb-smoke"><i style={{'--k':0} as React.CSSProperties}/><i style={{'--k':1} as React.CSSProperties}/><i style={{'--k':2} as React.CSSProperties}/></span>
         </div>)}
       </div>
     </div>
+    <p className="lb-profile-hint">내 자리를 눌러 캐릭터를 바꿀 수 있어요</p>
+    {profileOpen&&<ProfileDialog game={game} close={()=>setProfileOpen(false)}/>}
     <div className="lb-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=>{const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} size={14}/>{ROLE_DEFINITIONS[role].name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</div></div>
     <div className="lb-actions">
       <button className={`lb-ready${me.ready?' is-ready':''}`} onClick={()=>call('PLAYER_READY',{roomCode:game.roomCode})}>{me.ready?<><CheckIcon size={17}/> 준비 완료됨</>:'준비 완료'}</button>
@@ -380,8 +485,8 @@ function RoundHistory({game,open,setOpen,showSlots=true}:{game:ClientGameState;o
   const rejected=record?.votes&&game.players.filter(player=>record.votes?.[player.id]===false);
   return <>{showSlots&&<section className="round-history" aria-label="원정 라운드 기록">{Array.from({length:5},(_,round)=>{const item=game.roundHistory.find(entry=>entry.round===round);const state=item?.success===true?'success':item?.success===false?'fail':'pending';const status=item?(item.success===undefined?'진행 중':item.success?'성공':'실패'):'대기';return <div className="round-history-item" key={round}><button type="button" disabled={!item} className={`${state} ${round===game.round?'current':''}`} onClick={()=>setOpen(open===round?null:round)} aria-expanded={open===round}><span className="round-label">ROUND {round+1}</span><span className="round-meta">{QUEST_SIZES[game.maxPlayers]?.[round]}명 · {status}</span></button></div>;})}</section>}{record&&<section className="round-detail" aria-live="polite">
     <div className="round-detail-head"><span>ROUND {record.round+1} · 원정 기록</span><b className={record.success===true?'success':record.success===false?'fail':''}>{record.success===undefined?'진행 중':record.success?'원정 성공':'원정 실패'}</b></div>
-    <div className="round-detail-section expedition-detail"><div className="round-detail-label"><FactionSeal team="good" size={18}/><span>원정대</span></div><div className="expedition-content"><span className="leader-chip"><CrownIcon size={13}/> 리더 · {name(record.leaderId)}</span><div className="member-chips">{record.team.map(id=><span key={id}>{name(id)}</span>)}</div></div></div>
-    <div className="round-detail-section"><div className="round-detail-label"><ShieldIcon size={18}/><span>찬반 투표</span></div>{voteComplete?<><div className="vote-summary"><span className="approve"><CheckIcon size={13}/> 찬성 <b>{record.approveCount}</b></span><span className="reject"><SwordsIcon size={13}/> 반대 <b>{record.rejectCount}</b></span></div>{game.options.revealVoteIdentities&&<div className="vote-groups"><div className="vote-group approve"><b><CheckIcon size={13}/> 찬성</b><div>{approved?.map(player=><span key={player.id}>{player.nickname}</span>)}</div></div><div className="vote-group reject"><b><SwordsIcon size={13}/> 반대</b><div>{rejected?.map(player=><span key={player.id}>{player.nickname}</span>)}</div></div></div>}</>:<div className="round-pending"><Dots/> 투표 진행 중</div>}</div>
+    <div className="round-detail-section expedition-detail"><div className="round-detail-label"><FactionSeal team="good" size={18}/><span>원정대</span></div><div className="expedition-content"><span className="leader-chip"><CrownIcon size={13}/> 리더 · <PlayerAvatar playerId={record.leaderId} size={16}/>{name(record.leaderId)}</span><div className="member-chips">{record.team.map(id=><span key={id}><PlayerAvatar playerId={id} size={16}/>{name(id)}</span>)}</div></div></div>
+    <div className="round-detail-section"><div className="round-detail-label"><ShieldIcon size={18}/><span>찬반 투표</span></div>{voteComplete?<><div className="vote-summary"><span className="approve"><CheckIcon size={13}/> 찬성 <b>{record.approveCount}</b></span><span className="reject"><SwordsIcon size={13}/> 반대 <b>{record.rejectCount}</b></span></div>{game.options.revealVoteIdentities&&<div className="vote-groups"><div className="vote-group approve"><b><CheckIcon size={13}/> 찬성</b><div>{approved?.map(player=><span key={player.id}><PlayerAvatar playerId={player.id} size={16}/>{player.nickname}</span>)}</div></div><div className="vote-group reject"><b><SwordsIcon size={13}/> 반대</b><div>{rejected?.map(player=><span key={player.id}><PlayerAvatar playerId={player.id} size={16}/>{player.nickname}</span>)}</div></div></div>}</>:<div className="round-pending"><Dots/> 투표 진행 중</div>}</div>
     <div className="round-detail-section quest-detail"><div className="round-detail-label"><SwordsIcon size={18}/><span>원정 결과</span></div><div>{record.fails===undefined?<span className="round-pending"><Dots/> 원정 결과 대기 중</span>:<div className="quest-card-count"><span className="success"><ShieldIcon size={15}/> 성공 <b>{record.team.length-record.fails}</b></span><span className="fail"><SwordsIcon size={15}/> 실패 <b>{record.fails}</b></span></div>}</div></div>
   </section>}</>;
 }
@@ -430,7 +535,7 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
           <div className="table-center"><div className="selection-core"><FactionSeal team="good" size={36}/><strong>{isResult?'투표 공개':`${voteCount} / ${game.players.length}`}</strong><span>{isResult?'원탁의 판결을 확인합니다':'찬성 또는 반대를 비밀리에 선택하세요'}</span></div></div>
           {game.players.map((player,index)=><div className="seat vt-seat" style={{...seatPos(index,game.players.length,game.players.length>=8?39:42),'--i':index} as React.CSSProperties} key={player.id}>
             {player.id===game.leaderId&&<span className={`leader-crown${isResult&&!resultPassed?' vt-crown-seat':''}`} title="리더"><CrownIcon size={16}/></span>}
-            <div className="plate"><SeatFace name={player.nickname}/>{player.hasVoted&&<i className="vt-voted" aria-label="투표 완료"/>}</div>
+            <div className="plate"><SeatFace name={player.nickname} playerId={player.id}/>{player.hasVoted&&<i className="vt-voted" aria-label="투표 완료"/>}</div>
           </div>)}
         </div>
         <div className="vt-tilt--top" aria-hidden="true">
@@ -458,7 +563,7 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
       <h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2>
       <div className="vt-continue"><button className="primary" disabled={game.hasContinued} onClick={()=>call('VOTE_RESULT_CONTINUE',{roomCode:game.roomCode})}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button></div>
     </> : <div className="vote-stage">
-      <h2>원정대 투표</h2><div className="team-chips">{game.proposedTeam.map(id=><span className="chip" key={id}>{game.players.find(player=>player.id===id)?.nickname}</span>)}</div>
+      <h2>원정대 투표</h2><div className="team-chips">{game.proposedTeam.map(id=><span className="chip" key={id}><PlayerAvatar playerId={id} size={18}/>{game.players.find(player=>player.id===id)?.nickname}</span>)}</div>
       {game.players.find(player=>player.id===game.playerId)?.hasVoted?<><Pips done={game.teamVotesCompleted} total={game.players.length}/><p className="waiting">다른 기사를 기다리는 중<Dots/></p></>:<><div className="vote-tokens"><button className={`token approve${approve===true?' active':''}`} onClick={()=>setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button><button className={`token reject${approve===false?' active':''}`} onClick={()=>setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button></div><button className="primary seal-btn" disabled={approve===null} onClick={()=>approve!==null&&call('TEAM_VOTE',{roomCode:game.roomCode,approve})}>원정 투표하기 ({game.teamVotesCompleted}/{game.players.length})</button></>}</div>}
   </section>;
 }
@@ -472,7 +577,7 @@ function Board({game}:{game:ClientGameState}){
   const phase=game.phase;
   const leaderPlayer=game.players.find(p=>p.id===game.leaderId);
   const leaderName=leaderPlayer?.nickname;
-  const teamChips=(ids:string[])=><div className="team-chips">{ids.map(id=><span className="chip" key={id}>{game.players.find(p=>p.id===id)?.nickname}</span>)}</div>;
+  const teamChips=(ids:string[])=><div className="team-chips">{ids.map(id=><span className="chip" key={id}><PlayerAvatar playerId={id} size={18}/>{game.players.find(p=>p.id===id)?.nickname}</span>)}</div>;
   const meP=game.players.find(p=>p.id===me);
   const myTurn=phase==='team_build'?leader:phase==='team_vote'?!meP?.hasVoted:phase==='quest'?game.proposedTeam.includes(me)&&!meP?.hasQuestCard:phase==='assassination'?!!game.hasAssassinationAbility:false;
   const historyGame=phase==='quest_result'&&!questDisclosed?{...game,results:game.results.slice(0,-1),roundHistory:game.roundHistory.map(record=>record.round===game.round?{...record,fails:undefined,success:undefined}:record)}:game;
@@ -482,7 +587,7 @@ function Board({game}:{game:ClientGameState}){
   return <>
     <header className="game-status" aria-label="현재 원정 현황">
       <div className="leader-row" aria-label="현재 리더와 부결 횟수">
-        <CrownIcon size={15}/><span>리더 <b>{leaderName}</b></span>
+        <CrownIcon size={15}/>{leaderPlayer&&<PlayerAvatar playerId={leaderPlayer.id} size={20}/>}<span>리더 <b>{leaderName}</b></span>
         <div className="reject-track" title="연속 부결 횟수">{Array.from({length:5}).map((_,i)=><i className={i<game.rejectCount?'used':''} key={i}/>)}</div>{game.rejectCount>0&&<small className={`reject-label${game.rejectCount>=4?' danger':''}`}>{game.rejectCount>=4?'한 번 더 부결되면 악의 승리':`부결 ${game.rejectCount}/5`}</small>}
       </div>
       <RoundHistory game={historyGame} open={openRound} setOpen={setOpenRound}/>
@@ -540,6 +645,7 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const[unread,setUnread]=useState(0);
   const mobile=useChatMobile();
   const messages=game.chat??[];
+  const resolve=useCharacterResolver(game.players,game.playerId);
   const panelRef=useRef<HTMLElement>(null);
   const listRef=useRef<HTMLDivElement>(null);
   const inputRef=useRef<HTMLTextAreaElement>(null);
@@ -614,9 +720,9 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
           const first=!joins(prev,m);
           const last=!next||!joins(m,next)||chatTime(chatAt(next))!==chatTime(chatAt(m));
           return <div key={m.id} className={`ac-msg${mine?' mine':''}${first?' first':''}${last?' last':''}`}>
-            {!mine&&<i className="ac-avatar" aria-hidden="true">{first?[...m.nickname][0]:''}</i>}
+            {!mine&&<i className={`ac-avatar${first?' has-char':''}`} style={first?{background:resolve(m.playerId).bg}:undefined} aria-hidden="true">{first?resolve(m.playerId).emoji:''}</i>}
             <div className="ac-msg-main">
-              {!mine&&first&&<b>{m.nickname}</b>}
+              {!mine&&first&&<b>{m.nickname}<small>{resolve(m.playerId).name}</small></b>}
               <div className="ac-bubble-row"><span className="ac-bubble">{m.text}</span>{last&&chatTime(chatAt(m))&&<time>{chatTime(chatAt(m))}</time>}</div>
             </div>
           </div>;

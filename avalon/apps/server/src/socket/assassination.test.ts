@@ -21,6 +21,16 @@ beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();});
 afterEach(()=>{vi.useRealTimers();});
 
 describe('shared assassination scene',()=>{
+ it('stores a valid profile avatar and publishes the updated room state',async()=>{
+  const h=harness();const result=await h.request('PROFILE_UPDATE',{roomCode:h.room.roomCode,avatar:'fox'});
+  expect(result).toMatchObject({ok:true});expect(h.room.players[0]).toMatchObject({avatar:'fox'});expect(db.saveRoom).toHaveBeenCalledOnce();expect(h.broadcast).toHaveBeenCalledWith('ROOM_STATE',expect.objectContaining({players:expect.arrayContaining([expect.objectContaining({id:'assassin',avatar:'fox'})])}));
+ });
+ it('rejects invalid or already claimed profile avatars',async()=>{
+  const h=harness();h.room.players[1]!.avatar='king';
+  expect((await h.request('PROFILE_UPDATE',{roomCode:h.room.roomCode,avatar:'not-an-avatar'})).ok).toBe(false);
+  expect((await h.request('PROFILE_UPDATE',{roomCode:h.room.roomCode,avatar:'king'})).ok).toBe(false);
+  expect(h.room.players[0]!.avatar).toBeUndefined();expect(db.saveRoom).not.toHaveBeenCalled();
+ });
  it('relays only an authenticated assassin aim to their own room',async()=>{
   const h=harness();await h.handlers.get('ASSASSIN_AIM')!({roomCode:h.room.roomCode,targetId:'merlin'});
   expect(h.to).toHaveBeenCalledWith(`game:${h.room.roomCode}`);expect(h.broadcast).toHaveBeenCalledWith('ASSASSIN_AIM',{roomCode:h.room.roomCode,targetId:'merlin',actorId:'assassin',locked:false});expect(h.room.phase).toBe('assassination');expect(db.saveRoom).not.toHaveBeenCalled();

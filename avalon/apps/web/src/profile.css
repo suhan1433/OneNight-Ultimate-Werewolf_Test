@@ -1,0 +1,56 @@
+/* ============================================================
+   프로필 캐릭터 — 로비 좌석 / 채팅 아바타 / 프로필 수정 팝업
+   (main.tsx 에서 chat-mobile.css 다음에 import)
+   ============================================================ */
+
+/* 공통 캐릭터 아바타 */
+.pf-avatar{display:inline-grid;place-items:center;flex:none;border-radius:50%;line-height:1;font-style:normal;font-family:system-ui,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;box-shadow:inset 0 0 0 2px #ffffff26,0 2px 8px #0006;user-select:none}
+
+/* ---------- 로비 좌석 ---------- */
+.lb .lb-seat .lb-avatar.has-char{background:var(--pf-bg);font-family:system-ui,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-style:normal}
+/* 시작 연출(.lb.starting{pointer-events:none}) 중에는 눌리지 않게 한다 */
+.lb:not(.starting) .lb-seat.me{cursor:pointer;pointer-events:auto}
+/* 내 아바타 표시: 기존 링(box-shadow 다중 링·그림자)을 건드리지 않도록 outline 으로 바깥에 한 겹 */
+.lb .lb-seat.me .lb-avatar.has-char{outline:1.5px solid var(--gold-300);outline-offset:7px}
+.lb .lb-seat.me:focus-visible{outline:2px solid #f4d996;outline-offset:4px;border-radius:12px}
+.lb-edit{color:var(--gold-300);font-size:.9em}
+.lb-profile-hint{margin:2px 0 10px;text-align:center;color:var(--muted);font-size:12px}
+.lb .lb-profile-hint{animation:lbGlassRise .85s cubic-bezier(.2,.8,.2,1) .2s backwards} /* lobby.css 의 패널 등장 연출에 맞춤 */
+
+/* ---------- 채팅 ---------- */
+.ac-avatar.has-char{font:normal 15px/1 system-ui,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;border-color:#ffffff33}
+.ac-msg-main b small{margin-left:5px;color:var(--muted);font-size:10px;font-weight:500}
+
+/* ---------- 프로필 수정 팝업 ---------- */
+.pf-scrim{position:fixed;z-index:50;inset:0;display:grid;place-items:center;padding:16px;background:#02040ab8;backdrop-filter:blur(5px);animation:fadeIn .2s ease both}
+.pf-dialog{box-sizing:border-box;width:min(100%,420px);max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;padding:20px 18px 16px;text-align:center;background:linear-gradient(145deg,#192741,#0b1220);border:1px solid #c9a35c88;box-shadow:0 30px 80px #000b;color:var(--parchment)}
+.pf-dialog>small{display:block;letter-spacing:.14em;color:var(--gold-500);font-size:10px}
+.pf-dialog h3{margin:4px 0 14px;font-family:Manrope,'Noto Sans KR',sans-serif;font-size:18px;color:var(--gold-300)}
+.pf-preview{display:flex;align-items:center;justify-content:center;gap:14px;text-align:left}
+.pf-preview>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pf-preview b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px}
+.pf-preview em{font-style:normal;color:var(--gold-300);font-size:13px}
+.pf-sub{margin:10px 0 14px;color:var(--muted);font-size:12px}
+.pf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+
+/* 전역 button 스타일(배경 그라데이션·호버 시 위로 이동)을 이 팝업 안에서는 끈다 */
+:where(.pf-dialog) button{all:unset;box-sizing:border-box;cursor:pointer} /* :where 로 우선순위를 0 으로 낮춰 아래 개별 스타일이 이긴다 */
+.pf-dialog button:focus-visible{outline:2px solid #f4d996;outline-offset:2px}
+.pf-option{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 2px 6px;border:1.5px solid transparent;border-radius:6px;background:#ffffff0d;color:var(--parchment);font-size:11px;font-weight:500}
+.pf-dialog .pf-option:hover:not(:disabled){transform:none;box-shadow:none;border-color:transparent;background:#ffffff18}
+.pf-dialog .pf-option.on,.pf-dialog .pf-option.on:hover:not(:disabled){border-color:var(--gold-300);background:#f0d18a22}
+.pf-dialog .pf-option:active:not(:disabled){transform:scale(.95)}
+.pf-dialog .pf-option:disabled{opacity:.4;cursor:not-allowed}
+.pf-actions{display:flex;gap:10px;margin-top:16px}
+.pf-actions button{flex:1;min-height:44px;display:grid;place-items:center;border-radius:22px;font-size:14px;font-weight:700}
+.pf-dialog .pf-cancel,.pf-dialog .pf-cancel:hover:not(:disabled){transform:none;box-shadow:none;border:0;background:#ffffff14;color:var(--parchment)}
+.pf-dialog .pf-save,.pf-dialog .pf-save:hover:not(:disabled){transform:none;box-shadow:none;border:0;background:linear-gradient(#f6dc98,#c9a35c);color:#1b1304}
+.pf-dialog .pf-actions button:active:not(:disabled){transform:scale(.97)}
+@media (max-width:360px){.pf-grid{grid-template-columns:repeat(3,1fr)}}
+
+/* ---------- 다른 화면(투표 좌석 · 역할 공개 · 원정대 칩 · 라운드 기록) ---------- */
+.avatar.has-char{font-family:system-ui,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-style:normal}
+.rv-seat{font-family:system-ui,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-style:normal}
+.team-chips .chip,.member-chips>span,.vote-group>div>span,.leader-chip{display:inline-flex;align-items:center;gap:6px;vertical-align:middle}
+.leader-row .pf-avatar{box-shadow:inset 0 0 0 1px #ffffff26}
+.team-chips .pf-avatar,.member-chips .pf-avatar,.vote-group .pf-avatar,.leader-chip .pf-avatar{box-shadow:inset 0 0 0 1px #ffffff26}
