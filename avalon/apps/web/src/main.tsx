@@ -728,7 +728,8 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const feed=isMini&&!revealing?messages.slice(-feedRows).filter(m=>Date.now()-(arrivals.current.get(m.id)??0)<CHAT_FEED_TTL):[];
   const hiddenUnseen=(()=>{if(!isMini)return 0;const i=seenRef.current?messages.findIndex(m=>m.id===seenRef.current):-1;const tail=i>=0?messages.slice(i+1):messages;const shown=new Set(feed.map(m=>m.id));return tail.filter(m=>m.playerId!==game.playerId&&!shown.has(m.id)).length;})();
   const dockSolid=CHAT_COMPOSE_H+(showAct?CHAT_ACT_H:0);          // 실제로 눌리는 영역 = 게임 화면이 비워 줘야 하는 높이
-  const dockTotal=dockSolid+(revealing?0:feedRows*CHAT_FEED_ROW_H);            // 겹쳐 보이는 말풍선까지 포함한 패널 전체 높이 (공개 연출 중엔 말풍선을 숨긴다)
+  const feedPad=revealing?0:feedRows*(CHAT_FEED_ROW_H+4)+8;        // 말풍선(패널 위로 자라남)이 차지할 수 있는 높이 — 게임 화면 여백 계산용
+  const dockTotal=dockSolid+feedPad;            // 겹쳐 보이는 말풍선까지 포함한 패널 전체 높이 (공개 연출 중엔 말풍선을 숨긴다)
   const toBottom=(smooth=false)=>{const el=listRef.current;if(el)el.scrollTo({top:el.scrollHeight,behavior:smooth?'smooth':'auto'});};
 
   useLayoutEffect(()=>{toBottom();},[]);
@@ -755,6 +756,8 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   // 모바일 하단 도킹 채팅: mini(항상 보임, 게임이 거의 그대로) → half → full.
   // mini/half 는 게임 화면이 시트 높이만큼 위로 스크롤될 수 있게 여백을 만들고, full 은 배경을 잠근다.
   // half 에서 키보드가 올라오면 전체 높이를, mini 는 키보드 바로 위에 그대로 붙어 게임을 계속 보여준다.
+  const sizeRef=useRef<ChatSize|null>(null);
+  const animTimer=useRef(0);
   useLayoutEffect(()=>{
     if(!mobile)return;
     const root=document.documentElement;
@@ -767,18 +770,25 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
       let h:string,top:string,pad:string;
       if(mode==='mini'){
         const safe=kb?'0px':'env(safe-area-inset-bottom,0px)';
-        h=`calc(${dockTotal}px + ${safe})`;top=`calc(${top0+vvH}px - ${dockTotal}px - ${safe})`;pad=`calc(${dockTotal}px + ${safe})`;
+        h=`calc(${dockSolid}px + ${safe})`;top=`calc(${top0+vvH}px - ${dockSolid}px - ${safe})`;pad=`calc(${dockTotal}px + ${safe})`;
       }else{
         const hh=kb||mode==='full'?vvH:Math.min(vvH,Math.max(320,Math.round(vvH*.78)));
         h=`${hh}px`;top=`${top0+vvH-hh}px`;pad=mode==='full'?'0px':h;
       }
-      panel.style.setProperty('--chat-h',h);
-      panel.style.setProperty('--chat-top',top);
-      panel.dataset.size=mode;
-      panel.dataset.keyboard=String(kb);
-      root.style.setProperty('--chat-pad',pad);
-      root.classList.toggle('chat-open',mode==='full');root.classList.toggle('chat-half',mode!=='full');
+      const put=(el:HTMLElement,k:string,v:string)=>{if(el.style.getPropertyValue(k)!==v)el.style.setProperty(k,v);};
+      put(panel,'--chat-h',h);put(panel,'--chat-top',top);
+      if(panel.dataset.size!==mode)panel.dataset.size=mode;
+      const kbs=String(kb);if(panel.dataset.keyboard!==kbs)panel.dataset.keyboard=kbs;
+      put(root,'--chat-pad',pad);
+      if(!root.classList.contains('chat-half'))root.classList.add('chat-half');
+      if(root.classList.contains('chat-open'))root.classList.remove('chat-open');
     };
+    // 독 ↔ 시트 전환일 때만 높이·위치를 부드럽게 움직인다. 키보드 때문에 생기는 변화는 즉시 따라가야 하므로 애니메이션을 걸지 않는다.
+    if(panel&&sizeRef.current!==size&&sizeRef.current!==null){
+      panel.dataset.anim='1';window.clearTimeout(animTimer.current);
+      animTimer.current=window.setTimeout(()=>{delete panel.dataset.anim;},340);
+    }
+    sizeRef.current=size;
     fit();vv?.addEventListener('resize',fit);vv?.addEventListener('scroll',fit);window.addEventListener('resize',fit);
     return()=>{vv?.removeEventListener('resize',fit);vv?.removeEventListener('scroll',fit);window.removeEventListener('resize',fit);root.classList.remove('chat-open','chat-half');root.style.removeProperty('--chat-pad');};
   },[mobile,size,dockSolid,dockTotal]);

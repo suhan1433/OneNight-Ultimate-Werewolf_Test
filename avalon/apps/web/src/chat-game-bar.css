@@ -55,8 +55,8 @@
 
   aside.chat-panel[data-size="half"],aside.chat-panel[data-size="mini"]{
     border-radius:20px 20px 0 0;border-top:1px solid #c9a35c77;
-    background:linear-gradient(#101b30f7,#070c17fa);
-    box-shadow:0 -14px 40px #000c;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+    background:linear-gradient(#101b30fa,#070c17fc);
+    box-shadow:0 -8px 24px #000a}
   aside.chat-panel[data-size="half"] .chat-title{min-height:48px;padding:14px 8px 4px 14px}
   aside.chat-panel[data-size="half"] .ac-back{display:none}
   aside.chat-panel[data-size="full"] .chat-title .ac-size{margin-left:auto}
@@ -103,12 +103,12 @@
   aside.chat-panel[data-size="mini"]{
     background:linear-gradient(to top,#070c17fa env(safe-area-inset-bottom,0px),transparent env(safe-area-inset-bottom,0px));
     border:0;border-radius:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
-    pointer-events:none;animation:none}
+    pointer-events:none;animation:none;overflow:visible}
   aside.chat-panel[data-size="mini"] .ac-act,
   aside.chat-panel[data-size="mini"] .ac-compose{pointer-events:auto}
 
   /* 겹쳐 보이는 대화: 최신이 아래, 오래될수록 흐리게. 길면 2줄까지 */
-  .ac-mini-feed{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;overflow:hidden;padding:0 10px 6px;pointer-events:none}
+  .ac-mini-feed{position:absolute;left:0;right:0;bottom:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;padding:0 10px 6px;pointer-events:none}
   .ac-mini-row{flex:none;max-width:90%;align-self:flex-start;display:flex;align-items:flex-start;gap:7px;padding:4px 12px 4px 4px;
     border-radius:16px;border:1px solid #c9a35c33;background:#0b1220e6;color:var(--parchment);
     box-shadow:0 4px 14px #0007;animation:acMiniIn .3s ease-out both}
@@ -170,3 +170,25 @@ aside.chat-panel{transition:opacity .3s ease}
 aside.chat-panel[data-reveal="true"]{opacity:.72}
 aside.chat-panel[data-reveal="true"] .ac-mini-feed{display:none}
 aside.chat-panel[data-reveal="true"] .ac-compose:focus-within{opacity:1}
+
+/* ============================================================
+   독 ↔ 시트 전환을 매끄럽게
+   · data-anim 이 붙은 340ms 동안만 높이·위치가 움직인다 (키보드 추종에는 애니메이션 없음)
+   · 시트 쪽 re-mount 애니메이션(acSheet)은 끄고, 높이 전환 + 내용 페이드로 대체
+   · 게임 화면 하단 여백도 같이 부드럽게 변해서 화면이 '툭' 튀지 않는다
+   ============================================================ */
+@media (max-width:640px),(pointer:coarse) and (max-width:900px){
+  aside.chat-panel{will-change:top,height}
+  aside.chat-panel[data-anim="1"]{transition:top .32s cubic-bezier(.2,.8,.2,1),height .32s cubic-bezier(.2,.8,.2,1)}
+  aside.chat-panel[data-size="half"]{animation:none}
+  aside.chat-panel[data-size="half"]>.chat-title,
+  aside.chat-panel[data-size="half"]>.ac-game,
+  aside.chat-panel[data-size="half"]>.ac-act,
+  aside.chat-panel[data-size="half"]>.ac-list-wrap{animation:acFadeIn .26s ease both}
+  html.chat-half .app .board,html.chat-half .app .lb{transition:padding-bottom .32s cubic-bezier(.2,.8,.2,1)}
+}
+@keyframes acFadeIn{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  aside.chat-panel[data-anim="1"],html.chat-half .app .board,html.chat-half .app .lb{transition:none}
+  aside.chat-panel[data-size="half"]>*{animation:none}
+}
