@@ -3,25 +3,66 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#101322" />
+    <meta name="theme-color" content="#0c0f1d" />
     <title>온라인 보드게임</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@700;900&display=swap" />
     <link rel="stylesheet" href="/launcher.css" />
   </head>
   <body>
     <main class="launcher">
-      <p class="eyebrow">ONLINE SOCIAL DEDUCTION</p>
       <h1>오늘 어떤 게임을<br />플레이할까요?</h1>
       <p class="intro">친구들과 같은 방 코드로 모여, 각자의 기기에서 플레이하세요.</p>
       <nav class="games" aria-label="게임 선택">
+        <a class="game-card bloodbound" href="/bloodbound/">
+          <svg class="art" viewBox="0 0 320 200" aria-hidden="true">
+            <circle class="table" cx="160" cy="100" r="62" />
+            <path class="hill" d="M72 160c8-68 38-112 88-112s80 44 88 112" />
+            <path class="pines" d="M124 120c22-34 46-34 68 0M116 137h88" />
+            <g class="seats"><circle cx="246" cy="100" r="9"/><circle cx="194" cy="174" r="9"/><circle cx="108" cy="160" r="9"/><circle class="lit" cx="84" cy="75" r="9"/><circle cx="155" cy="20" r="9"/><circle cx="235" cy="53" r="9"/></g>
+          </svg>
+          <span class="game-copy"><strong>블러드 바운드</strong><small>가면 뒤 클랜 리더를 포획하는 추리 게임</small></span>
+          <span class="enter">입장하기 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg></span>
+        </a>
         <a class="game-card avalon" href="/avalon/">
-          <span class="symbol">♜</span>
+          <svg class="art" viewBox="0 0 320 200" aria-hidden="true">
+            <circle class="table" cx="160" cy="100" r="62" />
+            <circle class="table-inner" cx="160" cy="100" r="42" />
+            <circle class="core" cx="160" cy="100" r="7" />
+            <g class="seats">
+              <circle cx="246" cy="100" r="9" /><circle cx="220.8" cy="160.8" r="9" />
+              <circle cx="160" cy="186" r="9" /><circle cx="99.2" cy="160.8" r="9" />
+              <circle cx="74" cy="100" r="9" /><circle cx="99.2" cy="39.2" r="9" />
+              <circle class="lit" cx="160" cy="14" r="9" /><circle cx="220.8" cy="39.2" r="9" />
+            </g>
+          </svg>
           <span class="game-copy"><strong>아발론</strong><small>원탁의 기사들이 펼치는 팀 추리 게임</small></span>
-          <span class="arrow">→</span>
+          <span class="enter">입장하기
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+          </span>
         </a>
         <a class="game-card werewolf" href="/werewolf/">
-          <span class="symbol">☾</span>
+          <svg class="art" viewBox="0 0 320 200" aria-hidden="true">
+            <defs>
+              <radialGradient id="moonGlow"><stop offset="0" stop-color="#cfd4ff" stop-opacity=".55" /><stop offset="1" stop-color="#cfd4ff" stop-opacity="0" /></radialGradient>
+              <mask id="crescent"><rect width="320" height="200" fill="#fff" /><circle cx="226" cy="64" r="40" fill="#000" /></mask>
+            </defs>
+            <circle class="moon-glow" cx="200" cy="78" r="86" fill="url(#moonGlow)" />
+            <circle class="moon" cx="200" cy="78" r="46" mask="url(#crescent)" />
+            <g class="stars">
+              <circle cx="46" cy="34" r="1.5" /><circle cx="92" cy="70" r="1" /><circle cx="128" cy="26" r="1.3" />
+              <circle cx="278" cy="40" r="1.2" /><circle cx="292" cy="96" r="1" /><circle cx="60" cy="108" r="1.1" />
+            </g>
+            <path class="hill" d="M0 200V152Q42 126 86 150T172 146T252 152T320 138V200Z" />
+            <g class="pines">
+              <path d="M40 158l9-26 9 26zM108 156l8-22 8 22zM248 158l10-28 10 28zM286 150l7-19 7 19z" />
+            </g>
+          </svg>
           <span class="game-copy"><strong>한밤의 늑대인간</strong><small>단 한 번의 밤, 뒤바뀐 역할을 추리하세요</small></span>
-          <span class="arrow">→</span>
+          <span class="enter">입장하기
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+          </span>
         </a>
       </nav>
     </main>

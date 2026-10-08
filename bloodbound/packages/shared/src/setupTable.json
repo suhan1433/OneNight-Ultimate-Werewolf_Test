@@ -1,0 +1,9 @@
+{
+  "6": { "rose": 3, "beast": 3, "inquisitor": 0, "curse": null },
+  "7": { "rose": 3, "beast": 3, "inquisitor": 1, "curse": { "true": 1, "false": 1 } },
+  "8": { "rose": 4, "beast": 4, "inquisitor": 0, "curse": null },
+  "9": { "rose": 4, "beast": 4, "inquisitor": 1, "curse": { "true": 1, "false": 2 } },
+  "10": { "rose": 5, "beast": 5, "inquisitor": 0, "curse": null },
+  "11": { "rose": 5, "beast": 5, "inquisitor": 1, "curse": { "true": 1, "false": 3 } },
+  "12": { "rose": 6, "beast": 6, "inquisitor": 0, "curse": null }
+}

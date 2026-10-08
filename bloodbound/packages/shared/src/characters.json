@@ -1,0 +1,11 @@
+[
+  { "rank": 1, "name": "Elder", "ability": "elder", "rose": ["rose", "rose"], "beast": ["beast", "beast"], "clue": "own" },
+  { "rank": 2, "name": "Assassin", "ability": "assassin", "rose": ["unknown", "unknown"], "beast": ["unknown", "unknown"], "clue": "own" },
+  { "rank": 3, "name": "Harlequin", "ability": "harlequin", "rose": ["unknown", "unknown"], "beast": ["unknown", "unknown"], "clue": "opposite" },
+  { "rank": 4, "name": "Alchemist", "ability": "alchemist", "rose": ["unknown", "unknown"], "beast": ["unknown", "unknown"], "clue": "own" },
+  { "rank": 5, "name": "Mentalist", "ability": "mentalist", "rose": ["rose", "rose"], "beast": ["beast", "beast"], "clue": "own" },
+  { "rank": 6, "name": "Guardian", "ability": "guardian", "rose": ["rose", "rose"], "beast": ["beast", "beast"], "clue": "own" },
+  { "rank": 7, "name": "Berserker", "ability": "berserker", "rose": ["rose", "unknown"], "beast": ["beast", "unknown"], "clue": "own" },
+  { "rank": 8, "name": "Mage", "ability": "mage", "rose": ["rose", "unknown"], "beast": ["beast", "unknown"], "clue": "own" },
+  { "rank": 9, "name": "Courtesan", "ability": "courtesan", "rose": ["rose", "unknown"], "beast": ["beast", "unknown"], "clue": "own" }
+]

@@ -15,6 +15,16 @@ npm run dev
 - API/Socket.IO: `http://localhost:3001`
 - 상태 확인: `http://localhost:3001/health`
 
+Blood Bound는 별도 멀티플레이 앱으로 실행합니다.
+
+```bash
+npm --prefix bloodbound ci
+npm run dev:bloodbound
+```
+
+- 웹: `http://localhost:5175/bloodbound/`
+- API/Socket.IO: `http://localhost:3003`
+
 스마트폰에서는 Vite 주소의 `localhost` 대신 개발 PC의 LAN IP로 접속하고, `VITE_SOCKET_URL`도 같은 PC의 `3001` 포트로 지정합니다.
 
 ## Docker 멀티 서버 실행

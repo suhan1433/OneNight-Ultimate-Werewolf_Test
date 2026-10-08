@@ -1,0 +1,13 @@
+{
+  "name": "bloodbound-online",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n server,web -c red,cyan \"npm run dev -w @bloodbound/server\" \"npm run dev -w @bloodbound/web\"",
+    "build": "npm run build -w @bloodbound/shared && npm run build -w @bloodbound/server && npm run build -w @bloodbound/web",
+    "test": "npm run test -w @bloodbound/server",
+    "typecheck": "npm run typecheck -w @bloodbound/shared && npm run typecheck -w @bloodbound/server && npm run typecheck -w @bloodbound/web"
+  },
+  "devDependencies": { "concurrently": "^9.0.0", "typescript": "^5.7.0" }
+}

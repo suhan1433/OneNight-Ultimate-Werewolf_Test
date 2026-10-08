@@ -1,0 +1,83 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>블러드 바운드</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0a10;--panel:#1b1421;--ink:#eadfd0;--dim:#9a8c99;--gold:#c9a45c;--R:#e0476a;--B:#2fb5a0;--S:#a98be0;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:inherit}body{margin:0;background:radial-gradient(ellipse at top,#2a1630,var(--bg) 70%) fixed;color:var(--ink);font:15px/1.5 system-ui,'Noto Sans KR',sans-serif;min-height:100vh}
+#app{max-width:760px;margin:auto;padding:12px}h1,h2,h3{font-family:Cinzel,'Noto Serif KR',serif;color:var(--gold);margin:.3em 0;letter-spacing:.04em}
+button{min-height:44px;margin:4px 4px 4px 0;padding:8px 16px;background:#2a1e33;color:var(--ink);border:1px solid var(--gold);border-radius:10px;font-size:15px;cursor:pointer}button:hover{background:#3a2a46}button:disabled{opacity:.35}
+.panel,.card,.hand,.title{background:var(--panel);border:1px solid #4a3558;border-radius:12px;padding:12px;margin:10px 0}
+.hand,.title{text-align:center;margin-top:20vh}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.pl{background:var(--panel);border:2px solid #3b2d48;border-radius:12px;padding:8px;font-size:13px}.pl.dag{border-color:var(--gold);box-shadow:0 0 14px #c9a45c66}.pl.dead{opacity:.5}
+.pl b{font-size:15px}.pip{letter-spacing:3px;color:var(--R)}.chip{display:inline-block;font-size:11px;padding:0 6px;margin:1px;border:1px solid var(--dim);border-radius:8px;color:var(--dim)}
+.tk{display:inline-block;min-width:26px;text-align:center;margin:1px;padding:1px 5px;border-radius:6px;background:#0007;border:1px solid var(--gold)}
+.card.R{border-color:var(--R)}.card.B{border-color:var(--B)}.card.S{border-color:var(--S)}.R{color:var(--R)}.B{color:var(--B)}.S{color:var(--S)}
+.dim{color:var(--dim);font-size:13px}details{margin:8px 0;font-size:13px;color:var(--dim)}input,select{background:#0007;color:var(--ink);border:1px solid var(--dim);border-radius:8px;padding:8px;margin:4px;min-height:40px}
+@media(prefers-reduced-motion:no-preference){.pl.dag{animation:p 2s infinite}@keyframes p{50%{box-shadow:0 0 4px #c9a45c33}}}
+</style></head><body><div id="app"></div><script>
+const $=s=>document.querySelector(s);
+const KO=['심문관','장로','암살자','광대','연금술사','독심술사','수호자','광전사','마법사','여주인'];
+const DS=['','선택: Quill 획득, 본인은 리더 아님(새 리더=그 클랜 최고 랭크 번호)','대상에게 상처 2개 강제, 단검을 대상에게','아무 2명의 카드를 비밀 확인','개입했을 때만: 대상에게 상처 +1 또는 치유 1 (선택)','대상에게 랭크 토큰으로 상처 1 강제(이미 있으면 어피리에이션). 단검 이동','Shield를 한 명에게 주고 본인은 Sword. 보호받는 사람은 공격/능력 강제 불가','방금 공격한 플레이어에게 상처 1 강제','다른 1명과 함께 Staff: 어피리에이션은 Unknown만 가능','다른 1명에게 Fan: 그 사람이 공격받을 때 개입 불가'];
+const CL={R:{n:'로즈',i:'🌹'},B:{n:'비스트',i:'🐺'},S:{n:'비밀결사',i:'⚜'}},AF={rose:'🌹',beast:'🐺',unk:'❔',wild:'✴'},opp=c=>c=='R'?'B':'R';
+let P,S,rnd,LOG;
+const mul=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const hasR=p=>p.tok.some(t=>t.k=='r'),lg=m=>LOG.unshift(m),B=(v,t,c='')=>`<button class="${c}" data-v="${v}">${t}</button>`;
+function ask(h){return new Promise(r=>{const a=$('#app');a.innerHTML=h;scrollTo(0,0);a.onclick=e=>{const b=e.target.closest('[data-v]');if(b){a.onclick=null;r(b.dataset.v)}}})}
+const hand=n=>ask(`<div class=hand><h2>📱</h2><p>기기를 <b>${n}</b>님에게 넘기세요</p>${B('ok',n+'입니다')}</div>`);
+const tkH=(t,p)=>t.k=='r'?`<span class=tk>${p.c.clan=='S'?'⚜':'#'+p.c.rank+' '+KO[p.c.rank]}</span>`:`<span class=tk>${AF[t.v]}</span>`;
+const cardH=p=>`<div class="card ${p.c.clan}"><b>${CL[p.c.clan].i} ${CL[p.c.clan].n}</b> · ${p.c.clan=='S'?'⚜ 심문관':'#'+p.c.rank+' '+KO[p.c.rank]}<br>어피리에이션: ${p.icons.map(x=>AF[x]).join(' ')}<br>단서: ${CL[p.clue].i}</div>`;
+function board(){return `<h2>🩸 BLOOD BOUND</h2><div class=grid>${P.map((p,i)=>`<div class="pl ${S.dag==i?'dag':''}"><b>${i+1}. ${p.name}</b> ${S.dag==i?'🗡':''}<div class=pip>${'●'.repeat(p.tok.length)}${'○'.repeat(4-p.tok.length)}</div>${p.tok.map(t=>tkH(t,p)).join('')}<div>${p.sh.length?'<span class=chip>방패</span>':''}${p.sw?'<span class=chip>검</span>':''}${p.quill?'<span class=chip>깃펜</span>':''}${p.staff?'<span class=chip>지팡이</span>':''}${p.fan?'<span class=chip>부채</span>':''}</div></div>`).join('')}</div><p class=dim>좌석: 번호 순서대로 앉고, 왼쪽 이웃 = 다음 번호.</p>`}
+const foot=()=>`<details><summary>능력 도움말 / 로그</summary>${DS.slice(1).map((d,i)=>`<div>#${i+1} ${KO[i+1]}: ${d}</div>`).join('')}<hr>${LOG.slice(0,10).join('<br>')}</details>`;
+const panel=(t,b)=>ask(board()+`<div class=panel>${t}<div>${b}</div></div>`+foot());
+async function pick(t,ok,extra=''){const ix=P.map((_,i)=>i).filter(ok);return +(await panel(t,ix.map(i=>B(i,P[i].name)).join('')+extra))}
+function leader(cl){const m=P.map((_,i)=>i).filter(i=>P[i].c.clan==cl),rk=m.map(i=>P[i].c.rank),w=m.some(i=>P[i].quill)?Math.max(...rk):Math.min(...rk);return m.find(i=>P[i].c.rank==w)}
+function opts(p,force){const hr=hasR(p),tk=p.tok.filter(t=>t.k=='a').map(t=>t.v);if(force&&!hr)return[{k:'r'}];let a=[];
+if(p.c.clan=='S'){if(tk.length<2)a=['rose','beast','unk']}else p.icons.forEach(v=>{if(tk.filter(x=>x==v).length<p.icons.filter(x=>x==v).length&&!a.includes(v))a.push(v)});
+if(p.staff&&a.includes('unk'))a=['unk'];return[...(hr?[]:[{k:'r'}]),...a.map(v=>({k:'a',v}))]}
+async function suffer(i,o={}){const p=P[i];if(p.tok.length>=3)throw{end:1,v:i,by:o.by};
+if(o.hand!==false)await hand(p.name);const op=opts(p,o.rank);
+const v=+await ask(`<div class=panel><h3>${p.name}: 상처를 받습니다</h3>${cardH(p)}<p>공개할 토큰을 고르세요 (거짓 토큰 불가)</p>${op.map((x,j)=>B(j,x.k=='r'?'랭크 공개 '+tkH(x,p):'어피리에이션 '+AF[x.v])).join('')}</div>`);
+const t=op[v];p.tok.push(t);lg(`${p.name} 상처 → ${t.k=='r'?'랭크 '+(p.c.rank||'⚜'):AF[t.v]}`);
+if(p.sw&&p.tok.length==3){P.forEach(q=>q.sh=q.sh.filter(g=>g!=i));p.sw=0;lg('Sword/Shield 반환')}return t}
+const force=async(i,by,o={})=>{if(P[i].sh.length){lg(`${P[i].name}은(는) 방패로 보호됨`);return false}await suffer(i,{...o,by});return true};
+async function ability(i,o){const p=P[i],r=p.c.rank;if(r==4&&!o.int)return;
+if(p.c.clan=='S'&&S.curse)return;
+const v=await ask(`<div class=panel><h3>${p.name}: 능력 사용?</h3>${cardH(p)}<p><b>${KO[r]}</b> — ${p.c.clan=='S'?'Curse 카드를 서로 다른 플레이어에게 비공개 배분':DS[r]}</p>${B('y','사용')}${B('n','건너뛰기')}</div>`);if(v!='y')return;
+const oth=j=>j!=i,tgt=j=>j!=i&&!P[j].sh.length;lg(`${p.name} 능력 사용 (${KO[r]})`);
+if(p.c.clan=='S'){const n=P.length-(P.length-1)/2*0,c=(P.length-1)/2+(P.length==7?-1:P.length==9?-1:-1)+0;const cnt=P.length==7?2:P.length==9?3:4;const a={};
+for(;;){const x=await ask(`<div class=panel><h3>Curse 배분 (비공개)</h3><p>${cnt}명을 골라 진실의 저주 1, 거짓 ${cnt-1}를 배분. 탭하면 없음→거짓→진실</p>${P.map((q,j)=>j==i?'':B(j,q.name+' ['+(a[j]=='T'?'진실':a[j]=='F'?'거짓':'-')+']')).join('')}<br>${B('done','확정')}</div>`);
+if(x=='done'){const v=Object.values(a);if(v.length==cnt&&v.filter(y=>y=='T').length==1)break;continue}a[x]=!a[x]?'F':a[x]=='F'?'T':(delete a[x],undefined);if(!a[x])delete a[x]}
+Object.entries(a).forEach(([j,t])=>P[j].curse=t);S.curse=1;return}
+if(r==1){p.quill=1}
+else if(r==2){const t=await pick('암살자: 대상 (상처 2개)',tgt);if(await force(t,i)){await force(t,i,{hand:false});S.dag=t}}
+else if(r==3){const a=await pick('광대: 첫 번째 대상',oth),b=await pick('두 번째 대상',j=>oth(j)&&j!=a);await ask(`<div class=panel><h3>${p.name} 전용</h3>${[a,b].map(j=>P[j].name+cardH(P[j])).join('')}${B('ok','가리기')}</div>`)}
+else if(r==4){const c=await panel('연금술사: 선택',B('w','대상에게 상처 +1')+B('h','대상 치유 1'));const t=o.orig;
+if(c=='w')await force(t,i);else if(P[t].tok.length){const k=+await panel(P[t].name+' 치유: 반환할 토큰',P[t].tok.map((x,j)=>B(j,tkH(x,P[t]))).join(''));P[t].tok.splice(k,1)}}
+else if(r==5){const t=await pick('독심술사: 대상',tgt);if(await force(t,i,{rank:1}))S.dag=t}
+else if(r==6){const t=await pick('수호자: Shield 대상',oth);P[t].sh.push(i);p.sw=1}
+else if(r==7){if(o.by!=null)await force(o.by,i)}
+else if(r==8){const t=await pick('마법사: Staff 대상',oth);P[t].staff=1;p.staff=1}
+else if(r==9){P[await pick('여주인: Fan 대상',oth)].fan=1}}
+async function turn(){const me=P[S.dag],ok=j=>j!=S.dag&&!P[j].sh.length&&!(me.c.clan=='S'&&P[j].tok.length>=3);
+const v=await panel(`${me.name}의 턴`,B('a','공격')+B('p','패스'));
+if(v=='p'){S.dag=await pick('단검을 넘길 대상',j=>j!=S.dag);lg(`${me.name} 패스`);return}
+const t=await pick('공격 대상 (방패 보호자 제외)',ok,B('x','← 취소'));if(isNaN(t))return;
+let w=t,iv=false;lg(`${me.name} → ${P[t].name} 공격`);
+const el=P.map((_,j)=>j).filter(j=>j!=t&&!hasR(P[j]));
+if(!P[t].fan&&el.length){const c=await panel(`${P[t].name}: 개입 요청 (제안은 구두로 공개)`,el.map(j=>B(j,P[j].name+' 수락')).join('')+B('n','수락 안 함'));if(c!='n'){w=+c;iv=true}}
+const g=await suffer(w,{by:S.dag,rank:iv});S.dag=w;if(g.k=='r')await ability(w,{by:ix(me),int:iv,orig:t})}
+const ix=p=>P.indexOf(p);
+async function finish(e){const v=P[e.v],by=P[e.by];let win,why;
+if(v.c.clan=='S'){win='S';why=`심문관 ${v.name} 포획 → 심문관 단독 승리`}else{const cl=by.c.clan=='S'?opp(v.c.clan):by.c.clan,ok=v.c.clan!=cl&&leader(v.c.clan)==ix(v);win=ok?cl:opp(cl);
+why=`${by.name}이(가) ${ok?CL[v.c.clan].n+' 리더':'리더가 아닌/아군 '+v.name}를 포획 → ${CL[cl].n} ${ok?'승리':'패배'}`;
+if(S.curse){const l=P[leader(win)];if(l.curse=='T'){win='S';why+=' · 승리 클랜 리더에게 진실의 저주! 심문관 승리'}}}
+await ask(`<h2>종료</h2><div class=panel><h3 class=${win}>${CL[win].i} ${CL[win].n} 승리</h3><p>${why}</p></div>${P.map(p=>`<div class="card ${p.c.clan}"><b>${p.name}</b>${p.curse?' · 저주 '+(p.curse=='T'?'진실':'거짓'):''}${cardH(p)}</div>`).join('')}<p class=dim>${LOG.slice().reverse().join('<br>')}</p>${B('r','다시 하기')}`)}
+async function start(){$('#app').innerHTML=`<div class=title><h1>🩸 BLOOD BOUND</h1><p class=dim>로즈 vs 비스트 · 한 기기 돌려보기</p><label>인원 <select id=n>${[6,7,8,9,10,11,12].map(n=>`<option>${n}</option>`).join('')}</select></label><br><input id=nm placeholder="이름(쉼표 구분, 선택)"><br><input id=sd placeholder="시드(선택)"><br><button id=go>시작</button></div>`;
+await new Promise(r=>$('#go').onclick=r);const n=+$('#n').value,nm=$('#nm').value.split(',').map(s=>s.trim()).filter(Boolean);rnd=mul(+$('#sd').value||Date.now()%1e9);LOG=[];
+const per=n>>1,ch=[];['R','B'].forEach(c=>shuf([1,2,3,4,5,6,7,8,9]).slice(0,per).forEach(r=>ch.push({clan:c,rank:r})));if(n%2)ch.push({clan:'S',rank:0});shuf(ch);
+P=ch.map((c,i)=>({name:nm[i]||'플레이어'+(i+1),c,tok:[],sh:[],sw:0,quill:0,staff:0,fan:0,icons:c.clan=='S'?['wild','wild']:[c.clan=='R'?'rose':'beast','unk'],clue:c.clan=='S'?(rnd()<.5?'R':'B'):c.rank==3?opp(c.clan):c.clan}));
+S={dag:Math.floor(rnd()*n),curse:0};
+for(let i=0;i<n;i++){await hand(P[i].name);const L=P[(i+n-1)%n];await ask(`<div class=panel><h3>${P[i].name}의 신원 (비공개)</h3>${cardH(P[i])}<p>당신의 오른쪽 이웃 <b>${L.name}</b>의 단서: <b style="font-size:22px">${CL[L.clue].i}</b></p><p class=dim>당신의 단서는 왼쪽 이웃에게만 보여주세요. 단서는 항상 진실은 아닙니다.</p>${B('ok','가리기')}</div>`)}
+try{for(;;)await turn()}catch(e){if(!e.end)throw e;await finish(e)}}
+(async()=>{for(;;)await start()})();
+</script></body></html>

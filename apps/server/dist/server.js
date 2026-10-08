@@ -1,4 +1,6 @@
 import http from 'node:http';
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import pino from 'pino';
@@ -13,6 +15,14 @@ export function createGameServer(socketPath = '/socket.io') {
     app.use(cors({ origin, credentials: true }));
     app.use(express.json());
     app.get('/health', (_req, res) => res.json({ ok: true, instance: process.env.INSTANCE_NAME ?? 'server' }));
+    // The standalone container also serves the built React application. This
+    // keeps the browser and Socket.IO on one Render Web Service (same origin),
+    // while the Vercel Function continues to work when no web build exists.
+    const webDist = resolve(process.cwd(), 'apps/web/dist');
+    if (existsSync(webDist)) {
+        app.use(express.static(webDist));
+        app.get('*', (_req, res) => res.sendFile(join(webDist, 'index.html')));
+    }
     const server = http.createServer(app);
     const io = new Server(server, {
         path: socketPath,

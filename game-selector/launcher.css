@@ -45,6 +45,11 @@ h1 {
 .game-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .avalon { background: linear-gradient(160deg, #21505c 0, #12303a 55%, #0d2028); }
 .werewolf { --accent: var(--moon); background: linear-gradient(160deg, #3a2a6b 0, #221845 55%, #150f2c); }
+.bloodbound { --accent: #e58a9e; background: linear-gradient(160deg, #661d3e 0, #361226 55%, #190c18); }
+.bloodbound .table { fill: rgba(229, 138, 158, .1); stroke: #e8a1b2; }
+.bloodbound .hill { fill: none; stroke: #d988a3; stroke-width: 3; opacity: .75; }
+.bloodbound .pines { fill: none; stroke: #efc274; stroke-width: 2; opacity: .8; }
+.bloodbound .seats circle { fill: #351225; stroke: #efc274; }
 
 .art { display: block; width: 100%; height: auto; aspect-ratio: 8 / 5; border-bottom: 1px solid var(--line); }
 .game-copy { display: grid; gap: 8px; padding: 24px 28px 0; }

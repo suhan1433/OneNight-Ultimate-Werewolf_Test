@@ -94,6 +94,8 @@ function append(store, code, message) {
 }
 export async function appendChat(code, message) { return append(chats, code, message); }
 export async function appendLobbyChat(code, message) { return append(lobbyChats, code, message); }
+/** Day discussion belongs to one game, not to later rematches in the same room. */
+export async function clearChat(code) { chats.delete(code); }
 export async function clearLobbyChat(code) { lobbyChats.delete(code); }
 export async function withRoomLock(code, fn, requestId) {
     const previous = roomLocks.get(code) ?? Promise.resolve();
@@ -151,6 +153,25 @@ export async function recordVote(code, playerId, targetPlayerId) {
     return { added, count: roomVotes.size };
 }
 export async function getVotes(code) { return Object.fromEntries(votes.get(code) ?? []); }
+/**
+ * Ballots live outside the Room document so concurrent vote submissions can be
+ * recorded independently. A rematch keeps player IDs, therefore its ballots
+ * must be explicitly discarded before the new game begins.
+ */
+export async function clearVotes(code) { votes.delete(code); }
+/** Remove a departed player both as a voter and as a vote target. */
+export async function removeVotesForPlayer(code, playerId) {
+    const roomVotes = votes.get(code);
+    if (!roomVotes)
+        return {};
+    for (const [voterId, targetId] of roomVotes) {
+        if (voterId === playerId || targetId === playerId)
+            roomVotes.delete(voterId);
+    }
+    if (!roomVotes.size)
+        votes.delete(code);
+    return Object.fromEntries(roomVotes);
+}
 export async function toggleReady(code, playerId, requestId) {
     if (getProcessed(code, requestId) > Date.now())
         return ready.get(code)?.get(playerId) ?? false;
