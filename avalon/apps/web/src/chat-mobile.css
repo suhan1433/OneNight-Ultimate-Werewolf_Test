@@ -53,7 +53,8 @@ html.chat-open,html.chat-open body{overflow:hidden;overscroll-behavior:none}
 @media (max-width:640px),(pointer:coarse) and (max-width:900px){
   aside.chat-panel{
     left:0;right:0;bottom:auto;width:auto;max-width:none;border:0;border-radius:0;z-index:40;
-    top:var(--chat-top,0px);height:var(--chat-h,100dvh); /* JS 가 visualViewport(키보드 제외 영역)로 갱신 */
+    top:0;height:var(--chat-h,100dvh); /* JS 가 visualViewport(키보드 제외 영역)로 갱신 */
+    transform:translate3d(0,var(--chat-y,0px),0);will-change:transform;contain:layout;
     padding-bottom:env(safe-area-inset-bottom);overscroll-behavior:contain;
     background:linear-gradient(#0f192c,#070c17);backdrop-filter:none;box-shadow:none;
     animation:acSheet .22s cubic-bezier(.2,.8,.2,1) both;

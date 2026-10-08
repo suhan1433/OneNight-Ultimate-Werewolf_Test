@@ -577,14 +577,22 @@ const CHAT_FEED_ROW_H=34;                // 말풍선 한 줄 높이. 줄 수는
 const CHAT_FEED_TTL=45_000;              // 새 말풍선이 독에 떠 있는 시간. 조용해지면 사라져 게임 화면이 깨끗해진다(지난 대화는 ⌃ 시트에 그대로)
 
 
-function useVisualHeight(){
-  const[h,setH]=useState(()=>Math.round(window.visualViewport?.height??window.innerHeight));
+/* visualViewport 는 키보드 애니메이션 중 매 프레임 resize 된다. 그 값을 state 로 들고 있으면
+   채팅 전체(모든 말풍선 포함)가 매 프레임 다시 렌더링된다. 미리보기 줄 수가 바뀌는 경계에서만
+   state 를 바꾸고, 실제 패널 좌표는 아래 effect 가 CSS 변수로 직접 갱신한다. */
+const feedRowsFor=(height:number)=>height<430?1:height<560?2:3;
+function useChatFeedRows(){
+  const[rows,setRows]=useState(()=>feedRowsFor(Math.round(window.visualViewport?.height??window.innerHeight)));
   useEffect(()=>{
-    const vv=window.visualViewport;const u=()=>setH(Math.round(vv?.height??window.innerHeight));
-    vv?.addEventListener('resize',u);window.addEventListener('resize',u);
-    return()=>{vv?.removeEventListener('resize',u);window.removeEventListener('resize',u);};
+    const vv=window.visualViewport;
+    const update=()=>{
+      const next=feedRowsFor(Math.round(vv?.height??window.innerHeight));
+      setRows(current=>current===next?current:next);
+    };
+    vv?.addEventListener('resize',update);window.addEventListener('resize',update);
+    return()=>{vv?.removeEventListener('resize',update);window.removeEventListener('resize',update);};
   },[]);
-  return h;
+  return rows;
 }
 function useChatMobile(){
   const[mobile,setMobile]=useState(()=>window.matchMedia(CHAT_MOBILE_QUERY).matches);
@@ -681,8 +689,7 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   const[draft,setDraftState]=useState(chatDraft);
   const[unread,setUnread]=useState(0);
   const mobile=useChatMobile();
-  const vh=useVisualHeight();
-  const feedRows=vh<430?1:vh<560?2:3;   // 키보드가 올라오거나 가로모드로 화면이 낮으면 말풍선을 줄여 게임을 지킨다
+  const feedRows=useChatFeedRows();   // 키보드가 올라오거나 가로모드로 화면이 낮으면 말풍선을 줄여 게임을 지킨다
   const messages=game.chat??[];
   const resolve=useCharacterResolver(game.players,game.playerId);
   const panelRef=useRef<HTMLElement>(null);
@@ -748,9 +755,17 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
     }else setUnread(n=>n+added);
   },[curLastId]);
   useEffect(()=>{
-    // 키보드가 열리거나 입력창이 늘어나 목록 높이가 바뀌어도 맨 아래를 유지한다.
+    // 입력창이 늘어나 목록 높이가 바뀌어도 맨 아래를 유지한다.
+    // 키보드 애니메이션 중에는 visualViewport 가 매 프레임 목록 크기를 바꾼다. 여기서
+    // scrollHeight 를 계속 읽고 scrollTo 하면 강제 레이아웃이 생기므로, 움직임이 끝난 뒤
+    // 아래의 chatviewportsettled 이벤트에서 한 번만 보정한다.
     const el=listRef.current;if(!el||typeof ResizeObserver==='undefined')return;
-    const ro=new ResizeObserver(()=>{if(stick.current)toBottom();});ro.observe(el);return()=>ro.disconnect();
+    const onSettled=()=>{if(stick.current)toBottom();};
+    const ro=new ResizeObserver(()=>{
+      if(stick.current&&document.documentElement.dataset.viewportMoving!=='1')toBottom();
+    });
+    ro.observe(el);window.addEventListener('chatviewportsettled',onSettled);
+    return()=>{ro.disconnect();window.removeEventListener('chatviewportsettled',onSettled);};
   },[isMini]);
 
   // 모바일 하단 도킹 채팅: mini(항상 보임, 게임이 거의 그대로) → half → full.
@@ -767,16 +782,18 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
       const vvH=vv?.height??window.innerHeight,top0=vv?.offsetTop??0;
       const kb=window.innerHeight-vvH>120;
       const mode:ChatSize=size; // 키보드가 올라와도 크기를 강제로 키우지 않는다 (mini 는 키보드 바로 위에 붙고 게임이 계속 보인다)
-      let h:string,top:string,pad:string;
+      let h:string,y:string,pad:string;
       if(mode==='mini'){
         const safe=kb?'0px':'env(safe-area-inset-bottom,0px)';
-        h=`calc(${dockSolid}px + ${safe})`;top=`calc(${top0+vvH}px - ${dockSolid}px - ${safe})`;pad=`calc(${dockTotal}px + ${safe})`;
+        h=`calc(${dockSolid}px + ${safe})`;y=`calc(${top0+vvH}px - ${dockSolid}px - ${safe})`;pad=`calc(${dockTotal}px + ${safe})`;
       }else{
         const hh=kb||mode==='full'?vvH:Math.min(vvH,Math.max(320,Math.round(vvH*.78)));
-        h=`${hh}px`;top=`${top0+vvH-hh}px`;pad=mode==='full'?'0px':`${Math.max(320,Math.round(window.innerHeight*.78))}px`;
+        h=`${hh}px`;y=`${top0+vvH-hh}px`;pad=mode==='full'?'0px':`${Math.max(320,Math.round(window.innerHeight*.78))}px`;
       }
       const put=(el:HTMLElement,k:string,v:string)=>{if(el.style.getPropertyValue(k)!==v)el.style.setProperty(k,v);};
-      put(panel,'--chat-h',h);put(panel,'--chat-top',top);
+      // top 변경은 매번 레이아웃을 다시 잡는다. 키보드를 따라가는 좌표는 합성 단계에서
+      // 처리할 수 있도록 transform 용 변수로 분리한다.
+      put(panel,'--chat-h',h);put(panel,'--chat-y',y);
       if(panel.dataset.size!==mode)panel.dataset.size=mode;
       const kbs=String(kb);if(panel.dataset.keyboard!==kbs)panel.dataset.keyboard=kbs;
       put(root,'--chat-pad',pad);
@@ -790,10 +807,15 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
       animTimer.current=window.setTimeout(()=>{delete panel.dataset.anim;delete root.dataset.chatAnim;},340);
     }
     sizeRef.current=size;
-    let raf=0;
-    const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;fit();});};
+    let raf=0,settleTimer=0;
+    const schedule=()=>{
+      // ResizeObserver 의 하단 스크롤 보정을 잠시 멈춰 키보드 애니메이션과 경쟁하지 않게 한다.
+      root.dataset.viewportMoving='1';window.clearTimeout(settleTimer);
+      settleTimer=window.setTimeout(()=>{delete root.dataset.viewportMoving;window.dispatchEvent(new Event('chatviewportsettled'));},120);
+      if(raf)return;raf=requestAnimationFrame(()=>{raf=0;fit();});
+    };
     fit();vv?.addEventListener('resize',schedule);vv?.addEventListener('scroll',schedule);window.addEventListener('resize',schedule);
-    return()=>{cancelAnimationFrame(raf);vv?.removeEventListener('resize',schedule);vv?.removeEventListener('scroll',schedule);window.removeEventListener('resize',schedule);root.classList.remove('chat-open','chat-half');delete root.dataset.chatAnim;root.style.removeProperty('--chat-pad');};
+    return()=>{cancelAnimationFrame(raf);window.clearTimeout(settleTimer);vv?.removeEventListener('resize',schedule);vv?.removeEventListener('scroll',schedule);window.removeEventListener('resize',schedule);root.classList.remove('chat-open','chat-half');delete root.dataset.chatAnim;delete root.dataset.viewportMoving;root.style.removeProperty('--chat-pad');};
   },[mobile,size,dockSolid,dockTotal]);
   // 핸들/제목줄: 탭 = 펼치기(mini→half), 위로 끌기 = 크게, 아래로 끌기 = 작게(키보드가 열려 있으면 키보드부터 내림)
   const onSheetDown=(e:React.PointerEvent)=>{
