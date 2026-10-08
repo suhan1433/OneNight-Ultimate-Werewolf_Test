@@ -46,6 +46,11 @@ h1 {
 .avalon { background: linear-gradient(160deg, #21505c 0, #12303a 55%, #0d2028); }
 .werewolf { --accent: var(--moon); background: linear-gradient(160deg, #3a2a6b 0, #221845 55%, #150f2c); }
 .bloodbound { --accent: #e58a9e; background: linear-gradient(160deg, #661d3e 0, #361226 55%, #190c18); }
+.skullking { --accent: #e7bb55; background: linear-gradient(160deg, #5a310e 0, #2b1708 55%, #130a03); }
+.skullking .table { fill: rgba(231, 187, 85, .1); stroke: #eac469; }
+.skullking .hill { fill: none; stroke: #c2772d; stroke-width: 3; opacity: .8; }
+.skullking .pines { fill: none; stroke: #f0c65f; stroke-width: 2; opacity: .75; }
+.skullking .seats circle { fill: #2c1507; stroke: #f0c65f; }
 .bloodbound .table { fill: rgba(229, 138, 158, .1); stroke: #e8a1b2; }
 .bloodbound .hill { fill: none; stroke: #d988a3; stroke-width: 3; opacity: .75; }
 .bloodbound .pines { fill: none; stroke: #efc274; stroke-width: 2; opacity: .8; }

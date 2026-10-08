@@ -21,17 +21,26 @@ COPY bloodbound/apps/web/package.json bloodbound/apps/web/package.json
 WORKDIR /app/bloodbound
 RUN npm ci --include=dev
 WORKDIR /app
+COPY skullking/package*.json skullking/
+COPY skullking/packages/shared/package.json skullking/packages/shared/package.json
+COPY skullking/apps/server/package.json skullking/apps/server/package.json
+COPY skullking/apps/web/package.json skullking/apps/web/package.json
+WORKDIR /app/skullking
+RUN npm ci --include=dev
+WORKDIR /app
 COPY packages/shared packages/shared
 COPY apps/server apps/server
 COPY apps/web apps/web
 COPY mp3 mp3
 COPY avalon avalon
 COPY bloodbound bloodbound
+COPY skullking skullking
 COPY game-selector game-selector
-# All browser apps share /app/apps/web/dist: /werewolf, /avalon and /bloodbound.
+# All browser apps share /app/apps/web/dist.
 RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web \
   && npm --prefix avalon run build \
   && npm --prefix bloodbound run build \
+  && npm --prefix skullking run build \
   && cp game-selector/index.html apps/web/dist/index.html \
   && cp game-selector/launcher.css apps/web/dist/launcher.css
 
@@ -39,4 +48,4 @@ RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && np
 # and routes each Socket.IO endpoint to its own internal game server.
 RUN apk add --no-cache nginx gettext
 COPY infra/render-nginx.conf.template /etc/nginx/http.d/default.conf.template
-CMD ["sh", "-c", "envsubst '$PORT' < /etc/nginx/http.d/default.conf.template > /etc/nginx/http.d/default.conf && RUN_STANDALONE_SERVER=true PORT=3001 node apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3002 node avalon/apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3003 node bloodbound/apps/server/dist/server.js & nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "envsubst '$PORT' < /etc/nginx/http.d/default.conf.template > /etc/nginx/http.d/default.conf && RUN_STANDALONE_SERVER=true PORT=3001 node apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3002 node avalon/apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3003 node bloodbound/apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3004 node skullking/apps/server/dist/server.js & nginx -g 'daemon off;'"]

@@ -1,0 +1,156 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Skull King</title>
+<style>
+:root{--bg:#1a100a;--pan:#2b1b10;--ink:#f3e3bd;--gold:#e8b53a;--red:#b83a2a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html,body{margin:0;background:radial-gradient(circle at 50% 30%,#4a2c17,var(--bg) 70%);color:var(--ink);font-family:Georgia,'Noto Serif KR',serif;min-height:100%}
+button{font:inherit;cursor:pointer;background:var(--gold);color:#2a1606;border:0;border-radius:8px;padding:8px 14px;font-weight:700}button:disabled{opacity:.4}
+.w{max-width:980px;margin:auto;padding:12px}h1{text-align:center;color:var(--gold);font-size:2.6rem;margin:10px 0;text-shadow:0 3px 8px #000}
+.pan{background:var(--pan);border:2px solid #6b4423;border-radius:12px;padding:12px;margin:10px 0}
+.tg{display:flex;flex-wrap:wrap;gap:8px}.tg label{background:#3a2616;border:1px solid #6b4423;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:.9rem}.tg input:checked+span{color:var(--gold);font-weight:700}
+.top{display:flex;gap:6px;flex-wrap:wrap}.pl{flex:1;min-width:110px;background:var(--pan);border:2px solid #6b4423;border-radius:10px;padding:6px;text-align:center;font-size:.85rem}.pl.on{border-color:var(--gold);box-shadow:0 0 10px var(--gold)}
+.tbl{min-height:210px;background:radial-gradient(#6b4a2a,#3b2412);border:4px solid #5a3a1c;border-radius:50% / 20%;margin:10px 0;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:14px;position:relative}
+.tc{text-align:center;font-size:.75rem}.card{width:64px;height:92px;border-radius:8px;border:3px solid #fff;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:700;text-shadow:0 1px 2px #000;position:relative;user-select:none;transition:transform .15s}
+.card small{font-size:.58rem;line-height:1.1;text-align:center}.card .n{font-size:1.4rem}.card .i{font-size:1.4rem}
+.hand{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;padding:8px}.hand .card.ok{cursor:pointer;transform:translateY(-10px);box-shadow:0 0 10px var(--gold)}.hand .card.no{filter:brightness(.45)}.win .card{box-shadow:0 0 16px 4px var(--gold)}
+.msg{text-align:center;min-height:28px;color:var(--gold);font-size:1.05rem}
+.ov{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;z-index:9;padding:12px}.ov .pan{max-width:560px;width:100%;max-height:90%;overflow:auto;text-align:center}
+.big{font-size:3rem;color:var(--gold);animation:p .5s}@keyframes p{from{transform:scale(2);opacity:0}}
+table{width:100%;border-collapse:collapse;font-size:.85rem}td,th{border-bottom:1px solid #6b4423;padding:4px}
+@media(prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#1a100a}}
+</style></head><body><div class="w" id="app"></div>
+<script>
+const $=s=>document.querySelector(s),sleep=ms=>new Promise(r=>setTimeout(r,ms)),A=$('#app');
+const SU={g:['🦜','#2e8b3d','패럿'],p:['🗺️','#7b3fa0','지도'],y:['📦','#c99a17','보물상자'],b:['🏴‍☠️','#222','졸리로저']};
+const SP={pirate:['☠️','#a82a22'],tigress:['🦹','#c2492f'],sk:['💀','#111'],mer:['🧜','#1f8c9c'],esc:['🚢','#4a6c8c'],loot:['💰','#7a6a2a'],kraken:['🐙','#8a2a5a'],whale:['🐋','#2a5a8a'],sting:['🐟','#1d4d6a'],davy:['👻','#2a6a60'],con:['👊','#8a2a2a'],mary:['🗡️','#a8442a'],wild:['🐒','#6a4a8a'],volley:['💥','#6a4a2a'],plank:['🦈','#c9702a'],z:['🎭','#555']};
+const OPT=[['kraken','🐙 크라켄'],['whale','🐋 흰 고래'],['loot','💰 전리품 ×2'],['sting','🐟 점박이 가오리'],['davy','👻 데이비 존스'],['con','👊 일등항해사 콘'],['mary','🗡️ 메리 쏜'],['num','🔢 확장 7·8·0/14'],['wild','🐒 와일드 15'],['volley','💥 마지막 일제사격'],['plank','🦈 판자 걷기']];
+const PRE={Classic:[],Advanced:['kraken','whale','loot','abil'],Full:[...OPT.map(o=>o[0]),'abil']};
+const NAMES=['Rosie','Bendt','Rascal','Juanita','Harry','Calvin','Angela'],ALY=['Alyra','Marina'];
+const MODES={'Classic':[1,2,3,4,5,6,7,8,9,10],'Even Keeled':[2,4,6,8,10],'Skip to the Brawl':[6,7,8,9,10],'Swift-n-Salty Skirmish':[5,5,5,5,5],'Broadside Barrage':Array(10).fill(10),'Whirlpool':[9,9,7,7,5,5,3,3,1,1],'Past Your Bedtime':[1]};
+const ord=(lead,n)=>G.two?(lead===2?[2,G.L,1-G.L]:[lead,2,1-lead]):[...Array(n).keys()].map(k=>(lead+k)%n);
+let CFG={on:new Set(),n:4,mode:'Classic'},G,wait=null;
+function deck(on,two){let d=[],id=0;const add=o=>d.push({id:id++,...o});
+ for(const s of'gpyb')for(let n=1;n<=14;n++)add({t:'num',s,n});
+ ['Rosie','Bendt','Rascal','Juanita','Harry'].forEach(l=>add({t:'pirate',l}));
+ add({t:'tigress',l:'티그리스'});add({t:'sk',l:'해골왕'});ALY.forEach(l=>add({t:'mer',l}));for(let i=0;i<5;i++)add({t:'esc',l:'도주'});
+ if(on.has('kraken'))add({t:'kraken',l:'크라켄'});if(on.has('whale'))add({t:'whale',l:'흰 고래'});
+ if(on.has('loot')){add({t:'loot',l:'전리품'});add({t:'loot',l:'전리품'})}
+ if(on.has('sting'))add({t:'sting',l:'가오리'});if(on.has('davy'))add({t:'davy',l:'데이비 존스'});
+ if(on.has('con'))add({t:'con',l:'콘'});if(on.has('mary'))add({t:'mary',l:'메리 쏜'});
+ if(on.has('num'))for(const s of'gpyb'){add({t:'num',s,n:7,x:1});add({t:'num',s,n:8,x:1});add({t:'z',s,n:0,x:1})}
+ if(on.has('wild'))add({t:'wild',l:'와일드 15'});if(on.has('volley'))add({t:'volley',l:'마지막 일제사격'});if(on.has('plank'))add({t:'plank',l:'판자 걷기'});return two?d.filter(c=>!['loot','wild','plank','z'].includes(c.t)):d}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+// ---- 규칙 엔진 ----
+const eff=e=>{const c=e.c,d=e.d;if(c.t==='num')return{k:'suit',s:c.s,n:c.n};if(c.t==='z')return{k:'suit',s:c.s,n:d};if(c.t==='wild')return{k:'suit',s:d,n:15};
+ if(c.t==='tigress')return{k:d==='P'?'pirate':'esc'};if(c.t==='mary'||c.t==='pirate')return{k:'pirate'};if(c.t==='loot')return{k:'esc'};return{k:c.t}};
+const CH=['sk','mer','con','pirate','kraken','whale','sting'];
+function leadOf(tr){for(const e of tr){const f=eff(e);if(f.k==='suit'){if(f.s==='x')continue;return f.s}if(CH.includes(f.k))return null}return undefined}
+function legal(h,tr){const l=leadOf(tr);return h.filter(c=>!(l&&(c.t==='num'||c.t==='z')&&c.s!==l&&h.some(x=>(x.t==='num'||x.t==='z')&&x.s===l)))}
+function normal(es,lead){const K=k=>es.filter(e=>e.f.k===k),pir=K('pirate'),mer=K('mer'),sk=K('sk'),con=K('con');
+ if(mer.length&&(sk.length||con.length))return{w:mer[0],b:sk.length?40:30};
+ if(sk.length)return{w:sk[0],b:30*pir.length+30*con.length};if(con.length)return{w:con[0],b:0};
+ if(pir.length)return{w:pir[0],b:20*mer.length};if(mer.length)return{w:mer[0],b:0};
+ const su=es.filter(e=>e.f.k==='suit');if(su.length){let c=su.filter(e=>e.f.s==='b');if(!c.length)c=su.filter(e=>e.f.s===lead);if(!c.length)c=su;return{w:c.reduce((a,e)=>e.f.n>a.f.n?e:a),b:0}}
+ return{w:es.filter(e=>e.f.k==='esc')[0]||null,b:0}}
+function resolve(tr){let es=tr.map(e=>({...e,f:eff(e)})),bonus=[],loot=[],lead=leadOf(tr);const isM=e=>['kraken','whale','sting'].includes(e.f.k);
+ const dj=es.find(e=>e.f.k==='davy');
+ if(dj){const m=es.filter(isM);if(m.length)bonus.push({p:dj.p,pts:20*m.length,t:`👻 괴물 ${m.length}마리 격퇴 +${20*m.length}`});es=es.filter(e=>!isM(e)&&e!==dj)}
+ const mons=es.filter(isM),last=mons[mons.length-1];
+ if(last&&last.f.k==='kraken'){const r=normal(es.filter(e=>!isM(e)),lead);return{w:r.w?r.w.p:tr[0].p,kraken:1,bonus:[]}}
+ if(last){const su=es.filter(e=>e.f.k==='suit');if(!su.length)return{w:tr[0].p,discard:1,bonus};
+  const w=su.reduce((a,e)=>(last.f.k==='whale'?e.f.n>a.f.n:e.f.n<a.f.n)?e:a);return{w:w.p,bonus}}
+ const r=normal(es,lead);if(!r.w)return{w:tr[0].p,discard:1,bonus};
+ if(r.b)bonus.push({p:r.w.p,pts:r.b,t:`⚔️ 보너스 +${r.b}`});
+ es.filter(e=>e.c.t==='loot'&&e.p!==r.w.p&&r.w.f.k!=='esc').forEach(e=>loot.push([e.p,r.w.p]));
+ return{w:r.w.p,bonus,loot}}
+// ---- 봇 ----
+const pw=c=>({esc:0,loot:0,num:c.n+(c.s==='b'?20:0),z:7,wild:15,tigress:50,pirate:70,mary:70,con:75,sk:80,mer:65,kraken:5,whale:5,sting:5,davy:2,volley:1,plank:1})[c.t]+(c.t==='num'?0:0);
+function botBid(h,n){let s=0;h.forEach(c=>{if(c.t==='sk')s+=1;else if(['pirate','mary','con'].includes(c.t))s+=.8;else if(c.t==='tigress')s+=.5;else if(c.t==='mer')s+=.4;else if(c.t==='num'){if(c.s==='b')s+=c.n>=10?.7:.25;else if(c.n>=13)s+=.45}});
+ return Math.max(0,Math.min(h.length,Math.round(s+(Math.random()-.5)*.6)))}
+function botDecl(c,p,tr){const need=p.won<p.bid;if(c.t==='tigress')return need?'P':'E';if(c.t==='z')return need?14:0;
+ if(c.t==='wild'){const l=leadOf(tr);if(l==='b')return'x';if(l)return l;return'gpy'[Math.random()*3|0]}}
+function botPick(p,tr){const L=legal(p.hand,tr),need=p.won<p.bid;L.sort((a,b)=>pw(a)-pw(b)+(Math.random()-.5));return need?L[L.length-1]:L[0]}
+// ---- UI 헬퍼 ----
+function cardEl(c,d,cls=''){const col=c.t==='num'||c.t==='z'?SU[c.s][1]:c.t==='wild'?SP.wild[1]:SP[c.t][1];
+ const ic=c.t==='num'?SU[c.s][0]:c.t==='z'?SU[c.s][0]:SP[c.t][0];
+ const nm=c.t==='num'?'':c.t==='z'?'0/14':c.l;const num=c.t==='num'?c.n:c.t==='z'?(d!=null?d:'0/14'):c.t==='wild'?15:'';
+ return`<div class="card ${cls}" style="background:${col}" data-id="${c.id}"><span class="i">${ic}</span><span class="n">${num}</span><small>${nm}${c.x?' ✦':''}${d&&c.t==='tigress'?(d==='P'?' (해적)':' (도주)'):''}</small></div>`}
+function ask(title,opts){return new Promise(res=>{const o=document.createElement('div');o.className='ov';o.innerHTML=`<div class="pan"><h3>${title}</h3>${opts.map((x,i)=>`<button data-i="${i}" style="margin:4px">${x[0]}</button>`).join('')}</div>`;
+ o.onclick=e=>{const b=e.target.closest('button');if(b){o.remove();res(opts[b.dataset.i][1])}};document.body.appendChild(o)})}
+function say(t){const m=$('#msg');if(m)m.textContent=t}
+function render(hl){const me=G.players[0],tr=G.trick,myTurn=G.turn===0&&G.phase==='play',L=myTurn?legal(me.hand,tr):[];
+ A.innerHTML=`<div class="top">${G.players.map((p,i)=>`<div class="pl ${G.turn===i?'on':''}"><b>${p.name}</b>${i===0?' (나)':''}<br>예측 ${G.rev||i===0?p.bid??'-':'?'} · 획득 ${p.won}<br>총점 ${p.total}</div>`).join('')}</div>
+ <div style="text-align:center;margin-top:6px">라운드 ${G.r}/${G.sched.length} · 카드 ${G.cn}장 · 리드 수트: ${(()=>{const l=leadOf(tr);return l?SU[l][0]+SU[l][2]:l===null?'없음':'-'})()}</div>
+ <div class="tbl">${tr.length?tr.map(e=>`<div class="tc ${hl===e.p?'win':''}">${cardEl(e.c,e.d)}${G.players[e.p].name}</div>`).join(''):'<span style="opacity:.5">🏴‍☠️ 통 위에 카드를 올려주세요</span>'}</div>
+ <div class="msg" id="msg"></div>
+ <div class="hand">${me.hand.slice().sort((a,b)=>(a.s||'z').localeCompare(b.s||'z')||(a.n||0)-(b.n||0)).map(c=>cardEl(c,null,myTurn?(L.includes(c)?'ok':'no'):'')).join('')}</div>`;
+ if(myTurn)A.querySelectorAll('.card.ok').forEach(el=>el.onclick=()=>wait&&wait(+el.dataset.id))}
+async function humanPlay(tr){const me=G.players[0];say('당신 차례! 낼 카드를 고르세요');const id=await new Promise(r=>wait=r);wait=null;const c=me.hand.find(x=>x.id===id);return decl(c)}async function decl(c){const tr=G.trick;let d;
+ if(c.t==='tigress')d=await ask('티그리스: 어떻게 낼까요?',[['☠️ 해적',  'P'],['🚢 도주','E']]);
+ if(c.t==='z')d=await ask('0/14: 값을 선언하세요',[['0',0],['14',14]]);
+ if(c.t==='wild'){const l=leadOf(tr);d=l==='b'?'x':l||await ask('와일드 15: 수트 선택',[['🦜 패럿','g'],['🗺️ 지도','p'],['📦 보물상자','y']])}
+ return{c,d}}
+// ---- 게임 진행 ----
+async function start(){const on=CFG.on;const d=deck(on,CFG.n===2);G={cfg:{on:new Set(on),n:CFG.n},players:[],two:CFG.n===2,sched:MODES[CFG.mode],r:0,rev:0,trick:[],turn:-1,phase:'',log:[]};
+ const nm=['나',...shuffle(NAMES.slice())];for(let i=0;i<CFG.n;i++)G.players.push({name:nm[i],total:0,hand:[],pile:[],bonus:0});if(G.two)G.players.push({name:'👻 Graybeard',ghost:1,total:0,hand:[],pile:[],bonus:0});
+ G.dsize=d.length;for(let i=0;i<G.sched.length;i++)await round(i+1,G.sched[i]);final()}
+async function round(r,want){const n=G.players.length,cn=Math.min(want,Math.floor(G.dsize/n));G.r=r;G.cn=cn;G.rev=0;G.loots=[];G.trick=[];
+ const dk=G.dk=shuffle(deck(G.cfg.on,G.two));G.forced=null;G.players.forEach(p=>{p.hand=dk.splice(0,cn);p.won=0;p.bet=0;p.bid=null;p.pile=[];p.bonus=0});
+ const sea=['🌅 잔잔한 석양','🌫️ 안개 낀 바다','⛈️ 폭풍의 바다'][r%3];
+ A.innerHTML=`<div class="ov"><div class="pan"><div class="big">⛵ ROUND ${r}</div><p>${sea} — 카드 ${cn}장</p></div></div>`;await sleep(1100);
+ G.phase='bid';G.turn=-1;render();
+ G.players.forEach((p,i)=>{if(i&&!p.ghost)p.bid=botBid(p.hand,cn)});
+ G.players[0].bid=await ask(`예측: 이번 라운드에 몇 트릭을 딸까요? (0~${cn})`,[...Array(cn+1).keys()].map(i=>[i,i]));
+ render();const ov=document.createElement('div');ov.className='ov';document.body.appendChild(ov);
+ for(const t of['Yo!','Ho!','Ho!']){ov.innerHTML=`<div class="big">✊ ${t}</div>`;await sleep(550)}ov.remove();G.rev=1;render();say('모두의 예측이 공개되었습니다!');await sleep(900);
+ G.phase='play';let lead=G.two?(G.L=r%2):(r-1)%n;
+ for(let t=0;t<cn;t++){G.trick=[];const last=t===cn-1;for(const p of ord(lead,n))if(G.players[p].hand.length)await turn(p);for(const e of G.trick.slice())if(e.c.t==='volley'&&G.players[e.p].hand.length)await turn(e.p);G.forced=null;await plankStep();const tr=G.trick.filter(e=>!e.gone);
+   
+   
+  G.turn=-1;const res=resolve(tr);render(res.w);
+  const names={kraken:'🐙 크라켄이 트릭을 파괴했다!',discard:'트릭이 폐기되었다'};
+  if(res.kraken||res.discard){say(res.kraken?names.kraken:names.discard);lead=res.w}
+  else{const w=G.players[res.w];w.won++;w.pile.push(...tr);res.bonus.forEach(b=>G.players[b.p].bonus+=b.pts);G.loots.push(...(res.loot||[]));
+   say(`🏆 ${w.name} 승리!`+res.bonus.map(b=>' '+b.t).join(''));lead=res.w;await sleep(1400);if(G.cfg.on.has('abil'))lead=await abilities(tr,res.w,last,lead)}
+  await sleep(1700)}
+ // 정산
+ let rows='';G.players.forEach((p,i)=>{if(p.ghost)return;const ok=p.won===p.bid;let base=p.bid===0?(ok?10*cn:-10*cn):ok?20*p.bid:-10*Math.abs(p.won-p.bid),bn=0;
+  if(ok){bn+=p.bonus;p.pile.forEach(e=>{const c=e.c;if(c.t==='num'){if(c.n===14&&!c.x)bn+=c.s==='b'?20:10;if(c.x&&c.n===8)bn+=5;if(c.x&&c.n===7)bn-=5}});
+   G.loots.forEach(([a,b])=>{if((a===i||b===i)&&G.players[a].won===G.players[a].bid&&G.players[b].won===G.players[b].bid)bn+=20})}
+  bn+=ok?p.bet:-p.bet;p.total+=base+bn;rows+=`<tr><td>${p.name}</td><td>${p.bid}/${p.won} ${ok?'✅':'❌'}</td><td>${base}</td><td>${bn}</td><td><b>${p.total}</b></td></tr>`});
+ await ask(`<table><tr><th>이름</th><th>예측/결과</th><th>기본</th><th>보너스</th><th>누적</th></tr>${rows}</table><p>라운드 ${r} 정산</p>`,[[r<G.sched.length?'⛵ 다음 항해':'🏆 결과 보기',1]])}
+function final(){const s=G.players.filter(p=>!p.ghost).sort((a,b)=>b.total-a.total);
+ A.innerHTML=`<h1>👑 최종 결과</h1><div class="pan" style="text-align:center">${s.map((p,i)=>`<p style="font-size:${i?1.1:1.8}rem">${i?i+1+'위':'👑 해골왕'} ${p.name} — ${p.total}점</p>`).join('')}${CFG.mode==='Past Your Bedtime'?'<p>🤗 굿나잇 허그!</p>':''}<button onclick="home()">다시 하기</button></div>`}
+const lab=c=>c.t==='num'?SU[c.s][0]+c.n:c.t==='z'?SU[c.s][0]+'0/14':c.l;
+async function turn(p){G.turn=p;render();const pl=G.players[p],fc=G.forced&&G.forced.p===p&&pl.hand.includes(G.forced.c)?G.forced.c:null;let c,d;
+ if(pl.ghost){say('👻 Graybeard의 유령이 맨 위 카드를 뒤집습니다...');await sleep(800);c=pl.hand[0];d=c.t==='tigress'?'E':c.t==='z'?0:c.t==='wild'?(leadOf(G.trick)||'g'):undefined}else if(p===0){if(fc){say('🗡️ 메리 쏜의 힘! 이 카드를 내야 합니다');await sleep(900);({c,d}=await decl(fc))}else({c,d}=await humanPlay(G.trick))}
+ else{say(pl.name+'의 차례...');await sleep(650);c=fc||botPick(pl,G.trick);d=botDecl(c,pl,G.trick)}
+ if(c.t==='wild'&&leadOf(G.trick)==='b')d='x';pl.hand=pl.hand.filter(x=>x!==c);G.trick.push({p,c,d})}
+async function plankStep(){const pe=G.trick.find(e=>e.c.t==='plank');if(!pe)return;const pr=G.trick.filter(e=>eff(e).k==='pirate');if(!pr.length)return;
+ render();let t=pr[0];if(pe.p===0&&pr.length>1)t=await ask('🦈 판자 걷기: 제거할 해적 선택',pr.map(e=>[G.players[e.p].name+': '+lab(e.c),e]));
+ t.gone=1;say('🦈 '+lab(t.c)+' 해적이 판자 끝으로 걸어갑니다!');render();await sleep(1300)}
+async function abilities(tr,w,last,lead){if(G.players[w].ghost)return lead;const we=tr.filter(e=>e.p===w).map(e=>e.c),N=G.players.length,pl=G.players[w];
+ const ps=we.some(c=>c.t==='con')?tr.filter(e=>e.c.t==='pirate'||e.c.t==='mary').map(e=>e.c):we.filter(c=>c.t==='pirate'||c.t==='mary');
+ for(const c of ps){const H=c.l==='Harry';if(last&&!H)continue;say(`🎖️ ${c.l||'Mary Thorne'}의 능력 발동!`);await sleep(900);
+  if(c.l==='Rosie')lead=w===0?await ask('Rosie: 다음 트릭을 리드할 사람',G.players.map((p,i)=>[p.name,i])):(pl.won<pl.bid?w:(w+1)%N);
+  else if(c.l==='Bendt'){pl.hand.push(...G.dk.splice(0,2));for(let i=0;i<2&&pl.hand.length;i++){let d;if(w===0)d=await ask(`Bendt: 버릴 카드 (${i+1}/2)`,pl.hand.map(x=>[lab(x),x]));else{const s=pl.hand.slice().sort((a,b)=>pw(a)-pw(b));d=pl.won<pl.bid?s[0]:s[s.length-1]}pl.hand=pl.hand.filter(x=>x!==d)}}
+  else if(c.l==='Rascal')pl.bet=w===0?await ask('Rascal: 이번 예측에 얼마를 걸까요?',[['걸지 않음',0],['10점',10],['20점',20]]):(pl.won===pl.bid?10:0);
+  else if(c.l==='Juanita'){if(w===0)await ask(`딜되지 않은 카드 (${G.dk.length}장)<br><br>${G.dk.map(lab).join(' ')}<br><br>`,[['확인',1]])}
+  else if(H){const o=[-1,0,1].filter(v=>pl.bid+v>=0&&pl.bid+v<=G.cn);if(w===0)pl.bid+=await ask(`Harry: 예측을 바꿀까요? (현재 ${pl.bid})`,o.map(v=>[v?(v>0?'+1':'-1'):'유지',v]));else pl.bid+=pl.won>pl.bid&&o.includes(1)?1:(pl.bid-pl.won>pl.hand.length&&o.includes(-1)?-1:0)}
+  else if(c.t==='mary'){const o=G.players.map((p,i)=>[p.name+` (${p.hand.length}장)`,i]).filter(x=>G.players[x[1]].hand.length);if(!o.length)continue;
+   const t=w===0?await ask('Mary Thorne: 무작위 카드를 뽑을 플레이어',o):o[Math.random()*o.length|0][1],h=G.players[t].hand;G.forced={p:t,c:h[Math.random()*h.length|0]};say(`🗡️ ${G.players[t].name}은(는) 다음 트릭에 뽑힌 카드를 내야 합니다`);await sleep(1200)}
+  render()}
+ return lead}
+// ---- 홈 ----
+function home(){A.innerHTML=`<h1>💀 SKULL KING</h1><p style="text-align:center;opacity:.8">해골왕의 배에 오신 걸 환영하오, 마티!</p>
+ <div class="pan"><b>카드 프리셋</b><div class="tg" style="margin:8px 0">${Object.keys(PRE).map(k=>`<button onclick="pre('${k}')">${k}</button>`).join('')}</div>
+ <b>특수 카드 선택 (기본 덱 70장은 항상 포함)</b><div class="tg" style="margin-top:8px">${OPT.map(o=>`<label><input type="checkbox" hidden value="${o[0]}" ${CFG.on.has(o[0])?'checked':''} onchange="tog(this)"><span>${o[1]}</span></label>`).join('')}</div>
+ <p id="info"></p></div>
+ <div class="pan"><div class="tg"><label style="font-size:1.1rem"><input type="checkbox" hidden value="abil" ${CFG.on.has('abil')?'checked':''} onchange="tog(this);this.nextElementSibling.textContent=this.checked?'🎖️ 해적 능력: ON':'🎖️ 해적 능력: OFF'"><span>${CFG.on.has('abil')?'🎖️ 해적 능력: ON':'🎖️ 해적 능력: OFF'}</span></label></div>
+ <div style="font-size:.82rem;opacity:.85;margin-top:8px;line-height:1.5">해적으로 트릭을 이기면 능력 발동 (일등항해사 콘은 잡은 해적들의 능력을 모두 사용). OFF면 모든 해적이 능력 없이 일반 해적으로 동작합니다.<br>
+ ☠️ Rosie: 다음 리더 지정 · Bendt: 2장 받고 2장 버림 · Rascal: 10/20점 베팅 · Juanita: 안 딜된 카드 열람 · Harry: 예측 ±1 (마지막 트릭 후에도 가능) · Mary Thorne: 무작위 카드를 뽑아 다음 트릭에 강제로 내게 함</div></div>
+ <div class="pan"><b>라운드 구성</b><div class="tg" style="margin-top:8px">${Object.keys(MODES).map(k=>`<label><input type="radio" name="md" hidden ${CFG.mode===k?'checked':''} onchange="CFG.mode='${k}';info()"><span>${k} (${MODES[k].length}R)</span></label>`).join('')}</div></div>
+ <div class="pan"><b>인원: <span id="nv">${CFG.n}</span>명 (나 + 봇)</b><br><input type="range" min="2" max="8" value="${CFG.n}" oninput="CFG.n=+this.value;$('#nv').textContent=this.value;info()" style="width:100%"></div>
+ <div style="text-align:center"><button style="font-size:1.3rem;padding:12px 30px" onclick="start()">⚓ 출항!</button></div>`;info()}
+function pre(k){CFG.on=new Set(PRE[k]);home()}function tog(el){el.checked?CFG.on.add(el.value):CFG.on.delete(el.value);info()}
+function info(){const two=CFG.n===2,d=deck(CFG.on,two).length,m=Math.min(10,Math.floor(d/(two?3:CFG.n)));$('#info').textContent=`덱 ${d}장 · ${CFG.n}명${two?' + 👻Graybeard':''} 기준 최대 ${m}장 · 라운드별 딜: ${MODES[CFG.mode].map(x=>Math.min(x,m)).join(', ')}`+(two?' · 2인: 전리품·와일드15·판자걷기·0/14 제외':'')}
+home();
+</script></body></html>

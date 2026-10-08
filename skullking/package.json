@@ -1,0 +1,13 @@
+{
+  "name": "skullking-online",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n server,web -c yellow,cyan \"npm run dev -w @skullking/server\" \"npm run dev -w @skullking/web\"",
+    "build": "npm run build -w @skullking/shared && npm run build -w @skullking/server && npm run build -w @skullking/web",
+    "test": "npm run test -w @skullking/server",
+    "typecheck": "npm run typecheck -w @skullking/shared && npm run typecheck -w @skullking/server && npm run typecheck -w @skullking/web"
+  },
+  "devDependencies": { "concurrently": "^9.0.0", "typescript": "^5.7.0" }
+}

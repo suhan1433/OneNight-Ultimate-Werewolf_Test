@@ -1,0 +1,2 @@
+import { create } from 'zustand';import type { ClientGameState } from '@skullking/shared';
+export const useGame=create<{game:ClientGameState|null;error:string|null;online:boolean;setGame:(game:ClientGameState|null)=>void;setError:(error:string|null)=>void;setOnline:(online:boolean)=>void}>((set)=>({game:null,error:null,online:true,setGame:game=>set({game}),setError:error=>set({error}),setOnline:online=>set({online})}));

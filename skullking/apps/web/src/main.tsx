@@ -1,0 +1,77 @@
+import { useEffect, useMemo, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import type { Card, CardDeclaration, CardOptions, GameConfig, PendingDecision, PlayedCard, Suit } from '@skullking/shared';
+import { cardArt } from './card-art';
+import { emit, saveSession } from './socket';
+import { useGame } from './store';
+import './styles.css';
+
+const suits: Record<Suit,{icon:string;name:string}>={parrot:{icon:'🦜',name:'앵무새'},map:{icon:'🗺️',name:'지도'},treasure:{icon:'💰',name:'보물'},jolly:{icon:'🏴',name:'졸리 로저'}};
+const emptyCards: CardOptions={kraken:false,whale:false,loot:false,pirateAbilities:false,expansionSuitCards:false,wildMonkey:false,maryThorne:false,lastVolley:false,firstMateCon:false,stingray:false,davyJones:false,walkThePlank:false};
+const fullCards: CardOptions={kraken:true,whale:true,loot:true,pirateAbilities:true,expansionSuitCards:true,wildMonkey:true,maryThorne:true,lastVolley:true,firstMateCon:true,stingray:true,davyJones:true,walkThePlank:true};
+const cardSettings: Array<[keyof CardOptions,string,string]>=[
+  ['kraken','Kraken','트릭을 폐기합니다.'],['whale','White Whale','숫자만 남기고 가장 높은 숫자가 이깁니다.'],['loot','Loot ×2','승자와 성공 시 +20 동맹입니다.'],['pirateAbilities','Pirate Abilities','5명의 일반 Pirate 능력을 사용합니다.'],
+  ['expansionSuitCards','수트 확장 12장','7(-5), 8(+5), 0/14를 넣습니다.'],['wildMonkey','Wild Monkey 15','검정을 제외한 수트를 선언하는 15입니다.'],['maryThorne','Mary Thorne','승리 후 다음 강제 카드를 정합니다.'],
+  ['lastVolley','The Last Volley','추가 한 장을 내고 마지막 트릭을 건너뜁니다.'],['firstMateCon','First Mate Con','Pirate를 이기고 Mermaid·Skull King에게 집니다.'],['stingray','Spotted Stingray','숫자만 남기고 가장 낮은 숫자가 이깁니다.'],
+  ['davyJones',"Davy Jones' Locker",'Sea Monster를 제거하고 한 장당 +20입니다.'],['walkThePlank','Walk the Plank','트릭의 Pirate 하나를 제거합니다.'],
+];
+const icon:Record<Card['kind'],string>={number:'',wild:'🐵',pirate:'☠️',tigress:'🐯',skullKing:'💀',mermaid:'🧜',escape:'⛵',kraken:'🐙',whale:'🐋',stingray:'🛸',davy:'👻',con:'👊',lastVolley:'💥',plank:'🦈',loot:'💰'};
+const label=(c:Card)=>c.kind==='number'?suits[c.suit!].name+' '+(c.isZeroFourteen?'0/14':c.rank):c.name;
+const showError=(e:unknown)=>useGame.getState().setError(e instanceof Error?e.message:'요청을 처리할 수 없습니다.');
+
+function CardView({card,onClick,disabled,small}:{card:Card;onClick?:()=>void;disabled?:boolean;small?:boolean}) {
+  const art=cardArt(card);
+  return <button className={'card '+card.kind+' '+(art?'art-card ':'')+(small?'small ':'')+(disabled?'disabled':'')} onClick={onClick} disabled={disabled} title={label(card)}>
+    {art?<img className="card-art" src={art} alt={label(card)} draggable={false}/>:<><span>{card.kind==='number'?suits[card.suit!].icon:icon[card.kind]}</span><b>{card.kind==='number'?card.rank:card.kind==='wild'?'15':''}</b><em>{label(card)}</em></>}
+  </button>;
+}
+function Help({close}:{close:()=>void}) {
+  return <div className="modal"><div className="help"><h2>⚓ Skull King 도움말</h2>
+    <h3>진행과 점수</h3><p>매 라운드 받은 카드 수만큼 딸 트릭을 예측해 동시에 공개합니다. 리드 수트가 있으면 같은 수트를 내야 하며, 특수 카드와 Wild Monkey는 언제나 낼 수 있습니다. 비드 1 이상은 정확히 맞추면 트릭당 +20, 틀리면 차이당 -10입니다. 0 비드는 성공·실패 시 각각 ±딜 장수×10입니다.</p>
+    <h3>기본 서열</h3><p>Mermaid는 Skull King을 이기며 +40, Skull King은 Pirate를 이기며 Pirate당 +30, Pirate는 Mermaid를 이기며 Mermaid당 +20입니다. 졸리 로저는 트럼프이고, 일반 14는 +10(검정 14는 +20)입니다. Tigress는 Pirate 또는 Escape로 선언합니다.</p>
+    <h3>해적 능력</h3><p><b>Rosie</b>는 다음 리더를 지정합니다. <b>Bendt</b>는 최대 2장을 뽑고 버립니다. <b>Rascal</b>은 0·10·20점을 걸고, <b>Juanita</b>는 남은 덱을 봅니다. <b>Harry</b>는 비드를 ±1 조정합니다. <b>Mary Thorne</b>은 대상의 무작위 카드를 다음에 강제로 내게 합니다.</p>
+    <h3>확장</h3><p><b>Wild Monkey 15</b>는 검정을 제외한 수트를 선언합니다. <b>Con</b>은 Pirate를 이기지만 Mermaid·Skull King에게 집니다. <b>Kraken</b>은 트릭을 폐기합니다. <b>White Whale</b>/<b>Stingray</b>는 특수 카드를 없애고 각각 최고/최저 숫자로 승부합니다. <b>Davy Jones</b>는 Sea Monster를 제거해 장당 +20, <b>Walk the Plank</b>는 Pirate 하나를 제거합니다. <b>Last Volley</b>는 추가 카드를 내고 마지막 트릭을 건너뜁니다.</p>
+    <h3>수트 확장과 Loot</h3><p>확장 7은 -5, 8은 +5입니다. 0/14는 낼 때 값을 선언하며 14 보너스는 없습니다. Loot는 Escape처럼 행동하지만 다른 사람이 이긴 트릭에서는 그 승자와 동맹을 맺습니다. 카드 보너스는 비드 성공 시에만 적용됩니다.</p><button className="gold" onClick={close}>확인</button>
+  </div></div>;
+}
+function Landing() {
+  const [nickname,setNickname]=useState(localStorage.getItem('skullking-name')??''); const [roomCode,setRoomCode]=useState('');
+  const [maxPlayers,setMaxPlayers]=useState(4); const [mode,setMode]=useState<GameConfig['roundMode']>('classic'); const [cards,setCards]=useState<CardOptions>(emptyCards); const [help,setHelp]=useState(false); const [busy,setBusy]=useState(false); const error=useGame(s=>s.error);
+  const restricted=maxPlayers<3; const active=restricted?emptyCards:cards;
+  const deck=70+(active.kraken?1:0)+(active.whale?1:0)+(active.loot?2:0)+(active.expansionSuitCards?12:0)+(active.wildMonkey?1:0)+(active.maryThorne?1:0)+['lastVolley','firstMateCon','stingray','davyJones','walkThePlank'].filter(k=>active[k as keyof CardOptions]).length;
+  const enter=async(create:boolean)=>{try{setBusy(true);localStorage.setItem('skullking-name',nickname);const reply=await emit(create?'ROOM_CREATE':'ROOM_JOIN',create?{nickname,config:{maxPlayers,advanced:active.kraken||active.whale||active.loot,expansionSuitCards:active.expansionSuitCards,roundMode:mode,cards:active}}:{nickname,roomCode});saveSession(reply);}catch(e){showError(e);}finally{setBusy(false);}};
+  const preset=(p:'classic'|'advanced'|'full')=>setCards(p==='classic'?emptyCards:p==='advanced'?{...emptyCards,kraken:true,whale:true,loot:true,pirateAbilities:true}:fullCards);
+  return <main className="landing"><div className="crest">♛<span>☠</span></div><h1>SKULL KING</h1><p className="subtitle">해골왕의 배, 한 테이블, 마지막 트릭까지.</p><section className="parchment"><label>선원 이름<input value={nickname} onChange={e=>setNickname(e.target.value)} maxLength={16}/></label><div className="columns"><div><h2>새 항해</h2>
+    <label>인원 <select value={maxPlayers} onChange={e=>setMaxPlayers(Number(e.target.value))}>{[2,3,4,5,6,7,8,9].map(n=><option key={n}>{n}</option>)}</select></label>
+    <label>항해 <select value={mode} onChange={e=>setMode(e.target.value as GameConfig['roundMode'])}><option value="classic">Classic · 1–10장</option><option value="evenKeeled">Even Keeled · 2,4,6,8,10장</option><option value="brawl">Skip to the Brawl · 6–10장</option><option value="swift">Swift-n-Salty · 5장 ×5</option><option value="broadside">Broadside · 10장 ×10</option><option value="whirlpool">Whirlpool · 9,7,5,3,1장 ×2</option><option value="bedtime">Past Your Bedtime · 1장</option></select></label>
+    <h3>카드 상자</h3><div className="actions"><button onClick={()=>preset('classic')}>Classic</button><button onClick={()=>preset('advanced')} disabled={restricted}>Advanced</button><button className="gold" onClick={()=>preset('full')} disabled={restricted}>Full Expansion</button></div>
+    {restricted?<p className="error">확장 카드·해적 능력은 3인 이상에서만 사용합니다.</p>:<div className="card-options">{cardSettings.map(([key,title,desc])=><label className="check" key={key}><input type="checkbox" checked={cards[key]} onChange={e=>setCards({...cards,[key]:e.target.checked})}/><b>{title}</b><small>{desc}</small></label>)}</div>}
+    <p className="rules">현재 덱 {deck}장 · 10장 라운드 기준 최대 {Math.floor(deck/10)}명</p><button className="gold" disabled={!nickname.trim()||busy} onClick={()=>enter(true)}>방 만들기</button>
+  </div><div className="join"><h2>기존 항해</h2><label>방 코드<input value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} maxLength={6}/></label><button disabled={!nickname.trim()||roomCode.length<6||busy} onClick={()=>enter(false)}>방 참가</button><button className="text" onClick={()=>setHelp(true)}>📖 게임 도움말</button></div></div>{error&&<p className="error">{error}</p>}</section>{help&&<Help close={()=>setHelp(false)}/>}</main>;
+}
+function BidPanel(){const game=useGame(s=>s.game)!;const [bid,setBid]=useState(0);useEffect(()=>setBid(0),[game.round]);const me=game.players.find(p=>p.id===game.playerId)!;if(me.bid!==null)return <div className="status">다른 선원들의 예측을 기다리는 중…</div>;return <div className="bid"><h2>이번 항해, 몇 트릭?</h2><div>{Array.from({length:game.cardsThisRound+1},(_,n)=><button key={n} className={bid===n?'picked':''} onClick={()=>setBid(n)}>{n}</button>)}</div><button className="gold" onClick={()=>emit('BID_SUBMIT',{roomCode:game.roomCode,bid}).catch(showError)}>✊ Yo-ho-ho! 예측 제출</button></div>;}
+function Decision({pending}:{pending:PendingDecision}) {
+ const game=useGame(s=>s.game)!;const decide=(value:string|number,declaration?:CardDeclaration)=>emit('ABILITY_DECIDE',{roomCode:game.roomCode,value,declaration}).catch(showError);const pname=(id:string)=>game.players.find(p=>p.id===id)?.nickname??id;
+ if(pending.kind==='rosieLeader'||pending.kind==='maryTarget')return <div className="modal"><div><h2>{pending.kind==='rosieLeader'?'🍲 Rosie: 다음 리더':'🗡️ Mary Thorne: 대상 선택'}</h2>{pending.options.map(id=><button key={id} onClick={()=>decide(id)}>{pname(id)}</button>)}</div></div>;
+ if(pending.kind==='bendtDiscard'||pending.kind==='lastVolley')return <div className="modal"><div><h2>{pending.kind==='bendtDiscard'?'🃏 Bendt: '+pending.remaining+'장 버리기':'💥 Last Volley: 추가 카드'}</h2><div className="hand">{game.hand.map(c=><CardView key={c.id} card={c} onClick={()=>decide(c.id,c.kind==='wild'?'treasure':undefined)}/>)}</div></div></div>;
+ if(pending.kind==='rascalBet')return <div className="modal"><div><h2>🎲 Rascal의 내기</h2>{[0,10,20].map(n=><button key={n} className={n===20?'gold':''} onClick={()=>decide(n)}>{n===0?'내기 안 함':n+'점 걸기'}</button>)}</div></div>;
+ return <div className="modal"><div><h2>🦍 Harry: 비드 조정</h2>{[-1,0,1].map(n=><button key={n} onClick={()=>decide(n)}>{n>0?'+1':n===0?'유지':'-1'}</button>)}</div></div>;
+}
+function Table(){
+ const game=useGame(s=>s.game)!;const [choice,setChoice]=useState<Card|null>(null);const [help,setHelp]=useState(false);const active=game.turnId===game.playerId;const ordered=useMemo(()=>[...game.hand].sort((a,b)=>(a.suit??'z').localeCompare(b.suit??'z')+(a.rank??0)-(b.rank??0)),[game.hand]);
+ const play=(card:Card,declaration?:CardDeclaration)=>{setChoice(null);emit('CARD_PLAY',{roomCode:game.roomCode,cardId:card.id,declaration}).catch(showError);};const needs=(c:Card)=>c.kind==='tigress'||c.kind==='wild'||c.isZeroFourteen;
+ if(game.phase==='bidding')return <main className="game"><header><button className="text" onClick={()=>setHelp(true)}>📖 도움말</button></header><BidPanel/>{help&&<Help close={()=>setHelp(false)}/>}</main>;
+ if(game.phase==='roundScore'||game.phase==='result')return <Score/>;
+ return <main className="game"><header><a href="/">← 게임 선택</a><span>방 코드 <strong>{game.roomCode}</strong></span><span>라운드 {game.round} · {game.cardsThisRound}장</span><button className="text" onClick={()=>setHelp(true)}>📖 도움말</button></header>
+ <section className="crew">{game.players.map(p=><div className={'sailor '+(game.turnId===p.id?'turn ':'')+(game.leaderId===p.id?'leader':'')} key={p.id}><b>{p.nickname}{p.id===game.playerId?' (나)':''}</b><small>{p.bid===null?'예측 대기':'예측 '+p.bid} · 획득 {p.tricks}</small><strong>{p.score}점</strong><i>{p.cardsLeft}장</i></div>)}</section>
+ <section className="table"><div className="lead">{game.trickLead?suits[game.trickLead].icon+' 리드 수트':game.trick.length?'특수 카드 리드':'다음 트릭'}</div><div className="trick">{game.trick.length?game.trick.map((p:PlayedCard,i)=><div key={p.playerId+'-'+i} className="played"><CardView card={p.card} small/>{(p.card.isZeroFourteen||p.card.kind==='wild')&&<b className="declared-value">{p.declaration}</b>}<small>{pname(game,p.playerId)}</small></div>):<div className="empty">통 위에 첫 카드를 내세요</div>}</div></section>
+ <p className="turntext">{active?'당신의 차례입니다.':game.pendingDecision?'능력 선택을 기다리는 중…':pname(game,game.turnId)}</p><section className="hand">{ordered.map(c=><CardView key={c.id} card={c} disabled={!active||!game.legalCardIds.includes(c.id)} onClick={()=>needs(c)?setChoice(c):play(c)}/>)}</section>
+ {game.peekedDeck&&<p className="rules">🔮 Juanita가 본 남은 덱: {game.peekedDeck.map(label).join(' · ')||'없음'}</p>}
+ {choice&&<div className="modal"><div>{choice.isZeroFourteen?<><h2>0/14 선언</h2><button onClick={()=>play(choice,0)}>0</button><button className="gold" onClick={()=>play(choice,14)}>14</button></>:choice.kind==='wild'?<><h2>🐵 Wild Monkey 15</h2>{(['parrot','map','treasure'] as const).map(s=><button key={s} onClick={()=>play(choice,s)}>{suits[s].icon} {suits[s].name}</button>)}</>:<><h2>🐯 Tigress 선언</h2><button className="gold" onClick={()=>play(choice,'pirate')}>Pirate</button><button onClick={()=>play(choice,'escape')}>Escape</button></>}<button className="text" onClick={()=>setChoice(null)}>취소</button></div></div>}
+ {game.pendingDecision&&<Decision pending={game.pendingDecision}/>} {help&&<Help close={()=>setHelp(false)}/>}</main>;
+}
+const pname=(game:NonNullable<ReturnType<typeof useGame.getState>['game']>,id:string|null)=>game?.players.find(p=>p.id===id)?.nickname??'—';
+function Score(){const game=useGame(s=>s.game)!;const latest=game.history.at(-1);return <main className="game score"><header><span>방 코드 <strong>{game.roomCode}</strong></span></header><section className="parchment"><h1>{game.phase==='result'?'👑 항해의 끝':'📜 라운드 정산'}</h1>{latest&&<table><thead><tr><th>선원</th><th>예측 / 결과</th><th>기본</th><th>보너스</th><th>누적</th></tr></thead><tbody>{latest.scores.map(r=><tr key={r.playerId}><td>{pname(game,r.playerId)}</td><td>{r.bid} / {r.tricks}</td><td>{r.base}</td><td>{r.bonus}</td><td><b>{r.total}</b></td></tr>)}</tbody></table>}{game.canAdvance&&<button className="gold" onClick={()=>emit('ROUND_ADVANCE',{roomCode:game.roomCode}).catch(showError)}>다음 항해 →</button>}</section></main>;}
+function Lobby(){const game=useGame(s=>s.game)!;const me=game.players.find(p=>p.id===game.playerId)!;const host=game.hostId===game.playerId;const [help,setHelp]=useState(false);return <main className="lobby"><header><a href="/">← 게임 선택</a><span>방 코드 <strong>{game.roomCode}</strong></span><button className="text" onClick={()=>setHelp(true)}>📖 도움말</button></header><h1>선원 모집</h1><section className="parchment"><div className="seats">{Array.from({length:game.config.maxPlayers},(_,i)=>{const p=game.players[i];return <div className={'seat '+(p?'filled':'')} key={i}>{p?<><span>{p.isBot?'🤖':'🏴‍☠️'}</span><b>{p.nickname}</b><small>{p.ready?'준비 완료':'준비 중'}</small></>:<><span>⚓</span><small>빈 자리</small></>}</div>;})}</div><div className="actions"><button onClick={()=>emit('PLAYER_READY',{roomCode:game.roomCode}).catch(showError)}>{me.ready?'준비 취소':'준비 완료'}</button>{host&&<button onClick={()=>emit('BOT_FILL',{roomCode:game.roomCode}).catch(showError)}>봇으로 채우기</button>}{host&&<button className="gold" disabled={game.players.length<2||!game.players.every(p=>p.ready)} onClick={()=>emit('GAME_START',{roomCode:game.roomCode}).catch(showError)}>⚓ 출항!</button>}</div><p className="rules">선택된 카드: {Object.entries(game.config.cards??emptyCards).filter(([,on])=>on).map(([k])=>cardSettings.find(([id])=>id===k)?.[1]).filter(Boolean).join(' · ')||'Classic 기본 덱'}</p></section>{help&&<Help close={()=>setHelp(false)}/>}</main>;}
+function App(){const game=useGame(s=>s.game);const error=useGame(s=>s.error);useEffect(()=>{if(!error)return;const timer=setTimeout(()=>useGame.getState().setError(null),3500);return()=>clearTimeout(timer);},[error]);return <>{game?(game.phase==='lobby'?<Lobby/>:<Table/>):<Landing/>}{error&&game&&<div className="toast">{error}</div>}</>;}
+createRoot(document.getElementById('root')!).render(<App/>);

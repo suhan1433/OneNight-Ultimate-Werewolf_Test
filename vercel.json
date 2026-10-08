@@ -3,7 +3,7 @@
   "framework": "vite",
   "fluid": true,
   "regions": ["icn1"],
-  "installCommand": "npm ci && npm --prefix avalon ci && npm --prefix bloodbound ci",
+  "installCommand": "npm ci && npm --prefix avalon ci && npm --prefix bloodbound ci && npm --prefix skullking ci",
   "buildCommand": "npm run build",
   "outputDirectory": "apps/web/dist",
   "functions": {
@@ -14,6 +14,9 @@
       "maxDuration": 300
     },
     "api/bloodbound/socket.mjs": {
+      "maxDuration": 300
+    },
+    "api/skullking/socket.mjs": {
       "maxDuration": 300
     }
   }

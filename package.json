@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "concurrently -n server,web -c magenta,cyan \"npm run dev -w @werewolf/server\" \"npm run dev -w @werewolf/web\"",
     "dev:bloodbound": "npm --prefix bloodbound run dev",
-    "build": "npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web && npm --prefix avalon run build && npm --prefix bloodbound run build && cp game-selector/index.html apps/web/dist/index.html && cp game-selector/launcher.css apps/web/dist/launcher.css",
+    "dev:skullking": "npm --prefix skullking run dev",
+    "build": "npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web && npm --prefix avalon run build && npm --prefix bloodbound run build && npm --prefix skullking run build && cp game-selector/index.html apps/web/dist/index.html && cp game-selector/launcher.css apps/web/dist/launcher.css",
     "test": "npm run test -w @werewolf/server",
     "typecheck": "npm run typecheck -w @werewolf/shared && npm run typecheck -w @werewolf/server && npm run typecheck -w @werewolf/web"
   },
