@@ -391,6 +391,7 @@ function Lobby({ game }: { game: Game }) {
   const me = game.players.find(p => p.id === game.playerId);
   const host = game.hostId === game.playerId;
   const missing = game.maxPlayers - game.players.length;
+  const botCount = game.players.filter(p => p.isBot).length;
   const notReady = game.players.filter(p => !p.ready).map(p => p.nickname);
   const readyCount = game.players.length - notReady.length;
   const canStart = missing === 0 && notReady.length === 0;
@@ -434,15 +435,16 @@ function Lobby({ game }: { game: Game }) {
       </h2>
       <div className="roster">
         {game.players.map((p, index) => (
-          <article key={p.id} className={`${p.id === game.playerId ? 'me' : ''} ${p.connected ? '' : 'off'}`}>
+          <article key={p.id} className={`${p.id === game.playerId ? 'me' : ''} ${p.isBot ? 'bot' : ''} ${p.connected ? '' : 'off'}`}>
             <b>{index + 1}</b>
             <span className="name">
               {p.nickname}
               {p.id === game.hostId && <em className="tag">방장</em>}
               {p.id === game.playerId && <em className="tag me-tag">나</em>}
+              {p.isBot && <em className="tag bot-tag">봇</em>}
             </span>
-            <i className={p.connected ? 'on' : ''} aria-label={p.connected ? '접속 중' : '접속 끊김'}>{p.connected ? '●' : '○'}</i>
-            <small className={p.ready ? 'ok' : ''}>{!p.connected ? '접속이 끊겼어요' : p.ready ? '✓ 준비 완료' : '준비 중…'}</small>
+            <i className={p.connected ? 'on' : ''} aria-label={p.isBot ? '자동 플레이 봇' : p.connected ? '접속 중' : '접속 끊김'}>{p.isBot ? '✦' : p.connected ? '●' : '○'}</i>
+            <small className={p.ready ? 'ok' : ''}>{p.isBot ? '자동 플레이 · 준비 완료' : !p.connected ? '접속이 끊겼어요' : p.ready ? '✓ 준비 완료' : '준비 중…'}</small>
           </article>
         ))}
         {Array.from({ length: Math.max(0, missing) }, (_, i) => (
@@ -463,9 +465,13 @@ function Lobby({ game }: { game: Game }) {
           {me?.ready ? '준비 취소' : '준비 완료'}
         </button>
         {host && (
-          <button type="button" className="primary" disabled={!canStart || busy} onClick={() => run('GAME_START', { roomCode: game.roomCode })}>
-            게임 시작
-          </button>
+          <>
+            {missing > 0 && <button type="button" disabled={busy} onClick={() => run('BOT_FILL', { roomCode: game.roomCode })}>봇으로 빈자리 채우기</button>}
+            {botCount > 0 && <button type="button" disabled={busy} onClick={() => run('BOT_REMOVE', { roomCode: game.roomCode })}>봇 내보내기</button>}
+            <button type="button" className="primary" disabled={!canStart || busy} onClick={() => run('GAME_START', { roomCode: game.roomCode })}>
+              게임 시작
+            </button>
+          </>
         )}
       </div>
       <p className="reason" aria-live="polite">

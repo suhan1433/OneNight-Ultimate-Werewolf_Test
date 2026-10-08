@@ -7,7 +7,7 @@ export type AbilityInputKind = 'assassin_target' | 'harlequin_targets' | 'alchem
 
 export interface Character { clan: Clan; rank: number | null; name: string; affiliations: Affiliation[]; clue: 'rose' | 'beast'; ability: AbilityId; }
 export interface Equipment { shields: string[]; swords: string[]; staffs: number; fans: number; quill: boolean; }
-export interface BloodBoundPlayer { id: string; nickname: string; sessionToken: string; socketId: string | null; connected: boolean; ready: boolean; roleConfirmed: boolean; clueConfirmed: boolean; character: Character | null; tokens: Token[]; equipment: Equipment; curse?: 'true' | 'false'; }
+export interface BloodBoundPlayer { id: string; nickname: string; sessionToken: string; socketId: string | null; connected: boolean; ready: boolean; roleConfirmed: boolean; clueConfirmed: boolean; character: Character | null; tokens: Token[]; equipment: Equipment; curse?: 'true' | 'false'; isBot?: boolean; }
 export interface AttackContext { attackerId: string; targetId: string; offers: string[]; intervenerId?: string; actualTargetId?: string; }
 export interface PendingWound { targetId: string; sourceId: string; forceRank?: boolean; bypassShield?: boolean; after?: 'transfer_to_target' | 'continue'; originalAttack?: boolean; }
 export interface PendingAbility { actorId: string; ability: AbilityId; context: { intervened?: boolean; originalTargetId?: string; attackerId?: string; stage?: string; targetId?: string }; }
@@ -29,6 +29,6 @@ export type BloodBoundAction =
  | { type: 'HARLEQUIN_ACK'; actorId: string };
 export type ReduceResult = { state: BloodBoundRoom; events: GameEvent[] } | { error: string };
 
-export interface PublicPlayer { id: string; nickname: string; connected: boolean; ready: boolean; roleConfirmed: boolean; clueConfirmed: boolean; tokens: Token[]; wounds: number; equipment: Equipment; }
+export interface PublicPlayer { id: string; nickname: string; connected: boolean; ready: boolean; roleConfirmed: boolean; clueConfirmed: boolean; tokens: Token[]; wounds: number; equipment: Equipment; isBot: boolean; }
 export interface ClientGameState { roomCode: string; playerId: string; hostId: string; maxPlayers: number; phase: Phase; seed: number; daggerHolderId: string | null; players: PublicPlayer[]; activePlayerId: string | null; attack?: Omit<AttackContext, 'attackerId'> & { attackerId: string }; offers?: string[]; privateCharacter: Character | null; visibleClue?: { fromPlayerId: string; clue: 'rose' | 'beast' }; harlequinCards?: Character[]; pendingAbility?: { actorId: string; ability: AbilityId; context: PendingAbility['context'] }; permittedActions: string[]; publicLog: GameEvent[]; result?: VictoryResult; revealedCharacters?: Array<{ id: string; character: Character; curse?: 'true' | 'false' }>; }
 export interface Ack<T = unknown> { ok: boolean; data?: T; error?: string; }

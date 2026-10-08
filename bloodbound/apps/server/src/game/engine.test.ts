@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BloodBoundPlayer, BloodBoundRoom, Character, Token } from '@bloodbound/shared';
 import { clientState } from './view.js';
 import { assignCharacters, createRoom, leaderId, reduce } from './engine.js';
+import { settleBots } from './bots.js';
 
 const gear=()=>({shields:[] as string[],swords:[] as string[],staffs:0,fans:0,quill:false});
 const character=(clan:'rose'|'beast'|'secret',rank:number|null=1):Character=>({clan,rank,name:rank===null?'Inquisitor':`#${rank}`,affiliations:clan==='secret'?['unknown','unknown']:rank===2?['unknown','unknown']:[clan,clan],clue:clan==='beast'?'beast':'rose',ability:rank===1?'elder':rank===4?'alchemist':rank===5?'mentalist':rank===6?'guardian':rank===7?'berserker':rank===8?'mage':rank===9?'courtesan':rank===3?'harlequin':rank===2?'assassin':'inquisitor'});
@@ -42,5 +43,8 @@ describe('Blood Bound engine',()=>{
   });
   it('skips intervention for a Fan holder and lets the Inquisitor steal a cursed win',()=>{
     let state=game([character('rose',2),character('beast',1),character('secret',null),character('rose',3),character('beast',4),character('rose',5),character('beast',6)]);state.players[1]!.equipment.fans=1;state=act(state,{type:'ATTACK',actorId:'p0',targetId:'p1'});expect(state.phase).toBe('intervention_decide');state=act(state,{type:'INTERVENE_DECIDE',actorId:'p1'});state.players[1]!.tokens=[{kind:'rank',value:1},{kind:'affiliation',value:'beast'},{kind:'affiliation',value:'beast'}];state.players[0]!.curse='true';state.phase='action';state.daggerHolderId='p0';state=act(state,{type:'ATTACK',actorId:'p0',targetId:'p1'});state=act(state,{type:'INTERVENE_DECIDE',actorId:'p1'});expect(state.result?.winningClan).toBe('secret');
+  });
+  it('automatically confirms bot-only reveal steps and lets a bot open an attack',()=>{
+    let state=game([character('rose',2),character('beast',2),character('rose',3),character('beast',3),character('rose',4),character('beast',4)]);for(const bot of state.players.slice(1)){bot.isBot=true;bot.roleConfirmed=false;bot.clueConfirmed=false;}state.phase='role_reveal';state.players[0]!.roleConfirmed=true;state=settleBots(state);expect(state.phase).toBe('clue_reveal');state=act(state,{type:'CLUE_CONFIRM',actorId:'p0'});state.daggerHolderId='p1';state=settleBots(state);expect(state.attack?.attackerId).toBe('p1');expect(state.phase).toBe('intervention_offer');
   });
 });
