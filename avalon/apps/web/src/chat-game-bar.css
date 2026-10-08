@@ -17,7 +17,7 @@
 .ac-game-go{flex:none;font-size:12px;font-weight:700;color:var(--gold-300)}
 .chat-panel .ac-game.mine{
   border-color:var(--gold-300);background:linear-gradient(90deg,#f0d18a38,#f0d18a14);
-  animation:acGameFlash .7s ease-out both,acGamePulse 1.8s ease-in-out .7s infinite}
+  animation:acGameFlash .7s ease-out both,acGamePulse 1.8s ease-in-out .7s 3}
 .ac-game.mine .ac-game-dot{background:var(--gold-300);box-shadow:0 0 8px var(--gold-300)}
 .ac-game.mine .ac-game-txt small{color:var(--gold-300);font-weight:700}
 .ac-game.mine .ac-game-go{padding:6px 12px;border-radius:999px;background:linear-gradient(#f6dc98,#c9a35c);color:#1b1304}
@@ -141,7 +141,7 @@
    ============================================================ */
 .ac-act{flex:none;display:flex;align-items:center;gap:10px;margin:4px 10px 0;padding:6px 8px 6px 12px;min-height:56px;
   border-radius:14px;border:1px solid var(--gold-300);background:linear-gradient(90deg,#f0d18a38,#f0d18a14);
-  animation:acGameFlash .7s ease-out both,acGamePulse 1.8s ease-in-out .7s infinite}
+  animation:acGameFlash .7s ease-out both,acGamePulse 1.8s ease-in-out .7s 3}
 .ac-act-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .ac-act-txt small{font-size:11px;font-weight:700;color:var(--gold-300);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ac-act-txt b{font-size:13px;font-weight:600;color:var(--parchment);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -178,17 +178,25 @@ aside.chat-panel[data-reveal="true"] .ac-compose:focus-within{opacity:1}
    · 게임 화면 하단 여백도 같이 부드럽게 변해서 화면이 '툭' 튀지 않는다
    ============================================================ */
 @media (max-width:640px),(pointer:coarse) and (max-width:900px){
-  aside.chat-panel{will-change:top,height}
   aside.chat-panel[data-anim="1"]{transition:top .32s cubic-bezier(.2,.8,.2,1),height .32s cubic-bezier(.2,.8,.2,1)}
   aside.chat-panel[data-size="half"]{animation:none}
   aside.chat-panel[data-size="half"]>.chat-title,
   aside.chat-panel[data-size="half"]>.ac-game,
   aside.chat-panel[data-size="half"]>.ac-act,
   aside.chat-panel[data-size="half"]>.ac-list-wrap{animation:acFadeIn .26s ease both}
-  html.chat-half .app .board,html.chat-half .app .lb{transition:padding-bottom .32s cubic-bezier(.2,.8,.2,1)}
+  html[data-chat-anim="1"].chat-half .app .board,html[data-chat-anim="1"].chat-half .app .lb{transition:padding-bottom .32s cubic-bezier(.2,.8,.2,1)}
 }
 @keyframes acFadeIn{from{opacity:0}}
 @media (prefers-reduced-motion:reduce){
   aside.chat-panel[data-anim="1"],html.chat-half .app .board,html.chat-half .app .lb{transition:none}
   aside.chat-panel[data-size="half"]>*{animation:none}
 }
+
+/* ============================================================
+   키보드가 열리는 동안의 렉 방지
+   · 무한 box-shadow 펄스는 매 프레임 다시 그려져 키보드 애니메이션과 겹치면 끊긴다 → 3회만, 키보드 중엔 정지
+   · 대화 목록은 자기 영역 안에서만 레이아웃/페인트
+   ============================================================ */
+.chat-panel[data-keyboard="true"] .ac-act,
+.chat-panel[data-keyboard="true"] .ac-game.mine{animation:none}
+.ac-list-wrap{contain:layout paint}

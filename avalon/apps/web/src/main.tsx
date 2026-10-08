@@ -773,7 +773,7 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
         h=`calc(${dockSolid}px + ${safe})`;top=`calc(${top0+vvH}px - ${dockSolid}px - ${safe})`;pad=`calc(${dockTotal}px + ${safe})`;
       }else{
         const hh=kb||mode==='full'?vvH:Math.min(vvH,Math.max(320,Math.round(vvH*.78)));
-        h=`${hh}px`;top=`${top0+vvH-hh}px`;pad=mode==='full'?'0px':h;
+        h=`${hh}px`;top=`${top0+vvH-hh}px`;pad=mode==='full'?'0px':`${Math.max(320,Math.round(window.innerHeight*.78))}px`;
       }
       const put=(el:HTMLElement,k:string,v:string)=>{if(el.style.getPropertyValue(k)!==v)el.style.setProperty(k,v);};
       put(panel,'--chat-h',h);put(panel,'--chat-top',top);
@@ -781,16 +781,19 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
       const kbs=String(kb);if(panel.dataset.keyboard!==kbs)panel.dataset.keyboard=kbs;
       put(root,'--chat-pad',pad);
       if(!root.classList.contains('chat-half'))root.classList.add('chat-half');
-      if(root.classList.contains('chat-open'))root.classList.remove('chat-open');
+      const lock=mode!=='mini'&&kb;                       // 시트에서 키보드가 열린 동안만 뒤 화면 스크롤 잠금
+      if(root.classList.contains('chat-open')!==lock)root.classList.toggle('chat-open',lock);
     };
     // 독 ↔ 시트 전환일 때만 높이·위치를 부드럽게 움직인다. 키보드 때문에 생기는 변화는 즉시 따라가야 하므로 애니메이션을 걸지 않는다.
     if(panel&&sizeRef.current!==size&&sizeRef.current!==null){
-      panel.dataset.anim='1';window.clearTimeout(animTimer.current);
-      animTimer.current=window.setTimeout(()=>{delete panel.dataset.anim;},340);
+      panel.dataset.anim='1';root.dataset.chatAnim='1';window.clearTimeout(animTimer.current);
+      animTimer.current=window.setTimeout(()=>{delete panel.dataset.anim;delete root.dataset.chatAnim;},340);
     }
     sizeRef.current=size;
-    fit();vv?.addEventListener('resize',fit);vv?.addEventListener('scroll',fit);window.addEventListener('resize',fit);
-    return()=>{vv?.removeEventListener('resize',fit);vv?.removeEventListener('scroll',fit);window.removeEventListener('resize',fit);root.classList.remove('chat-open','chat-half');root.style.removeProperty('--chat-pad');};
+    let raf=0;
+    const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;fit();});};
+    fit();vv?.addEventListener('resize',schedule);vv?.addEventListener('scroll',schedule);window.addEventListener('resize',schedule);
+    return()=>{cancelAnimationFrame(raf);vv?.removeEventListener('resize',schedule);vv?.removeEventListener('scroll',schedule);window.removeEventListener('resize',schedule);root.classList.remove('chat-open','chat-half');delete root.dataset.chatAnim;root.style.removeProperty('--chat-pad');};
   },[mobile,size,dockSolid,dockTotal]);
   // 핸들/제목줄: 탭 = 펼치기(mini→half), 위로 끌기 = 크게, 아래로 끌기 = 작게(키보드가 열려 있으면 키보드부터 내림)
   const onSheetDown=(e:React.PointerEvent)=>{
