@@ -17,6 +17,12 @@ describe('Skull King engine',()=>{
     play(room,'a','twelve');play(room,'b','five');
     expect(room.players[0]!.tricks).toBe(1);expect(room.phase).toBe('roundScore');
   });
+  it('keeps the completed trick available to clients after the final card resolves',()=>{
+    const room=createRoom('ABC123','a','a',config,'token');room.players.push(sailor('b'));
+    room.phase='play';room.cardsThisRound=1;room.leaderId='a';room.turnId='a';room.players[0]!.hand=[card('twelve','number',12)];room.players[1]!.hand=[card('five','number',5)];
+    play(room,'a','twelve');play(room,'b','five');
+    expect(view(room,'a').lastTrick).toEqual({cards:[expect.objectContaining({playerId:'a',card:expect.objectContaining({id:'twelve'})}),expect.objectContaining({playerId:'b',card:expect.objectContaining({id:'five'})})],winnerId:'a'});
+  });
   it('lets a Mermaid capture Skull King and records the 40-point bonus',()=>{
     const room=createRoom('ABC123','a','a',config,'token');room.players.push(sailor('b'));
     room.phase='play';room.cardsThisRound=1;room.leaderId='a';room.turnId='a';room.players[0]!.hand=[card('king','skullKing')];room.players[1]!.hand=[card('mermaid','mermaid')];
