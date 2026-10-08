@@ -47,4 +47,28 @@ describe('Blood Bound engine',()=>{
   it('automatically confirms bot-only reveal steps and lets a bot open an attack',()=>{
     let state=game([character('rose',2),character('beast',2),character('rose',3),character('beast',3),character('rose',4),character('beast',4)]);for(const bot of state.players.slice(1)){bot.isBot=true;bot.roleConfirmed=false;bot.clueConfirmed=false;}state.phase='role_reveal';state.players[0]!.roleConfirmed=true;state=settleBots(state);expect(state.phase).toBe('clue_reveal');state=act(state,{type:'CLUE_CONFIRM',actorId:'p0'});state.daggerHolderId='p1';state=settleBots(state);expect(state.attack?.attackerId).toBe('p1');expect(state.phase).toBe('intervention_offer');
   });
+  it('has eligible bots publicly offer to intervene before the target decides',()=>{
+    let state=game([character('rose',2),character('beast',2),character('rose',3),character('beast',3),character('rose',4),character('beast',4)]);state.players[2]!.isBot=true;state=act(state,{type:'ATTACK',actorId:'p0',targetId:'p1'});state=settleBots(state);expect(state.phase).toBe('intervention_offer');expect(state.attack?.offers).toEqual(['p2']);
+  });
+  it('lets a bot-only table finish a complete game, including intervention, tokens, and abilities',()=>{
+    let state=game([character('rose',1),character('beast',2),character('rose',3),character('beast',4),character('rose',5),character('beast',6)]);
+    for(const bot of state.players)bot.isBot=true;
+    for(let step=0;step<200&&state.phase!=='result';step+=1){
+      state=settleBots(state);
+      if((state.phase==='intervention_offer'||state.phase==='intervention_decide')&&state.attack){
+        const target=state.players.find(player=>player.id===state.attack!.targetId)!;
+        const intervenerId=state.attack.offers.find(id=>state.players.find(player=>player.id===id)?.isBot);
+        state=act(state,{type:'INTERVENE_DECIDE',actorId:target.id,intervenerId});
+      }
+    }
+    expect(state.phase).toBe('result');
+    expect(state.result).toBeDefined();
+  });
+  it('skips an unusable Alchemist ability instead of leaving a bot turn pending',()=>{
+    let state=game([character('rose',4),character('beast',2),character('rose',3),character('beast',3),character('rose',5),character('beast',5)]);
+    state.players[0]!.isBot=true;state.phase='ability_decide';state.pendingAbility={actorId:'p0',ability:'alchemist',context:{originalTargetId:'p0'}};
+    state=settleBots(state);
+    expect(state.phase).toBe('intervention_offer');
+    expect(state.pendingAbility).toBeUndefined();
+  });
 });

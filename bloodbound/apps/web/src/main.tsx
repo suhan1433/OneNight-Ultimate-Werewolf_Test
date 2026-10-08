@@ -3,7 +3,7 @@ import type { CSSProperties, FormEvent, ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import type { AbilityId, Affiliation, ClientGameState, Token } from '@bloodbound/shared';
 import { useGame } from './store';
-import { emit, saveSession } from './socket';
+import { clearSession, emit, saveSession } from './socket';
 import './styles.css';
 
 /* ───────────── 타입 · 상수 · 헬퍼 ───────────── */
@@ -58,6 +58,19 @@ const abilityNames: Record<AbilityId, string> = {
   courtesan: '코르티잔 (Courtesan)',
   inquisitor: '저주 배분 (Curse Distribution)',
 };
+
+const roleGuide = [
+  ['1', '장로', '랭크를 공개해 깃펜을 사용하면, 같은 클랜의 리더가 다음 랭크 후보로 바뀝니다.'],
+  ['2', '암살자', '방패가 없는 다른 한 명을 지정해 연속으로 두 번 상처를 입힙니다.'],
+  ['3', '할리퀸', '다른 두 명의 역할 카드를 비공개로 확인합니다.'],
+  ['4', '연금술사', '원래 공격 대상에게 상처를 하나 더 입히거나, 그 대상의 상처 하나를 치유합니다.'],
+  ['5', '정신술사', '방패가 없는 다른 한 명에게 랭크 토큰 공개를 강요합니다.'],
+  ['6', '수호자', '다른 한 명에게 Shield를 주어 일반 공격을 막습니다.'],
+  ['7', '광전사', '자신을 공격한 사람에게 상처를 입힙니다.'],
+  ['8', '마법사', '다른 한 명에게 Staff를 주어 소속 토큰 공개를 제한합니다.'],
+  ['9', '귀부인', '다른 한 명에게 Fan을 주어 해당 공격의 개입을 막습니다.'],
+  ['✥', '심문관', '홀수 인원 게임에서 Curse를 배분합니다. 진짜 저주가 리더에게 있으면 비밀 결사가 승리합니다.'],
+] as const;
 
 const PHASE: Record<string, string> = {
   action: '행동',
@@ -174,6 +187,16 @@ function Help({ onClose }: { onClose: () => void }) {
         <dt>†</dt>
         <dd>좌석 위의 † 표시는 단검을 가진 사람이에요</dd>
       </dl>
+      <h3>역할과 능력</h3>
+      <p className="role-note">랭크 토큰을 공개한 뒤에만 해당 역할의 능력을 사용할 수 있어요.</p>
+      <dl className="role-guide">
+        {roleGuide.map(([rank, name, description]) => (
+          <div key={name}>
+            <dt><b>{rank}</b>{name}</dt>
+            <dd>{description}</dd>
+          </div>
+        ))}
+      </dl>
     </Sheet>
   );
 }
@@ -219,27 +242,15 @@ function Peek({ character }: { character: Character }) {
 }
 
 function CharacterCard({ character }: { character: Character }) {
+  const asset = character.clan === 'secret'
+    ? `inquisitor-${character.clue}`
+    : `${character.clan}-${character.rank}`;
   return (
-    <article className={`character-card ${character.clan}`}>
-      <div className="card-top">
-        <span aria-hidden="true">{clanIcon(character.clan)}</span>
-        <b>{clanName(character.clan)}</b>
-        <strong aria-label={`랭크 ${character.rank ?? '없음'}`}>{character.rank ?? '✥'}</strong>
-      </div>
-      <div className="silhouette" aria-hidden="true">
-        {CLAN[character.clan]?.glyph ?? '✥'}
-      </div>
-      <h2>{character.name}</h2>
-      <p className="card-aff">
-        {character.affiliations.map((item, index) => (
-          <span className="aff" key={index}>
-            <i aria-hidden="true">{aff(item).icon}</i>
-            <em>{aff(item).name}</em>
-          </span>
-        ))}
-      </p>
-      <small className="card-clue">전달되는 단서 {aff(character.clue).icon} {aff(character.clue).name}</small>
-      <footer>{abilityNames[character.ability]}</footer>
+    <article className={`character-card-image ${character.clan}`}>
+      <img
+        src={`${import.meta.env.BASE_URL}role-cards/${asset}.png`}
+        alt={`${clanName(character.clan)} ${character.name} 역할 카드`}
+      />
     </article>
   );
 }
@@ -1015,6 +1026,14 @@ function App() {
   const link = useGame(s => s.link);
   const restoring = useGame(s => s.restoring);
   const [help, setHelp] = useState(false);
+  const leaveRoom = async () => {
+    if (game) {
+      try { await emit('ROOM_LEAVE', { roomCode: game.roomCode }); } catch { /* local exit still clears this browser session */ }
+    }
+    clearSession();
+    useGame.getState().clearGame();
+    history.replaceState(null, '', location.pathname);
+  };
 
   useEffect(() => {
     document.documentElement.lang = 'ko';
@@ -1053,6 +1072,7 @@ function App() {
         <div className="banner" role="status">연결이 끊겼어요. 다시 연결하는 중이에요. 잠시 후 자동으로 이어져요.</div>
       )}
       {page}
+      {game && <button type="button" className="leave-room" onClick={() => void leaveRoom()}>방 나가기</button>}
       <button type="button" className="help-fab" aria-label="게임 안내" onClick={() => setHelp(true)}>?</button>
       {help && <Help onClose={() => setHelp(false)} />}
       {error && (

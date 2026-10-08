@@ -13,19 +13,26 @@ const pendingBotDecisions=new Set<string>();
 const ack=<T>(socket:Socket,name:string,fn:(data:any)=>Promise<T>)=>socket.on(name,async(data:any,callback?:(reply:Ack<T>)=>void)=>{try{callback?.({ok:true,data:await fn(data)});}catch(error){const message=error instanceof Error?error.message:'요청을 처리하지 못했습니다.';callback?.({ok:false,error:message});socket.emit('ERROR',{message});}});
 function bind(socket:Socket,room:BloodBoundRoom,playerId:string){socket.data.roomCode=room.roomCode;socket.data.playerId=playerId;socket.join(channel(playerId));socket.join(roomChannel(room.roomCode));}
 function session(socket:Socket,code:string){if(socket.data.roomCode!==code||!socket.data.playerId)throw Error('유효한 게임 세션이 아닙니다.');return socket.data.playerId as string;}
-export async function emitRoomState(io:Server,room:BloodBoundRoom){for(const player of room.players)io.to(channel(player.id)).emit('ROOM_STATE',clientState(room,player.id));}
+export async function emitRoomState(io:Server,room:BloodBoundRoom){for(const player of room.players)io.to(channel(player.id)).emit('ROOM_STATE',clientState(room,player.id));scheduleBotDecision(io,room);}
 function scheduleBotDecision(io:Server,room:BloodBoundRoom){
   const targetId=room.attack?.targetId;const target=targetId?room.players.find(player=>player.id===targetId):undefined;
   if(!target?.isBot||!['intervention_offer','intervention_decide'].includes(room.phase)||pendingBotDecisions.has(room.roomCode))return;
   pendingBotDecisions.add(room.roomCode);
-  const timer=setTimeout(()=>void withRoomLock(room.roomCode,async current=>{
-    const target=current.attack?.targetId?current.players.find(player=>player.id===current.attack!.targetId):undefined;
-    if(!target?.isBot||!['intervention_offer','intervention_decide'].includes(current.phase))return null;
-    const result=reduce(current,{type:'INTERVENE_DECIDE',actorId:target.id});
-    if('error' in result)return null;
-    const next=settleBots(result.state);await saveRoom(next);return next;
-  }).then(next=>{if(next){void emitRoomState(io,next);scheduleBotDecision(io,next);}}).catch(()=>{}).finally(()=>pendingBotDecisions.delete(room.roomCode)),900);
-  timer.unref();
+  setTimeout(()=>void (async()=>{
+    let next:BloodBoundRoom|null=null;
+    try {
+      next=await withRoomLock(room.roomCode,async current=>{
+        const target=current.attack?.targetId?current.players.find(player=>player.id===current.attack!.targetId):undefined;
+        if(!target?.isBot||!['intervention_offer','intervention_decide'].includes(current.phase))return null;
+        const intervenerId=current.attack?.offers.find(id=>current.players.find(player=>player.id===id)?.isBot);
+        const result=reduce(current,{type:'INTERVENE_DECIDE',actorId:target.id,intervenerId});
+        if('error' in result)return null;
+        const settled=settleBots(result.state);await saveRoom(settled);return settled;
+      });
+    } catch { /* a human already resolved the attack */ }
+    finally { pendingBotDecisions.delete(room.roomCode); }
+    if(next){await emitRoomState(io,next);scheduleBotDecision(io,next);}
+  })(),900);
 }
 export function registerHandlers(io:Server,socket:Socket){
   ack(socket,'ROOM_CREATE',async(data)=>{const maxPlayers=Number(data.maxPlayers);if(!Number.isInteger(maxPlayers)||maxPlayers<6||maxPlayers>12)throw Error('인원은 6~12명이어야 합니다.');const nickname=String(data.nickname??'').trim().slice(0,16);if(!nickname)throw Error('닉네임을 입력하세요.');let roomCode=code();while(await getRoom(roomCode))roomCode=code();const playerId=randomUUID();const room=createRoom(roomCode,playerId,nickname,maxPlayers,Number(data.seed)||Date.now(),token());room.players[0]!.socketId=socket.id;await saveRoom(room);bind(socket,room,playerId);await emitRoomState(io,room);return {roomCode,playerId,sessionToken:room.players[0]!.sessionToken};});
@@ -38,5 +45,5 @@ export function registerHandlers(io:Server,socket:Socket){
   mutate('GAME_START',(actorId)=>({type:'START',actorId}));mutate('ROLE_CONFIRM',(actorId)=>({type:'ROLE_CONFIRM',actorId}));mutate('CLUE_CONFIRM',(actorId)=>({type:'CLUE_CONFIRM',actorId}));mutate('PASS',(actorId,d)=>({type:'PASS',actorId,targetId:String(d.targetId)}));mutate('ATTACK',(actorId,d)=>({type:'ATTACK',actorId,targetId:String(d.targetId)}));mutate('INTERVENE_OFFER',(actorId)=>({type:'INTERVENE_OFFER',actorId}));mutate('INTERVENE_DECIDE',(actorId,d)=>({type:'INTERVENE_DECIDE',actorId,intervenerId:d.intervenerId?String(d.intervenerId):undefined}));mutate('TOKEN_SELECT',(actorId,d)=>({type:'TOKEN_SELECT',actorId,token:d.token}));mutate('ABILITY_DECIDE',(actorId,d)=>({type:'ABILITY_DECIDE',actorId,use:!!d.use}));mutate('ABILITY_INPUT',(actorId,d)=>({type:'ABILITY_INPUT',actorId,kind:d.kind,targetIds:d.targetIds,choice:d.choice,curses:d.curses}));mutate('HARLEQUIN_ACK',(actorId)=>({type:'HARLEQUIN_ACK',actorId}));
   ack(socket,'GAME_RESTART',async data=>{const roomCode=String(data.roomCode??'').toUpperCase();const room=await withRoomLock(roomCode,async current=>{const playerId=session(socket,roomCode);if(current.hostId!==playerId||current.phase!=='result')throw Error('방장만 새 게임을 시작할 수 있습니다.');current.phase='lobby';current.players=current.players.map(p=>({...p,ready:p.isBot===true,roleConfirmed:false,clueConfirmed:false,character:null,tokens:[],equipment:botEquipment(),curse:undefined}));current.result=undefined;current.attack=undefined;current.pendingAbility=undefined;current.pendingWound=undefined;current.resolutionStack=[];current.publicLog=[];current.privateLog=[];current.harlequinViews={};current.curseDistributed=false;current.updatedAt=Date.now();await saveRoom(current);return current;});await emitRoomState(io,room);return {};});
   socket.on('disconnect',()=>{const roomCode=socket.data.roomCode as string|undefined,playerId=socket.data.playerId as string|undefined;if(!roomCode||!playerId)return;void withRoomLock(roomCode,async room=>{const player=room.players.find(p=>p.id===playerId);if(player&&player.socketId===socket.id){player.connected=false;player.socketId=null;room.updatedAt=Date.now();await saveRoom(room);}return room;}).then(room=>emitRoomState(io,room)).catch(()=>{});});
-  ack(socket,'ROOM_LEAVE',async data=>{const roomCode=String(data.roomCode??'').toUpperCase();const room=await withRoomLock(roomCode,async current=>{const playerId=session(socket,roomCode);if(current.phase==='lobby'||current.phase==='result'){current.players=current.players.filter(p=>p.id!==playerId);if(!current.players.length){await deleteRoom(roomCode);return current;}if(current.hostId===playerId)current.hostId=current.players[0]!.id;await saveRoom(current);}return current;});socket.leave(roomChannel(roomCode));socket.leave(channel(socket.data.playerId));socket.data.roomCode=undefined;socket.data.playerId=undefined;if(room.players.length)await emitRoomState(io,room);return {};});
+  ack(socket,'ROOM_LEAVE',async data=>{const roomCode=String(data.roomCode??'').toUpperCase();const room=await withRoomLock(roomCode,async current=>{const playerId=session(socket,roomCode);if(current.phase==='lobby'||current.phase==='result'){current.players=current.players.filter(p=>p.id!==playerId);if(!current.players.length){await deleteRoom(roomCode);return current;}if(current.hostId===playerId)current.hostId=current.players[0]!.id;}else{const leaving=current.players.find(player=>player.id===playerId);if(leaving){leaving.connected=false;leaving.socketId=null;}}current.updatedAt=Date.now();await saveRoom(current);return current;});socket.leave(roomChannel(roomCode));socket.leave(channel(socket.data.playerId));socket.data.roomCode=undefined;socket.data.playerId=undefined;if(room.players.length)await emitRoomState(io,room);return {};});
 }

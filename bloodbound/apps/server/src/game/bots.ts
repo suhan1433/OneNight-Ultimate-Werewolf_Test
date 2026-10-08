@@ -1,4 +1,4 @@
-import type { AbilityInputKind, Affiliation, BloodBoundAction, BloodBoundPlayer, BloodBoundRoom, Token } from '@bloodbound/shared';
+import { SETUP_TABLE, type AbilityInputKind, type Affiliation, type BloodBoundAction, type BloodBoundPlayer, type BloodBoundRoom, type Token } from '@bloodbound/shared';
 import { reduce } from './engine.js';
 
 const byId=(room:BloodBoundRoom,id:string)=>room.players.find(player=>player.id===id);
@@ -16,6 +16,42 @@ const tokenFor=(player:BloodBoundPlayer,forceRank=false):Token|undefined=>{
   return values[0]?{kind:'affiliation',value:values[0]}:undefined;
 };
 const first=(items:BloodBoundPlayer[])=>items[0]?.id;
+const unshieldedOther=(room:BloodBoundRoom,actor:BloodBoundPlayer)=>otherPlayers(room,actor.id).filter(player=>!shielded(player));
+
+/**
+ * A bot should only opt in to an ability when the engine has a legal follow-up
+ * action.  Choosing "use" unconditionally left games stuck for abilities such
+ * as Alchemist when it was wounded itself, or Assassin when every target had a
+ * Shield.
+ */
+function canUseAbility(room:BloodBoundRoom,actor:BloodBoundPlayer){
+  const pending=room.pendingAbility;
+  if(!pending)return false;
+  const other=otherPlayers(room,actor.id);
+  switch(pending.ability){
+    case 'elder': return true;
+    case 'assassin':
+    case 'mentalist': return unshieldedOther(room,actor).length>0;
+    case 'harlequin': return other.length>=2;
+    case 'alchemist': {
+      const targetId=pending.context.originalTargetId;
+      const target=targetId?byId(room,targetId):undefined;
+      return !!target&&target.id!==actor.id&&(target.tokens.length>0||!shielded(target));
+    }
+    case 'guardian':
+    case 'mage':
+    case 'courtesan': return other.length>0;
+    case 'berserker': {
+      const attackerId=pending.context.attackerId;
+      return !!attackerId&&!shielded(byId(room,attackerId)!);
+    }
+    case 'inquisitor': {
+      const count=SETUP_TABLE[String(room.maxPlayers)]?.curse;
+      return !!count&&other.length>=count.true+count.false&&!room.curseDistributed;
+    }
+    default: return false;
+  }
+}
 function abilityInput(room:BloodBoundRoom,actor:BloodBoundPlayer):BloodBoundAction|undefined{
   const pending=room.pendingAbility!;const other=otherPlayers(room,actor.id);const unshielded=other.filter(player=>!shielded(player));
   const target=first(unshielded)||first(other);
@@ -23,14 +59,21 @@ function abilityInput(room:BloodBoundRoom,actor:BloodBoundPlayer):BloodBoundActi
   switch(pending.ability){
     case 'assassin': return target?one('assassin_target',target):undefined;
     case 'harlequin': {const ids=other.slice(0,2).map(player=>player.id);return ids.length===2?{type:'ABILITY_INPUT',actorId:actor.id,kind:'harlequin_targets',targetIds:ids}:undefined;}
-    case 'alchemist': return {type:'ABILITY_INPUT',actorId:actor.id,kind:'alchemist_effect',choice:'wound'};
+    case 'alchemist': {
+      const originalId=pending.context.originalTargetId;
+      const original=originalId?byId(room,originalId):undefined;
+      if(!original||original.id===actor.id)return undefined;
+      if(original.tokens.length)return {type:'ABILITY_INPUT',actorId:actor.id,kind:'alchemist_effect',choice:'heal'};
+      return !shielded(original)?{type:'ABILITY_INPUT',actorId:actor.id,kind:'alchemist_effect',choice:'wound'}:undefined;
+    }
     case 'mentalist': return target?one('mentalist_target',target):undefined;
     case 'guardian': return first(other)?one('guardian_target',first(other)!):undefined;
     case 'mage': return first(other)?one('mage_target',first(other)!):undefined;
     case 'courtesan': return first(other)?one('courtesan_target',first(other)!):undefined;
     case 'inquisitor': {
-      const count=room.maxPlayers===7?2:room.maxPlayers===9?3:4;const ids=other.slice(0,count).map(player=>player.id);
-      return ids.length===count?{type:'ABILITY_INPUT',actorId:actor.id,kind:'inquisitor_curses',targetIds:ids,curses:Object.fromEntries(ids.map((id,index)=>[id,index===0?'true':'false']))}:undefined;
+      const curse=SETUP_TABLE[String(room.maxPlayers)]?.curse;
+      const count=curse?curse.true+curse.false:0;const ids=other.slice(0,count).map(player=>player.id);
+      return curse&&ids.length===count?{type:'ABILITY_INPUT',actorId:actor.id,kind:'inquisitor_curses',targetIds:ids,curses:Object.fromEntries(ids.map((id,index)=>[id,index===0?'true':'false']))}:undefined;
     }
     default:return undefined;
   }
@@ -38,6 +81,10 @@ function abilityInput(room:BloodBoundRoom,actor:BloodBoundPlayer):BloodBoundActi
 
 /** Returns one deterministic legal mechanical choice for a local test bot. */
 export function chooseBotAction(room:BloodBoundRoom):BloodBoundAction|undefined{
+  // Harlequin's private view does not change phase, so a bot must explicitly
+  // close it before the next normal decision can be made.
+  const viewingBot=room.players.find(player=>player.isBot&&(room.harlequinViews[player.id]??[]).length>0);
+  if(viewingBot)return {type:'HARLEQUIN_ACK',actorId:viewingBot.id};
   if(room.phase==='role_reveal'){const bot=room.players.find(player=>player.isBot&&!player.roleConfirmed);return bot?{type:'ROLE_CONFIRM',actorId:bot.id}:undefined;}
   if(room.phase==='clue_reveal'){const bot=room.players.find(player=>player.isBot&&!player.clueConfirmed);return bot?{type:'CLUE_CONFIRM',actorId:bot.id}:undefined;}
   if(room.phase==='action'){
@@ -46,13 +93,17 @@ export function chooseBotAction(room:BloodBoundRoom):BloodBoundAction|undefined{
     const target=targets.sort((left,right)=>right.tokens.length-left.tokens.length)[0];
     return target?{type:'ATTACK',actorId:bot.id,targetId:target.id}:first(otherPlayers(room,bot.id))?{type:'PASS',actorId:bot.id,targetId:first(otherPlayers(room,bot.id))!}:undefined;
   }
+  if(room.phase==='intervention_offer'&&room.attack){
+    const bot=room.players.find(player=>player.isBot&&player.id!==room.attack!.attackerId&&player.id!==room.attack!.targetId&&!hasRank(player)&&!room.attack!.offers.includes(player.id));
+    return bot?{type:'INTERVENE_OFFER',actorId:bot.id}:undefined;
+  }
   if(room.phase==='token_select'&&room.pendingWound){const bot=byId(room,room.pendingWound.targetId);const token=bot?.isBot?tokenFor(bot,!!room.pendingWound.forceRank):undefined;return bot&&token?{type:'TOKEN_SELECT',actorId:bot.id,token}:undefined;}
-  if(room.phase==='ability_decide'&&room.pendingAbility){const bot=byId(room,room.pendingAbility.actorId);return bot?.isBot?{type:'ABILITY_DECIDE',actorId:bot.id,use:true}:undefined;}
+  if(room.phase==='ability_decide'&&room.pendingAbility){const bot=byId(room,room.pendingAbility.actorId);return bot?.isBot?{type:'ABILITY_DECIDE',actorId:bot.id,use:canUseAbility(room,bot)}:undefined;}
   if(room.phase==='ability_input'&&room.pendingAbility){const bot=byId(room,room.pendingAbility.actorId);return bot?.isBot?abilityInput(room,bot):undefined;}
   return undefined;
 }
 
-/** Advance only bot-owned, non-social decisions. Human intervention offers remain open. */
+/** Advance every bot-owned decision. Intervention acceptance stays timed in the socket layer so humans can see and respond to offers. */
 export function settleBots(initial:BloodBoundRoom){
   let room=initial;
   for(let steps=0;steps<100;steps+=1){const action=chooseBotAction(room);if(!action)return room;const result=reduce(room,action);if('error' in result)return room;room=result.state;}

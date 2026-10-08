@@ -14,6 +14,7 @@ type Store = {
   setError: (error: string | null) => void;
   setLink: (link: Link) => void;
   setRestoring: (restoring: boolean) => void;
+  clearGame: () => void;
 };
 
 const hasSavedSession = () => {
@@ -33,4 +34,5 @@ export const useGame = create<Store>(set => ({
   setError: error => set({ error }),
   setLink: link => set({ link }),
   setRestoring: restoring => set({ restoring }),
+  clearGame: () => set({ game: null, error: null, restoring: false }),
 }));
