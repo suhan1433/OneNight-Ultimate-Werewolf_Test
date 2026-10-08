@@ -738,7 +738,7 @@ function ActionPanel({ game, needsMe }: { game: Game; needsMe: boolean }) {
 
   const room = game.roomCode;
   const pending = game.pendingAbility;
-  const nameOf = (id?: string) => game.players.find(p => p.id === id)?.nickname ?? '누군가';
+  const nameOf = (id?: string | null) => game.players.find(p => p.id === id)?.nickname ?? '누군가';
   const holder = nameOf(game.daggerHolderId);
 
   let title = '다른 플레이어를 기다리는 중';
