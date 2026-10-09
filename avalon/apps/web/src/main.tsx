@@ -902,7 +902,7 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
     </>}
     <form className="ac-compose" onSubmit={send}>
       {isMini&&<button type="button" className="ac-expand" onClick={()=>setSize('half')} aria-label={hiddenUnseen>0?`지난 대화 보기, 새 메시지 ${hiddenUnseen}개`:'지난 대화 보기'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>{hiddenUnseen>0&&<em className="ac-badge">{hiddenUnseen>99?'99+':hiddenUnseen}</em>}</button>}
-      <textarea ref={inputRef} rows={1} value={draft} maxLength={300} autoComplete="off" placeholder="원탁에 메시지 보내기" aria-label="채팅 메시지"
+      <textarea ref={inputRef} rows={1} value={draft} maxLength={300} autoComplete="off" enterKeyHint="enter" placeholder="원탁에 메시지 보내기" aria-label="채팅 메시지"
         onChange={event=>setDraft(event.target.value)}
         onKeyDown={event=>{
           // 데스크톱: Enter 전송 / Shift+Enter 줄바꿈. 모바일: Enter 는 줄바꿈, 전송은 버튼.
