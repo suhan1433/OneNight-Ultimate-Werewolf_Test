@@ -24,15 +24,13 @@ const next=(room:SkullRoom,id:string)=>{
   return room.players[index]!;
 };
 
-export const leadSuit=(trick:PlayedCard[]):Suit|undefined|null=>{
+export const leadSuit=(trick:PlayedCard[]):Suit|undefined=>{
   for(const p of trick){
     const suit=playedSuit(p); if(suit)return suit;
-    /* A numbered lead stays in force even if a Sea Monster appears later.  Davy
-       Jones merely removes monsters when resolving the trick; it never changes
-       the follow-suit rule.  These lead cards leave no suit for the trick. */
-    if(['pirate','skullKing','mermaid','kraken','whale'].includes(normalKind(p)))return null;
-    /* Escape-style cards, Davy Jones, Stingray, Volley and Plank defer choosing
-       a suit to the next eligible numbered card. */
+    /* Characters and the two base Sea Monsters leave no lead suit for the
+       whole trick.  Escape-style cards and the newer expansion specials defer
+       suit selection until a later suited card is played. */
+    if(['pirate','skullKing','mermaid','con','kraken','whale'].includes(normalKind(p)))return undefined;
   }
   return undefined;
 };
@@ -118,7 +116,7 @@ export function createRoom(roomCode:string,hostId:string,nickname:string,config:
 }
 export function beginRound(room:SkullRoom){const wanted=room.schedule[room.roundIndex]!;const options=defaultCardOptions(room.config);const deck=makeDeck(room.config.advanced,room.config.expansionSuitCards,options);const cards=Math.min(wanted,Math.floor(deck.length/room.players.length));room.cardsThisRound=cards;room.deck=shuffle(deck);room.lootAlliances=[];room.pendingDecision=undefined;room.abilityQueue=undefined;room.lastTrick=undefined;room.players.forEach(p=>{p.hand=room.deck.splice(0,cards);p.bid=null;p.tricks=0;p.roundBonus=0;p.rascalBet=0;p.forcedCardId=undefined;p.peekedDeck=undefined;});room.phase='bidding';room.leaderId=room.players[(room.dealerIndex+1)%room.players.length]!.id;room.turnId=null;room.trick=[];room.trickPlayerIds=[];room.trickLead=undefined;room.log.push(`⛵ Round ${room.roundIndex+1}: ${cards} cards. Submit your bid.`);}
 export function start(room:SkullRoom,actor:string){if(room.hostId!==actor||room.phase!=='lobby')throw Error('Only the captain can start from the lobby.');if(room.players.length<2)throw Error('At least two sailors are needed.');beginRound(room);}
-export function submitBid(room:SkullRoom,actor:string,bid:number){if(room.phase!=='bidding')throw Error('Bidding is not open.');const sailor=player(room,actor);if(!Number.isInteger(bid)||bid<0||bid>sailor.hand.length)throw Error('Choose a valid bid.');sailor.bid=bid;if(room.players.every(p=>p.bid!==null)){room.phase='play';room.turnId=room.leaderId;room.log.push('✊ Yo-ho-ho! All bids are revealed.');}}
+export function submitBid(room:SkullRoom,actor:string,bid:number){if(room.phase!=='bidding')throw Error('Bidding is not open.');const sailor=player(room,actor);if(!Number.isInteger(bid)||bid<0||bid>sailor.hand.length)throw Error('Choose a valid bid.');sailor.bid=bid;if(room.players.every(p=>p.bid!==null)){room.phase='play';room.turnId=room.leaderId;room.log.push('✊ All bids are revealed.');}}
 function validateDeclaration(room:SkullRoom,card:Card,declaration?:CardDeclaration):CardDeclaration|undefined{if(card.kind==='tigress'&&declaration!=='pirate'&&declaration!=='escape')throw Error('Tigress must be declared as Pirate or Escape.');if(card.isZeroFourteen&&declaration!==0&&declaration!==14)throw Error('0/14 must be declared as 0 or 14.');if(card.kind==='wild'){
   // Wild 15 is forced to a colored lead suit; it needs a choice only with no lead.
   if(room.trickLead==='jolly')return undefined;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, SkullPlayer } from '@skullking/shared';
-import { createRoom, legalCards, makeDeck, play, resolveDecision, returnToLobby, scoreRound, view } from './engine.js';
+import { createRoom, leadSuit, legalCards, makeDeck, play, resolveDecision, returnToLobby, scoreRound, view } from './engine.js';
 
 const card=(id:string,kind:Card['kind'],rank?:number,suit:Card['suit']='treasure',extra:Partial<Card>={}):Card=>({id,kind,name:id,suit:kind==='number'?suit:undefined,rank,...extra});
 const sailor=(id:string):SkullPlayer=>({id,nickname:id,sessionToken:id,socketId:null,connected:true,ready:true,isBot:false,hand:[],bid:null,tricks:0,score:0,roundBonus:0});
@@ -11,10 +11,15 @@ describe('Skull King engine',()=>{
     const trick=[{playerId:'a',card:{...card('treasure-8','number',8),suit:'treasure' as const}}];
     expect(legalCards(hand,trick).map(item=>item.id)).toEqual(['treasure-4','escape']);
   });
-  it('allows special cards at any time, while a character lead leaves no suit to follow',()=>{
+  it('does not establish a lead suit after a character leads',()=>{
     const hand=[card('treasure-4','number',4),card('map-14','number',14,'map'),card('escape','escape'),card('Rosie','pirate')];
     const trick=[{playerId:'a',card:card('Skull King','skullKing')},{playerId:'b',card:card('treasure-8','number',8)}];
+    expect(leadSuit(trick)).toBeUndefined();
     expect(legalCards(hand,trick).map(item=>item.id)).toEqual(['treasure-4','map-14','escape','Rosie']);
+  });
+  it('uses the first suited card after suit-deferring specials as the lead suit',()=>{
+    const trick=[{playerId:'a',card:card('escape','escape')},{playerId:'b',card:card('davy','davy')},{playerId:'c',card:card('stingray','stingray')},{playerId:'d',card:card('map-8','number',8,'map')}];
+    expect(leadSuit(trick)).toBe('map');
   });
   it('keeps an established lead suit after Davy Jones or a Sea Monster is played',()=>{
     const hand=[card('treasure-4','number',4),card('map-14','number',14,'map'),card('davy','davy'),card('kraken','kraken')];

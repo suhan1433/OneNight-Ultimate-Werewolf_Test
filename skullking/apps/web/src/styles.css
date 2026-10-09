@@ -443,63 +443,6 @@ body::before{z-index:1}#root{z-index:2}
 .bid .bid-dial button.picked{background:radial-gradient(circle at 35% 28%,#fff0c0 0,#e0b35f 55%,#9a6420 100%);color:#2a1706;border-color:#ffe3a1;transform:translateY(-6px) scale(1.1);box-shadow:inset 0 0 0 3px rgba(122,82,24,.35),0 0 0 4px rgba(240,207,138,.18),0 0 30px rgba(240,207,138,.5),0 5px 0 #5e3d10,0 14px 20px rgba(0,0,0,.55)}
 .bid .bid-dial button.picked small{color:#6a4513}
 
-/* ═════════ Yo-ho-ho! 공개 연출: 달빛 · 파도 · 3박 쿵쿵 · 한꺼번에 뒤집기 ═════════
-   --t0 첫 박 / --dt 박 간격 / --tf 뒤집는 시점. 두 번째 공개부터 .short 로 단축 */
-.reveal{--t0:.5s;--dt:.6s;--tf:2.4s;--bw:110px;--pw:calc(var(--bw) + 28px);position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:1rem;overflow:hidden;cursor:pointer;background:radial-gradient(ellipse 70% 55% at 50% 38%,#17414f 0,#0a1f2b 45%,#02050a 100%);animation:fade .3s ease both,revealOut .45s ease calc(var(--tf) + 2.1s) forwards}
-.reveal.short{--t0:.15s;--dt:.28s;--tf:1.1s}
-.reveal[data-n="5"],.reveal[data-n="6"]{--bw:96px}.reveal[data-n="7"],.reveal[data-n="8"],.reveal[data-n="9"]{--bw:80px}
-.rv-sea{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.rv-rays{position:absolute;left:50%;top:40%;width:170vmax;aspect-ratio:1;translate:-50% -50%;background:repeating-conic-gradient(from 0deg,rgba(240,207,138,.08) 0 6deg,transparent 6deg 18deg);-webkit-mask-image:radial-gradient(circle,#000 0,transparent 42%);mask-image:radial-gradient(circle,#000 0,transparent 42%);animation:spinSlow 60s linear infinite}
-.rv-moon{position:absolute;left:50%;top:5%;width:min(34vw,170px);aspect-ratio:1;translate:-50% 0;border-radius:50%;background:radial-gradient(circle,rgba(255,244,214,.5),rgba(255,244,214,.1) 55%,transparent 70%);filter:blur(2px)}
-.rv-wave{position:absolute;left:0;bottom:0;width:200%;animation:sceneWave 12s linear infinite}
-.rv-wave.rw0{height:22vh;fill:#0b2f44;opacity:.85}.rv-wave.rw1{height:14vh;fill:#06192a;animation-duration:8s;animation-direction:reverse}
-.rv-bolt{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 40%,rgba(255,244,214,.55),transparent 62%);animation:bolt var(--dt) ease-out var(--t0) 3}
-.reveal-flash{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 55%,rgba(240,207,138,.55),transparent 62%);animation:flash .8s ease var(--tf) forwards}
-.reveal-stage{position:relative;display:grid;gap:1.3rem;justify-items:center;text-align:center;animation:quake var(--dt) ease-out var(--t0) 3}
-.reveal-command{margin:0;color:var(--sea-hi);font-size:.72rem;letter-spacing:.24em;animation:fadeup .5s both}
-.reveal-title{position:relative;font:800 clamp(3rem,10vw,6.2rem) 'Cinzel',serif;letter-spacing:.06em;line-height:1}
-.reveal-title span{display:inline-block;margin:0 .2em;opacity:0;background:linear-gradient(180deg,#fff4d2,#f0cf8a 48%,#b57d2e);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 6px 22px rgba(0,0,0,.85));animation:yo .5s var(--ease) calc(var(--t0) + var(--k)*var(--dt)) forwards}
-.reveal-ring{position:absolute;left:50%;top:50%;width:240px;height:240px;margin:-120px 0 0 -120px;border:2px solid var(--brass-hi);border-radius:50%;opacity:0;pointer-events:none;animation:ring .8s ease-out calc(var(--t0) + var(--k)*var(--dt)) forwards}
-.reveal-beats{display:flex;gap:.9rem;margin-top:-.4rem}
-.reveal-beats i{width:11px;height:11px;border-radius:50%;border:1px solid var(--brass);animation:beatDot .3s ease calc(var(--t0) + var(--k)*var(--dt)) forwards}
-.reveal-table{position:relative;padding:0 1.5rem}
-.plank{position:absolute;left:0;right:0;bottom:2.3rem;height:24px;border-radius:8px;background:linear-gradient(180deg,#5b3d22,#3a2514 60%,#26170c);box-shadow:inset 0 2px 0 rgba(255,220,160,.2),inset 0 -3px 6px rgba(0,0,0,.5),0 16px 28px rgba(0,0,0,.65)}
-.plank::before{content:'';position:absolute;inset:0;border-radius:inherit;background:repeating-linear-gradient(90deg,transparent 0 118px,rgba(0,0,0,.35) 118px 120px)}
-.reveal-row{position:relative;z-index:1;display:flex;flex-wrap:wrap;justify-content:center;gap:1.4rem;max-width:980px;animation:rise .5s var(--ease) .15s both}
-.bid-slot{position:relative;display:grid;gap:.75rem;justify-items:center}
-.bid-card{position:relative;width:var(--bw);aspect-ratio:110/156;perspective:800px;animation:pound var(--dt) ease-out var(--t0) 3}
-.bid-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;animation:bidFlip .8s var(--ease) var(--tf) forwards}
-.bid-back,.bid-face{position:absolute;inset:0;display:grid;place-items:center;border-radius:12px;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-.bid-back{color:var(--brass);background:radial-gradient(circle at 50% 38%,#25394d,#0b141d 75%);border:2px solid #8f6a2c;box-shadow:inset 0 0 0 4px #0a121a,inset 0 0 0 5px rgba(214,170,90,.45),0 16px 28px rgba(0,0,0,.7)}
-.bid-back svg{width:62%;filter:drop-shadow(0 0 8px rgba(214,170,90,.5))}
-.bid-face{transform:rotateY(180deg);align-content:center;gap:.15rem;color:#2a1706;background:linear-gradient(165deg,#fff2c9,#e8bd6d 55%,#b9833a);border:2px solid #ffe3a1;box-shadow:inset 0 0 0 4px rgba(122,82,24,.35),0 16px 28px rgba(0,0,0,.7),0 0 34px rgba(240,207,138,.45)}
-.bid-face b{font-family:'Cinzel',serif;font-weight:800;font-size:calc(var(--bw)*.58);line-height:1;text-shadow:0 2px 0 rgba(255,244,214,.6)}
-.bid-face span{font-family:'Cinzel',serif;font-weight:700;font-size:calc(var(--bw)*.11);letter-spacing:.2em;color:#6a4513}
-.bid-face::before,.bid-face::after{content:'⚓';position:absolute;font-size:calc(var(--bw)*.15);color:#7a5218}
-.bid-face::before{top:6%;left:9%}.bid-face::after{bottom:6%;right:9%;transform:rotate(180deg)}
-.bid-slot.me .bid-face{box-shadow:inset 0 0 0 4px rgba(122,82,24,.35),0 0 0 3px var(--brass-hi),0 16px 28px rgba(0,0,0,.7),0 0 44px rgba(240,207,138,.65)}
-.bid-slot.zero .bid-face{color:#06242b;background:linear-gradient(165deg,#effafb,#9fd6dc 55%,#4aa0aa);border-color:#e1f5f7}
-.bid-slot.zero .bid-face span{color:#0b4650}.bid-slot.zero .bid-face::before,.bid-slot.zero .bid-face::after{color:#0b4650}
-.spark{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#ffe3a1;box-shadow:0 0 10px #f0cf8a;opacity:0;pointer-events:none;animation:spark .8s ease-out calc(var(--tf) + .35s) forwards}
-.reveal-sum{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.4rem .6rem;margin:0;opacity:0;color:var(--muted);font-size:.9rem;animation:showUp .5s var(--ease) calc(var(--tf) + .7s) forwards}
-.reveal-sum b{color:var(--brass-hi);font:800 1.15rem 'Cinzel',serif}
-.verdict{margin-left:.4rem;padding:.2rem .8rem;border-radius:99px;border:1px solid;font-style:normal;font-weight:800;font-size:.8rem}
-.verdict.over{color:#ffb4aa;border-color:rgba(212,87,78,.6);background:rgba(212,87,78,.12)}
-.verdict.under{color:#b8edf0;border-color:rgba(74,160,170,.6);background:rgba(74,160,170,.12)}
-.verdict.even{color:#fff0bd;border-color:var(--brass-hi);background:rgba(214,170,90,.16)}
-.reveal-hint{position:absolute;bottom:1.2rem;left:50%;transform:translateX(-50%);font-size:.72rem;letter-spacing:.1em;color:var(--muted);opacity:.7}
-@keyframes yo{from{opacity:0;transform:scale(2) translateY(-16px);filter:blur(8px) drop-shadow(0 6px 22px rgba(0,0,0,.85))}60%{transform:scale(.94)}to{opacity:1;transform:none}}
-@keyframes ring{from{opacity:.85;transform:scale(.3)}to{opacity:0;transform:scale(2.8)}}
-@keyframes pound{30%{transform:translateY(16px) scale(.96)}}
-@keyframes quake{12%{transform:translate(-5px,3px)}24%{transform:translate(5px,-3px)}38%{transform:translate(-3px,2px)}52%{transform:translate(2px,-1px)}}
-@keyframes bolt{0%{opacity:.85}100%{opacity:0}}
-@keyframes beatDot{to{background:var(--brass-hi);box-shadow:0 0 14px var(--brass-hi)}}
-@keyframes bidFlip{to{transform:rotateY(180deg)}}
-@keyframes flash{30%{opacity:1}to{opacity:0}}
-@keyframes spark{0%{opacity:1;transform:rotate(var(--a)) translateX(0) scale(1)}100%{opacity:0;transform:rotate(var(--a)) translateX(calc(var(--bw)*.9)) scale(.3)}}
-@keyframes showUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@keyframes revealOut{to{opacity:0}}
-
 /* ═════════ 라운드 정산 · 최종 결산 ═════════ */
 .score{max-width:880px;padding-top:.6rem}
 .eyebrow{margin:0;color:var(--sea-hi);font-size:.68rem;letter-spacing:.16em}
@@ -586,9 +529,6 @@ body::before{z-index:1}#root{z-index:2}
   .crown{font-size:1.4rem;top:-1.2rem}
   .trick-result{bottom:-3rem;padding:.3rem .85rem .3rem .35rem;font-size:.78rem}.trick-result b{font-size:.9rem}.medal-crown{width:24px;height:24px;font-size:.8rem}
   .bid{margin:.65rem auto;padding:1.55rem .8rem 1.25rem}.bid .bid-dial{gap:.45rem}.bid .bid-dial button{width:48px;height:48px;font-size:1.15rem}.bid .bid-dial button small{font-size:.46rem}.bid h2{font-size:1.34rem}.bid>p:not(.eyebrow){font-size:.76rem}.bid-submit{min-width:190px}
-  .reveal{--bw:78px}.reveal[data-n="5"]{--bw:62px}.reveal[data-n="6"],.reveal[data-n="7"],.reveal[data-n="8"],.reveal[data-n="9"]{--bw:52px}
-  .reveal-stage{gap:.95rem}.reveal-title{font-size:clamp(2.6rem,15vw,3.6rem)}.reveal-command{font-size:.6rem}.reveal-table{padding:0}.reveal-row{gap:.5rem}.reveal .plate{font-size:.58rem}.reveal .plate .dot{display:none}.reveal-sum{font-size:.74rem}.reveal-hint{font-size:.62rem}
-  .reveal[data-n="7"] .plank,.reveal[data-n="8"] .plank,.reveal[data-n="9"] .plank{display:none}
   .roundhead{padding-top:.6rem}.lrow{grid-template-columns:auto minmax(0,1fr) auto;gap:.25rem .6rem;padding:.65rem .7rem}.lrow .av{display:none}
   .ltotal{grid-column:1/-1;grid-template-columns:auto auto 1fr;align-items:center;justify-items:start;gap:.4rem}.ltotal b{font-size:1.05rem}.ldelta strong{font-size:1.25rem}
   .pod .av{--s:42px}.pod b{font-size:.78rem}.pod.p0{--hgt:108px}.pod.p1{--hgt:82px}.pod.p2{--hgt:62px}
@@ -640,3 +580,60 @@ body::before{background:radial-gradient(38% 35% at 10% 12%,rgba(231,181,104,.12)
 .hcard{filter:drop-shadow(0 9px 7px #0705038c)}.hcard.ok{box-shadow:0 0 0 1px var(--brass-hi),0 14px 22px #0009}.hcard.sel{box-shadow:0 0 0 2px #f1d397,0 22px 32px #000b}
 .turntext{color:#e0c48f}.turntext.wait{color:#b2d0bd}
 @media(max-width:620px){.table{border-radius:34px;padding:3rem .6rem 3.5rem}.table::before{border-radius:26px}.crew{margin-top:.55rem}.handwrap{padding-inline:.15rem}}
+
+/* ───────── 몰입/사용성 보정 ───────── */
+/* 비네팅은 배경에만 남겨 카드와 대화상자의 대비를 유지 */
+body::after{z-index:1;opacity:.55;box-shadow:inset 0 0 130px rgba(0,0,0,.62)}
+/* 바다 배경용 소품은 선실 장면에서 숨긴다 */
+.scene.game .scene-moon,.scene.game .scene-ship,.scene.game .scene-wave,.scene.game .star,.scene.game .ember{display:none}
+.scene.game::after{z-index:0}
+/* 헤더의 오디오와 도움말은 한 조작 그룹으로 */
+.game-tools{grid-column:3;justify-self:end;display:flex;align-items:center;gap:.45rem}
+.sound-toggle{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;min-height:38px;padding:.38rem .62rem!important;border:1px solid rgba(194,158,102,.28)!important;border-radius:3px!important;background:rgba(23,17,12,.48)!important;color:#d4c8b0!important;box-shadow:0 3px 12px #120b0666!important;font-size:.69rem!important}
+.sound-toggle svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sound-toggle[aria-pressed="false"]{color:#a69a83!important;border-color:rgba(166,154,131,.2)!important}
+/* 게임 안의 기본 버튼도 목재/황동 팔레트로 통일 */
+.game :where(button:not(.card):not(.gold):not(.leave):not(.text)){border-color:rgba(194,158,102,.36);border-radius:4px;background:linear-gradient(180deg,#34271a,#21180f 55%,#17110b);color:#e8dfca;box-shadow:inset 0 1px rgba(255,239,211,.08),0 2px 0 #0b0805,0 6px 12px #08060466}
+.game :where(button:not(.card):not(.gold):not(.leave):not(.text)):hover:not(:disabled){border-color:#d3b27c;background:linear-gradient(180deg,#49351f,#2b1e12 60%,#1d150d);box-shadow:inset 0 1px rgba(255,239,211,.12),0 3px 0 #0b0805,0 8px 16px #08060477}
+.game .gold{border-color:#886536;background:linear-gradient(180deg,#d5b67d,#b18a52 55%,#846033);color:#20170e;box-shadow:inset 0 1px rgba(255,255,255,.45),0 3px 0 #5a4023,0 8px 16px #07050377}
+.game .gold:hover:not(:disabled){background:linear-gradient(180deg,#e2c893,#c19b61 55%,#98703c)}
+.game .bid-dial button{border-radius:50%;background:radial-gradient(circle at 35% 28%,#51412c,#2a2015 58%,#17110c);border-color:#80633b;color:#e8dfca}
+.game .bid-dial button.picked{background:radial-gradient(circle at 35% 28%,#f1dcae,#d1a75e 58%,#91662e);color:#241909;border-color:#f0d5a0}
+.game .modal>div{background:linear-gradient(145deg,#302317,#19130d);border-color:rgba(203,168,112,.36);border-radius:5px;box-shadow:0 24px 70px #070503c7,inset 0 1px #f7e5c414}
+.bid,.status{border-radius:4px 4px 14px 14px;background:linear-gradient(145deg,rgba(47,34,22,.95),rgba(20,17,13,.97))}
+.bid-submit{grid-template-columns:auto 1fr!important}
+.bid-submit>svg{grid-row:1/3;width:20px;height:20px}
+/* 차례 표시는 계속 깜박이지 않고, 차례가 바뀔 때 한 번만 반응 */
+.sailor.now::after{animation:turnPing .7s ease-out 1}
+.turntext.mine{animation:turnTextPing .75s ease-out 1}
+@keyframes turnPing{0%{opacity:0;box-shadow:0 0 0 rgba(228,197,141,0)}45%{opacity:1;box-shadow:0 0 20px rgba(228,197,141,.32)}100%{opacity:.75;box-shadow:0 0 5px rgba(228,197,141,.08)}}
+@keyframes turnTextPing{0%{box-shadow:0 0 0 rgba(228,197,141,0)}45%{box-shadow:0 0 30px rgba(228,197,141,.32)}100%{box-shadow:0 0 10px rgba(228,197,141,.12)}}
+/* 트릭 회수는 짧고 또렷하게: 승자에게 모이는 움직임만 남긴다 */
+.sweep-card{animation:sweepDim .35s ease var(--b,0s) both,sweepAway .5s cubic-bezier(.55,0,.8,.4) calc(var(--b,0s) + .25s + var(--i,0)*.035s) forwards}
+.sweep-card.win{animation:winPulse .45s ease var(--b,0s) both,sweepAway .5s cubic-bezier(.55,0,.8,.4) calc(var(--b,0s) + .25s + var(--i,0)*.035s) forwards}
+.sweep-card.late{animation:lateIn .3s var(--ease) both,sweepDim .35s ease var(--b,0s) forwards,sweepAway .5s cubic-bezier(.55,0,.8,.4) calc(var(--b,0s) + .6s + var(--i,0)*.035s) forwards}
+.sweep-card.late.win{animation:lateIn .3s var(--ease) both,winPulse .45s ease var(--b,0s) both,sweepAway .5s cubic-bezier(.55,0,.8,.4) calc(var(--b,0s) + .6s + var(--i,0)*.035s) forwards}
+.sweep.has-late{--b:.25s}
+.sailor.collect{animation:collect .42s var(--ease) .74s both}
+.sailor.collect.late{animation-delay:1.58s}
+.sailor.collect::after{animation:collectGlow .5s ease .74s both}
+.sailor.collect.late::after{animation-delay:1.58s}
+.trick-plus{animation:plus .58s var(--ease) .74s both}
+.sailor.collect.late .trick-plus{animation-delay:1.58s}
+.table.won{animation:tableWin .9s ease-out}
+/* 모바일은 선원 정보를 한눈에 훑고 카드가 테이블 안에 들어오게 */
+@media(max-width:620px){
+  .game-tools{gap:.25rem}.sound-toggle{width:36px;min-width:36px;padding:.35rem!important}.sound-toggle span{display:none}
+  .crew{grid-template-columns:repeat(var(--np,2),minmax(0,1fr));gap:.28rem}
+  .sailor{grid-template-columns:minmax(0,1fr);padding:.34rem .38rem;border-radius:3px}
+  .sailor .who{display:flex;align-items:center;justify-content:space-between;gap:.15rem}
+  .sailor .who b{font-size:.64rem}.sailor .who small{font-size:.54rem}
+  .sailor>strong{display:none}.sailor .tally{font-size:.58rem}.sailor .tally .n{font-size:.72rem}
+  .table{--cw:76px;min-height:280px}
+  .table[data-n="4"]{--cw:64px}
+  .table[data-n="5"],.table[data-n="6"]{--cw:52px}
+  .table[data-n="7"],.table[data-n="8"],.table[data-n="9"]{--cw:44px}
+  .table .card.small{width:var(--cw)}
+  .trick,.sweep{gap:.32rem}
+  .hcard.sel{transform:translateY(-34px) rotate(0deg) scale(1.08)!important}
+}

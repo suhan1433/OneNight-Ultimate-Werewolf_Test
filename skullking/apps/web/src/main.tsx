@@ -7,6 +7,10 @@ import { playCardSound, unlockCardSounds } from './sound';
 import { useGame } from './store';
 import './styles.css';
 
+const SFX_PREF='skullking.effects';
+const soundEnabled=()=>{try{return localStorage.getItem(SFX_PREF)!=='off';}catch{return true;}};
+const setSoundEnabled=(enabled:boolean)=>{try{localStorage.setItem(SFX_PREF,enabled?'on':'off');}catch{/* 저장소를 사용할 수 없어도 현재 화면에서는 계속 작동 */}};
+
 const suits: Record<Suit,{icon:string;name:string}>={parrot:{icon:'♧',name:'앵무새'},map:{icon:'⌖',name:'지도'},treasure:{icon:'◈',name:'보물'},jolly:{icon:'✦',name:'졸리 로저'}};
 const emptyCards: CardOptions={kraken:false,whale:false,loot:false,pirateAbilities:false,expansionSuitCards:false,wildMonkey:false,maryThorne:false,lastVolley:false,firstMateCon:false,stingray:false,davyJones:false,walkThePlank:false};
 const fullCards: CardOptions={kraken:true,whale:true,loot:true,pirateAbilities:true,expansionSuitCards:true,wildMonkey:true,maryThorne:true,lastVolley:true,firstMateCon:true,stingray:true,davyJones:true,walkThePlank:true};
@@ -32,11 +36,10 @@ function CardView({card,small,disabled,className,...rest}:CardViewProps) {
     {art?<img className="card-art" src={art} alt={label(card)} draggable={false}/>:<><span className={'card-sigil '+(card.kind==='number'?'suit-'+card.suit:'')}>{card.kind==='number'?suits[card.suit!].icon:icon[card.kind]}</span><b>{card.kind==='number'?card.rank:card.kind==='wild'?'15':''}</b><em>{label(card)}</em></>}
   </button>;
 }
-/* ───── v3 공용 조각: 이니셜 · 해골 · 카운트업 · 트릭 현황 · Yo-ho-ho 공개 연출 ───── */
+/* ───── v3 공용 조각: 이니셜 · 해골 · 카운트업 · 트릭 현황 ───── */
 const ini=(s:string)=>[...s][0]??'?';
 const sg=(v:number)=>v>0?'+'+v:String(v);
 const wavePath='M0 24'+'q80-26 160 0t160 0'.repeat(17)+'V200H0Z';
-function Skull({className}:{className?:string}){return <svg className={className} viewBox="0 0 64 64" aria-hidden="true"><g stroke="currentColor" strokeWidth="5" strokeLinecap="round" opacity=".55"><path d="M9 53 55 13M55 53 9 13"/></g><g fill="currentColor" opacity=".55"><circle cx="8" cy="54" r="3.4"/><circle cx="56" cy="54" r="3.4"/><circle cx="8" cy="12" r="3.4"/><circle cx="56" cy="12" r="3.4"/></g><path fill="currentColor" stroke="#0b141c" strokeWidth="2" d="M32 7C19.5 7 10.5 15.5 10.5 27c0 6.8 3 11.7 8 14.6V49c0 2 1.2 3.4 3.2 3.4h20.6c2 0 3.2-1.4 3.2-3.4v-7.4c5-2.9 8-7.8 8-14.6C53.5 15.5 44.5 7 32 7Z"/><g fill="#0b141c"><ellipse cx="23.5" cy="28" rx="6.4" ry="7.2"/><ellipse cx="40.5" cy="28" rx="6.4" ry="7.2"/><path d="M32 33.5 28 41.5h8Z"/></g><path stroke="#0b141c" strokeWidth="2.2" strokeLinecap="round" d="M25 46v6M30 46.5V52M34 46.5V52M39 46v6"/></svg>;}
 function Crest({kind='anchor',className}:{kind?:'anchor'|'crown'|'coin';className?:string}){return <svg className={className} viewBox="0 0 48 48" aria-hidden="true">{kind==='anchor'?<g fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="24" cy="8" r="3.3"/><path d="M24 12v25M16 17h16M10 27c0 8 5.5 13 14 13s14-5 14-13M10 27l-4 4m32-4 4 4"/></g>:kind==='crown'?<g fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinejoin="round"><path d="m7 16 10 8 7-14 7 14 10-8-4 22H11z"/><path d="M12 43h24"/></g>:<g fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="24" cy="24" r="17"/><path d="M30 17c-1.4-2-3.1-2.8-5.6-2.8-3.1 0-5.2 1.7-5.2 4.1 0 6.3 10.6 3 10.6 9.7 0 2.7-2.3 4.8-5.8 4.8-2.2 0-4.3-.8-5.9-2.5M24 11v26"/></g>}</svg>;}
 function CountUp({to,delay=0,dur=1000,signed}:{to:number;delay?:number;dur?:number;signed?:boolean}){
   const [v,setV]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches?to:0);
@@ -48,25 +51,6 @@ function Tally({bid,tricks}:{bid:number|null;tricks:number}){
   if(bid===null)return <span className="tally"><span className="lab">획득</span><em className="n">{tricks}</em></span>;
   const cnt=Math.min(Math.max(bid,tricks),12);
   return <span className={'tally'+(tricks===bid?' exact':tricks>bid?' over':'')} title={'예측 '+bid+' · 획득 '+tricks}><span className="lab">{bid===0?'무승':'트릭'}</span><span className="pips">{Array.from({length:cnt},(_,k)=><i key={k} className={k<tricks?(k>=bid?'on bust':'on'):''}/>)}</span><em className="n">{tricks}</em><span className="of">/{bid}</span></span>;
-}
-type RevealData={short:boolean;sum:number;total:number;rows:{id:string;name:string;bid:number|null;me:boolean}[]};
-/** 비딩 공개: 달빛 아래 파도 → 3박 쿵쿵(화면 흔들림·번개) → 나무 탁자 위 카드가 한꺼번에 뒤집힘 */
-function RevealStage({reveal,close}:{reveal:RevealData;close:()=>void}){
-  const v:[string,string]=reveal.sum>reveal.total?['over','욕심 많은 항해']:reveal.sum<reveal.total?['under','조심스러운 항해']:['even','정확히 맞물린 항해'];
-  return <div className={'reveal'+(reveal.short?' short':'')} data-n={Math.min(reveal.rows.length,9)} onClick={close} role="dialog" aria-label="예측 공개">
-    <div className="rv-sea" aria-hidden="true"><i className="rv-rays"/><i className="rv-moon"/>{[0,1].map(k=><svg key={k} className={'rv-wave rw'+k} viewBox="0 0 2700 200" preserveAspectRatio="none"><path d={wavePath}/></svg>)}{Array.from({length:10},(_,i)=><i className="ember" key={i} style={{left:(i*83)%100+'%',animationDelay:(i%6)*1.1+'s',animationDuration:6+(i%4)+'s'}}/>)}</div>
-    <div className="rv-bolt" aria-hidden="true"/><div className="reveal-flash" aria-hidden="true"/>
-    <div className="reveal-stage">
-      <p className="reveal-command">선원들, 운명을 걸어라</p>
-      <div className="reveal-title">{['Yo','ho','ho!'].map((w,k)=><span key={k} style={{'--k':k} as CSSProperties}>{w}</span>)}{[0,1,2].map(k=><i className="reveal-ring" key={k} style={{'--k':k} as CSSProperties}/>)}</div>
-      <div className="reveal-beats" aria-hidden="true">{[0,1,2].map(k=><i key={k} style={{'--k':k} as CSSProperties}/>)}</div>
-      <div className="reveal-table"><div className="plank" aria-hidden="true"/>
-        <div className="reveal-row">{reveal.rows.map((r,i)=><div className={'bid-slot'+(r.me?' me':'')+(r.bid===0?' zero':'')} key={r.id} style={{'--i':i} as CSSProperties}>
-          <div className="bid-card"><div className="bid-inner"><div className="bid-back"><Skull/></div><div className="bid-face"><b>{r.bid??'–'}</b><span>{r.bid===1?'TRICK':'TRICKS'}</span></div></div>{Array.from({length:8},(_,k)=><i className="spark" key={k} style={{'--a':k*45+'deg'} as CSSProperties}/>)}</div>
-          <span className={'plate'+(r.me?' me':'')} style={{'--h':hue(r.name)} as CSSProperties}><i className="dot">{ini(r.name)}</i>{r.name}{r.me?' (나)':''}</span></div>)}</div></div>
-      <p className="reveal-sum">예측 합계 <b>{reveal.sum}</b><span>/</span>이번 라운드 <b>{reveal.total}</b>트릭<em className={'verdict '+v[0]}>{v[1]}</em></p>
-    </div>
-    <span className="reveal-hint">탭하여 건너뛰기</span></div>;
 }
 /* ───── 손패 정렬 ───── */
 const SUIT_RANK:Record<string,number>={parrot:0,map:1,treasure:2,jolly:3};
@@ -141,8 +125,8 @@ function Help({close}:{close:()=>void}) {
   return <div className="modal" onClick={close}><div className="help book" onClick={e=>e.stopPropagation()}><button type="button" className="help-x" onClick={close} aria-label="도움말 닫기">✕</button>
     <nav className="help-tabs">{helpTabs.map(t=><button key={t} className={t===tab?'on':''} onClick={()=>setTab(t)}>{t}</button>)}</nav>
     <div className="help-body" key={tab}>
-      {tab==='항해 규칙'&&<><h2>항해 규칙</h2><ol className="steps"><li><b>딜</b>N라운드에는 N장씩 받습니다.</li><li><b>비딩</b>이번 라운드에 딸 트릭 수를 정해 <i>Yo-ho-ho!</i> 하고 동시에 공개합니다.</li><li><b>트릭</b>선(리드)부터 시계 방향으로 한 장씩 냅니다. 이긴 사람이 다음 선이 됩니다.</li><li><b>정산</b>예측이 정확하면 트릭당 <em>+20</em>, 틀리면 차이당 <em>-10</em>. 0 예측은 딜된 장수 × 10점을 걸고 성공·실패가 갈립니다.</li></ol>
-        <h3>수트 따르기</h3><div className="suit-row">{[['parrot-7','앵무새'],['map-7','지도'],['treasure-7','보물'],['jolly-7','졸리 로저 · 트럼프']].map(([i,t])=><figure key={i}><img src={art(i)} alt={t} draggable={false}/><figcaption>{t}</figcaption></figure>)}</div><p className="help-note">리드 수트의 숫자 카드가 손에 있으면 그 수트를 내야 합니다. 특수 카드는 언제나 낼 수 있습니다.</p></>}
+      {tab==='항해 규칙'&&<><h2>항해 규칙</h2><ol className="steps"><li><b>딜</b>N라운드에는 N장씩 받습니다.</li><li><b>비딩</b>이번 라운드에 딸 트릭 수를 정해 동시에 공개합니다.</li><li><b>트릭</b>선(리드)부터 시계 방향으로 한 장씩 냅니다. 이긴 사람이 다음 선이 됩니다.</li><li><b>정산</b>예측이 정확하면 트릭당 <em>+20</em>, 틀리면 차이당 <em>-10</em>. 0 예측은 딜된 장수 × 10점을 걸고 성공·실패가 갈립니다.</li></ol>
+        <h3>수트 따르기</h3><div className="suit-row">{[['parrot-7','앵무새'],['map-7','지도'],['treasure-7','보물'],['jolly-7','졸리 로저 · 트럼프']].map(([i,t])=><figure key={i}><img src={art(i)} alt={t} draggable={false}/><figcaption>{t}</figcaption></figure>)}</div><p className="help-note">Escape·Loot 및 일부 확장 특수 카드 뒤에는 처음 나온 숫자 카드가 리드 수트가 됩니다. Pirate·Mermaid·Skull King·Kraken·White Whale이 먼저 나오면 그 트릭에는 리드 수트가 없습니다.</p></>}
       {tab==='서열'&&<><h2>서열 · 가위바위보</h2><Beat a="skull-king" b="pirate-rosie" note="Skull King이 Pirate를 잡음" bonus="+30 / 장"/><Beat a="pirate-rosie" b="mermaid-alyra" note="Pirate가 Mermaid를 잡음" bonus="+20 / 장"/><Beat a="mermaid-alyra" b="skull-king" note="Mermaid가 Skull King을 잡음" bonus="+40"/><p className="help-note">셋이 한 트릭에 모두 나오면 <b>Mermaid</b>가 이깁니다.</p>
         <h3>기본 높낮이</h3><div className="ladder">{[['escape','Escape','항상 짐'],['parrot-9','숫자 카드','리드 수트 중 최고'],['jolly-9','졸리 로저','트럼프'],['pirate-rosie','특수 캐릭터','위 가위바위보']].map(([i,t,d],k)=><Fragment key={i}>{k>0&&<span className="lad-arrow">›</span>}<figure><img src={art(i)} alt={t} draggable={false}/><figcaption><b>{t}</b>{d}</figcaption></figure></Fragment>)}</div></>}
       {tab==='보너스'&&<><h2>보너스</h2><p className="help-note strong">보너스는 <b>예측을 맞힌 트릭 승자</b>에게만 지급됩니다.</p><div className="tiles">
@@ -217,8 +201,8 @@ function Landing() {
     {help&&<Help close={()=>setHelp(false)}/>}
   </main>;
 }
-function GameHeader({round,cards,onHelp,title}:{round?:number;cards?:number;onHelp:()=>void;title?:string}){const game=useGame(s=>s.game)!;return <header className="game-head"><button className="leave" onClick={()=>leaveRoom(game.roomCode)}><span aria-hidden="true">‹</span> 방 나가기</button><span className="voyage-mark">{title??<><small>ROUND</small><b>{round}</b><i>·</i><span>{cards}장</span></>}</span><button className="help-orb" onClick={onHelp} aria-label="도움말 열기">?</button></header>;}
-function BidPanel(){const game=useGame(s=>s.game)!;const [bid,setBid]=useState(0);useEffect(()=>setBid(0),[game.round]);const me=game.players.find(p=>p.id===game.playerId)!;if(me.bid!==null)return <div className="status"><Crest/>다른 선원들이 비드를 고르는 중입니다…</div>;return <section className="bid"><div className="bid-crest"><Crest/></div><p className="eyebrow">CAPTAIN'S CALL · ROUND {game.round}</p><h2>이번 항해, 몇 트릭을<br/>차지하시겠습니까?</h2><p>선원들의 눈을 읽고, 당신의 운을 걸어 보세요.</p><div className="bid-dial" aria-label="예측할 트릭 수">{Array.from({length:game.cardsThisRound+1},(_,n)=><button key={n} className={bid===n?'picked':''} onClick={()=>setBid(n)}><small>{n===0?'무승':'트릭'}</small>{n}</button>)}</div><button className="gold bid-submit" onClick={()=>{unlockCardSounds();emit('BID_SUBMIT',{roomCode:game.roomCode,bid}).catch(showError);}}><Crest kind="coin"/><b>Yo-ho-ho!</b><small>{bid}트릭을 예측합니다</small></button></section>;}
+function GameHeader({round,cards,onHelp,title}:{round?:number;cards?:number;onHelp:()=>void;title?:string}){const game=useGame(s=>s.game)!;const [soundOn,setSoundOn]=useState(soundEnabled);return <header className="game-head"><button className="leave" onClick={()=>leaveRoom(game.roomCode)}><span aria-hidden="true">‹</span> 방 나가기</button><span className="voyage-mark">{title??<><small>ROUND</small><b>{round}</b><i>·</i><span>{cards}장</span></>}</span><div className="game-tools"><button className="sound-toggle" type="button" aria-pressed={soundOn} aria-label={'카드 효과음 '+(soundOn?'켜짐':'꺼짐')} title={'카드 효과음 '+(soundOn?'끄기':'켜기')} onClick={()=>{const next=!soundOn;setSoundOn(next);setSoundEnabled(next);}}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4Z"/><path d="M16 9a5 5 0 0 1 0 6M18.5 6.5a9 9 0 0 1 0 11"/></svg><span>{soundOn?'소리':'음소거'}</span></button><button className="help-orb" onClick={onHelp} aria-label="도움말 열기">?</button></div></header>;}
+function BidPanel(){const game=useGame(s=>s.game)!;const [bid,setBid]=useState(0);useEffect(()=>setBid(0),[game.round]);const me=game.players.find(p=>p.id===game.playerId)!;if(me.bid!==null)return <div className="status"><Crest/>다른 선원들이 비드를 고르는 중입니다…</div>;return <section className="bid"><div className="bid-crest"><Crest/></div><p className="eyebrow">CAPTAIN'S CALL · ROUND {game.round}</p><h2>이번 항해, 몇 트릭을<br/>차지하시겠습니까?</h2><p>선원들의 눈을 읽고, 당신의 운을 걸어 보세요.</p><div className="bid-dial" aria-label="예측할 트릭 수">{Array.from({length:game.cardsThisRound+1},(_,n)=><button key={n} className={bid===n?'picked':''} onClick={()=>setBid(n)}><small>{n===0?'무승':'트릭'}</small>{n}</button>)}</div><button className="gold bid-submit" onClick={()=>{unlockCardSounds();emit('BID_SUBMIT',{roomCode:game.roomCode,bid}).catch(showError);}}><Crest kind="coin"/><b>예측 제출</b><small>{bid}트릭을 예측합니다</small></button></section>;}
 /** 능력 이름(대기 중인 다른 선원에게도 무슨 일이 벌어지는지 보여주기 위함) */
 const abilityName:Record<string,string>={rosieLeader:'Rosie',maryTarget:'Mary Thorne',plankTarget:'Walk the Plank',bendtDiscard:'Bendt',lastVolley:'The Last Volley',rascalBet:'Rascal'};
 function Sheet({title,sub,children}:{title:string;sub?:string;children:ReactNode}){return <div className="modal" role="dialog" aria-modal="true" aria-label={title}><div className="sheet"><h2>{title}</h2>{sub&&<p>{sub}</p>}{children}</div></div>;}
@@ -240,21 +224,15 @@ function Decision({pending}:{pending:PendingDecision}) {
  const myBid=game.players.find(p=>p.id===game.playerId)?.bid??0;
  return <Sheet title="🦍 Harry: 비드 조정" sub={'현재 비드 '+myBid+' · 딜 장수 '+game.cardsThisRound}><div className="choices">{[-1,0,1].filter(n=>myBid+n>=0&&myBid+n<=game.cardsThisRound).map(n=><button key={n} disabled={busy} onClick={()=>decide(n)}>{n>0?'+1':n===0?'유지':'-1'}</button>)}</div></Sheet>;
 }
-/* 첫 공개만 길게, 이후엔 짧게(몰입감 원칙) */
-let seenReveal=false;
 function Table(){
  const game=useGame(s=>s.game)!;const [choice,setChoice]=useState<Card|null>(null);const [help,setHelp]=useState(false);
  /* State arrives separately for every player. Sound only the newly revealed card so
     animation/state refreshes never replay an entire trick. */
  const heardCards=useRef<Set<string>|null>(null);
- useEffect(()=>{const cards=[...game.trick,...(game.lastTrick?.cards??[])];const keys=cards.map(p=>p.card.id);if(!heardCards.current){heardCards.current=new Set(keys);return;}const heard=heardCards.current;cards.forEach(p=>{if(!heard.has(p.card.id)){heard.add(p.card.id);playCardSound(p);}});},[game.trick,game.lastTrick]);
+ useEffect(()=>{const cards=[...game.trick,...(game.lastTrick?.cards??[])];const keys=cards.map(p=>p.card.id);if(!heardCards.current){heardCards.current=new Set(keys);return;}const heard=heardCards.current;cards.forEach(p=>{if(!heard.has(p.card.id)){heard.add(p.card.id);if(soundEnabled())playCardSound(p);}});},[game.trick,game.lastTrick]);
  /* 트릭 종료 연출: 직전 상태의 트릭 카드를 복사해 두었다가 승자 칩(.sailor[data-pid]) 쪽으로 쓸어 보낸다. 승자는 '획득 수가 늘어난 선원'으로 추론(서버 상태/로직은 변경 없음). */
  const [sweep,setSweep]=useState<{cards:SweepCard[];winner:string|null;late:boolean}|null>(null);const lastOwn=useRef<SweepCard|null>(null);const prevGame=useRef(game);const sweepRef=useRef<HTMLDivElement>(null);
- /* 비딩 동시 공개: bidding → 진행 단계로 넘어가는 순간(= 전원 제출 후 서버가 공개)에 'Yo-ho-ho!' 3박 후 모든 예측을 한꺼번에 뒤집는다. 서버 로직은 그대로. */
- const [reveal,setReveal]=useState<RevealData|null>(null);const prevReveal=useRef(game);
- useEffect(()=>{const b=prevReveal.current;prevReveal.current=game;if(!b||b===game)return;if(b.phase!=='bidding'||game.phase==='bidding'||b.round!==game.round||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;const rows=game.players.map(p=>({id:p.id,name:p.nickname,bid:p.bid,me:p.id===game.playerId}));const short=seenReveal;seenReveal=true;setReveal({short,sum:rows.reduce((a,r)=>a+(r.bid??0),0),total:game.cardsThisRound,rows});},[game]);
- useEffect(()=>{if(!reveal)return;const t=setTimeout(()=>setReveal(null),reveal.short?3700:4950);return()=>clearTimeout(t);},[reveal]);
- useEffect(()=>{const before=prevGame.current;prevGame.current=game;if(!before||before===game)return;const ended=before.trick.length>0&&before.round===game.round&&before.phase!=='bidding'&&game.phase!=='bidding'&&(game.trick.length<before.trick.length||game.trick[0]?.card.id!==before.trick[0].card.id);if(!ended||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ useEffect(()=>{const before=prevGame.current;prevGame.current=game;if(!before||before===game)return;const ended=before.trick.length>0&&before.round===game.round&&before.phase!=='bidding'&&game.phase!=='bidding'&&(game.trick.length<before.trick.length||game.trick[0]?.card.id!==before.trick[0].card.id);if(!ended)return;
   /* 서버가 lastTrick({cards,winnerId})을 내려주면 그것을 사용(마지막 카드까지 정확). 없으면 직전 상태 + '마지막 사람의 카드'를 보완한다: 내 카드는 직접 기억, 남의 카드는 뒷면으로 표시. */
   const last=game.lastTrick;let cards:SweepCard[]=before.trick.map(t=>({playerId:t.playerId,card:t.card,declaration:t.declaration}));
   if(last?.cards?.length&&last.cards.length>=cards.length)cards=last.cards.map(c=>({playerId:c.playerId,card:c.card,declaration:c.declaration,late:!before.trick.some(t=>t.playerId===c.playerId)}));
@@ -263,7 +241,7 @@ function Table(){
  /* 트릭 기록: 이 화면에서 본 트릭의 승자를 라운드별로 쌓아 둔다(파괴된 트릭은 null) */
  const [log,setLog]=useState<{round:number;ids:(string|null)[]}>({round:-1,ids:[]});
  useEffect(()=>{if(!sweep)return;setLog(l=>({round:game.round,ids:[...(l.round===game.round?l.ids:[]),sweep.winner]}));},[sweep]);
- useEffect(()=>{if(!sweep)return;const t=setTimeout(()=>setSweep(null),(sweep.late?2650:1950)+sweep.cards.length*60);return()=>clearTimeout(t);},[sweep]);
+ useEffect(()=>{if(!sweep)return;const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;const t=setTimeout(()=>setSweep(null),reduced?420:(sweep.late?1950:1200)+sweep.cards.length*30);return()=>clearTimeout(t);},[sweep]);
  useLayoutEffect(()=>{const root=sweepRef.current;if(!sweep||!root)return;const to=document.querySelector(`[data-pid="${sweep.winner}"]`)?.getBoundingClientRect();root.querySelectorAll<HTMLElement>('.sweep-card').forEach(el=>{const r=el.getBoundingClientRect();el.style.setProperty('--tx',(to?to.left+to.width/2-(r.left+r.width/2):0)+'px');el.style.setProperty('--ty',(to?to.top+to.height/2-(r.top+r.height/2):80)+'px');});},[sweep]);const active=game.turnId===game.playerId;
  /* Juanita: 본 덱을 모달로 보여준다(예전엔 화면 맨 아래 작은 글씨뿐이라 '아무 일도 안 일어난 것'처럼 보였음) */
  const [peek,setPeek]=useState(false);const peekKey=useRef('');
@@ -290,7 +268,7 @@ function Table(){
  {log.round===game.round&&log.ids.length>0&&<div className="tricklog" aria-label="트릭 기록"><span>트릭 기록</span>{log.ids.map((id,i)=>{const nm=id?pname(game,id):'파괴';return <i key={i} className={id?'':'void'} style={{'--h':hue(nm)} as CSSProperties} title={'트릭 '+(i+1)+': '+nm}>{id?ini(nm):'✕'}</i>;})}</div>}
  {waiting?<p className="turntext wait" role="status"><i className="spinner"/>{pname(game,game.pendingPlayerId??null)}님이 {abilityName[String(game.pendingKind??'')]??'능력'}{game.pendingKind==='lastVolley'?' 추가 카드를 내는 중…':' 능력을 사용하는 중…'}</p>:<p className={'turntext'+(active&&!game.pendingDecision?' mine':'')}>{turnLine}</p>}<Hand cards={game.hand} legal={game.legalCardIds} canPlay={canPlay} mode="play" resetKey={game.round} onPlay={c=>needs(c)?setChoice(c):play(c)}/>
  {choice&&<div className="modal"><div>{choice.isZeroFourteen?<><h2>0/14 선언</h2><button onClick={()=>play(choice,0)}>0</button><button className="gold" onClick={()=>play(choice,14)}>14</button></>:choice.kind==='wild'?<><h2>Wild Monkey 15</h2>{(['parrot','map','treasure'] as const).map(s=><button key={s} onClick={()=>play(choice,s)}>{suits[s].icon} {suits[s].name}</button>)}</>:<><h2>Tigress 선언</h2><button className="gold" onClick={()=>play(choice,'pirate')}>Pirate</button><button onClick={()=>play(choice,'escape')}>Escape</button></>}<button className="text" onClick={()=>setChoice(null)}>취소</button></div></div>}
- {reveal&&<RevealStage reveal={reveal} close={()=>setReveal(null)}/>} {notice&&<div className="notice" role="status">{notice}</div>}{peek&&game.peekedDeck&&<div className="modal" onClick={()=>setPeek(false)}><div className="sheet peek" onClick={e=>e.stopPropagation()}><h2>Juanita · 비공개 덱 확인</h2><p>이 정보는 당신에게만 공개됩니다.</p><p>{game.peekedDeck.length?'남은 덱 '+game.peekedDeck.length+'장':'남은 덱이 없어요.'}</p><div className="pick-row mini">{game.peekedDeck.map(c=><CardView key={c.id} card={c} small/>)}</div><button className="gold" onClick={()=>setPeek(false)}>확인</button></div></div>}{game.pendingDecision&&<Decision pending={game.pendingDecision}/>} {help&&<Help close={()=>setHelp(false)}/>}</main>;
+ {notice&&<div className="notice" role="status">{notice}</div>}{peek&&game.peekedDeck&&<div className="modal" onClick={()=>setPeek(false)}><div className="sheet peek" onClick={e=>e.stopPropagation()}><h2>Juanita · 비공개 덱 확인</h2><p>이 정보는 당신에게만 공개됩니다.</p><p>{game.peekedDeck.length?'남은 덱 '+game.peekedDeck.length+'장':'남은 덱이 없어요.'}</p><div className="pick-row mini">{game.peekedDeck.map(c=><CardView key={c.id} card={c} small/>)}</div><button className="gold" onClick={()=>setPeek(false)}>확인</button></div></div>}{game.pendingDecision&&<Decision pending={game.pendingDecision}/>} {help&&<Help close={()=>setHelp(false)}/>}</main>;
 }
 const pname=(game:NonNullable<ReturnType<typeof useGame.getState>['game']>,id:string|null)=>game?.players.find(p=>p.id===id)?.nickname??'—';
 const rankOf=(rows:{total:number}[],i:number)=>rows.findIndex(r=>r.total===rows[i].total)+1;
