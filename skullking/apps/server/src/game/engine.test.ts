@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Card, SkullPlayer } from '@skullking/shared';
-import { createRoom, leadSuit, legalCards, makeDeck, play, resolveDecision, returnToLobby, scoreRound, view } from './engine.js';
+import { createRoom, leadSuit, legalCards, makeDeck, play, resolveDecision, returnToLobby, scoreRound, start, view } from './engine.js';
 
 const card=(id:string,kind:Card['kind'],rank?:number,suit:Card['suit']='treasure',extra:Partial<Card>={}):Card=>({id,kind,name:id,suit:kind==='number'?suit:undefined,rank,...extra});
 const sailor=(id:string):SkullPlayer=>({id,nickname:id,sessionToken:id,socketId:null,connected:true,ready:true,isBot:false,hand:[],bid:null,tricks:0,score:0,roundBonus:0});
@@ -50,6 +50,13 @@ describe('Skull King engine',()=>{
   });
   it('returns a finished crew to the lobby with a clean scorecard',()=>{
     const room=createRoom('ABC123','a','a',config,'token');room.players.push(sailor('b'));room.phase='result';room.roundIndex=9;room.cardsThisRound=10;room.history=[{round:10,cards:10,scores:[]}];room.players[0]!.score=125;room.players[0]!.hand=[card('old','escape')];room.players[1]!.score=80;returnToLobby(room,'a');expect(room.phase).toBe('lobby');expect(room.roundIndex).toBe(0);expect(room.history).toEqual([]);expect(room.players.map(p=>({ready:p.ready,score:p.score,hand:p.hand.length}))).toEqual([{ready:false,score:0,hand:0},{ready:false,score:0,hand:0}]);expect(()=>returnToLobby(room,'b')).toThrow('captain');
+  });
+  it('chooses a random sailor to lead the first round',()=>{
+    const room=createRoom('ABC123','a','a',{...config,maxPlayers:3},'token');room.players.push(sailor('b'),sailor('c'));
+    const random=vi.spyOn(Math,'random').mockReturnValue(.34);
+    start(room,'a');
+    expect(room.dealerIndex).toBe(1);expect(room.leaderId).toBe('c');
+    random.mockRestore();
   });
   it('keeps submitted bids hidden from other sailors until reveal',()=>{
     const room=createRoom('ABC123','a','a',config,'token');room.players.push(sailor('b'));room.phase='bidding';room.players[0]!.bid=2;room.players[1]!.bid=null;
