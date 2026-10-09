@@ -99,7 +99,7 @@ Kraken ×1, White Whale ×1, Loot ×2. 그리고 **Pirate Abilities(해적 능�
 | 수트 숫자 카드 | 그 수트가 리드 수트 |
 | Escape / Tigress(Escape 선언) | 다음 플레이어가 리드 수트를 정함. 다음도 이런 카드면 그다음 사람이 정함 |
 | Pirate / Mermaid / Skull King / Tigress(Pirate 선언) | **리드 수트 없음**. 아무 카드나 가능 |
-| Kraken / White Whale | 리드 수트 없음. **트릭 중간에 나와도 이후 카드는 수트를 안 따라도 됨** |
+| Kraken / White Whale | 이 카드가 **리드**되면 리드 수트 없음. 이미 숫자 카드로 리드 수트가 정해진 뒤에 나오면 그 리드 수트 의무는 유지됨 |
 | Loot | 다음에 나오는 숫자 카드가 수트를 정함. 나머지가 전부 Escape류면 **Loot를 낸 사람이 승리**(동맹 없음, 보너스 없음) |
 | The Last Volley / Walk the Plank / Davy Jones | 리드 수트 선택을 **다음 플레이어에게 넘김** |
 

@@ -11,10 +11,15 @@ describe('Skull King engine',()=>{
     const trick=[{playerId:'a',card:{...card('treasure-8','number',8),suit:'treasure' as const}}];
     expect(legalCards(hand,trick).map(item=>item.id)).toEqual(['treasure-4','escape']);
   });
-  it('allows special cards at any time and lets the first later suit card establish the lead',()=>{
+  it('allows special cards at any time, while a character lead leaves no suit to follow',()=>{
     const hand=[card('treasure-4','number',4),card('map-14','number',14,'map'),card('escape','escape'),card('Rosie','pirate')];
     const trick=[{playerId:'a',card:card('Skull King','skullKing')},{playerId:'b',card:card('treasure-8','number',8)}];
-    expect(legalCards(hand,trick).map(item=>item.id)).toEqual(['treasure-4','escape','Rosie']);
+    expect(legalCards(hand,trick).map(item=>item.id)).toEqual(['treasure-4','map-14','escape','Rosie']);
+  });
+  it('keeps an established lead suit after Davy Jones or a Sea Monster is played',()=>{
+    const hand=[card('treasure-4','number',4),card('map-14','number',14,'map'),card('davy','davy'),card('kraken','kraken')];
+    const trick=[{playerId:'a',card:card('treasure-8','number',8)},{playerId:'b',card:card('davy-played','davy')},{playerId:'c',card:card('whale-played','whale')}];
+    expect(legalCards(hand,trick).map(item=>item.id)).toEqual(['treasure-4','davy','kraken']);
   });
   it('awards a standard higher suited card the trick',()=>{
     const room=createRoom('ABC123','a','a',config,'token');room.players.push(sailor('b'));

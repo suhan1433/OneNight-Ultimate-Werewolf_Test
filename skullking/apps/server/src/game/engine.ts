@@ -25,11 +25,14 @@ const next=(room:SkullRoom,id:string)=>{
 };
 
 export const leadSuit=(trick:PlayedCard[]):Suit|undefined|null=>{
-  // Sea Monsters remove suit-following for the whole trick, even when played after a number card.
-  if(trick.some(isMonster))return null;
   for(const p of trick){
-    // Character and escape-style special cards pass lead selection to the next suit card.
     const suit=playedSuit(p); if(suit)return suit;
+    /* A numbered lead stays in force even if a Sea Monster appears later.  Davy
+       Jones merely removes monsters when resolving the trick; it never changes
+       the follow-suit rule.  These lead cards leave no suit for the trick. */
+    if(['pirate','skullKing','mermaid','kraken','whale'].includes(normalKind(p)))return null;
+    /* Escape-style cards, Davy Jones, Stingray, Volley and Plank defer choosing
+       a suit to the next eligible numbered card. */
   }
   return undefined;
 };
