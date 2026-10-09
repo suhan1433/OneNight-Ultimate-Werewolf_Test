@@ -9,6 +9,7 @@ COPY packages/shared packages/shared
 COPY apps/web apps/web
 ARG VITE_SOCKET_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
+ENV DOCKER_BUILD=true
 RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/web
 FROM nginx:1.27-alpine
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html

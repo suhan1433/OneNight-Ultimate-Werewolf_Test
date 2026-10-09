@@ -1,6 +1,6 @@
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import ReactDOM from 'react-dom/client';
-import {ROLE_DEFINITIONS,type AvalonOptions,type ClientGameState,type DelegableAssassinRole} from '@werewolf/shared';
+import {ROLE_DEFINITIONS,type AvalonOptions,type ClientGameState,type DelegableAssassinRole,type RoleType} from '@werewolf/shared';
 import {useGame} from './store';
 import {emit,saveSession} from './socket';
 import './styles.css';
@@ -21,6 +21,20 @@ import {GateIntro,Table,useGateIntro} from './GateIntro';
 import {RV,findMates,useHold} from './RoleScene';
 import {LOBBY_TL,LobbyBackdrop,LobbyGlow,RoomCode,StartCurtain,shakeVars,useRoster,type GlowHandle} from './LobbyScene';
 import {buildPlan,coinStyle,readVotes,tintOf,useNewCoins,useReducedMotion,useRevealEffects,useTableMetrics,type Plan} from './VoteScene';
+import merlinArt from './assets/role-art/merlin.jpg';
+import percivalArt from './assets/role-art/percival.jpg';
+import assassinArt from './assets/role-art/assassin.jpg';
+import morganaArt from './assets/role-art/morgana.jpg';
+import mordredArt from './assets/role-art/mordred.jpg';
+import oberonArt from './assets/role-art/oberon.jpg';
+import goodCitizenArt1 from './assets/role-art/good-citizen-1.jpg';
+import goodCitizenArt2 from './assets/role-art/good-citizen-2.jpg';
+import goodCitizenArt3 from './assets/role-art/good-citizen-3.jpg';
+import goodCitizenArt4 from './assets/role-art/good-citizen-4.jpg';
+import goodCitizenArt5 from './assets/role-art/good-citizen-5.jpg';
+import evilCitizenArt1 from './assets/role-art/evil-citizen-1.jpg';
+import evilCitizenArt2 from './assets/role-art/evil-citizen-2.jpg';
+import evilCitizenArt3 from './assets/role-art/evil-citizen-3.jpg';
 
 const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false,revealVoteIdentities:true};
 const ROLE_OPTION_KEYS=['assassin','percival','morgana','mordred','oberon'] as const;
@@ -47,8 +61,6 @@ function CheckIcon({size}:{size?:number}){return <Icon size={size}><path d="M4 1
 function EyeIcon({size}:{size?:number}){return <Icon size={size}><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="2.6"/></Icon>;}
 function DaggerIcon({size}:{size?:number}){return <Icon size={size}><path d="M12 2v12.5"/><path d="M7.5 14.5h9L12 21l-4.5-6.5Z"/><path d="M8.5 6h7"/></Icon>;}
 function SpearIcon({size}:{size?:number}){return <Icon size={size}><path d="M4 20 17 7"/><path d="M14.5 3.5l6 6-3 1.2-4.2-4.2Z"/></Icon>;}
-function MaskIcon({size}:{size?:number}){return <Icon size={size}><path d="M4.5 9c0-4 3.8-6.2 7.5-6.2S19.5 5 19.5 9c0 6-3.1 11.2-7.5 11.2S4.5 15 4.5 9Z"/><path d="M8 10.2c.5 1 1.5 1 2 0M14 10.2c.5 1 1.5 1 2 0"/></Icon>;}
-function ChainIcon({size}:{size?:number}){return <Icon size={size}><rect x="3.5" y="8" width="7.5" height="9.5" rx="3.75"/><rect x="13" y="6.5" width="7.5" height="9.5" rx="3.75"/></Icon>;}
 function SealIcon({size=96}:{size?:number}){
   return <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className="seal">
     <circle cx="50" cy="50" r="46" stroke="currentColor" strokeWidth="1.4"/>
@@ -63,15 +75,23 @@ function FactionSeal({team,size=44}:{team:'good'|'evil';size?:number}){
     {good?<><path d="M32 13 19 25v17l13 9 13-9V25L32 13Z"/><path d="M32 22v22M24 31h16"/></>:<><path d="m18 17 28 30M46 17 18 47"/><path d="M23 12h18l5 10-14 30-14-30 5-10Z"/></>}
   </svg>;
 }
-function RoleIcon({role,team,size}:{role:string;team:'good'|'evil';size?:number}){
-  const r=role.toLowerCase();
-  if(r.includes('merlin'))return <EyeIcon size={size}/>;
-  if(r.includes('assassin'))return <DaggerIcon size={size}/>;
-  if(r.includes('percival'))return <SpearIcon size={size}/>;
-  if(r.includes('morgana'))return <MaskIcon size={size}/>;
-  if(r.includes('mordred'))return <CrownIcon size={size}/>;
-  if(r.includes('oberon'))return <ChainIcon size={size}/>;
-  return <ShieldIcon size={size}/>;
+const GOOD_CITIZEN_ART=[goodCitizenArt1,goodCitizenArt2,goodCitizenArt3,goodCitizenArt4,goodCitizenArt5];
+const EVIL_CITIZEN_ART=[evilCitizenArt1,evilCitizenArt2,evilCitizenArt3];
+const ROLE_ART:Record<Exclude<RoleType,'loyal'|'minion'>,string>={
+  merlin:merlinArt,percival:percivalArt,assassin:assassinArt,morgana:morganaArt,mordred:mordredArt,oberon:oberonArt,
+};
+const stableArtIndex=(key:string,length:number)=>{
+  let hash=0;for(const char of key)hash=(hash*31+char.charCodeAt(0))>>>0;
+  return hash%length;
+};
+/* 이름이 있는 특수 역할은 해당 일러스트를, 여러 명이 될 수 있는 시민은 각 플레이어/목록 항목에 따라 다른 초상을 쓴다. */
+function RoleIcon({role,size,variantKey=''}:{role:RoleType;team:'good'|'evil';size?:number;variantKey?:string}){
+  const art=role==='loyal'
+    ?GOOD_CITIZEN_ART[stableArtIndex(variantKey||role,GOOD_CITIZEN_ART.length)]!
+    :role==='minion'
+      ?EVIL_CITIZEN_ART[stableArtIndex(variantKey||role,EVIL_CITIZEN_ART.length)]!
+      :ROLE_ART[role];
+  return <img className="role-art" src={art} width={size} height={size} alt="" aria-hidden="true" loading="lazy"/>;
 }
 function Dots(){return <span className="dots"><i/><i/><i/></span>;}
 function PhaseRibbon({game,turn=false}:{game:ClientGameState;turn?:boolean}){
@@ -281,7 +301,7 @@ function Role({game}:{game:ClientGameState}){
             <span className="rv-face rv-back"><SealIcon size={92}/><small>AVALON</small></span>
             <span className="rv-face rv-front" aria-hidden={!shown}>{everShown&&<>
               <FactionSeal team={def.team} size={200}/>
-              <span className="rv-glyph"><RoleIcon role={role} team={def.team} size={Math.round(24*1.9)}/></span>
+              <span className="rv-glyph"><RoleIcon role={role} team={def.team} variantKey={game.playerId} size={Math.round(24*1.9)}/></span>
               <small>{label}</small><strong>{def.name}</strong>
             </>}</span>
           </span>
@@ -390,7 +410,7 @@ function Lobby({game,starting=false}:{game:ClientGameState;starting?:boolean}){
     </div>
     <p className="lb-profile-hint">내 자리를 눌러 캐릭터를 바꿀 수 있어요</p>
     {profileOpen&&<ProfileDialog game={game} close={()=>setProfileOpen(false)}/>}
-    <div className="lb-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=>{const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} size={14}/>{ROLE_DEFINITIONS[role].name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</div></div>
+    <div className="lb-roles"><b>이번 게임의 캐릭터</b><div>{game.activeRoles.map((role,index)=>{const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span key={`${role}-${index}`} className={ROLE_DEFINITIONS[role].team}><RoleIcon role={role} team={ROLE_DEFINITIONS[role].team} variantKey={`${role}-${index}`} size={14}/>{ROLE_DEFINITIONS[role].name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</div></div>
     <div className="lb-actions">
       <button className={`lb-ready${me.ready?' is-ready':''}`} onClick={()=>call('PLAYER_READY',{roomCode:game.roomCode})}>{me.ready?<><CheckIcon size={17}/> 준비 완료됨</>:'준비 완료'}</button>
       {game.playerId===game.hostId&&<button className="primary lb-start" onClick={()=>call('GAME_START',{roomCode:game.roomCode})}><CrownIcon size={17}/> 게임 시작</button>}
@@ -413,7 +433,7 @@ function RoundHistory({game,open,setOpen,showSlots=true}:{game:ClientGameState;o
 }
 
 function ActiveRoles({game}:{game:ClientGameState}){
-  return <section className="active-roles"><b>사용 캐릭터</b>{game.activeRoles.map((role,index)=>{const def=ROLE_DEFINITIONS[role];const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span className={def.team} key={`${role}-${index}`} title={delegated?`${def.description} 암살 능력을 함께 가집니다.`:def.description}><RoleIcon role={role} team={def.team} size={14}/>{def.name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</section>;
+  return <section className="active-roles"><b>사용 캐릭터</b>{game.activeRoles.map((role,index)=>{const def=ROLE_DEFINITIONS[role];const delegated=!game.options.assassin&&game.options.assassinationAbilityRole===role;return <span className={def.team} key={`${role}-${index}`} title={delegated?`${def.description} 암살 능력을 함께 가집니다.`:def.description}><RoleIcon role={role} team={def.team} variantKey={`${role}-${index}`} size={14}/>{def.name}{delegated&&<DaggerIcon size={12}/>}</span>;})}</section>;
 }
 
 /* 방 옵션 '원정 기록 투표자 공개'
