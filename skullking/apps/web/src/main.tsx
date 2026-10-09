@@ -14,7 +14,7 @@ const soundEnabled=()=>{try{return localStorage.getItem(SFX_PREF)!=='off';}catch
 const setSoundEnabled=(enabled:boolean)=>{try{localStorage.setItem(SFX_PREF,enabled?'on':'off');}catch{/* 저장소를 사용할 수 없어도 현재 화면에서는 계속 작동 */}fx.setEnabled(enabled);};
 fx.setEnabled(soundEnabled());
 /** 사용자 제스처 안에서: 카드 효과음 + 앰비언트 오디오 잠금 해제 */
-const unlock=()=>{unlock();fx.unlock();};
+const unlock=()=>{unlockCardSounds();fx.unlock();};
 type Pl=NonNullable<ReturnType<typeof useGame.getState>['game']>['players'][number];
 
 const suits:Record<Suit,{icon:string;name:string}>={parrot:{icon:'parrot',name:'앵무새'},map:{icon:'map',name:'지도'},treasure:{icon:'treasure',name:'보물'},jolly:{icon:'jolly',name:'졸리 로저'}};

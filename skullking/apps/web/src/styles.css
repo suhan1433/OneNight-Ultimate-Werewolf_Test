@@ -36,12 +36,12 @@ button,input,select{font:inherit}
 .room{position:absolute;inset:0;background:url('./textures/wood.jpg') center/960px auto}
 .dim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,5,3,.38),rgba(8,5,3,.6))}
 .scene.m-game .dim{background:rgba(8,5,3,.3)}
-.overlay{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden}
-.lantern{position:absolute;inset:0;background:radial-gradient(72% 62% at 20% 3%,rgba(255,186,96,.38),rgba(255,150,60,.1) 44%,transparent 72%);mix-blend-mode:soft-light;animation:flicker 6s steps(1) infinite}
-.lantern::after{content:'';position:absolute;inset:0;background:radial-gradient(46% 38% at 20% 3%,rgba(255,196,120,.12),transparent 70%);mix-blend-mode:screen}
-.grain{position:absolute;inset:-60px;background:url('./textures/grain.png');opacity:.17;mix-blend-mode:overlay;animation:grain 1s steps(5) infinite}
+.overlay{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.lantern{position:absolute;inset:0;background:radial-gradient(72% 62% at 20% 3%,rgba(255,176,86,.30),rgba(255,150,60,.08) 44%,transparent 72%);}
+.lantern::after{content:none}
+.grain{position:absolute;inset:0;background:url('./textures/grain.png');opacity:.05;mix-blend-mode:overlay}
 .vignette{position:absolute;inset:0;background:radial-gradient(130% 100% at 20% 3%,transparent 38%,rgba(0,0,0,.36) 72%,rgba(0,0,0,.62))}
-.mote{position:absolute;width:3px;height:3px;border-radius:50%;background:#ffd9a0;opacity:0;filter:blur(.6px);animation:mote linear infinite}
+.mote{display:none;position:absolute;width:3px;height:3px;border-radius:50%;background:#ffd9a0;opacity:0;filter:blur(.6px);animation:mote linear infinite}
 
 /* ───────── 공용: 양피지 · 버튼 · 입력 ───────── */
 .paper,.modal>div{position:relative;background:url('./textures/parchment.jpg') 0 0/512px;color:var(--ink);border-radius:3px;box-shadow:var(--sh-3),inset 0 0 0 1px rgba(90,60,25,.4),inset 0 0 44px rgba(110,70,25,.3)}
