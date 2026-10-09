@@ -21,20 +21,7 @@ import {GateIntro,Table,useGateIntro} from './GateIntro';
 import {RV,findMates,useHold} from './RoleScene';
 import {LOBBY_TL,LobbyBackdrop,LobbyGlow,RoomCode,StartCurtain,shakeVars,useRoster,type GlowHandle} from './LobbyScene';
 import {buildPlan,coinStyle,readVotes,tintOf,useNewCoins,useReducedMotion,useRevealEffects,useTableMetrics,type Plan} from './VoteScene';
-import merlinArt from './assets/role-art/merlin.jpg';
-import percivalArt from './assets/role-art/percival.jpg';
-import assassinArt from './assets/role-art/assassin.jpg';
-import morganaArt from './assets/role-art/morgana.jpg';
-import mordredArt from './assets/role-art/mordred.jpg';
-import oberonArt from './assets/role-art/oberon.jpg';
-import goodCitizenArt1 from './assets/role-art/good-citizen-1.jpg';
-import goodCitizenArt2 from './assets/role-art/good-citizen-2.jpg';
-import goodCitizenArt3 from './assets/role-art/good-citizen-3.jpg';
-import goodCitizenArt4 from './assets/role-art/good-citizen-4.jpg';
-import goodCitizenArt5 from './assets/role-art/good-citizen-5.jpg';
-import evilCitizenArt1 from './assets/role-art/evil-citizen-1.jpg';
-import evilCitizenArt2 from './assets/role-art/evil-citizen-2.jpg';
-import evilCitizenArt3 from './assets/role-art/evil-citizen-3.jpg';
+import {roleArtFor} from './role-art';
 
 const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false,revealVoteIdentities:true};
 const ROLE_OPTION_KEYS=['assassin','percival','morgana','mordred','oberon'] as const;
@@ -75,23 +62,8 @@ function FactionSeal({team,size=44}:{team:'good'|'evil';size?:number}){
     {good?<><path d="M32 13 19 25v17l13 9 13-9V25L32 13Z"/><path d="M32 22v22M24 31h16"/></>:<><path d="m18 17 28 30M46 17 18 47"/><path d="M23 12h18l5 10-14 30-14-30 5-10Z"/></>}
   </svg>;
 }
-const GOOD_CITIZEN_ART=[goodCitizenArt1,goodCitizenArt2,goodCitizenArt3,goodCitizenArt4,goodCitizenArt5];
-const EVIL_CITIZEN_ART=[evilCitizenArt1,evilCitizenArt2,evilCitizenArt3];
-const ROLE_ART:Record<Exclude<RoleType,'loyal'|'minion'>,string>={
-  merlin:merlinArt,percival:percivalArt,assassin:assassinArt,morgana:morganaArt,mordred:mordredArt,oberon:oberonArt,
-};
-const stableArtIndex=(key:string,length:number)=>{
-  let hash=0;for(const char of key)hash=(hash*31+char.charCodeAt(0))>>>0;
-  return hash%length;
-};
-/* 이름이 있는 특수 역할은 해당 일러스트를, 여러 명이 될 수 있는 시민은 각 플레이어/목록 항목에 따라 다른 초상을 쓴다. */
-function RoleIcon({role,size,variantKey=''}:{role:RoleType;team:'good'|'evil';size?:number;variantKey?:string}){
-  const art=role==='loyal'
-    ?GOOD_CITIZEN_ART[stableArtIndex(variantKey||role,GOOD_CITIZEN_ART.length)]!
-    :role==='minion'
-      ?EVIL_CITIZEN_ART[stableArtIndex(variantKey||role,EVIL_CITIZEN_ART.length)]!
-      :ROLE_ART[role];
-  return <img className="role-art" src={art} width={size} height={size} alt="" aria-hidden="true" loading="lazy"/>;
+function RoleIcon({role,size,variantKey='',className='',eager=false}:{role:RoleType;team:'good'|'evil';size?:number;variantKey?:string;className?:string;eager?:boolean}){
+  return <img className={`role-art ${className}`} src={roleArtFor(role,variantKey)} width={size} height={size} alt="" aria-hidden="true" loading={eager?'eager':'lazy'}/>;
 }
 function Dots(){return <span className="dots"><i/><i/><i/></span>;}
 function PhaseRibbon({game,turn=false}:{game:ClientGameState;turn?:boolean}){
@@ -300,9 +272,9 @@ function Role({game}:{game:ClientGameState}){
           <span className="rv-flipper">
             <span className="rv-face rv-back"><SealIcon size={92}/><small>AVALON</small></span>
             <span className="rv-face rv-front" aria-hidden={!shown}>{everShown&&<>
-              <FactionSeal team={def.team} size={200}/>
-              <span className="rv-glyph"><RoleIcon role={role} team={def.team} variantKey={game.playerId} size={Math.round(24*1.9)}/></span>
-              <small>{label}</small><strong>{def.name}</strong>
+              <RoleIcon role={role} team={def.team} variantKey={game.playerId} className="rv-role-card-art" eager/>
+              <i className="rv-art-shade" aria-hidden="true"/>
+              <span className="rv-role-label"><small>{label}</small><strong>{def.name}</strong></span>
             </>}</span>
           </span>
           <span className="rv-heat" aria-hidden="true"/>
