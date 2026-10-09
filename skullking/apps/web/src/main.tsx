@@ -76,6 +76,9 @@ function Hand({cards,legal,canPlay,mode,resetKey,onPlay}:{cards:Card[];legal:str
   const [order,setOrder]=useState<string[]>([]);const [sortMode,setSortMode]=useState<'suit'|'rank'|null>('suit');
   const [sel,setSel]=useState<string|null>(null);const [drag,setDrag]=useState<{id:string;x:number;over:number}|null>(null);const [width,setWidth]=useState(0);
   const box=useRef<HTMLDivElement>(null);const info=useRef<{id:string;sx:number;sy:number;off:number;moved:boolean;over:number}|null>(null);
+  /* Legal cards are server-authoritative.  Keep this distinct from the manual
+     card order so a trick/turn update cannot wait for a sort or drag rerender. */
+  const legalSet=useMemo(()=>new Set(legal),[legal]);const availabilityKey=mode==='play'?(canPlay?'play:'+legal.join(','):'wait'):'bid';
   useEffect(()=>{setOrder([]);setSortMode('suit');setSel(null);},[resetKey]);
   useEffect(()=>{if(canPlay)setSel(null);},[canPlay]);/* 내 차례가 되는 순간 선택 해제 → 이전에 올려둔 카드가 한 번 탭으로 나가는 사고 방지 */
   useEffect(()=>{if(sel&&!cards.some(c=>c.id===sel))setSel(null);},[cards,sel]);
@@ -88,7 +91,7 @@ function Hand({cards,legal,canPlay,mode,resetKey,onPlay}:{cards:Card[];legal:str
   const pad=Math.round(cw*.16);const U=Math.max(cw,W-pad*2);/* 회전한 양 끝 카드가 화면 밖으로 잘리지 않게 좌우 여백 */
   const step=n>1?Math.max(10,Math.min(cw*.8,(U-cw)/(n-1))):0;const total=cw+step*Math.max(0,n-1);const left0=Math.max(0,pad+(U-total)/2);const H=ch+84;const mid=(n-1)/2;
   const slot=(i:number)=>left0+i*step;
-  const tap=(id:string)=>{const c=list.find(x=>x.id===id);if(!c)return;if(sel!==id){setSel(id);return;}if(mode==='play'&&canPlay&&legal.includes(id)&&onPlay){setSel(null);onPlay(c);}else setSel(null);};
+  const tap=(id:string)=>{const c=list.find(x=>x.id===id);if(!c)return;if(sel!==id){setSel(id);return;}if(mode==='play'&&canPlay&&legalSet.has(id)&&onPlay){setSel(null);onPlay(c);}else setSel(null);};
   const down=(e:ReactPointerEvent<HTMLButtonElement>,id:string)=>{if(e.pointerType==='mouse'&&e.button!==0)return;const br=box.current!.getBoundingClientRect();const i=shown.findIndex(c=>c.id===id);info.current={id,sx:e.clientX,sy:e.clientY,off:e.clientX-br.left-slot(i),moved:false,over:i};try{e.currentTarget.setPointerCapture(e.pointerId);}catch{/* 일부 브라우저 예외 무시 */}};
   const move=(e:ReactPointerEvent<HTMLButtonElement>)=>{const d=info.current;if(!d)return;if(!d.moved){if(Math.hypot(e.clientX-d.sx,e.clientY-d.sy)<8)return;d.moved=true;setSel(null);}
     const br=box.current!.getBoundingClientRect();const x=Math.max(left0-cw*.35,Math.min(e.clientX-br.left-d.off,left0+total-cw*.65));const over=step>0?Math.max(0,Math.min(n-1,Math.round((x-left0)/step))):0;d.over=over;setDrag({id:d.id,x,over});};
@@ -96,14 +99,14 @@ function Hand({cards,legal,canPlay,mode,resetKey,onPlay}:{cards:Card[];legal:str
     if(d.moved){if(commit){const ids=list.map(c=>c.id);ids.splice(ids.indexOf(d.id),1);ids.splice(d.over,0,d.id);setOrder(ids);setSortMode(null);}setDrag(null);}
     else if(commit)tap(d.id);};
   const sortBy=(by:'suit'|'rank')=>{setOrder(sortCards(cards,by).map(c=>c.id));setSortMode(by);setSel(null);};
-  const selIdx=drag?-1:shown.findIndex(c=>c.id===sel);const selCard=selIdx>=0?shown[selIdx]:null;const okSel=!!selCard&&mode==='play'&&canPlay&&legal.includes(selCard.id);
+  const selIdx=drag?-1:shown.findIndex(c=>c.id===sel);const selCard=selIdx>=0?shown[selIdx]:null;const okSel=!!selCard&&mode==='play'&&canPlay&&legalSet.has(selCard.id);
   return <section className="handwrap" aria-label="내 손패">
     <div className="hand-bar"><span className="hand-title">내 손패<small>{n}장 · 카드를 끌어서 순서를 바꿀 수 있어요</small></span>
       <div className="seg sm" role="group" aria-label="손패 정렬"><button type="button" className={sortMode==='suit'?'on':''} onClick={()=>sortBy('suit')}>수트순</button><button type="button" className={sortMode==='rank'?'on':''} onClick={()=>sortBy('rank')}>숫자순</button></div></div>
     <div className="hand-box" ref={box} style={{height:H}} onPointerDown={e=>{if(e.target===e.currentTarget)setSel(null);}}>
-      {shown.map((c,i)=>{const dragging=drag?.id===c.id;const isSel=sel===c.id&&!dragging;const ok=mode==='play'&&canPlay&&legal.includes(c.id);const dim=mode==='play'&&canPlay&&!ok;
+      {shown.map((c,i)=>{const dragging=drag?.id===c.id;const isSel=sel===c.id&&!dragging;const ok=mode==='play'&&canPlay&&legalSet.has(c.id);const dim=mode==='play'&&canPlay&&!ok;
         const arc=Math.pow(i-mid,2)*Math.min(.9,5/Math.max(n,1));const rot=dragging?0:(i-mid)*Math.min(2.6,16/Math.max(n,1));
-        return <CardView key={c.id} card={c} className={'hcard'+(dragging?' dragging':'')+(isSel?' sel':'')+(ok?' ok':'')+(dim?' dim':'')} aria-pressed={isSel}
+        return <CardView key={c.id+':'+availabilityKey} card={c} className={'hcard'+(dragging?' dragging':'')+(isSel?' sel':'')+(ok?' ok':'')+(dim?' dim':'')} aria-pressed={isSel}
           onPointerDown={e=>down(e,c.id)} onPointerMove={move} onPointerUp={()=>finish(true)} onPointerCancel={()=>finish(false)} onClick={e=>{if(e.detail===0)tap(c.id);}}
           style={{width:cw,height:ch,left:dragging?drag!.x:slot(i),zIndex:dragging?200:isSel?100:i+1,'--y':(isSel?-30:dragging?-14:arc)+'px','--r':rot+'deg','--d':Math.min(i,10)*.04+'s'} as CSSProperties}/>;})}
       {selCard&&mode==='play'&&<span className={'hand-tip'+(okSel?'':' no')} style={{left:Math.max(72,Math.min(W-72,slot(selIdx)+cw/2)),top:Math.max(0,H-ch-74)}}>{okSel?'한 번 더 눌러서 내기':canPlay?'지금은 낼 수 없는 카드예요':'내 차례가 아니에요'}</span>}
