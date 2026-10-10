@@ -7,6 +7,7 @@ import { playCardSound, unlockCardSounds } from './sound';
 import { useGame } from './store';
 import { fx } from './fx';
 import { Avatar, Icon } from './icons';
+import { Bubble, ChatInput, useChatSync } from './chat';
 import './styles.css';
 
 const SFX_PREF='skullking.effects';
@@ -89,7 +90,7 @@ function sortCards(cards:Card[],by:'suit'|'rank'):Card[]{
  * - 끌기: 8px 이상 움직이면 드래그 시작 → 좌우로 끌어 순서 변경(터치/마우스 공통, Pointer Events)
  * - 비딩 중에는 disabled를 쓰지 않으므로 흐려지지 않고, 탭은 '확대해서 보기'로만 동작
  */
-function Hand({cards,legal,canPlay,mode,resetKey,onPlay}:{cards:Card[];legal:string[];canPlay:boolean;mode:'bid'|'play';resetKey:number|string;onPlay?:(c:Card)=>void}){
+function Hand({cards,legal,canPlay,mode,resetKey,onPlay,bar}:{cards:Card[];legal:string[];canPlay:boolean;mode:'bid'|'play';resetKey:number|string;onPlay?:(c:Card)=>void;bar?:ReactNode}){
   const [order,setOrder]=useState<string[]>([]);const [sortMode,setSortMode]=useState<'suit'|'rank'|null>('suit');
   const [sel,setSel]=useState<string|null>(null);const [drag,setDrag]=useState<{id:string;x:number;over:number}|null>(null);const [width,setWidth]=useState(0);
   const box=useRef<HTMLDivElement>(null);const info=useRef<{id:string;sx:number;sy:number;off:number;moved:boolean;over:number}|null>(null);
@@ -118,7 +119,7 @@ function Hand({cards,legal,canPlay,mode,resetKey,onPlay}:{cards:Card[];legal:str
   const sortBy=(by:'suit'|'rank')=>{setOrder(sortCards(cards,by).map(c=>c.id));setSortMode(by);setSel(null);};
   const selIdx=drag?-1:shown.findIndex(c=>c.id===sel);const selCard=selIdx>=0?shown[selIdx]:null;const okSel=!!selCard&&mode==='play'&&canPlay&&legalSet.has(selCard.id);
   return <section className="handwrap" aria-label="내 손패">
-    <div className="hand-bar"><span className="hand-title">내 손패<small>{n}장 · 카드를 끌어서 순서를 바꿀 수 있어요</small></span>
+    <div className="hand-bar"><span className="hand-title" title="카드를 끌어서 순서를 바꿀 수 있어요">내 손패<small>{n}장</small></span>{bar}
       <div className="seg sm" role="group" aria-label="손패 정렬"><button type="button" className={sortMode==='suit'?'on':''} onClick={()=>sortBy('suit')}>수트순</button><button type="button" className={sortMode==='rank'?'on':''} onClick={()=>sortBy('rank')}>숫자순</button></div></div>
     <div className="hand-box" ref={box} style={{height:H}} onPointerDown={e=>{if(e.target===e.currentTarget)setSel(null);}}>
       {shown.map((c,i)=>{const dragging=drag?.id===c.id;const isSel=sel===c.id&&!dragging;const ok=mode==='play'&&canPlay&&legalSet.has(c.id);const dim=mode==='play'&&canPlay&&!ok;
@@ -145,11 +146,15 @@ const HSec=({title,tag,children}:{title:string;tag?:string;children:ReactNode})=
 function Help({close}:{close:()=>void}) {
   const [tab,setTab]=useState<typeof helpTabs[number]>('기본 규칙');
   const bodyRef=useRef<HTMLDivElement>(null);
-  useEffect(()=>{const h=(e:KeyboardEvent)=>{if(e.key==='Escape')close();};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[close]);
-  useEffect(()=>{bodyRef.current?.scrollTo({top:0});},[tab]);
+  const tabsRef=useRef<HTMLElement>(null);const [edge,setEdge]=useState({l:false,r:false});
+  const idx=helpTabs.indexOf(tab);const go=(d:number)=>setTab(t=>helpTabs[Math.min(helpTabs.length-1,Math.max(0,helpTabs.indexOf(t)+d))]);
+  const measure=()=>{const e=tabsRef.current;if(e)setEdge({l:e.scrollLeft>4,r:e.scrollLeft+e.clientWidth<e.scrollWidth-4});};
+  useEffect(()=>{const h=(e:KeyboardEvent)=>{if(e.key==='Escape')close();else if(e.key==='ArrowRight')go(1);else if(e.key==='ArrowLeft')go(-1);};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[close]);
+  useEffect(()=>{window.addEventListener('resize',measure);return()=>window.removeEventListener('resize',measure);},[]);
+  useEffect(()=>{bodyRef.current?.scrollTo({top:0});const e=tabsRef.current;const b=e?.querySelector<HTMLElement>('.on');if(e&&b)e.scrollTo({left:b.offsetLeft-(e.clientWidth-b.clientWidth)/2,behavior:'smooth'});measure();},[tab]);
   return <div className="modal" onClick={close}><div className="help book" role="dialog" aria-label="도움말" onClick={e=>e.stopPropagation()}>
     <button type="button" className="help-x" onClick={close} aria-label="도움말 닫기"><Icon name="close"/></button>
-    <nav className="help-tabs" role="tablist">{helpTabs.map(t=><button key={t} role="tab" aria-selected={t===tab} className={t===tab?'on':''} onClick={()=>setTab(t)}>{t}</button>)}</nav>
+    <nav className={'help-tabs'+(edge.l?' fade-l':'')+(edge.r?' fade-r':'')} role="tablist" ref={tabsRef} onScroll={measure}>{helpTabs.map(t=><button key={t} role="tab" aria-selected={t===tab} className={t===tab?'on':''} onClick={()=>setTab(t)}>{t}</button>)}</nav>
     <div className="help-body" ref={bodyRef} key={tab}>
       {tab==='기본 규칙'&&<>
         <HHead title="기본 규칙" lead="예측한 만큼 정확히 트릭을 따는 게임입니다."/>
@@ -222,7 +227,10 @@ function Help({close}:{close:()=>void}) {
           <Tile img="mary-thorne" title="Mary Thorne" desc="플레이어 한 명(자신 포함)의 손패에서 무작위로 카드 한 장을 정합니다. 그 카드는 다음 트릭에 수트 규칙과 상관없이 내야 합니다."/>
           <Tile img="first-mate-con" title="Con이 잡은 Pirate" desc="Con으로 이긴 트릭에서 잡은 Pirate들의 능력을 차례로 사용할 수 있습니다. 상대가 낸 Juanita의 능력도 포함됩니다."/></div></HSec></>}
     </div>
-    <footer className="help-foot"><button className="primary" onClick={close}>확인</button></footer></div></div>;
+    <footer className="help-foot">
+      <button type="button" className="prev" disabled={idx===0} onClick={()=>go(-1)}><Icon name="back"/><span>이전</span></button>
+      <div className="help-dots" role="group" aria-label={'도움말 페이지 '+(idx+1)+' / '+helpTabs.length}>{helpTabs.map((t,i)=><button key={t} type="button" className={i===idx?'on':''} onClick={()=>setTab(t)} aria-label={t} aria-current={i===idx?'page':undefined}/>)}</div>
+      {idx<helpTabs.length-1?<button type="button" className="primary next" onClick={()=>go(1)}>다음 · {helpTabs[idx+1]}<Icon name="next"/></button>:<button type="button" className="primary next" onClick={close}>확인</button>}</footer></div></div>;
 }
 const modes:Array<[GameConfig['roundMode'],string,string]>=[['classic','Classic','1–10장'],['evenKeeled','Even Keeled','2·4·6·8·10장'],['brawl','Skip to the Brawl','6–10장'],['swift','Swift-n-Salty','5장 × 5'],['broadside','Broadside','10장 × 10'],['whirlpool','Whirlpool','9·7·5·3·1장 × 2'],['bedtime','Past Your Bedtime','1장']];
 const advancedCards:CardOptions={...emptyCards,kraken:true,whale:true,loot:true,pirateAbilities:true};
@@ -345,9 +353,9 @@ function Table(){
   return <button type="button" key={p.playerId+'-t'+i} className={'tag-pill'+(focus===p.playerId?' focused':'')+(mine?' mine':'')} style={placed(p.playerId,p.card.id)} onClick={()=>setFocus(focus===p.playerId?null:p.playerId)} aria-label={(i+1)+'번째 '+nm+' · '+label(p.card)}><i className="ord">{i+1}</i><span className="tp-av"><Avatar name={pl?.nickname??nm} bot={pl?.isBot}/></span><b>{nm}</b></button>;};
  const seatEl=(p:Pl)=>{const o=waitOrder.get(p.id)??0;const st=bidding?'wait':playedIds.has(p.id)?'done':o===0?'now':o===1?'next':'wait';const isMe=p.id===game.playerId;const a=ang(p.id);
   const pos={'--si':rel(p.id),...(isMe?{}:{left:(50+38*Math.cos(a)).toFixed(2)+'%',top:(46+35*Math.sin(a)).toFixed(2)+'%'})} as CSSProperties;const toggle=()=>{setOpenSeat(openSeat===p.id?null:p.id);setFocus(p.id);};
-  return <div key={p.id} data-pid={p.id} role="button" tabIndex={0} aria-label={p.nickname+' 정보 보기'} onClick={toggle} onMouseEnter={()=>setFocus(p.id)} onMouseLeave={()=>setFocus(null)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}}} style={pos}
+  return <div key={p.id} data-pid={p.id} data-side={isMe||Math.cos(a)<-.35?'l':Math.cos(a)>.35?'r':'c'} role="button" tabIndex={0} aria-label={p.nickname+' 정보 보기'} onClick={toggle} onMouseEnter={()=>setFocus(p.id)} onMouseLeave={()=>setFocus(null)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}}} style={pos}
    className={'seat '+st+(game.turnId===p.id&&!bidding?' turn':'')+(game.leaderId===p.id?' leader':'')+(isMe?' me':'')+(openSeat===p.id?' open':'')+(focus===p.id?' spot':'')+(sweep&&sweep.winner===p.id?' collect'+(sweep.late?' late':''):'')}>
-   <span className="portrait"><Avatar name={p.nickname} bot={p.isBot}/>{game.leaderId===p.id&&<em className="lead-tag" title="선(리드)">선</em>}</span>
+   <span className="portrait"><Avatar name={p.nickname} bot={p.isBot}/><Bubble playerId={p.id}/>{game.leaderId===p.id&&<em className="lead-tag" title="선(리드)">선</em>}</span>
    <b className="nm">{p.nickname}</b>
    {bidding?<span className="state">{p.bid===null?'고민 중':'봉인'}</span>:<Tally bid={p.bid} tricks={p.tricks}/>}
    <span className="sr">{badge(p)}</span>
@@ -376,7 +384,7 @@ function Table(){
   {game.peekedDeck&&<button className="peek-fab" onClick={()=>setPeek(true)}><Icon name="scroll"/><span>비공개 덱</span></button>}
  </section>
  {bidding?<p className="turntext sub">손패를 살피고, 선원들과 동시에 예측을 공개하세요.</p>:waiting?<p className="turntext wait" role="status"><i className="spinner"/>{pname(game,game.pendingPlayerId??null)}님이 {abilityName[String(game.pendingKind??'')]??'능력'}{game.pendingKind==='lastVolley'?' 추가 카드를 내는 중…':' 능력을 사용하는 중…'}</p>:<p className={'turntext'+(active&&!game.pendingDecision?' mine':'')}>{turnLine}</p>}
- <Hand cards={game.hand} legal={game.legalCardIds} canPlay={bidding?false:canPlay} mode={bidding?'bid':'play'} resetKey={game.round} onPlay={c=>needs(c)?setChoice(c):play(c)}/>
+ <Hand cards={game.hand} legal={game.legalCardIds} canPlay={bidding?false:canPlay} mode={bidding?'bid':'play'} resetKey={game.round} bar={<ChatInput roomCode={game.roomCode} meId={game.playerId}/>} onPlay={c=>needs(c)?setChoice(c):play(c)}/>
  {choice&&<div className="modal"><div className="sheet">{choice.isZeroFourteen?<><h2>0/14 선언</h2><div className="choices"><button onClick={()=>play(choice,0)}>0</button><button className="primary" onClick={()=>play(choice,14)}>14</button></div></>:choice.kind==='wild'?<><h2>Wild Monkey 15</h2><div className="choices">{(['parrot','map','treasure'] as const).map(s=><button key={s} onClick={()=>play(choice,s)}><Icon name={suits[s].icon}/> {suits[s].name}</button>)}</div></>:<><h2>Tigress 선언</h2><div className="choices"><button className="primary" onClick={()=>play(choice,'pirate')}><Icon name="sword"/>Pirate</button><button onClick={()=>play(choice,'escape')}><Icon name="escape"/>Escape</button></div></>}<button className="text" onClick={()=>setChoice(null)}>취소</button></div></div>}
  {notice&&<div className="notice" role="status">{notice}</div>}{peek&&game.peekedDeck&&<div className="modal" onClick={()=>setPeek(false)}><div className="sheet peek" onClick={e=>e.stopPropagation()}><h2>Juanita · 비공개 덱 확인</h2><p>이 정보는 당신에게만 공개됩니다.</p><p>{game.peekedDeck.length?'남은 덱 '+game.peekedDeck.length+'장':'남은 덱이 없어요.'}</p><div className="pick-row mini">{game.peekedDeck.map(c=><CardView key={c.id} card={c} small/>)}</div><button className="primary" onClick={()=>setPeek(false)}>확인</button></div></div>}{game.pendingDecision&&<Decision pending={game.pendingDecision}/>} {help&&<Help close={()=>setHelp(false)}/>}</main>;
 }
@@ -392,11 +400,18 @@ function Score(){
   const ledger=latest&&<ol className="ledger" aria-label="점수표">{ranking.map((r,i)=>{
     const nm=pname(game,r.playerId);const g=gain(r);const hit=r.bid===r.tricks;const rk=rankOf(ranking,i);const me=r.playerId===game.playerId;const delay=(final?1.9:.35)+(n-1-i)*.3;
     return <li key={r.playerId} className={'lrow'+(rk===1?' first':'')+(me?' me':'')} style={{'--h':hue(nm),'--d':delay+'s'} as CSSProperties}>
-      <span className={'medal m'+Math.min(rk,4)}>{rk===1?<Icon name="crown"/>:rk}</span><Avatar name={nm}/>
+      <span className={'medal m'+Math.min(rk,4)}>{rk===1?<Icon name="crown"/>:rk}</span><span className="bwrap"><Avatar name={nm}/><Bubble playerId={r.playerId}/></span>
       <div className="lmain"><b>{nm}{me&&<u>나</u>}</b><span className="lline"><em className={'res '+(hit?'ok':'no')}>{hit?(r.bid===0?'무승 성공':'적중'):'빗나감'}</em><span>예측 {r.bid} · 획득 {r.tricks}</span></span><span className="lbreak">기본 {sg(r.base)} · 보너스 {sg(r.bonus)}</span></div>
       <div className={'ldelta '+(g>0?'pos':g<0?'neg':'zero')}><strong><CountUp to={g} delay={delay*1000+250} signed/></strong><small>이번 라운드</small></div>
       <div className="ltotal"><b><CountUp to={r.total} delay={delay*1000+250}/></b><small>누적</small><i><s style={{width:Math.max(0,r.total)/maxTotal*100+'%'}}/></i></div>
     </li>;})}</ol>;
+  /* 모두 확인 → 다음 라운드. 서버가 advanceReady(확인한 playerId 배열)를 내려주면 전원 확인 방식,
+     내려주지 않으면 기존처럼 방장 버튼만 쓴다. 봇은 항상 확인한 것으로 보고 사람 수만 센다. */
+  const [sent,setSent]=useState(false);useEffect(()=>{setSent(false);},[game.round,game.phase]);
+  const readyRaw=(game as unknown as {advanceReady?:string[]}).advanceReady;const confirmMode=Array.isArray(readyRaw);
+  const humans=game.players.filter(p=>!p.isBot);const readySet=new Set<string>([...(readyRaw??[]),...(sent?[game.playerId]:[])]);
+  const readyN=humans.filter(p=>readySet.has(p.id)).length;const iReady=readySet.has(game.playerId);
+  const confirmRound=()=>{if(iReady)return;setSent(true);emit('ROUND_ADVANCE',{roomCode:game.roomCode}).catch(e=>{setSent(false);showError(e);});};
   const rn=(h:unknown,i:number)=>(h as {round?:number}).round??i+1;const last=game.history.length-1;
   /** 전체 점수표: 라운드별 점수(큰 숫자)와 그 시점의 누적(작은 숫자), 오른쪽 끝에 현재 총점 */
   const board=latest&&<div className="board paper" ref={boardRef} role="region" aria-label="전체 점수표" tabIndex={0}><table>
@@ -415,15 +430,20 @@ function Score(){
       <p className="champ-label">{champs.length>1?'공동 우승':'새로운 바다의 지배자'}</p>
       <h1 className="champ-name">{champs.map(c=>pname(game,c.playerId)).join(' · ')||'항해의 끝'}</h1>
       {top&&<p className="champ-score"><CountUp to={top.total} delay={900} dur={1500}/><small>점</small></p>}
-      <div className="podium">{pod.map(k=>{const r=ranking[k];const nm=pname(game,r.playerId);return <div key={r.playerId} className={'pod p'+k+(r.playerId===game.playerId?' me':'')} style={{'--h':hue(nm),'--d':(k===0?1.3:k===1?.5:.8)+'s'} as CSSProperties}><Avatar name={nm}/><b>{nm}</b><strong>{r.total}</strong><div className="pillar"><em>{rankOf(ranking,k)}</em></div></div>;})}</div>
+      <div className="podium">{pod.map(k=>{const r=ranking[k];const nm=pname(game,r.playerId);return <div key={r.playerId} className={'pod p'+k+(r.playerId===game.playerId?' me':'')} style={{'--h':hue(nm),'--d':(k===0?1.3:k===1?.5:.8)+'s'} as CSSProperties}><span className="bwrap"><Avatar name={nm}/><Bubble playerId={r.playerId}/></span><b>{nm}</b><strong>{r.total}</strong><div className="pillar"><em>{rankOf(ranking,k)}</em></div></div>;})}</div>
       {myIdx>=0&&<p className={'myrank'+(myWin?' win':'')}>{myWin?'당신이 이 바다의 주인입니다.':'당신의 최종 순위 '+rankOf(ranking,myIdx)+'위 · '+ranking[myIdx].total+'점'}</p>}
     </section>:<section className="roundhead"><div className="crest" aria-hidden="true"><Icon name="anchor" strokeWidth={1.2}/></div><p className="eyebrow">THE CAPTAIN’S LOG · ROUND {game.round}</p><h1>라운드 {game.round} 정산</h1>{best&&gain(best)>0&&<p className="mvp"><Icon name="coin"/>이번 라운드 최고 득점 <b>{pname(game,best.playerId)}</b><em>+{gain(best)}</em></p>}</section>}
     {latest&&<div className="score-tabs"><div className="seg" role="tablist" aria-label="점수 보기">{([['round',final?'마지막 라운드':'이번 라운드'],['total','전체 점수표']] as const).map(([k,t])=><button key={k} type="button" role="tab" aria-selected={view===k} className={view===k?'on':''} onClick={()=>setView(k)}>{t}</button>)}</div></div>}
     {view==='round'?ledger:board}
     {!final&&<p className="score-note">예측을 맞힌 선원만 보너스를 온전히 획득합니다.</p>}
+    <div className="chat-inline"><ChatInput roomCode={game.roomCode} meId={game.playerId} wide/></div>
     <div className="score-actions">
-      {game.canAdvance&&!final&&<button className="primary cta-lg" onClick={()=>emit('ROUND_ADVANCE',{roomCode:game.roomCode}).catch(showError)}>다음 항해를 시작합니다<Icon name="next"/></button>}
-      {!final&&!game.canAdvance&&<p className="waiting-captain"><i className="spinner"/>다음 항해를 준비하는 중입니다…</p>}
+      {!final&&confirmMode&&<div className="confirm">
+        <button className="primary cta-lg" disabled={iReady} onClick={confirmRound}>{iReady?<><Icon name="check"/>확인 완료</>:<>확인하고 다음 항해로<Icon name="next"/></>}<span className="count" aria-label={'확인한 인원 '+readyN+'명, 전체 '+humans.length+'명'}>{readyN}/{humans.length}</span></button>
+        <ul className="ready-row" aria-label="확인 현황">{humans.map(p=>{const ok=readySet.has(p.id);return <li key={p.id} className={ok?'ok':''} title={p.nickname+(ok?' · 확인함':' · 확인 중')}><Avatar name={p.nickname}/>{ok&&<i><Icon name="check"/></i>}</li>;})}</ul>
+        <p className="hint">{iReady?'다른 선원이 확인하면 바로 다음 항해가 시작됩니다.':'모든 선원이 확인하면 다음 항해가 시작됩니다.'}</p></div>}
+      {game.canAdvance&&!final&&!confirmMode&&<button className="primary cta-lg" onClick={()=>emit('ROUND_ADVANCE',{roomCode:game.roomCode}).catch(showError)}>다음 항해를 시작합니다<Icon name="next"/></button>}
+      {!final&&!confirmMode&&!game.canAdvance&&<p className="waiting-captain"><i className="spinner"/>다음 항해를 준비하는 중입니다…</p>}
       {final&&(host?<><button className="primary cta-lg" onClick={()=>emit('GAME_RETURN_TO_LOBBY',{roomCode:game.roomCode}).catch(showError)}><Icon name="anchor"/>선원 모집으로 돌아가기</button><p className="hint">모든 선원이 대기실로 돌아가 한 판 더 즐길 수 있어요.</p></>:<p className="waiting-captain"><i className="spinner"/>선장이 대기실로 돌아가기를 기다리는 중입니다…</p>)}
     </div>
     {help&&<Help close={()=>setHelp(false)}/>}</main>;
@@ -442,20 +462,20 @@ function Lobby(){
     <div className="harbor-body">
       <ul className="roster" aria-label="선원 목록">{Array.from({length:game.config.maxPlayers},(_,i)=>{const p=game.players[i];
         if(!p)return <li className="berth vacant" key={'v'+i}><span className="avatar"><Icon name="plus"/></span><b>빈 자리</b><small>기다리는 중…</small></li>;
-        return <li className={'berth'+(p.ready?' ready':'')+(p.id===game.playerId?' me':'')} key={p.id} style={{'--h':hue(p.nickname)} as CSSProperties}><span className="avatar"><Avatar name={p.nickname} bot={p.isBot}/></span>
+        return <li className={'berth'+(p.ready?' ready':'')+(p.id===game.playerId?' me':'')} key={p.id} style={{'--h':hue(p.nickname)} as CSSProperties}><span className="avatar"><Avatar name={p.nickname} bot={p.isBot}/><Bubble playerId={p.id}/></span>
           <b>{p.nickname}{p.id===game.playerId&&<em className="tag">나</em>}{p.id===game.hostId&&<em className="tag host">선장</em>}</b><small className={p.ready?'ok':''}>{p.isBot?'봇 · ':''}{p.ready?'준비 완료':'준비 중'}</small></li>;})}</ul>
       <aside className="voyage paper"><h2>항해 설정</h2>
         <dl><div><dt>인원</dt><dd>{game.players.length} / {game.config.maxPlayers}명</dd></div><div><dt>방식</dt><dd>{modeInfo?modeInfo[1]:game.config.roundMode}{modeInfo&&<small>{modeInfo[2]}</small>}</dd></div><div><dt>덱</dt><dd>{deckSize(cards)}장</dd></div></dl>
         <div className="chips">{on.length?on.map(([k,t])=><span className="chip" key={k}>{t}</span>):<span className="chip">Classic 기본 덱</span>}</div></aside>
     </div>
-    <div className="harbor-actions"><p className="hint">{hint}</p>
+    <div className="harbor-actions"><ChatInput roomCode={game.roomCode} meId={game.playerId} wide/><p className="hint">{hint}</p>
       <div className="btnrow"><button className={me.ready?'':'primary'} onClick={()=>emit('PLAYER_READY',{roomCode:game.roomCode}).catch(showError)}>{me.ready?'준비 취소':'준비 완료'}</button>
         {host&&<button disabled={game.players.length>=game.config.maxPlayers} onClick={()=>emit('BOT_FILL',{roomCode:game.roomCode}).catch(showError)}>봇으로 채우기</button>}
         {host&&<button className={me.ready?'primary':''} disabled={!canStart} onClick={()=>emit('GAME_START',{roomCode:game.roomCode}).catch(showError)}><Icon name="anchor"/>출항</button>}</div></div>
     {help&&<Help close={()=>setHelp(false)}/>}
   </main>;
 }
-function App(){const game=useGame(s=>s.game);const error=useGame(s=>s.error);useEffect(()=>{if(!error)return;const timer=setTimeout(()=>useGame.getState().setError(null),3500);return()=>clearTimeout(timer);},[error]);
+function App(){const game=useGame(s=>s.game);const error=useGame(s=>s.error);useChatSync();useEffect(()=>{if(!error)return;const timer=setTimeout(()=>useGame.getState().setError(null),3500);return()=>clearTimeout(timer);},[error]);
   useEffect(()=>{window.addEventListener('pointerdown',unlock);return()=>window.removeEventListener('pointerdown',unlock);},[]);
   const inRoom=!!game;useEffect(()=>{fx.ambience(inRoom);},[inRoom]);
   return <><Scene mode={game?(game.phase==='lobby'?'lobby':'game'):'home'}/>{game?(game.phase==='lobby'?<Lobby/>:<Table/>):<Landing/>}{error&&game&&<div className="toast">{error}</div>}</>;}
