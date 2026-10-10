@@ -21,10 +21,10 @@ const suits:Record<Suit,{icon:string;name:string}>={parrot:{icon:'parrot',name:'
 const emptyCards: CardOptions={kraken:false,whale:false,loot:false,pirateAbilities:false,expansionSuitCards:false,wildMonkey:false,maryThorne:false,lastVolley:false,firstMateCon:false,stingray:false,davyJones:false,walkThePlank:false};
 const fullCards: CardOptions={kraken:true,whale:true,loot:true,pirateAbilities:true,expansionSuitCards:true,wildMonkey:true,maryThorne:true,lastVolley:true,firstMateCon:true,stingray:true,davyJones:true,walkThePlank:true};
 const cardSettings: Array<[keyof CardOptions,string,string]>=[
-  ['kraken','Kraken','트릭을 폐기합니다.'],['whale','White Whale','숫자만 남기고 가장 높은 숫자가 이깁니다.'],['loot','Loot ×2','승자와 성공 시 +20 동맹입니다.'],['pirateAbilities','Pirate Abilities','5명의 일반 Pirate 능력을 사용합니다.'],
+  ['kraken','Kraken','트릭 전체를 파괴합니다.'],['whale','White Whale','특수카드를 제거하고 가장 높은 숫자가 이깁니다.'],['loot','Loot ×2','다른 사람이 가져가고 둘 다 예측을 맞히면 각 +20점입니다.'],['pirateAbilities','Pirate Abilities','일반 Pirate 5명의 능력을 사용합니다.'],
   ['expansionSuitCards','수트 확장 12장','7(-5), 8(+5), 0/14를 넣습니다.'],['wildMonkey','Wild Monkey 15','검정을 제외한 수트를 선언하는 15입니다.'],['maryThorne','Mary Thorne','승리 후 다음 강제 카드를 정합니다.'],
-  ['lastVolley','The Last Volley','추가 한 장을 선언까지 마치고 내며 마지막 트릭을 건너뜁니다.'],['firstMateCon','First Mate Con','Pirate를 이기고, 잡은 Pirate 능력을 모두 이어서 사용합니다.'],['stingray','Spotted Stingray','숫자만 남기고 가장 낮은 숫자가 이깁니다.'],
-  ['davyJones',"Davy Jones' Locker",'Sea Monster를 제거하고 한 장당 +20입니다.'],['walkThePlank','Walk the Plank','트릭의 Pirate 중 제거할 대상을 직접 고릅니다.'],
+  ['lastVolley','The Last Volley','모두 첫 카드를 낸 뒤 한 장 더 냅니다. 마지막 트릭에는 참여하지 않습니다.'],['firstMateCon','First Mate Con','일반 Pirate를 이기고, 잡은 Pirate의 능력을 사용할 수 있습니다.'],['stingray','Spotted Stingray','특수카드를 제거하고 가장 낮은 숫자가 이깁니다.'],
+  ['davyJones',"Davy Jones' Locker",'모든 Sea Monster를 제거하고 다른 괴물마다 +20점입니다.'],['walkThePlank','Walk the Plank','트릭이 끝날 때 일반 Pirate 한 장을 제거합니다.'],
 ];
 const icon:Record<Card['kind'],string>={number:'',wild:'wild',pirate:'sword',tigress:'tigress',skullKing:'skull',mermaid:'mermaid',escape:'escape',kraken:'kraken',whale:'whale',stingray:'stingray',davy:'davy',con:'con',lastVolley:'lastVolley',plank:'plank',loot:'loot'};
 const label=(c:Card)=>c.kind==='number'?suits[c.suit!].name+' '+(c.isZeroFourteen?'0/14':c.rank):c.name;
@@ -145,34 +145,33 @@ function Help({close}:{close:()=>void}) {
   return <div className="modal" onClick={close}><div className="help book" onClick={e=>e.stopPropagation()}><button type="button" className="help-x" onClick={close} aria-label="도움말 닫기"><Icon name="close"/></button>
     <nav className="help-tabs">{helpTabs.map(t=><button key={t} className={t===tab?'on':''} onClick={()=>setTab(t)}>{t}</button>)}</nav>
     <div className="help-body" key={tab}>
-      {tab==='항해 규칙'&&<><h2>항해 규칙</h2><ol className="steps"><li><b>딜</b>N라운드에는 N장씩 받습니다.</li><li><b>비딩</b>이번 라운드에 딸 트릭 수를 정해 동시에 공개합니다.</li><li><b>트릭</b>선(리드)부터 시계 방향으로 한 장씩 냅니다. 이긴 사람이 다음 선이 됩니다.</li><li><b>정산</b>예측이 정확하면 트릭당 <em>+20</em>, 틀리면 차이당 <em>-10</em>. 0 예측은 딜된 장수 × 10점을 걸고 성공·실패가 갈립니다.</li></ol>
-        <h3>수트 따르기</h3><div className="suit-row">{[['parrot-7','앵무새'],['map-7','지도'],['treasure-7','보물'],['jolly-7','졸리 로저 · 트럼프']].map(([i,t])=><figure key={i}><img src={art(i)} alt={t} draggable={false}/><figcaption>{t}</figcaption></figure>)}</div><p className="help-note">Escape·Loot 및 일부 확장 특수 카드 뒤에는 처음 나온 숫자 카드가 리드 수트가 됩니다. Pirate·Mermaid·Skull King·Kraken·White Whale이 먼저 나오면 그 트릭에는 리드 수트가 없습니다.</p></>}
-      {tab==='서열'&&<><h2>서열 · 가위바위보</h2><Beat a="skull-king" b="pirate-rosie" note="Skull King이 Pirate를 잡음" bonus="+30 / 장"/><Beat a="pirate-rosie" b="mermaid-alyra" note="Pirate가 Mermaid를 잡음" bonus="+20 / 장"/><Beat a="mermaid-alyra" b="skull-king" note="Mermaid가 Skull King을 잡음" bonus="+40"/><p className="help-note">셋이 한 트릭에 모두 나오면 <b>Mermaid</b>가 이깁니다.</p>
-        <h3>기본 높낮이</h3><div className="ladder">{[['escape','Escape','항상 짐'],['parrot-9','숫자 카드','리드 수트 중 최고'],['jolly-9','졸리 로저','트럼프'],['pirate-rosie','특수 캐릭터','위 가위바위보']].map(([i,t,d],k)=><Fragment key={i}>{k>0&&<span className="lad-arrow"><Icon name="next"/></span>}<figure><img src={art(i)} alt={t} draggable={false}/><figcaption><b>{t}</b>{d}</figcaption></figure></Fragment>)}</div></>}
-      {tab==='보너스'&&<><h2>보너스</h2><p className="help-note strong">보너스는 <b>예측을 맞힌 트릭 승자</b>에게만 지급됩니다.</p><div className="tiles">
-        <Tile img="jolly-14" title="검정 14" desc="잡은 트릭에 있으면 +20"/><Tile img="parrot-14" title="초록·보라·노랑 14" desc="잡은 트릭에 있으면 +10"/><Tile img="skull-king" title="Skull King" desc="잡은 Pirate마다 +30"/><Tile img="mermaid-alyra" title="Mermaid" desc="Skull King을 잡으면 +40"/><Tile img="pirate-rosie" title="Pirate" desc="잡은 Mermaid마다 +20"/><Tile img="loot" title="Loot" desc="동맹이 둘 다 성공하면 각자 +20" tag="어드밴스드"/><Tile img="davy-jones" title="Davy Jones" desc="제거한 Sea Monster마다 +20" tag="확장"/><Tile img="parrot-8-expansion" title="확장 8 / 7" desc="8은 +5, 7은 -5 (확장 카드만)" tag="확장"/></div></>}
-      {tab==='특수 카드'&&<><h2>특수 카드</h2><p className="help-note">Sea Monster가 여러 장이면 <b>마지막에 낸 괴물</b>의 효과를 적용합니다. 이길 수 없는 특수카드만 남으면 트릭은 폐기됩니다.</p><div className="tiles">
-        <Tile img="tigress" title="Tigress" desc="낼 때 Pirate 또는 Escape를 선언합니다. Pirate 선언이면 Pirate의 모든 서열·보너스 규칙을 따릅니다."/>
-        <Tile img="escape" title="Escape" desc="항상 집니다. Escape류만 있으면 먼저 낸 Escape류 카드가 이깁니다."/>
-        <Tile img="loot" title="Loot" desc="Escape로 취급합니다. 다른 사람이 획득하면 둘 다 비드 성공 시 각 +20; 본인이 이기면 동맹은 없습니다." tag="어드밴스드"/>
-        <Tile img="kraken" title="Kraken" desc="트릭 전체를 파괴해 아무도 획득·보너스를 받지 않습니다. Kraken이 없었다면 이길 사람이 다음 리드입니다." tag="어드밴스드"/>
-        <Tile img="white-whale" title="White Whale" desc="특수카드를 파괴하고 수트를 무시한 최고 숫자가 이깁니다. 숫자가 없으면 폐기되고 Whale을 낸 사람이 다음 리드입니다." tag="어드밴스드"/>
-        <Tile img="spotted-stingray" title="Spotted Stingray" desc="White Whale처럼 특수카드를 파괴하지만 가장 낮은 숫자가 이깁니다. 동점은 먼저 낸 쪽 승리." tag="확장"/>
-        <Tile img="wild-monkey-15" title="Wild Monkey 15" desc="색 리드가 있으면 그 수트의 15, 리드가 없으면 초록·보라·노랑 중 선언합니다. 검정 리드에는 트럼프에게 집니다." tag="확장"/>
-        <Tile img="first-mate-con" title="First Mate Con" desc="Pirate를 모두 이기지만 Mermaid·Skull King에게 집니다. 승리하면 잡은 모든 Pirate 능력을 사용할 수 있으며 Pirate 포획 보너스는 없습니다." tag="확장"/>
-        <Tile img="davy-jones" title="Davy Jones' Locker" desc="언제든 낼 수 있지만 Sea Monster를 강제하지는 않습니다. 순서와 무관하게 모든 Sea Monster와 자신을 제거하고, 제거한 괴물마다 +20을 기록한 뒤 남은 카드로 승부합니다." tag="확장"/>
-        <Tile img="last-volley" title="The Last Volley" desc="모두 낸 뒤 자신이 한 장을 더 냅니다. 그 결과 마지막 트릭은 본인만 건너뜁니다(마지막 트릭에서는 추가 카드 없음)." tag="확장"/>
-        <Tile img="walk-the-plank" title="Walk the Plank" desc="트릭 끝에 Pirate 한 장을 반드시 제거합니다. 제거된 Pirate는 승리·Skull King 보너스·Con 능력 대상이 아닙니다." tag="확장"/>
-        <Tile img="parrot-zero-fourteen" title="0/14" desc="낼 때 0 또는 14를 선언합니다. 14로 써도 14 보너스는 없습니다." tag="확장"/>
-        <Tile img="parrot-8-expansion" title="확장 7 / 8" desc="잡은 확장 7은 -5, 확장 8은 +5입니다. 기본 덱의 7·8에는 적용되지 않습니다." tag="확장"/></div></>}
-      {tab==='해적 능력'&&<><h2>해적 능력</h2><p className="help-note">능력 옵션이 켜졌을 때 <b>그 Pirate로 트릭을 이긴 플레이어</b>가 즉시 사용합니다. 다음 라운드로 넘길 수 없고, 마지막 트릭 뒤에도 쓸 수 있는 것은 Harry뿐입니다.</p><div className="tiles">
-        <Tile img="pirate-rosie" title="Rosie D'Laney" desc="자신을 포함한 아무 플레이어를 다음 트릭 리더로 지정합니다."/>
-        <Tile img="pirate-bendt" title="Bendt the Bandit" desc="덱에서 2장을 가져온 뒤, 손패에서 원하는 2장을 버립니다. 덱이 부족하면 가능한 만큼만 처리합니다."/>
-        <Tile img="pirate-rascal" title="Rascal of Roatan" desc="0·10·20점 중 하나를 겁니다. 비드 성공 시 얻고 실패 시 건 금액만큼 잃습니다."/>
-        <Tile img="pirate-juanita" title="Juanita Jade" desc="그 라운드에 딜되지 않은 모든 카드를 본인만 비공개로 확인합니다."/>
-        <Tile img="pirate-harry" title="Harry the Giant" desc="내 예측을 -1·유지·+1 중 하나로 조정합니다. 마지막 트릭 뒤에도 사용할 수 있습니다."/>
-        <Tile img="mary-thorne" title="Mary Thorne" desc="자신을 포함한 한 사람의 손패에서 무작위 카드 1장을 정해, 다음 트릭에 수트·다른 효과와 무관하게 반드시 내게 합니다." tag="확장"/>
-        <Tile img="first-mate-con" title="Con이 잡은 Pirate" desc="Con으로 이긴 트릭의 모든 Pirate 능력을 Con의 승자가 차례로 사용할 수 있습니다. 상대가 낸 Juanita도 여기에 포함됩니다." tag="확장"/></div></>}
+      {tab==='항해 규칙'&&<><h2>라운드 진행</h2><ol className="steps"><li><b>카드 받기</b>방에서 고른 항해 방식대로 진행합니다. Classic은 1라운드 1장부터 시작해 라운드마다 한 장씩 늘어납니다.</li><li><b>예측 공개</b>손패를 확인하고 이번 라운드에 딸 트릭 수를 정해 동시에 공개합니다.</li><li><b>트릭 진행</b>리더부터 시계 방향으로 한 장씩 냅니다. 가장 높은 카드가 트릭을 가져가고, 그 사람이 다음 트릭의 리더가 됩니다.</li><li><b>점수 계산</b>예측이 맞으면 트릭마다 +20점, 틀리면 차이마다 -10점입니다. 0 예측은 트릭을 하나도 따면 카드 장수 × 10점, 하나라도 따면 카드 장수 × -10점입니다.</li></ol>
+        <h3>수트(무늬) 따라내기</h3><div className="suit-row">{[['parrot-7','앵무새'],['map-7','지도'],['treasure-7','보물'],['jolly-7','졸리 로저 · 트럼프']].map(([i,t])=><figure key={i}><img src={art(i)} alt={t} draggable={false}/><figcaption>{t}</figcaption></figure>)}</div><p className="help-note">숫자 카드가 먼저 나오면 그 수트의 숫자 카드를 가지고 있을 때 반드시 내야 합니다. 해당 수트가 없으면 다른 숫자 카드나 특수 카드를 낼 수 있어요.</p><p className="help-note">Escape, Loot 또는 Escape로 선언한 Tigress, Spotted Stingray, Davy Jones, Walk the Plank, The Last Volley로 리드하면 다음 플레이어가 수트를 정합니다. 그 카드가 또 리드 수트를 넘기는 카드라면 다음 사람에게 넘어갑니다. Pirate, Mermaid, Skull King, Kraken, White Whale, First Mate Con으로 리드하면 수트가 정해지지 않습니다. 보너스 점수는 라운드 예측을 정확히 맞혔을 때만 받아요.</p></>}
+      {tab==='서열'&&<><h2>카드 서열</h2><p className="help-note">숫자끼리는 리드 수트의 가장 높은 카드가 이깁니다. 졸리 로저(검정)는 다른 숫자 수트보다 강합니다. 같은 서열끼리 동률이면 먼저 낸 카드가 이겨요.</p><div className="ladder">{[['escape','Escape','숫자 카드보다 낮음'],['parrot-9','숫자 카드','리드 수트 중 최고'],['jolly-9','졸리 로저','숫자 수트의 트럼프'],['pirate-rosie','Pirate','숫자 카드보다 높음']].map(([i,t,d],k)=><Fragment key={i}>{k>0&&<span className="lad-arrow"><Icon name="next"/></span>}<figure><img src={art(i)} alt={t} draggable={false}/><figcaption><b>{t}</b>{d}</figcaption></figure></Fragment>)}</div><h3>캐릭터 카드 상성</h3><Beat a="skull-king" b="pirate-rosie" note="Skull King이 Pirate를 이김" bonus="Pirate마다 +30"/><Beat a="pirate-rosie" b="mermaid-alyra" note="Pirate가 Mermaid를 이김" bonus="Mermaid마다 +20"/><Beat a="mermaid-alyra" b="skull-king" note="Mermaid가 Skull King을 이김" bonus="+40"/><p className="help-note">Skull King·Pirate·Mermaid가 한 트릭에 모두 나오면 Mermaid가 이깁니다. First Mate Con은 일반 Pirate를 이기지만 Skull King과 Mermaid에게 집니다.</p></>}
+      {tab==='보너스'&&<><h2>보너스 점수</h2><p className="help-note strong">예측을 정확히 맞힌 라운드에만 보너스를 받습니다. 잡은 카드와 능력으로 제거한 카드에 따라 점수가 더해져요.</p><div className="tiles">
+        <Tile img="jolly-14" title="검정 14" desc="내가 딴 트릭에 있으면 +20점"/><Tile img="parrot-14" title="초록·보라·노랑 14" desc="내가 딴 트릭에 있으면 카드마다 +10점"/><Tile img="skull-king" title="Skull King" desc="내가 딴 트릭의 Pirate마다 +30점"/><Tile img="mermaid-alyra" title="Mermaid" desc="내가 Skull King을 잡으면 +40점"/><Tile img="pirate-rosie" title="Pirate" desc="내가 딴 트릭의 Mermaid마다 +20점"/><Tile img="loot" title="Loot 동맹" desc="다른 사람이 Loot를 가져가고 두 사람 모두 예측을 맞히면 각 +20점" tag="어드밴스드"/><Tile img="first-mate-con" title="First Mate Con" desc="Skull King 또는 Mermaid가 Con을 잡으면 +30점" tag="확장"/><Tile img="davy-jones" title="Davy Jones' Locker" desc="Davy Jones가 제거한 다른 Sea Monster마다 +20점" tag="확장"/><Tile img="parrot-8-expansion" title="확장 8 / 7" desc="확장 8은 +5점, 확장 7은 -5점. 기본 카드에는 적용되지 않아요." tag="확장"/></div></>}
+      {tab==='특수 카드'&&<><h2>특수 카드</h2><p className="help-note">특수 카드는 수트 의무와 관계없이 낼 수 있어요. 여러 Sea Monster가 함께 나오면 가장 나중에 낸 괴물의 효과를 적용합니다. 단, Davy Jones는 순서와 관계없이 모든 괴물과 자신을 제거합니다.</p><div className="tiles">
+        <Tile img="tigress" title="Tigress" desc="낼 때 Pirate 또는 Escape를 선택합니다. Pirate로 내면 Pirate 서열과 보너스가 적용되고, Escape로 내면 이길 수 없으며 포획 보너스도 없어요."/>
+        <Tile img="escape" title="Escape" desc="숫자 카드·Pirate 같은 승리 카드에는 이기지 못합니다. 모두 Escape·Loot·Escape로 선언한 Tigress만 냈다면 가장 먼저 낸 카드가 이겨요."/>
+        <Tile img="loot" title="Loot" desc="Escape처럼 이기지 않는 카드입니다. 다른 사람이 Loot를 가져가면, 두 사람 모두 예측을 맞혔을 때 각 +20점 동맹 보너스를 받아요." tag="어드밴스드"/>
+        <Tile img="kraken" title="Kraken" desc="트릭 전체를 파괴해 아무도 가져가지 못합니다. Kraken이 없었다면 이겼을 사람이 다음 트릭을 리드합니다." tag="어드밴스드"/>
+        <Tile img="white-whale" title="White Whale" desc="특수카드를 제거합니다. 낼 때의 수트 의무는 그대로지만, 승부는 수트를 무시하고 가장 높은 숫자 카드가 이겨요. 숫자가 없으면 트릭을 버리고 처음 낸 사람이 다음 트릭을 리드합니다." tag="어드밴스드"/>
+        <Tile img="spotted-stingray" title="Spotted Stingray" desc="White Whale처럼 특수카드를 제거합니다. 승부는 수트를 무시하고 가장 낮은 숫자 카드가 이겨요. 동률이면 먼저 낸 카드가 이깁니다." tag="확장"/>
+        <Tile img="wild-monkey-15" title="Wild Monkey 15" desc="리드 수트가 초록·보라·노랑이면 그 수트의 15로 냅니다. 아직 수트가 없으면 세 수트 중 하나를 선언해요. 검정으로 선언할 수 없고, 검정 수트가 리드되면 트럼프에 집니다." tag="확장"/>
+        <Tile img="first-mate-con" title="First Mate Con" desc="일반 Pirate를 이기지만 Skull King과 Mermaid에게는 집니다. Con으로 트릭을 이기면 잡은 Pirate들의 능력을 사용할 수 있지만 Pirate 포획 보너스는 받지 않습니다." tag="확장"/>
+        <Tile img="davy-jones" title="Davy Jones' Locker" desc="모든 Sea Monster와 Davy Jones 자신을 제거합니다. 남은 카드 중 가장 높은 카드가 트릭을 가져가고, 제거한 다른 괴물마다 +20점입니다." tag="확장"/>
+        <Tile img="last-volley" title="The Last Volley" desc="모두 첫 카드를 낸 뒤, 내가 추가로 한 장을 냅니다. 나는 그 라운드의 마지막 트릭에 참여하지 않습니다. 마지막 트릭에서 사용하면 건너뛸 트릭은 없어요." tag="확장"/>
+        <Tile img="walk-the-plank" title="Walk the Plank" desc="트릭이 끝나면 일반 Pirate 한 장을 제거해야 합니다. 여러 장이면 내가 고릅니다. 제거된 Pirate는 트릭 승자·Skull King 보너스·Con 능력에 포함되지 않아요." tag="확장"/>
+        <Tile img="parrot-zero-fourteen" title="확장 0/14" desc="낼 때 0 또는 14를 선언합니다. 확장 14는 일반 14 보너스를 주지 않습니다." tag="확장"/>
+        <Tile img="parrot-8-expansion" title="확장 7 / 8" desc="일반 수트 카드처럼 냅니다. 확장 7은 -5점, 확장 8은 +5점입니다. 기본 덱의 7·8에는 적용되지 않아요." tag="확장"/></div><p className="help-note">승자를 정할 수 있는 카드가 하나도 없는 트릭은 버리고, 처음 카드를 낸 사람이 다음 트릭을 시작합니다. Kraken이 나온 트릭은 Kraken 설명의 다음 리더 규칙을 따릅니다.</p></>}
+      {tab==='해적 능력'&&<><h2>해적 능력</h2><p className="help-note">해적 능력 옵션을 켠 경우에만 사용합니다. Pirate 또는 First Mate Con으로 트릭을 이긴 직후 능력을 사용하고, 다음 라운드로 미룰 수 없어요. Harry만 마지막 트릭 뒤에도 사용할 수 있습니다.</p><div className="tiles">
+        <Tile img="pirate-rosie" title="Rosie D'Laney" desc="플레이어 한 명을 골라 다음 트릭의 리더로 정합니다. 자신을 고를 수도 있어요."/>
+        <Tile img="pirate-bendt" title="Bendt the Bandit" desc="덱에서 2장을 가져온 뒤 손패에서 원하는 2장을 버립니다. 덱에 카드가 부족하면 가능한 만큼만 처리합니다."/>
+        <Tile img="pirate-rascal" title="Rascal of Roatan" desc="0·10·20점 중 하나를 걸어요. 라운드 예측을 맞히면 건 점수를 얻고, 틀리면 같은 점수를 잃습니다."/>
+        <Tile img="pirate-juanita" title="Juanita Jade" desc="이번 라운드에 나눠 주지 않은 남은 덱을 혼자 비공개로 확인합니다."/>
+        <Tile img="pirate-harry" title="Harry the Giant" desc="내 예측을 1 낮추거나, 그대로 두거나, 1 높입니다. 마지막 트릭 뒤에도 사용할 수 있어요."/>
+        <Tile img="mary-thorne" title="Mary Thorne" desc="플레이어 한 명(자신 포함)을 고르고, 그 사람 손패에서 무작위 카드 한 장을 선택합니다. 그 카드는 다음 트릭에 수트 규칙과 관계없이 내야 합니다." tag="확장"/>
+        <Tile img="first-mate-con" title="Con이 잡은 Pirate" desc="Con으로 이긴 트릭에서 잡은 Pirate 능력을 차례로 사용할 수 있습니다. 상대가 낸 Juanita의 능력도 사용할 수 있어요." tag="확장"/></div></>}
     </div><button className="primary help-close" onClick={close}>확인</button></div></div>;
 }
 const modes:Array<[GameConfig['roundMode'],string,string]>=[['classic','Classic','1–10장'],['evenKeeled','Even Keeled','2·4·6·8·10장'],['brawl','Skip to the Brawl','6–10장'],['swift','Swift-n-Salty','5장 × 5'],['broadside','Broadside','10장 × 10'],['whirlpool','Whirlpool','9·7·5·3·1장 × 2'],['bedtime','Past Your Bedtime','1장']];
