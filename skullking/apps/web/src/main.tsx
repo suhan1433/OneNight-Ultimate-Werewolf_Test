@@ -136,43 +136,93 @@ function CardPicker({cards,cta,onPick,disabled}:{cards:Card[];cta:string;onPick:
   return <><div className="pick-row">{sortCards(cards,'suit').map(c=><CardView key={c.id} card={c} className={sel===c.id?'picked-card':''} onClick={()=>setSel(sel===c.id?null:c.id)}/>)}</div>
     <button className="primary" disabled={!sel||disabled} onClick={()=>{const c=cards.find(x=>x.id===sel);if(c){setSel(null);onPick(c);}}}>{sel?cta:'카드를 한 장 고르세요'}</button></>;
 }
-const helpTabs=['항해 규칙','서열','보너스','특수 카드','해적 능력'] as const;
+const helpTabs=['기본 규칙','서열','점수','특수 카드','해적 능력'] as const;
 function Tile({img,title,desc,tag}:{img:string;title:string;desc:string;tag?:string}){return <div className="tile"><img src={art(img)} alt={title} loading="lazy" draggable={false}/><div><b>{title}{tag&&<em>{tag}</em>}</b><p>{desc}</p></div></div>;}
 function Beat({a,b,note,bonus}:{a:string;b:string;note:string;bonus:string}){return <div className="beat"><img src={art(a)} alt="" draggable={false}/><span className="beat-arrow">이긴다<Icon name="next"/></span><img src={art(b)} alt="" draggable={false}/><div><b>{note}</b><em>{bonus}</em></div></div>;}
+/** 도움말 공통 조각: 탭마다 같은 틀(제목+한 줄 요약 → 섹션)로 맞춘다 */
+const HHead=({title,lead}:{title:string;lead:string})=><header className="hhead"><h2>{title}</h2><p>{lead}</p></header>;
+const HSec=({title,tag,children}:{title:string;tag?:string;children:ReactNode})=><section className="hsec"><h3>{title}{tag&&<small>{tag}</small>}</h3>{children}</section>;
 function Help({close}:{close:()=>void}) {
-  const [tab,setTab]=useState<typeof helpTabs[number]>('항해 규칙');
+  const [tab,setTab]=useState<typeof helpTabs[number]>('기본 규칙');
+  const bodyRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{const h=(e:KeyboardEvent)=>{if(e.key==='Escape')close();};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[close]);
-  return <div className="modal" onClick={close}><div className="help book" onClick={e=>e.stopPropagation()}><button type="button" className="help-x" onClick={close} aria-label="도움말 닫기"><Icon name="close"/></button>
-    <nav className="help-tabs">{helpTabs.map(t=><button key={t} className={t===tab?'on':''} onClick={()=>setTab(t)}>{t}</button>)}</nav>
-    <div className="help-body" key={tab}>
-      {tab==='항해 규칙'&&<><h2>라운드 진행</h2><ol className="steps"><li><b>카드 받기</b>방에서 고른 항해 방식대로 진행합니다. Classic은 1라운드 1장부터 시작해 라운드마다 한 장씩 늘어납니다.</li><li><b>예측 공개</b>손패를 확인하고 이번 라운드에 딸 트릭 수를 정해 동시에 공개합니다.</li><li><b>트릭 진행</b>리더부터 시계 방향으로 한 장씩 냅니다. 가장 높은 카드가 트릭을 가져가고, 그 사람이 다음 트릭의 리더가 됩니다.</li><li><b>점수 계산</b>예측이 맞으면 트릭마다 +20점, 틀리면 차이마다 -10점입니다. 0 예측은 트릭을 하나도 따면 카드 장수 × 10점, 하나라도 따면 카드 장수 × -10점입니다.</li></ol>
-        <h3>수트(무늬) 따라내기</h3><div className="suit-row">{[['parrot-7','앵무새'],['map-7','지도'],['treasure-7','보물'],['jolly-7','졸리 로저 · 트럼프']].map(([i,t])=><figure key={i}><img src={art(i)} alt={t} draggable={false}/><figcaption>{t}</figcaption></figure>)}</div><p className="help-note">숫자 카드가 먼저 나오면 그 수트의 숫자 카드를 가지고 있을 때 반드시 내야 합니다. 해당 수트가 없으면 다른 숫자 카드나 특수 카드를 낼 수 있어요.</p><p className="help-note">Escape, Loot 또는 Escape로 선언한 Tigress, Spotted Stingray, Davy Jones, Walk the Plank, The Last Volley로 리드하면 다음 플레이어가 수트를 정합니다. 그 카드가 또 리드 수트를 넘기는 카드라면 다음 사람에게 넘어갑니다. Pirate, Mermaid, Skull King, Kraken, White Whale, First Mate Con으로 리드하면 수트가 정해지지 않습니다. 보너스 점수는 라운드 예측을 정확히 맞혔을 때만 받아요.</p></>}
-      {tab==='서열'&&<><h2>카드 서열</h2><p className="help-note">숫자끼리는 리드 수트의 가장 높은 카드가 이깁니다. 졸리 로저(검정)는 다른 숫자 수트보다 강합니다. 같은 서열끼리 동률이면 먼저 낸 카드가 이겨요.</p><div className="ladder">{[['escape','Escape','숫자 카드보다 낮음'],['parrot-9','숫자 카드','리드 수트 중 최고'],['jolly-9','졸리 로저','숫자 수트의 트럼프'],['pirate-rosie','Pirate','숫자 카드보다 높음']].map(([i,t,d],k)=><Fragment key={i}>{k>0&&<span className="lad-arrow"><Icon name="next"/></span>}<figure><img src={art(i)} alt={t} draggable={false}/><figcaption><b>{t}</b>{d}</figcaption></figure></Fragment>)}</div><h3>캐릭터 카드 상성</h3><Beat a="skull-king" b="pirate-rosie" note="Skull King이 Pirate를 이김" bonus="Pirate마다 +30"/><Beat a="pirate-rosie" b="mermaid-alyra" note="Pirate가 Mermaid를 이김" bonus="Mermaid마다 +20"/><Beat a="mermaid-alyra" b="skull-king" note="Mermaid가 Skull King을 이김" bonus="+40"/><p className="help-note">Skull King·Pirate·Mermaid가 한 트릭에 모두 나오면 Mermaid가 이깁니다. First Mate Con은 일반 Pirate를 이기지만 Skull King과 Mermaid에게 집니다.</p></>}
-      {tab==='보너스'&&<><h2>보너스 점수</h2><p className="help-note strong">예측을 정확히 맞힌 라운드에만 보너스를 받습니다. 잡은 카드와 능력으로 제거한 카드에 따라 점수가 더해져요.</p><div className="tiles">
-        <Tile img="jolly-14" title="검정 14" desc="내가 딴 트릭에 있으면 +20점"/><Tile img="parrot-14" title="초록·보라·노랑 14" desc="내가 딴 트릭에 있으면 카드마다 +10점"/><Tile img="skull-king" title="Skull King" desc="내가 딴 트릭의 Pirate마다 +30점"/><Tile img="mermaid-alyra" title="Mermaid" desc="내가 Skull King을 잡으면 +40점"/><Tile img="pirate-rosie" title="Pirate" desc="내가 딴 트릭의 Mermaid마다 +20점"/><Tile img="loot" title="Loot 동맹" desc="다른 사람이 Loot를 가져가고 두 사람 모두 예측을 맞히면 각 +20점" tag="어드밴스드"/><Tile img="first-mate-con" title="First Mate Con" desc="Skull King 또는 Mermaid가 Con을 잡으면 +30점" tag="확장"/><Tile img="davy-jones" title="Davy Jones' Locker" desc="Davy Jones가 제거한 다른 Sea Monster마다 +20점" tag="확장"/><Tile img="parrot-8-expansion" title="확장 8 / 7" desc="확장 8은 +5점, 확장 7은 -5점. 기본 카드에는 적용되지 않아요." tag="확장"/></div></>}
-      {tab==='특수 카드'&&<><h2>특수 카드</h2><p className="help-note">특수 카드는 수트 의무와 관계없이 낼 수 있어요. 여러 Sea Monster가 함께 나오면 가장 나중에 낸 괴물의 효과를 적용합니다. 단, Davy Jones는 순서와 관계없이 모든 괴물과 자신을 제거합니다.</p><div className="tiles">
-        <Tile img="tigress" title="Tigress" desc="낼 때 Pirate 또는 Escape를 선택합니다. Pirate로 내면 Pirate 서열과 보너스가 적용되고, Escape로 내면 이길 수 없으며 포획 보너스도 없어요."/>
-        <Tile img="escape" title="Escape" desc="숫자 카드·Pirate 같은 승리 카드에는 이기지 못합니다. 모두 Escape·Loot·Escape로 선언한 Tigress만 냈다면 가장 먼저 낸 카드가 이겨요."/>
-        <Tile img="loot" title="Loot" desc="Escape처럼 이기지 않는 카드입니다. 다른 사람이 Loot를 가져가면, 두 사람 모두 예측을 맞혔을 때 각 +20점 동맹 보너스를 받아요." tag="어드밴스드"/>
-        <Tile img="kraken" title="Kraken" desc="트릭 전체를 파괴해 아무도 가져가지 못합니다. Kraken이 없었다면 이겼을 사람이 다음 트릭을 리드합니다." tag="어드밴스드"/>
-        <Tile img="white-whale" title="White Whale" desc="특수카드를 제거합니다. 낼 때의 수트 의무는 그대로지만, 승부는 수트를 무시하고 가장 높은 숫자 카드가 이겨요. 숫자가 없으면 트릭을 버리고 처음 낸 사람이 다음 트릭을 리드합니다." tag="어드밴스드"/>
-        <Tile img="spotted-stingray" title="Spotted Stingray" desc="White Whale처럼 특수카드를 제거합니다. 승부는 수트를 무시하고 가장 낮은 숫자 카드가 이겨요. 동률이면 먼저 낸 카드가 이깁니다." tag="확장"/>
-        <Tile img="wild-monkey-15" title="Wild Monkey 15" desc="리드 수트가 초록·보라·노랑이면 그 수트의 15로 냅니다. 아직 수트가 없으면 세 수트 중 하나를 선언해요. 검정으로 선언할 수 없고, 검정 수트가 리드되면 트럼프에 집니다." tag="확장"/>
-        <Tile img="first-mate-con" title="First Mate Con" desc="일반 Pirate를 이기지만 Skull King과 Mermaid에게는 집니다. Con으로 트릭을 이기면 잡은 Pirate들의 능력을 사용할 수 있지만 Pirate 포획 보너스는 받지 않습니다." tag="확장"/>
-        <Tile img="davy-jones" title="Davy Jones' Locker" desc="모든 Sea Monster와 Davy Jones 자신을 제거합니다. 남은 카드 중 가장 높은 카드가 트릭을 가져가고, 제거한 다른 괴물마다 +20점입니다." tag="확장"/>
-        <Tile img="last-volley" title="The Last Volley" desc="모두 첫 카드를 낸 뒤, 내가 추가로 한 장을 냅니다. 나는 그 라운드의 마지막 트릭에 참여하지 않습니다. 마지막 트릭에서 사용하면 건너뛸 트릭은 없어요." tag="확장"/>
-        <Tile img="walk-the-plank" title="Walk the Plank" desc="트릭이 끝나면 일반 Pirate 한 장을 제거해야 합니다. 여러 장이면 내가 고릅니다. 제거된 Pirate는 트릭 승자·Skull King 보너스·Con 능력에 포함되지 않아요." tag="확장"/>
-        <Tile img="parrot-zero-fourteen" title="확장 0/14" desc="낼 때 0 또는 14를 선언합니다. 확장 14는 일반 14 보너스를 주지 않습니다." tag="확장"/>
-        <Tile img="parrot-8-expansion" title="확장 7 / 8" desc="일반 수트 카드처럼 냅니다. 확장 7은 -5점, 확장 8은 +5점입니다. 기본 덱의 7·8에는 적용되지 않아요." tag="확장"/></div><p className="help-note">승자를 정할 수 있는 카드가 하나도 없는 트릭은 버리고, 처음 카드를 낸 사람이 다음 트릭을 시작합니다. Kraken이 나온 트릭은 Kraken 설명의 다음 리더 규칙을 따릅니다.</p></>}
-      {tab==='해적 능력'&&<><h2>해적 능력</h2><p className="help-note">해적 능력 옵션을 켠 경우에만 사용합니다. Pirate 또는 First Mate Con으로 트릭을 이긴 직후 능력을 사용하고, 다음 라운드로 미룰 수 없어요. Harry만 마지막 트릭 뒤에도 사용할 수 있습니다.</p><div className="tiles">
-        <Tile img="pirate-rosie" title="Rosie D'Laney" desc="플레이어 한 명을 골라 다음 트릭의 리더로 정합니다. 자신을 고를 수도 있어요."/>
-        <Tile img="pirate-bendt" title="Bendt the Bandit" desc="덱에서 2장을 가져온 뒤 손패에서 원하는 2장을 버립니다. 덱에 카드가 부족하면 가능한 만큼만 처리합니다."/>
-        <Tile img="pirate-rascal" title="Rascal of Roatan" desc="0·10·20점 중 하나를 걸어요. 라운드 예측을 맞히면 건 점수를 얻고, 틀리면 같은 점수를 잃습니다."/>
-        <Tile img="pirate-juanita" title="Juanita Jade" desc="이번 라운드에 나눠 주지 않은 남은 덱을 혼자 비공개로 확인합니다."/>
-        <Tile img="pirate-harry" title="Harry the Giant" desc="내 예측을 1 낮추거나, 그대로 두거나, 1 높입니다. 마지막 트릭 뒤에도 사용할 수 있어요."/>
-        <Tile img="mary-thorne" title="Mary Thorne" desc="플레이어 한 명(자신 포함)을 고르고, 그 사람 손패에서 무작위 카드 한 장을 선택합니다. 그 카드는 다음 트릭에 수트 규칙과 관계없이 내야 합니다." tag="확장"/>
-        <Tile img="first-mate-con" title="Con이 잡은 Pirate" desc="Con으로 이긴 트릭에서 잡은 Pirate 능력을 차례로 사용할 수 있습니다. 상대가 낸 Juanita의 능력도 사용할 수 있어요." tag="확장"/></div></>}
-    </div><button className="primary help-close" onClick={close}>확인</button></div></div>;
+  useEffect(()=>{bodyRef.current?.scrollTo({top:0});},[tab]);
+  return <div className="modal" onClick={close}><div className="help book" role="dialog" aria-label="도움말" onClick={e=>e.stopPropagation()}>
+    <button type="button" className="help-x" onClick={close} aria-label="도움말 닫기"><Icon name="close"/></button>
+    <nav className="help-tabs" role="tablist">{helpTabs.map(t=><button key={t} role="tab" aria-selected={t===tab} className={t===tab?'on':''} onClick={()=>setTab(t)}>{t}</button>)}</nav>
+    <div className="help-body" ref={bodyRef} key={tab}>
+      {tab==='기본 규칙'&&<>
+        <HHead title="기본 규칙" lead="예측한 만큼 정확히 트릭을 따는 게임입니다."/>
+        <HSec title="라운드 진행"><ol className="steps">
+          <li><div><b>카드 받기</b>방에서 고른 항해 방식대로 받습니다. Classic은 1라운드 1장에서 시작해 라운드마다 1장씩 늘어납니다.</div></li>
+          <li><div><b>예측</b>손패를 보고 이번 라운드에 딸 트릭 수를 정합니다. 모두 정하면 동시에 공개됩니다.</div></li>
+          <li><div><b>트릭</b>리더부터 시계 방향으로 한 장씩 냅니다. 가장 강한 카드를 낸 사람이 트릭을 가져가고 다음 리더가 됩니다.</div></li>
+          <li><div><b>정산</b>예측과 딴 트릭 수를 비교해 점수를 계산합니다. 자세한 계산은 ‘점수’ 탭에 있습니다.</div></li></ol></HSec>
+        <HSec title="수트(무늬) 따라내기">
+          <div className="suit-row">{[['parrot-7','앵무새'],['map-7','지도'],['treasure-7','보물'],['jolly-7','졸리 로저 · 트럼프']].map(([i,t])=><figure key={i}><img src={art(i)} alt={t} draggable={false}/><figcaption>{t}</figcaption></figure>)}</div>
+          <ul className="hlist" style={{marginTop:'.9rem'}}><li>숫자 카드로 리드되면, 같은 수트의 숫자 카드가 있을 때 반드시 그 수트를 냅니다.</li><li>같은 수트가 없으면 어떤 카드든 낼 수 있습니다. 특수 카드는 언제든 낼 수 있습니다.</li></ul>
+        </HSec>
+        <HSec title="리드 수트는 어떻게 정해지나요?">
+          <div className="hcols">
+            <div className="hbox"><b>다음 플레이어가 수트를 정함</b><p>Escape, Loot, Escape로 선언한 Tigress, Spotted Stingray, Davy Jones, Walk the Plank, The Last Volley로 리드한 경우입니다. 다음 카드도 수트를 넘기는 카드라면 그다음 사람에게 넘어갑니다.</p></div>
+            <div className="hbox"><b>수트가 정해지지 않음</b><p>Pirate, Mermaid, Skull King, Kraken, White Whale, First Mate Con으로 리드한 경우입니다. 그 트릭에는 리드 수트가 없습니다.</p></div>
+          </div>
+        </HSec></>}
+      {tab==='서열'&&<>
+        <HHead title="카드 서열" lead="숫자 카드끼리는 리드 수트의 높은 숫자가 이기고, 특수 카드는 서로 상성이 있습니다."/>
+        <HSec title="기본 높낮이">
+          <div className="ladder">{[['escape','Escape','숫자 카드보다 낮음'],['parrot-9','숫자 카드','리드 수트 중 최고'],['jolly-9','졸리 로저','숫자 수트의 트럼프'],['pirate-rosie','Pirate','숫자 카드보다 높음']].map(([i,t,d],k)=><Fragment key={i}>{k>0&&<span className="lad-arrow"><Icon name="next"/></span>}<figure><img src={art(i)} alt={t} draggable={false}/><figcaption><b>{t}</b>{d}</figcaption></figure></Fragment>)}</div>
+          <p className="hnote">서열이 같으면 먼저 낸 카드가 이깁니다.</p>
+        </HSec>
+        <HSec title="캐릭터 카드 상성">
+          <Beat a="skull-king" b="pirate-rosie" note="Skull King이 Pirate를 이김" bonus="Pirate마다 +30"/><Beat a="pirate-rosie" b="mermaid-alyra" note="Pirate가 Mermaid를 이김" bonus="Mermaid마다 +20"/><Beat a="mermaid-alyra" b="skull-king" note="Mermaid가 Skull King을 이김" bonus="+40"/>
+          <p className="hnote">Skull King·Pirate·Mermaid가 한 트릭에 모두 나오면 <b>Mermaid</b>가 이깁니다. First Mate Con은 일반 Pirate를 이기지만 Skull King과 Mermaid에게 집니다.</p>
+        </HSec></>}
+      {tab==='점수'&&<>
+        <HHead title="점수" lead="예측을 정확히 맞힌 라운드에만 보너스를 받습니다."/>
+        <HSec title="라운드 점수"><div className="srules">
+          <div className="srow"><span>예측 적중<small>딴 트릭 1개마다</small></span><b>+20</b></div>
+          <div className="srow"><span>예측 빗나감<small>예측과 딴 트릭 수의 차이 1마다</small></span><b className="neg">−10</b></div>
+          <div className="srow"><span>0 예측 성공<small>트릭을 하나도 따지 않음</small></span><b>+10 × 카드 수</b></div>
+          <div className="srow"><span>0 예측 실패<small>트릭을 하나라도 땀</small></span><b className="neg">−10 × 카드 수</b></div></div></HSec>
+        <HSec title="보너스 점수"><div className="tiles">
+          <Tile img="jolly-14" title="검정 14" desc="내가 딴 트릭에 있으면 +20점"/><Tile img="parrot-14" title="초록·보라·노랑 14" desc="내가 딴 트릭에 있으면 카드마다 +10점"/><Tile img="skull-king" title="Skull King" desc="내가 딴 트릭의 Pirate마다 +30점"/><Tile img="mermaid-alyra" title="Mermaid" desc="Skull King을 잡으면 +40점"/><Tile img="pirate-rosie" title="Pirate" desc="내가 딴 트릭의 Mermaid마다 +20점"/></div></HSec>
+        <HSec title="어드밴스드" tag="옵션"><div className="tiles"><Tile img="loot" title="Loot 동맹" desc="다른 사람이 Loot를 가져가고 두 사람 모두 예측을 맞히면 각각 +20점"/></div></HSec>
+        <HSec title="확장" tag="옵션"><div className="tiles">
+          <Tile img="first-mate-con" title="First Mate Con" desc="Skull King 또는 Mermaid가 Con을 잡으면 +30점"/><Tile img="davy-jones" title="Davy Jones' Locker" desc="Davy Jones가 제거한 다른 Sea Monster마다 +20점"/><Tile img="parrot-8-expansion" title="확장 8 / 7" desc="확장 8은 +5점, 확장 7은 −5점. 기본 카드에는 적용되지 않습니다."/></div></HSec></>}
+      {tab==='특수 카드'&&<>
+        <HHead title="특수 카드" lead="수트 의무와 상관없이 언제든 낼 수 있습니다."/>
+        <HSec title="기본"><div className="tiles">
+          <Tile img="tigress" title="Tigress" desc="낼 때 Pirate 또는 Escape를 선택합니다. Pirate로 내면 Pirate의 서열과 보너스가 적용되고, Escape로 내면 이길 수 없으며 포획 보너스도 없습니다."/>
+          <Tile img="escape" title="Escape" desc="숫자 카드나 Pirate 같은 승리 카드에는 이기지 못합니다. 모두가 Escape·Loot·Escape로 선언한 Tigress만 냈다면 가장 먼저 낸 카드가 이깁니다."/></div></HSec>
+        <HSec title="어드밴스드" tag="옵션"><div className="tiles">
+          <Tile img="loot" title="Loot" desc="Escape처럼 이기지 않는 카드입니다. 다른 사람이 Loot를 가져가고 두 사람 모두 예측을 맞히면 각각 +20점을 받습니다."/>
+          <Tile img="kraken" title="Kraken" desc="트릭 전체를 파괴해 아무도 가져가지 못합니다. 다음 리더는 Kraken이 없었다면 이겼을 사람입니다."/>
+          <Tile img="white-whale" title="White Whale" desc="특수 카드를 제거하고, 수트와 상관없이 가장 높은 숫자 카드가 이깁니다. 숫자 카드가 없으면 트릭을 버리고 처음 낸 사람이 다음 트릭을 리드합니다."/></div></HSec>
+        <HSec title="확장" tag="옵션"><div className="tiles">
+          <Tile img="spotted-stingray" title="Spotted Stingray" desc="White Whale처럼 특수 카드를 제거하지만 가장 낮은 숫자 카드가 이깁니다. 동률이면 먼저 낸 카드가 이깁니다."/>
+          <Tile img="wild-monkey-15" title="Wild Monkey 15" desc="리드 수트가 초록·보라·노랑이면 그 수트의 15로 냅니다. 수트가 아직 없으면 세 수트 중 하나를 선언합니다. 검정으로는 선언할 수 없고, 검정이 리드되면 트럼프에게 집니다."/>
+          <Tile img="first-mate-con" title="First Mate Con" desc="일반 Pirate를 이기지만 Skull King과 Mermaid에게는 집니다. Con으로 이기면 잡은 Pirate들의 능력을 쓸 수 있지만 Pirate 포획 보너스는 받지 않습니다."/>
+          <Tile img="davy-jones" title="Davy Jones' Locker" desc="모든 Sea Monster와 자신을 제거합니다. 남은 카드 중 가장 높은 카드가 트릭을 가져가며, 제거한 다른 괴물마다 +20점입니다."/>
+          <Tile img="last-volley" title="The Last Volley" desc="모두 첫 카드를 낸 뒤 내가 한 장을 더 냅니다. 대신 그 라운드의 마지막 트릭에는 참여하지 않습니다. 마지막 트릭에서 쓰면 건너뛸 트릭이 없습니다."/>
+          <Tile img="walk-the-plank" title="Walk the Plank" desc="트릭이 끝나면 일반 Pirate 한 장을 제거해야 합니다. 여러 장이면 내가 고릅니다. 제거된 Pirate는 승자 판정, Skull King 보너스, Con 능력에서 제외됩니다."/>
+          <Tile img="parrot-zero-fourteen" title="확장 0/14" desc="낼 때 0 또는 14를 선언합니다. 확장 14는 14 보너스를 주지 않습니다."/>
+          <Tile img="parrot-8-expansion" title="확장 7 / 8" desc="일반 수트 카드처럼 냅니다. 딴 확장 7은 −5점, 확장 8은 +5점입니다. 기본 덱의 7·8에는 적용되지 않습니다."/></div></HSec>
+        <p className="hnote">Sea Monster가 여러 장 나오면 가장 나중에 낸 괴물의 효과를 적용합니다. Davy Jones만 순서와 상관없이 모든 괴물을 제거합니다. 승자를 정할 카드가 하나도 없으면 트릭을 버리고, 처음 카드를 낸 사람이 다음 트릭을 시작합니다.</p></>}
+      {tab==='해적 능력'&&<>
+        <HHead title="해적 능력" lead="해적 능력 옵션을 켠 경우에만 사용합니다."/>
+        <p className="hnote" style={{marginTop:0,marginBottom:'1.1rem'}}>Pirate 또는 First Mate Con으로 트릭을 이긴 직후에 사용하며, 다음 라운드로 미룰 수 없습니다. 단, <b>Harry</b>만 마지막 트릭 뒤에도 사용할 수 있습니다.</p>
+        <HSec title="기본 Pirate"><div className="tiles">
+          <Tile img="pirate-rosie" title="Rosie D'Laney" desc="플레이어 한 명(자신 포함)을 골라 다음 트릭의 리더로 정합니다."/>
+          <Tile img="pirate-bendt" title="Bendt the Bandit" desc="덱에서 2장을 가져온 뒤 손패에서 원하는 2장을 버립니다. 덱이 부족하면 가능한 만큼만 처리합니다."/>
+          <Tile img="pirate-rascal" title="Rascal of Roatan" desc="0·10·20점 중 하나를 겁니다. 라운드 예측을 맞히면 건 점수를 얻고, 틀리면 같은 점수를 잃습니다."/>
+          <Tile img="pirate-juanita" title="Juanita Jade" desc="이번 라운드에 나눠 주지 않은 남은 덱을 나만 비공개로 확인합니다."/>
+          <Tile img="pirate-harry" title="Harry the Giant" desc="내 예측을 1 낮추거나, 그대로 두거나, 1 높입니다."/></div></HSec>
+        <HSec title="확장" tag="옵션"><div className="tiles">
+          <Tile img="mary-thorne" title="Mary Thorne" desc="플레이어 한 명(자신 포함)의 손패에서 무작위로 카드 한 장을 정합니다. 그 카드는 다음 트릭에 수트 규칙과 상관없이 내야 합니다."/>
+          <Tile img="first-mate-con" title="Con이 잡은 Pirate" desc="Con으로 이긴 트릭에서 잡은 Pirate들의 능력을 차례로 사용할 수 있습니다. 상대가 낸 Juanita의 능력도 포함됩니다."/></div></HSec></>}
+    </div>
+    <footer className="help-foot"><button className="primary" onClick={close}>확인</button></footer></div></div>;
 }
 const modes:Array<[GameConfig['roundMode'],string,string]>=[['classic','Classic','1–10장'],['evenKeeled','Even Keeled','2·4·6·8·10장'],['brawl','Skip to the Brawl','6–10장'],['swift','Swift-n-Salty','5장 × 5'],['broadside','Broadside','10장 × 10'],['whirlpool','Whirlpool','9·7·5·3·1장 × 2'],['bedtime','Past Your Bedtime','1장']];
 const advancedCards:CardOptions={...emptyCards,kraken:true,whale:true,loot:true,pirateAbilities:true};
@@ -280,6 +330,9 @@ function Table(){
  useEffect(()=>{if(!sweep||!sweep.winner)return;const mine=sweep.winner===game.playerId;setTimeout(()=>{if(soundEnabled())fx.coin(mine);},sweep.late?1500:850);},[sweep]);
  const [openSeat,setOpenSeat]=useState<string|null>(null);
  useEffect(()=>{if(!openSeat)return;const t=setTimeout(()=>setOpenSeat(null),3200);return()=>clearTimeout(t);},[openSeat]);
+ const [focus,setFocus]=useState<string|null>(null);
+ useEffect(()=>{if(!focus)return;const t=setTimeout(()=>setFocus(null),3000);return()=>clearTimeout(t);},[focus]);
+ useEffect(()=>{setFocus(null);},[game.trick.length]);
  /* 좌석은 내가 맨 아래, 나머지는 시계 방향으로 둘러앉는다. 낸 카드도 자기 좌석 방향에서 날아와 약간 삐뚤게 놓인다. */
  const meIdx=Math.max(0,game.players.findIndex(p=>p.id===game.playerId));
  const rel=(id:string)=>(game.players.findIndex(p=>p.id===id)-meIdx+nP)%nP;
@@ -287,11 +340,13 @@ function Table(){
  const hs=(s:string)=>[...s].reduce((a,c)=>(a*131+c.charCodeAt(0))>>>0,17);const rnd=(s:string,k:number)=>(hs(s+':'+k)%2000)/1000-1;
  const placed=(id:string,seed:string)=>{const a=ang(id);return {'--ax':Math.cos(a).toFixed(3),'--ay':Math.sin(a).toFixed(3),'--rot':(rnd(seed,1)*10).toFixed(1)+'deg','--jx':(rnd(seed,2)*8).toFixed(1)+'px','--jy':(rnd(seed,3)*7).toFixed(1)+'px'} as CSSProperties;};
  const badge=(p:{id:string})=>{const o=waitOrder.get(p.id)??0;return bidding?(o===0?'첫 리드':(o+1)+'번째'):playedIds.has(p.id)?'제출 완료':o===0?'지금 차례':o===1?'다음':(o+1)+'번째';};
- const plate=(id:string,first=false)=><span className="plate">{id===game.playerId?'나':pname(game,id)}{first&&<em>선</em>}</span>;
+ /* 이름표는 카드와 별도 레이어(항상 맨 위)라서 카드가 겹쳐도 가려지지 않는다. 번호 = 낸 순서. */
+ const tagFor=(p:PlayedCard,i:number)=>{const pl=game.players.find(x=>x.id===p.playerId);const mine=p.playerId===game.playerId;const nm=mine?'나':pname(game,p.playerId);
+  return <button type="button" key={p.playerId+'-t'+i} className={'tag-pill'+(focus===p.playerId?' focused':'')+(mine?' mine':'')} style={placed(p.playerId,p.card.id)} onClick={()=>setFocus(focus===p.playerId?null:p.playerId)} aria-label={(i+1)+'번째 '+nm+' · '+label(p.card)}><i className="ord">{i+1}</i><span className="tp-av"><Avatar name={pl?.nickname??nm} bot={pl?.isBot}/></span><b>{nm}</b></button>;};
  const seatEl=(p:Pl)=>{const o=waitOrder.get(p.id)??0;const st=bidding?'wait':playedIds.has(p.id)?'done':o===0?'now':o===1?'next':'wait';const isMe=p.id===game.playerId;const a=ang(p.id);
-  const pos={'--si':rel(p.id),...(isMe?{}:{left:(50+38*Math.cos(a)).toFixed(2)+'%',top:(46+35*Math.sin(a)).toFixed(2)+'%'})} as CSSProperties;const toggle=()=>setOpenSeat(openSeat===p.id?null:p.id);
-  return <div key={p.id} data-pid={p.id} role="button" tabIndex={0} aria-label={p.nickname+' 정보 보기'} onClick={toggle} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}}} style={pos}
-   className={'seat '+st+(game.turnId===p.id&&!bidding?' turn':'')+(game.leaderId===p.id?' leader':'')+(isMe?' me':'')+(openSeat===p.id?' open':'')+(sweep&&sweep.winner===p.id?' collect'+(sweep.late?' late':''):'')}>
+  const pos={'--si':rel(p.id),...(isMe?{}:{left:(50+38*Math.cos(a)).toFixed(2)+'%',top:(46+35*Math.sin(a)).toFixed(2)+'%'})} as CSSProperties;const toggle=()=>{setOpenSeat(openSeat===p.id?null:p.id);setFocus(p.id);};
+  return <div key={p.id} data-pid={p.id} role="button" tabIndex={0} aria-label={p.nickname+' 정보 보기'} onClick={toggle} onMouseEnter={()=>setFocus(p.id)} onMouseLeave={()=>setFocus(null)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}}} style={pos}
+   className={'seat '+st+(game.turnId===p.id&&!bidding?' turn':'')+(game.leaderId===p.id?' leader':'')+(isMe?' me':'')+(openSeat===p.id?' open':'')+(focus===p.id?' spot':'')+(sweep&&sweep.winner===p.id?' collect'+(sweep.late?' late':''):'')}>
    <span className="portrait"><Avatar name={p.nickname} bot={p.isBot}/>{game.leaderId===p.id&&<em className="lead-tag" title="선(리드)">선</em>}</span>
    <b className="nm">{p.nickname}</b>
    {bidding?<span className="state">{p.bid===null?'고민 중':'봉인'}</span>:<Tally bid={p.bid} tricks={p.tricks}/>}
@@ -311,9 +366,10 @@ function Table(){
   {game.players.filter(p=>p.id!==game.playerId).map(seatEl)}{game.players.filter(p=>p.id===game.playerId).map(seatEl)}
   <div className="arena">
    {!bidding&&game.trick.length>0&&<div className="lead">{game.trickLead?<><Icon name={suits[game.trickLead].icon}/>{suits[game.trickLead].name} 리드</>:'리드 수트 없음'}</div>}
-   <div className={'trick'+(sweep?' holding':'')}>{game.trick.map((p:PlayedCard,i)=><div key={p.playerId+'-'+i} className={'played'+(p.card.kind==='tigress'&&p.declaration?' as-'+p.declaration:'')} style={placed(p.playerId,p.card.id)}><CardView card={p.card} small/>{declTag(p)}{plate(p.playerId,i===0)}</div>)}</div>
+   <div className={'trick'+(sweep?' holding':'')+(focus?' has-focus':'')}>{game.trick.map((p:PlayedCard,i)=><div key={p.playerId+'-'+i} className={'played'+(p.card.kind==='tigress'&&p.declaration?' as-'+p.declaration:'')+(focus===p.playerId?' focused':'')} style={placed(p.playerId,p.card.id)} onClick={()=>setFocus(focus===p.playerId?null:p.playerId)} onMouseEnter={()=>setFocus(p.playerId)} onMouseLeave={()=>setFocus(null)}><CardView card={p.card} small/>{declTag(p)}</div>)}</div>
+   {!sweep&&game.trick.length>0&&<div className="tags">{game.trick.map(tagFor)}</div>}
    {!bidding&&!game.trick.length&&!sweep&&<div className="empty"><span className="hintline">탁자 위에 첫 카드를 내세요</span>{lastId&&<span className="lastwin"><Crest kind="crown"/>직전 트릭 · <b>{pname(game,lastId)}</b></span>}</div>}
-   {sweep&&<div className={'sweep'+(sweep.late?' has-late':'')} ref={sweepRef}>{sweep.cards.map((p,i)=><div key={i} className={'played sweep-card'+(p.playerId===sweep.winner?' win':'')+(p.late?' late':'')+(p.card?.kind==='tigress'&&p.declaration?' as-'+p.declaration:'')} style={{...placed(p.playerId,p.card?.id??('x'+i)),'--i':i} as CSSProperties}>{p.card?<><CardView card={p.card} small/>{declTag(p as unknown as PlayedCard)}</>:<div className="card small back" aria-label="마지막 카드"><Icon name="skull"/></div>}{plate(p.playerId,i===0)}</div>)}{sweep.winner?<div className="trick-result"><Crest kind="crown"/><span><b>{pname(game,sweep.winner)}</b> 님이 트릭 획득</span></div>:<span className="sweep-note">승자 없음 · 트릭 파괴</span>}</div>}
+   {sweep&&<div className={'sweep'+(sweep.late?' has-late':'')} ref={sweepRef}>{sweep.cards.map((p,i)=><div key={i} className={'played sweep-card'+(p.playerId===sweep.winner?' win':'')+(p.late?' late':'')+(p.card?.kind==='tigress'&&p.declaration?' as-'+p.declaration:'')} style={{...placed(p.playerId,p.card?.id??('x'+i)),'--i':i} as CSSProperties}>{p.card?<><CardView card={p.card} small/>{declTag(p as unknown as PlayedCard)}</>:<div className="card small back" aria-label="마지막 카드"><Icon name="skull"/></div>}</div>)}{sweep.winner?<div className="trick-result"><Crest kind="crown"/><span><b>{pname(game,sweep.winner)}</b> 님이 트릭 획득</span></div>:<span className="sweep-note">승자 없음 · 트릭 파괴</span>}</div>}
   </div>
   {bidding&&<div className="center-ui"><BidPanel/></div>}
   {reveal&&<div className="reveal-note" role="status">예측 공개</div>}
@@ -327,7 +383,7 @@ function Table(){
 const pname=(game:NonNullable<ReturnType<typeof useGame.getState>['game']>,id:string|null)=>game?.players.find(p=>p.id===id)?.nickname??'—';
 const rankOf=(rows:{total:number}[],i:number)=>rows.findIndex(r=>r.total===rows[i].total)+1;
 function Score(){
-  const game=useGame(s=>s.game)!;const latest=game.history.at(-1);const [help,setHelp]=useState(false);const final=game.phase==='result';
+  const game=useGame(s=>s.game)!;const latest=game.history.at(-1);const [help,setHelp]=useState(false);const final=game.phase==='result';const [view,setView]=useState<'round'|'total'>(final?'total':'round');const boardRef=useRef<HTMLDivElement>(null);useEffect(()=>{const e=boardRef.current;if(view==='total'&&e)e.scrollLeft=e.scrollWidth;},[view,game.history.length]);
   const ranking=[...(latest?.scores??[])].sort((a,b)=>b.total-a.total);const n=ranking.length;const host=game.hostId===game.playerId;
   const maxTotal=Math.max(1,...ranking.map(r=>r.total));const top=ranking[0];const champs=final&&top?ranking.filter(r=>r.total===top.total):[];
   const gain=(r:{base:number;bonus:number})=>r.base+r.bonus;const best=[...ranking].sort((a,b)=>gain(b)-gain(a))[0];
@@ -341,6 +397,15 @@ function Score(){
       <div className={'ldelta '+(g>0?'pos':g<0?'neg':'zero')}><strong><CountUp to={g} delay={delay*1000+250} signed/></strong><small>이번 라운드</small></div>
       <div className="ltotal"><b><CountUp to={r.total} delay={delay*1000+250}/></b><small>누적</small><i><s style={{width:Math.max(0,r.total)/maxTotal*100+'%'}}/></i></div>
     </li>;})}</ol>;
+  const rn=(h:unknown,i:number)=>(h as {round?:number}).round??i+1;const last=game.history.length-1;
+  /** 전체 점수표: 라운드별 점수(큰 숫자)와 그 시점의 누적(작은 숫자), 오른쪽 끝에 현재 총점 */
+  const board=latest&&<div className="board paper" ref={boardRef} role="region" aria-label="전체 점수표" tabIndex={0}><table>
+    <thead><tr><th className="who" scope="col">선원</th>{game.history.map((h,i)=><th key={i} scope="col" className={i===last?'cur':''}>R{rn(h,i)}</th>)}<th className="sum" scope="col">총점</th></tr></thead>
+    <tbody>{ranking.map((r,idx)=>{const nm=pname(game,r.playerId);const rk=rankOf(ranking,idx);const me=r.playerId===game.playerId;
+      return <tr key={r.playerId} className={me?'me':''}><th className="who" scope="row"><div className="wh"><span className={'medal m'+Math.min(rk,4)}>{rk===1?<Icon name="crown"/>:rk}</span><Avatar name={nm}/><b>{nm}{me&&<u>나</u>}</b></div></th>
+        {game.history.map((h,i)=>{const e=h.scores.find(x=>x.playerId===r.playerId);const g=e?gain(e):0;return <td key={i} className={(g>0?'pos':g<0?'neg':'')+(i===last?' cur':'')} title={e?'예측 '+e.bid+' · 획득 '+e.tricks:''}><b>{e?sg(g):'–'}</b><small>{e?e.total:''}</small></td>;})}
+        <td className="sum"><b>{r.total}</b></td></tr>;})}</tbody></table>
+    <p className="board-note">큰 숫자는 그 라운드에서 얻은 점수, 작은 숫자는 그 라운드까지의 누적 점수입니다.</p></div>;
   return <main className={'game score'+(final?' final-score':'')}>
     <GameHeader round={game.round} cards={game.cardsThisRound} title={final?'최종 결산':'라운드 정산'} onHelp={()=>setHelp(true)}/>
     {final?<section className="finale">
@@ -353,7 +418,8 @@ function Score(){
       <div className="podium">{pod.map(k=>{const r=ranking[k];const nm=pname(game,r.playerId);return <div key={r.playerId} className={'pod p'+k+(r.playerId===game.playerId?' me':'')} style={{'--h':hue(nm),'--d':(k===0?1.3:k===1?.5:.8)+'s'} as CSSProperties}><Avatar name={nm}/><b>{nm}</b><strong>{r.total}</strong><div className="pillar"><em>{rankOf(ranking,k)}</em></div></div>;})}</div>
       {myIdx>=0&&<p className={'myrank'+(myWin?' win':'')}>{myWin?'당신이 이 바다의 주인입니다.':'당신의 최종 순위 '+rankOf(ranking,myIdx)+'위 · '+ranking[myIdx].total+'점'}</p>}
     </section>:<section className="roundhead"><div className="crest" aria-hidden="true"><Icon name="anchor" strokeWidth={1.2}/></div><p className="eyebrow">THE CAPTAIN’S LOG · ROUND {game.round}</p><h1>라운드 {game.round} 정산</h1>{best&&gain(best)>0&&<p className="mvp"><Icon name="coin"/>이번 라운드 최고 득점 <b>{pname(game,best.playerId)}</b><em>+{gain(best)}</em></p>}</section>}
-    {ledger}
+    {latest&&<div className="score-tabs"><div className="seg" role="tablist" aria-label="점수 보기">{([['round',final?'마지막 라운드':'이번 라운드'],['total','전체 점수표']] as const).map(([k,t])=><button key={k} type="button" role="tab" aria-selected={view===k} className={view===k?'on':''} onClick={()=>setView(k)}>{t}</button>)}</div></div>}
+    {view==='round'?ledger:board}
     {!final&&<p className="score-note">예측을 맞힌 선원만 보너스를 온전히 획득합니다.</p>}
     <div className="score-actions">
       {game.canAdvance&&!final&&<button className="primary cta-lg" onClick={()=>emit('ROUND_ADVANCE',{roomCode:game.roomCode}).catch(showError)}>다음 항해를 시작합니다<Icon name="next"/></button>}
