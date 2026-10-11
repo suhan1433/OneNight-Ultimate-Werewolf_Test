@@ -198,7 +198,7 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .trick.has-focus .played:not(.focused){filter:brightness(.6) saturate(.7)}
 /* 이름표: 카드와 분리된 맨 위 레이어. 낸 순서(번호) + 초상화 + 이름. 좌석 방향 바깥쪽 카드 모서리에 붙는다. */
 .tags{position:absolute;left:0;top:0;z-index:5;pointer-events:none}
-.tag-pill{position:absolute;left:0;top:0;translate:calc(-50% + var(--ax)*var(--cw)*(var(--rx) + .58)) calc(-50% + var(--ay)*var(--cw)*(var(--ry) + .8));display:flex;align-items:center;gap:.3rem;height:24px;padding:0 .6rem 0 .2rem;white-space:nowrap;pointer-events:auto;background:var(--paper)!important;color:var(--ink)!important;border:0!important;border-radius:999px;box-shadow:var(--sh-2),inset 0 0 0 1px rgba(42,28,16,.4)!important;font:700 .66rem var(--sans);animation:rise .35s var(--ease) .25s both;transition:opacity .2s,box-shadow .2s}
+.tag-pill{position:absolute;left:0;top:0;translate:calc(-50% + var(--ax)*var(--cw)*(var(--rx) + .58)) calc(-50% + var(--ay)*var(--cw)*(var(--ry) + .8));display:flex;align-items:center;gap:.3rem;height:24px;padding:0 .6rem 0 .2rem;white-space:nowrap;pointer-events:auto;background:var(--paper)!important;color:var(--ink)!important;border:0!important;border-radius:999px;box-shadow:var(--sh-2),inset 0 0 0 1px rgba(42,28,16,.4)!important;font:700 .66rem var(--sans);opacity:.55;animation:rise .35s var(--ease) .25s both;transition:opacity .2s,box-shadow .2s}
 .tag-pill:hover:not(:disabled){transform:none}
 .tag-pill b{font-weight:700}
 .tag-pill .ord{width:17px;height:17px;display:grid;place-items:center;border-radius:50%;background:var(--ink);color:var(--paper);font:900 .62rem var(--serif);font-style:normal}
