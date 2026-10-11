@@ -1420,7 +1420,7 @@ function Reveal({ game }: { game: ClientGameState }) {
 function Night({ game }: { game: ClientGameState }) {
   const a = game.currentNightAction;
   const role = a && ROLE_DEFINITIONS[a.role];
-  const remain = useCountdown(a?.expiresAt, game.serverNow);
+  const remain = useCountdown(a?.expiresAt ?? game.nightEndsAt ?? null, game.serverNow);
   const syncedAction = useRef<string>();
   useEffect(() => {
     // The opening narration is pending on the first role itself, so its
@@ -1439,6 +1439,16 @@ function Night({ game }: { game: ClientGameState }) {
         <h1>밤이 시작되었습니다.</h1>
         <p>모두 눈을 감아주세요.</p>
         <div className="dots">● ● ●</div>
+      </section>
+    );
+  if (!a)
+    return (
+      <section className="center night">
+        <div className="crescent">☾</div>
+        <div className="eyebrow">NIGHT</div>
+        <h1>밤 행동 진행 중</h1>
+        <p>당신은 오늘 밤 별도의 행동이 없습니다.</p>
+        <NightTimer remain={remain} total={game.settings.actionTimeLimitSeconds} />
       </section>
     );
   return (
@@ -1524,11 +1534,6 @@ function NightControls({ game }: { game: ClientGameState }) {
         </button>
       </>
     );
-  const witchSeen =
-    role === "witch" && game.actionResult?.kind === "witch_seen";
-  const stagedCenter = witchSeen
-    ? Number(game.actionResult?.centerIndex)
-    : undefined;
   const maxPlayers = role === "troublemaker" ? 2 : 1;
   const needCenter = role === "seer" ? 2 : 1;
   const playerRole =
@@ -1541,11 +1546,11 @@ function NightControls({ game }: { game: ClientGameState }) {
       "journalist",
       "troublemaker",
     ].includes(role) ||
-    (role === "witch" && witchSeen) ||
+    role === "witch" ||
     (role === "seer" && seerMode === "player");
   const centerRole =
     ["apprentice_seer", "drunk"].includes(role) ||
-    (role === "witch" && !witchSeen) ||
+    role === "witch" ||
     (role === "seer" && seerMode === "center") ||
     (role === "werewolf" && !contextPeople.length);
   const commandFor = (
@@ -1558,9 +1563,7 @@ function NightControls({ game }: { game: ClientGameState }) {
         : role === "drunk"
           ? "swap_center"
           : role === "witch"
-            ? witchSeen
-              ? "swap_center"
-              : "inspect_center"
+            ? "swap_center"
             : role === "robber" || role === "alpha_wolf"
               ? "swap_player"
               : role === "shield_bearer"
@@ -1571,9 +1574,14 @@ function NightControls({ game }: { game: ClientGameState }) {
                     ? "inspect_centers"
                     : "inspect_center",
     targetPlayerIds: nextPlayers,
-    centerIndexes:
-      witchSeen && stagedCenter !== undefined ? [stagedCenter] : nextCenters,
+    centerIndexes: nextCenters,
   });
+  const readyToSubmit = (nextPlayers: string[], nextCenters: number[]) =>
+    role === "witch"
+      ? nextPlayers.length === 1 && nextCenters.length === 1
+      : playerRole
+        ? nextPlayers.length === maxPlayers
+        : nextCenters.length === needCenter;
   const pickPlayer = (id: string) => {
     if (submitting) return;
     const next = players.includes(id)
@@ -1581,7 +1589,7 @@ function NightControls({ game }: { game: ClientGameState }) {
       : [...players.slice(-(maxPlayers - 1)), id];
     buzz();
     setPlayers(next);
-    if (next.length === maxPlayers) submit(commandFor(next, centers));
+    if (readyToSubmit(next, centers)) submit(commandFor(next, centers));
   };
   const pickCenter = (i: number) => {
     if (submitting) return;
@@ -1591,7 +1599,7 @@ function NightControls({ game }: { game: ClientGameState }) {
       : [...centers.slice(-(max - 1)), i];
     buzz();
     setCenters(next);
-    if (next.length === needCenter) submit(commandFor(players, next));
+    if (readyToSubmit(players, next)) submit(commandFor(players, next));
   };
   return (
     <>
@@ -1625,11 +1633,6 @@ function NightControls({ game }: { game: ClientGameState }) {
         </div>
       )}
       <Panel>
-        {witchSeen && (
-          <p className="witch-next">
-            센터 카드를 확인했습니다. 이제 교환할 플레이어를 선택하세요.
-          </p>
-        )}
         {playerRole && (
           <>
             <h3>플레이어 선택</h3>

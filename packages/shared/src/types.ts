@@ -55,6 +55,10 @@ export interface Room {
   actionTimeLimitSeconds: number; dayTimeLimitSeconds: number; ttsEnabled: boolean; nightLog: NightActionLog[];
   votes: Record<string, string>; voteStartRequests: string[]; processedRequestIds: string[]; chat: ChatMessage[]; publicReveals: string[];
   privateResults: Record<string, Record<string, unknown>>;
+  /** Choices collected during the simultaneous night-input window. */
+  pendingNightCommands?: Record<string, NightCommand>;
+  /** Brief private-result window shown after ordered night resolution. */
+  nightResolutionExpiresAt?: number | null;
   /** Never broadcast: each player only receives their own entries. */
   privateNightActions: Record<string, PrivateNightAction[]>;
   protectedPlayerId: string | null; dayExpiresAt: number | null; result: GameResult | null;
@@ -73,5 +77,6 @@ export interface ClientGameState {
   votesCompleted: number; dayVoteRequests: number; hasRequestedDayVote: boolean; totalPlayers: number; dayExpiresAt: number | null; serverNow: number; chat: ChatMessage[]; lobbyChat: ChatMessage[];
   publicReveals: string[]; settings: { actionTimeLimitSeconds: number; dayTimeLimitSeconds: number };
   result: GameResult | null;
+  nightEndsAt?: number | null;
 }
 export interface Ack<T = unknown> { ok: boolean; data?: T; error?: string; }

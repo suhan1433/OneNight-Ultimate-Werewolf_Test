@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { AVATAR_IDS, NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type ClientGameState, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
 import { z } from 'zod';
-import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
+import { assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
 import { appendChat, appendLobbyChat, canCreateRoom, clearChat, clearLobbyChat, clearReadiness, clearVotes, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, removeVotesForPlayer, saveRoom, sweepExpiredRooms, toggleReady, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 
@@ -205,7 +205,7 @@ export function registerHandlers(io: Server, socket: Socket) {
     // Starting a rematch reuses player IDs, so retaining this map would make
     // last game's ballots look like instant votes in the new voting phase.
     await clearVotes(room.roomCode);
-    room.players = assigned.players.map((player) => ({ ...player, vote: null, hasConfirmedCard: !!player.isBot })); room.centerCards = assigned.centerCards; room.phase = 'card_reveal'; room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
+    room.players = assigned.players.map((player) => ({ ...player, vote: null, hasConfirmedCard: !!player.isBot })); room.centerCards = assigned.centerCards; room.phase = 'card_reveal'; room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.pendingNightCommands = {}; room.nightResolutionExpiresAt = null; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
     await clearLobbyChat(room.roomCode);
   }, 'GAME_STARTED'));
   on(socket, 'CARD_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId) => {
@@ -220,14 +220,13 @@ export function registerHandlers(io: Server, socket: Socket) {
       const player = room.players.find((p) => p.id === playerId);
       if (!player || !player.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
       const error = validateNightAction(room, playerId, base.actionId, base.command); if (error) throw new Error(error);
-      const applied = applyNightAction(room, playerId, base.command); room = applied.room; room.privateResults[playerId] = applied.result;
+      if (room.pendingNightCommands?.[playerId]) throw new Error('밤 행동은 한 번만 선택할 수 있습니다.');
+      room.pendingNightCommands = { ...(room.pendingNightCommands ?? {}), [playerId]: base.command };
       room.updatedAt = Date.now(); await saveRoom(room, base.requestId); return room;
     }, base.requestId);
     if (duplicate) return {};
-    const nextAction = room.phase === 'night' && room.nightActionQueue[room.currentNightActionIndex]?.id !== base.actionId;
-    if (nextAction) emitActionStart(io, room);
     await emitRoomState(io, room); io.to(roomChannel(room.roomCode)).emit('NIGHT_ACTION_COMPLETED', { actionId: base.actionId });
-    if (room.phase === 'day') emitDayStart(io, room); return {};
+    await processExpiredRoom(io, room.roomCode); return {};
   });
   on(socket, 'NIGHT_ACTION_CONFIRM', async (raw) => {
     const base = safe(requestSchema.extend({ actionId: z.string().uuid() }), raw); const playerId = assertSession(socket, base.roomCode);
@@ -237,13 +236,12 @@ export function registerHandlers(io: Server, socket: Socket) {
       const player = room.players.find((p) => p.id === playerId);
       if (!player || !player.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
       const command: NightCommand = { type: 'confirm' }; const error = validateNightAction(room, playerId, base.actionId, command); if (error) throw new Error(error);
-      const applied = applyNightAction(room, playerId, command); room = applied.room; room.privateResults[playerId] = applied.result;
+      if (room.pendingNightCommands?.[playerId]) throw new Error('밤 행동은 한 번만 선택할 수 있습니다.');
+      room.pendingNightCommands = { ...(room.pendingNightCommands ?? {}), [playerId]: command };
       room.updatedAt = Date.now(); await saveRoom(room, base.requestId); return room;
     }, base.requestId);
     if (duplicate) return {};
-    const nextAction = room.phase === 'night' && room.nightActionQueue[room.currentNightActionIndex]?.id !== base.actionId;
-    if (nextAction) emitActionStart(io, room);
-    await emitRoomState(io, room); if (room.phase === 'day') emitDayStart(io, room); return {};
+    await emitRoomState(io, room); await processExpiredRoom(io, room.roomCode); return {};
   });
   on(socket, 'DAY_START', async (raw) => {
     const data = safe(requestSchema, raw);
@@ -311,13 +309,13 @@ export function registerHandlers(io: Server, socket: Socket) {
   on(socket, 'GAME_RESTART', async (raw) => mutate(io, socket, raw, async (room, playerId) => {
     if (room.hostId !== playerId || room.phase !== 'result') throw new Error('방장만 대기실로 돌아갈 수 있습니다.');
     room.players = room.players.map((p) => ({ ...p, originalRole: null, currentRole: null, isReady: !!p.isBot, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
-    room.centerCards = []; room.phase = 'lobby'; room.nightActionQueue = []; room.currentNightActionIndex = 0; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.publicReveals = []; room.nightLog = []; room.chat = []; room.dayExpiresAt = null; room.result = null; room.protectedPlayerId = null; room.lobbyExpiresAt = Date.now() + LOBBY_TTL_MS; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
+    room.centerCards = []; room.phase = 'lobby'; room.nightActionQueue = []; room.currentNightActionIndex = 0; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.pendingNightCommands = {}; room.nightResolutionExpiresAt = null; room.publicReveals = []; room.nightLog = []; room.chat = []; room.dayExpiresAt = null; room.result = null; room.protectedPlayerId = null; room.lobbyExpiresAt = Date.now() + LOBBY_TTL_MS; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
     await Promise.all([clearChat(room.roomCode), clearReadiness(room.roomCode), clearVotes(room.roomCode)]);
   }, 'PHASE_CHANGED'));
 
   socket.on('disconnect', async () => {
     const code = socket.data.roomCode as string | undefined; const playerId = socket.data.playerId as string | undefined; if (!code || !playerId) return;
-    try { const room = await withRoomLock(code, async (room) => { const p = room.players.find((x) => x.id === playerId); if (p && p.socketId === socket.id) { p.connected = false; p.socketId = null; p.disconnectedAt = Date.now(); const action = room.nightActionQueue[room.currentNightActionIndex]; if (room.phase === 'night' && action?.status === 'active' && action.playerIds.includes(playerId)) action.expiresAt = Math.min(action.expiresAt, Date.now() + 5_000); if (room.hostId === playerId) room.hostId = room.players.find((x) => x.id !== playerId && x.connected)?.id ?? room.hostId; if (room.players.every((player) => !player.connected)) room.allOfflineExpiresAt = Date.now() + ALL_OFFLINE_GRACE_MS; await saveRoom(room); } return room; }); await emitRoomState(io, room); io.to(roomChannel(code)).emit('PLAYER_LEFT', { playerId }); } catch { /* expired room */ }
+    try { const room = await withRoomLock(code, async (room) => { const p = room.players.find((x) => x.id === playerId); if (p && p.socketId === socket.id) { p.connected = false; p.socketId = null; p.disconnectedAt = Date.now(); if (room.phase === 'night' && room.nightActionQueue.some((action) => action.status === 'active' && action.playerIds.includes(playerId))) for (const action of room.nightActionQueue) if (action.status === 'active') action.expiresAt = Math.min(action.expiresAt, Date.now() + 5_000); if (room.hostId === playerId) room.hostId = room.players.find((x) => x.id !== playerId && x.connected)?.id ?? room.hostId; if (room.players.every((player) => !player.connected)) room.allOfflineExpiresAt = Date.now() + ALL_OFFLINE_GRACE_MS; await saveRoom(room); } return room; }); await emitRoomState(io, room); io.to(roomChannel(code)).emit('PLAYER_LEFT', { playerId }); } catch { /* expired room */ }
   });
 }
 

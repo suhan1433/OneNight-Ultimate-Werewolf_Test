@@ -317,7 +317,10 @@ function Table(){
  useEffect(()=>{const cards=[...game.trick,...(game.lastTrick?.cards??[])];const keys=cards.map(p=>p.card.id);if(!heardCards.current){heardCards.current=new Set(keys);return;}const heard=heardCards.current;cards.forEach(p=>{if(!heard.has(p.card.id)){heard.add(p.card.id);if(soundEnabled())playCardSound(p);}});},[game.trick,game.lastTrick]);
  /* 트릭 종료 연출: 직전 상태의 트릭 카드를 복사해 두었다가 승자 칩(.sailor[data-pid]) 쪽으로 쓸어 보낸다. 승자는 '획득 수가 늘어난 선원'으로 추론(서버 상태/로직은 변경 없음). */
  const [sweep,setSweep]=useState<{cards:SweepCard[];winner:string|null;late:boolean}|null>(null);const lastOwn=useRef<SweepCard|null>(null);const prevGame=useRef(game);const sweepRef=useRef<HTMLDivElement>(null);
- useEffect(()=>{const before=prevGame.current;prevGame.current=game;if(!before||before===game)return;const ended=before.trick.length>0&&before.round===game.round&&before.phase!=='bidding'&&game.phase!=='bidding'&&(game.trick.length<before.trick.length||game.trick[0]?.card.id!==before.trick[0].card.id);if(!ended)return;
+ /* Use a layout effect here: on the final card the server also changes phase to
+    roundScore.  A normal effect lets the score screen paint for one frame
+    before the sweep is mounted, which looks like a flash. */
+ useLayoutEffect(()=>{const before=prevGame.current;prevGame.current=game;if(!before||before===game)return;const ended=before.trick.length>0&&before.round===game.round&&before.phase!=='bidding'&&game.phase!=='bidding'&&(game.trick.length<before.trick.length||game.trick[0]?.card.id!==before.trick[0].card.id);if(!ended)return;
   /* 서버가 lastTrick({cards,winnerId})을 내려주면 그것을 사용(마지막 카드까지 정확). 없으면 직전 상태 + '마지막 사람의 카드'를 보완한다: 내 카드는 직접 기억, 남의 카드는 뒷면으로 표시. */
   const last=game.lastTrick;let cards:SweepCard[]=before.trick.map(t=>({playerId:t.playerId,card:t.card,declaration:t.declaration}));
   if(last?.cards?.length&&last.cards.length>=cards.length)cards=last.cards.map(c=>({playerId:c.playerId,card:c.card,declaration:c.declaration,late:!before.trick.some(t=>t.playerId===c.playerId)}));
@@ -374,7 +377,11 @@ function Table(){
  const needs=(c:Card)=>c.kind==='tigress'||c.isZeroFourteen||(c.kind==='wild'&&!game.trickLead);
  const canPlay=active&&!game.pendingDecision&&game.phase!=='decision';const waiting=game.phase==='decision'&&!game.pendingDecision;
  const turnLine=game.pendingDecision?'능력을 선택하세요.':active?'당신의 차례입니다.'+nextTxt:pname(game,game.turnId)+'의 차례'+nextTxt;
- if((game.phase==='roundScore'||game.phase==='result')&&!sweep)return <Score/>;
+ /* Keep the table mounted while a just-finished final trick is handed to the
+    layout effect above.  This prevents the score screen from appearing for a
+    single render between the card play and the sweep animation. */
+ const before=prevGame.current;const trickJustEnded=before!==game&&before.trick.length>0&&before.round===game.round&&before.phase!=='bidding'&&game.phase!=='bidding'&&(game.trick.length<before.trick.length||game.trick[0]?.card.id!==before.trick[0].card.id);
+ if((game.phase==='roundScore'||game.phase==='result')&&!sweep&&!trickJustEnded)return <Score/>;
  return <main className={'game '+(bidding?'is-bidding':'is-play')}><GameHeader round={game.round} cards={game.cardsThisRound} onHelp={()=>setHelp(true)}/>
  <section className={'felt'+(sweep?.winner?' won':'')+(reveal?' revealing':'')} data-n={Math.min(nP,9)}>
   <Chart/>

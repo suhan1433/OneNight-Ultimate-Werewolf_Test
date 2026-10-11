@@ -112,6 +112,10 @@ export interface Room {
     chat: ChatMessage[];
     publicReveals: string[];
     privateResults: Record<string, Record<string, unknown>>;
+    /** Choices collected during the simultaneous night-input window. */
+    pendingNightCommands?: Record<string, NightCommand>;
+    /** Brief private-result window shown after ordered night resolution. */
+    nightResolutionExpiresAt?: number | null;
     /** Never broadcast: each player only receives their own entries. */
     privateNightActions: Record<string, PrivateNightAction[]>;
     protectedPlayerId: string | null;
@@ -166,6 +170,7 @@ export interface ClientGameState {
         dayTimeLimitSeconds: number;
     };
     result: GameResult | null;
+    nightEndsAt?: number | null;
 }
 export interface Ack<T = unknown> {
     ok: boolean;

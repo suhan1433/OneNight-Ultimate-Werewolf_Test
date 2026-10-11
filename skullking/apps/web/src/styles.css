@@ -205,8 +205,9 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .tag-pill .tp-av{width:20px;height:20px;flex:none}
 .tag-pill.mine{background:var(--ink)!important;color:var(--paper)!important}.tag-pill.mine .ord{background:var(--paper);color:var(--ink)}
 .tag-pill.focused{box-shadow:0 0 0 2px var(--blood),var(--sh-2)!important;z-index:2}
-/* 상대 카드를 살펴볼 때는 이름표 뒤로 카드 일러스트가 조금 비치게 한다. */
-.tag-pill.focused:not(.mine){background:rgba(231,216,180,.76)!important}
+/* 선택한 카드의 이름표는 배경을 완전히 덮어, 반투명 레이어가 카드
+   일러스트와 섞여 보이지 않게 한다. */
+.tag-pill.focused:not(.mine){background:var(--paper)!important}
 .tags:has(.focused) .tag-pill:not(.focused){opacity:.55}
 .felt[data-n="7"] .tag-pill:not(.focused) b,.felt[data-n="8"] .tag-pill:not(.focused) b,.felt[data-n="9"] .tag-pill:not(.focused) b{display:none}
 .seat.spot .portrait{box-shadow:0 0 0 2px var(--paper),var(--sh-2)}
