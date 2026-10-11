@@ -446,6 +446,10 @@ button:disabled{opacity:.38;cursor:not-allowed}
   .chart{height:70%}
 }
 @media(max-width:640px){
+  /* 키보드가 열린 동안에는 손패 대신 탁자와 좌석을 우선한다. JS가
+     visual viewport 높이를 넣어 iOS의 자동 화면 이동도 같은 기준으로 맞춘다. */
+  .game.is-play.chat-focus{height:var(--chat-viewport-height,100dvh)}
+  .game.is-play.chat-focus .hand-box{height:0!important;overflow:hidden}
   .help-foot{padding:.7rem 1rem .9rem;gap:.5rem}.help-foot .prev{padding:.6rem}.help-foot .prev span{display:none}.help-foot .next{padding:.6rem .9rem;font-size:.86rem}
   .board th,.board td{padding:.5rem .45rem}.board .who{min-width:92px}.wh{gap:.4rem}.wh .avatar-cameo{display:none}.wh .medal{width:22px;height:22px}
   .tiles,.hcols{grid-template-columns:1fr}.help-body{padding:1.2rem 1.1rem 1rem}.help-foot{padding:.7rem 1.1rem 1rem}.help-tabs{padding-left:1rem}

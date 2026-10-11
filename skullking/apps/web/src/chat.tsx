@@ -57,9 +57,47 @@ export function Bubble({ playerId }: { playerId: string }) {
   return <span key={b.key} className={'bubble' + (playerId === me ? ' mine' : '')} role="status" style={{ '--life': b.ms + 'ms' } as CSSProperties}>{b.text}</span>;
 }
 
+/**
+ * iOS처럼 키보드가 layout viewport를 줄이지 않는 브라우저에서는 입력창에
+ * 포커스될 때 화면이 손패 쪽으로만 밀린다. 실제 보이는 높이(visual viewport)에
+ * 게임판을 맞추고 손패를 잠시 접어서, 초상화와 그 위 말풍선을 계속 볼 수 있게 한다.
+ */
+function useMobileChatView(focused: boolean) {
+  useEffect(() => {
+    if (!focused || !window.matchMedia('(max-width: 640px)').matches) return;
+    const game = document.querySelector<HTMLElement>('.game.is-play');
+    if (!game) return;
+    const viewport = window.visualViewport;
+    let frame = 0;
+    const sync = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        game.style.setProperty('--chat-viewport-height', `${Math.round(viewport?.height ?? window.innerHeight)}px`);
+        game.classList.add('chat-focus');
+        // 브라우저가 입력창을 보이게 하려고 밀어 둔 페이지를 게임판의 위쪽으로 되돌린다.
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      });
+    };
+    sync();
+    viewport?.addEventListener('resize', sync);
+    viewport?.addEventListener('scroll', sync);
+    window.addEventListener('resize', sync);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      viewport?.removeEventListener('resize', sync);
+      viewport?.removeEventListener('scroll', sync);
+      window.removeEventListener('resize', sync);
+      game.classList.remove('chat-focus');
+      game.style.removeProperty('--chat-viewport-height');
+    };
+  }, [focused]);
+}
+
 export function ChatInput({ roomCode, meId, wide }: { roomCode: string; meId: string; wide?: boolean }) {
   const [text, setText] = useState('');
+  const [focused, setFocused] = useState(false);
   const last = useRef(0);
+  useMobileChatView(focused);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const t = text.trim().slice(0, 60);
@@ -73,7 +111,7 @@ export function ChatInput({ roomCode, meId, wide }: { roomCode: string; meId: st
   };
   return <form className={'chat' + (wide ? ' wide' : '')} onSubmit={submit}>
     <Icon name="chat" />
-    <input value={text} onChange={e => setText(e.target.value)} maxLength={60} placeholder="한마디…" aria-label="채팅 입력" autoComplete="off" autoCorrect="off" enterKeyHint="send" />
+    <input value={text} onChange={e => setText(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} maxLength={60} placeholder="한마디…" aria-label="채팅 입력" autoComplete="off" autoCorrect="off" enterKeyHint="send" />
     <button type="submit" disabled={!text.trim()} aria-label="보내기"><Icon name="send" /></button>
   </form>;
 }
