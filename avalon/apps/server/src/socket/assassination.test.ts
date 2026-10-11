@@ -21,6 +21,13 @@ beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();});
 afterEach(()=>{vi.useRealTimers();});
 
 describe('shared assassination scene',()=>{
+ it('relays only the leader\'s in-progress team selection to the room',async()=>{
+  const h=harness();h.room.phase='team_build';h.room.results=[];
+  await h.handlers.get('TEAM_SELECTION')!({roomCode:h.room.roomCode,team:['assassin','merlin']});
+  expect(h.broadcast).toHaveBeenCalledWith('TEAM_SELECTION',{roomCode:h.room.roomCode,actorId:'assassin',team:['assassin','merlin']});
+  h.client.data.playerId='loyal';await h.handlers.get('TEAM_SELECTION')!({roomCode:h.room.roomCode,team:['loyal','merlin']});
+  expect(h.broadcast).toHaveBeenCalledTimes(1);
+ });
  it('stores a valid profile avatar and publishes the updated room state',async()=>{
   const h=harness();const result=await h.request('PROFILE_UPDATE',{roomCode:h.room.roomCode,avatar:'fox'});
   expect(result).toMatchObject({ok:true});expect(h.room.players[0]).toMatchObject({avatar:'fox'});expect(db.saveRoom).toHaveBeenCalledOnce();expect(h.broadcast).toHaveBeenCalledWith('ROOM_STATE',expect.objectContaining({players:expect.arrayContaining([expect.objectContaining({id:'assassin',avatar:'fox'})])}));

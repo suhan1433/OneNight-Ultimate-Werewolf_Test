@@ -1,6 +1,6 @@
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {ROLE_DEFINITIONS,type ClientGameState} from '@werewolf/shared';
-import {emit,socket,getAssassinAim,type AssassinAimState} from './socket';
+import {emit,socket,getAssassinAim,getTeamSelection,type AssassinAimState,type TeamSelectionState} from './socket';
 import {useGame} from './store';
 import {PlayerAvatar,useCharacterResolver} from './profile';
 import {roleArtFor} from './role-art';
@@ -90,13 +90,15 @@ function SeatEmoji({playerId}:{playerId:string}){return <>{useCharacterResolver(
    인원 충족: 코어 링 완성 + 버튼 맥동 → 제안: 다각형 완성 + 카메라 후퇴
    ========================================================= */
 export function TeamScene({game}:{game:ClientGameState}){
-  const[team,setTeam]=useState<string[]>([]);const[leaving,setLeaving]=useState<string[]>([]);const[submitting,setSubmitting]=useState(false);
+  const[team,setTeam]=useState<string[]>(()=>getTeamSelection(game.roomCode)?.team??[]);const[leaving,setLeaving]=useState<string[]>([]);const[submitting,setSubmitting]=useState(false);
   const timer=useRef<number>();const reduced=useMotion();const leader=game.playerId===game.leaderId;
   const n=game.players.length;
   const leaderIndex=Math.max(0,game.players.findIndex(player=>player.id===game.leaderId));const origin=position(leaderIndex,n);const lightAt=position(leaderIndex,n,30);
   const selected=game.players.filter(player=>team.includes(player.id));const ready=team.length===game.questSize;
   useEffect(()=>()=>window.clearTimeout(timer.current),[]);
-  const toggle=(id:string)=>{if(!leader||submitting)return;if(team.includes(id)){setTeam(team.filter(value=>value!==id));setLeaving(previous=>[...previous.filter(value=>value!==id),id]);}else if(!ready){setLeaving(previous=>previous.filter(value=>value!==id));setTeam([...team,id]);}};
+  useEffect(()=>{const receive=(message:TeamSelectionState)=>{if(message.roomCode===game.roomCode)setTeam(message.team);};socket.on('TEAM_SELECTION',receive);const cached=getTeamSelection(game.roomCode);if(cached)receive(cached);return()=>{socket.off('TEAM_SELECTION',receive);};},[game.roomCode]);
+  const shareSelection=(next:string[])=>{setTeam(next);socket.emit('TEAM_SELECTION',{roomCode:game.roomCode,team:next});};
+  const toggle=(id:string)=>{if(!leader||submitting)return;if(team.includes(id)){shareSelection(team.filter(value=>value!==id));setLeaving(previous=>[...previous.filter(value=>value!==id),id]);}else if(!ready){setLeaving(previous=>previous.filter(value=>value!==id));shareSelection([...team,id]);}};
   const propose=()=>{if(!ready||submitting)return;setSubmitting(true);timer.current=window.setTimeout(()=>{void emit('TEAM_PROPOSE',{roomCode:game.roomCode,team}).catch(error=>{setSubmitting(false);useGame.getState().setError(error.message);});},reduced?0:1150);};
   const at=(id:string)=>position(Math.max(0,game.players.findIndex(player=>player.id===id)),n);
   const pts=selected.map(player=>{const p=position(game.players.indexOf(player),n);return`${p.x},${p.y}`;}).join(' ');

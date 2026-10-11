@@ -11,9 +11,19 @@ const BOT_ASSASSINATION_RESULT_DELAY_MS=1_000;
 const pendingBotTeamSelections=new Set<string>();
 const pendingBotAssassinations=new Set<string>();
 const pendingAssassinations=new Map<string,string>();
+// Team building is intentionally an in-progress, public scene.  Keep its latest
+// ephemeral selection so a reconnecting player can immediately join the scene.
+const pendingTeamSelections=new Map<string,{actorId:string;team:string[]}>();
 const ack=<T>(socket:Socket,event:string,fn:(data:any)=>Promise<T>)=>socket.on(event,async(data:any,cb?:(x:Ack<T>)=>void)=>{try{cb?.({ok:true,data:await fn(data)});}catch(e){const error=e instanceof Error?e.message:'요청을 처리하지 못했습니다.';cb?.({ok:false,error});socket.emit('ERROR',{message:error});}});
 const session=(s:Socket,c:string)=>{if(s.data.roomCode!==c||!s.data.playerId)throw Error('유효한 게임 세션이 아닙니다.');return s.data.playerId as string;};
-export async function emitRoomState(io:Server,room:Room){for(const p of room.players)io.to(channel(p.id)).emit('ROOM_STATE',clientState(room,p.id));if(room.phase==='assassination')io.to(roomChannel(room.roomCode)).emit('ASSASSIN_AIM',{roomCode:room.roomCode,actorId:room.players.find(p=>p.hasAssassinationAbility)?.id,targetId:pendingAssassinations.get(room.roomCode)??null,locked:pendingAssassinations.has(room.roomCode)});}
+export async function emitRoomState(io:Server,room:Room){
+ for(const p of room.players)io.to(channel(p.id)).emit('ROOM_STATE',clientState(room,p.id));
+ if(room.phase==='team_build'){
+  const selection=pendingTeamSelections.get(room.roomCode);
+  io.to(roomChannel(room.roomCode)).emit('TEAM_SELECTION',{roomCode:room.roomCode,actorId:selection?.actorId??room.players[room.leaderIndex]?.id,team:selection?.team??[]});
+ }else pendingTeamSelections.delete(room.roomCode);
+ if(room.phase==='assassination')io.to(roomChannel(room.roomCode)).emit('ASSASSIN_AIM',{roomCode:room.roomCode,actorId:room.players.find(p=>p.hasAssassinationAbility)?.id,targetId:pendingAssassinations.get(room.roomCode)??null,locked:pendingAssassinations.has(room.roomCode)});
+}
 function bind(s:Socket,r:Room,id:string){s.data.roomCode=r.roomCode;s.data.playerId=id;s.join(roomChannel(r.roomCode));s.join(channel(id));}
 function resetRound(room:Room){room.proposedTeam=[];room.teamVotes={};room.questCards={};room.continueConfirmations={};room.voteResult=undefined;room.questResult=undefined;room.assassinTarget=undefined;}
 function validateRoleOptions(maxPlayers:number,options:AvalonOptions){const special=['morgana','mordred','oberon'].filter(role=>options[role as keyof AvalonOptions]).length;const evilRoles=special+Number(options.assassin);if(evilRoles>COUNT_TABLE[maxPlayers]!.evil)throw Error('선택한 악 역할이 인원수보다 많습니다.');if(!options.assassin&&(!options.assassinationAbilityRole||!options[options.assassinationAbilityRole]))throw Error('암살자가 없으면 선택한 악의 세력 중 암살 능력 보유자를 지정해야 합니다.');if(options.assassin&&options.assassinationAbilityRole)throw Error('암살자를 포함한 게임에서는 암살 능력을 위임할 수 없습니다.');}
@@ -149,6 +159,20 @@ function scheduleBotAssassination(io:Server, room:Room) {
   aimTimer.unref();
 }
 export function registerHandlers(io:Server,socket:Socket){
+ // Like an assassin's aim, team selection is an ephemeral visual event.  The
+ // proposed team itself remains authoritative only once TEAM_PROPOSE succeeds.
+ socket.on('TEAM_SELECTION',async(d:{roomCode?:string;team?:unknown})=>{
+  try{
+   if(!d||typeof d.roomCode!=='string')return;
+   const roomCode=d.roomCode.toUpperCase(),id=session(socket,roomCode);
+   const room=await getRoom(roomCode),leader=room?.players[room.leaderIndex];
+   if(!room||room.phase!=='team_build'||leader?.id!==id||leader.socketId!==socket.id||!leader.connected)return;
+   const team=Array.isArray(d.team)?d.team.filter((member:unknown):member is string=>typeof member==='string'):[];
+   if(team.length>questSize(room)||new Set(team).size!==team.length||team.some(member=>!room.players.some(player=>player.id===member)))return;
+   pendingTeamSelections.set(roomCode,{actorId:id,team});
+   io.to(roomChannel(roomCode)).emit('TEAM_SELECTION',{roomCode,actorId:id,team});
+  }catch{/* Selection updates must not produce error toasts. */}
+ });
  // Aim is an ephemeral room-scoped visual event, never a committed game action.
  socket.on('ASSASSIN_AIM',async(d:{roomCode?:string;targetId?:string|null})=>{
   try{

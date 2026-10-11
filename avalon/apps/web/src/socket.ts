@@ -1,10 +1,14 @@
 import { io } from 'socket.io-client'; import type { Ack, ChatMessage, ClientGameState } from '@werewolf/shared'; import { useGame } from './store';
 export const socket=io(import.meta.env.DEV?(import.meta.env.VITE_SOCKET_URL??'http://localhost:3002'):undefined,{path:import.meta.env.DEV?'/socket.io':'/api/avalon/socket',transports:['websocket','polling']});
 export type AssassinAimState={roomCode:string;targetId:string|null;actorId?:string;locked?:boolean};
+export type TeamSelectionState={roomCode:string;actorId?:string;team:string[]};
 let lastAssassinAim:AssassinAimState|null=null;
+let lastTeamSelection:TeamSelectionState|null=null;
 export const getAssassinAim=(roomCode:string)=>lastAssassinAim?.roomCode===roomCode?lastAssassinAim:null;
+export const getTeamSelection=(roomCode:string)=>lastTeamSelection?.roomCode===roomCode?lastTeamSelection:null;
 socket.on('ASSASSIN_AIM',(message:AssassinAimState)=>{lastAssassinAim=message;});
-socket.on('ROOM_STATE',(game:ClientGameState)=>{if(game.phase!=='assassination')lastAssassinAim=null;});
+socket.on('TEAM_SELECTION',(message:TeamSelectionState)=>{lastTeamSelection=message;});
+socket.on('ROOM_STATE',(game:ClientGameState)=>{if(game.phase!=='assassination')lastAssassinAim=null;if(game.phase!=='team_build')lastTeamSelection=null;});
 socket.on('ROOM_STATE',(game:ClientGameState)=>useGame.getState().setGame(game)); socket.on('ERROR',({message})=>useGame.getState().setError(message));
 socket.on('CHAT_MESSAGE',(message:ChatMessage)=>useGame.getState().addChat(message)); socket.on('CHAT_HISTORY',(messages:ChatMessage[])=>useGame.getState().setChatHistory(messages));
 export const emit=(event:string,data:unknown)=>new Promise<any>((resolve,reject)=>socket.emit(event,data,(a:Ack)=>a.ok?resolve(a.data):reject(Error(a.error))));
