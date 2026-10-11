@@ -417,3 +417,34 @@ button.card{cursor:pointer}
   .stars i{animation:none!important}
   .hand.fan .card,.hand.row .card{transition:none}
 }
+
+/* ───── 가로 넘침 방지(웹/앱 공통): 그리드 칸이 가로 스크롤 내용 폭만큼 늘어나지 않게 고정 ───── */
+html,body{max-width:100%;overflow-x:hidden}
+.table-scene,.lobby{grid-template-columns:minmax(0,1fr)}
+.table-scene>*,.lobby>*,.dock>*,.stage>*,.seat>*{min-width:0}
+.table-scene{width:100%;overflow-x:clip;overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+.dock,.hand-zone,.hand{max-width:100%}
+@media (max-width:760px){
+  .logbook{grid-template-columns:minmax(0,1fr)}
+  .crew-strip{max-width:100%;-webkit-overflow-scrolling:touch}
+  .topbar{height:auto;min-height:46px;gap:.3rem}
+  .topbar .bar-btn{padding:.35rem .55rem;font-size:.74rem}
+  .topbar .bar-btn.round{width:30px;height:30px;padding:0}
+  .tricks{font-size:.72rem}.tricks b{font-size:.88rem}
+  .mission-pill{padding:.35rem .55rem;gap:.4rem}.mission-pill b{font-size:.72rem}.mission-pill span{font-size:.78rem}
+  .seat.me{grid-template-columns:auto minmax(0,1fr) auto}
+  .seat.me .who{min-width:0}
+  .seat.me .nm{max-width:5.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .seat.me .seat-tasks{flex-wrap:nowrap;min-width:0}
+  .comm-slot{min-width:64px;padding:3px 5px}
+  .hand.row{width:100%;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+  .status{font-size:.86rem}
+  .trick-zone{width:min(100%,360px)}
+  .center-note{max-width:44%}
+}
+/* 아주 좁은 화면(≤400px): 미션 목표 줄을 윗줄로, 트릭·버튼은 아랫줄로 */
+@media (max-width:400px){
+  .topbar{flex-wrap:wrap;padding:6px 0}
+  .mission-pill{order:-1;flex:1 1 100%}
+  .tricks{margin-right:auto}
+}
