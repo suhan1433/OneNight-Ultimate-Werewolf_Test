@@ -47,6 +47,7 @@ h1 {
 .werewolf { --accent: var(--moon); background: linear-gradient(160deg, #3a2a6b 0, #221845 55%, #150f2c); }
 .bloodbound { --accent: #e58a9e; background: linear-gradient(160deg, #661d3e 0, #361226 55%, #190c18); }
 .skullking { --accent: #e7bb55; background: linear-gradient(160deg, #5a310e 0, #2b1708 55%, #130a03); }
+.spacecrew { --accent: #7bc8ff; background: linear-gradient(160deg, #172d68 0, #0c173d 55%, #070b22); }
 .skullking .table { fill: rgba(231, 187, 85, .1); stroke: #eac469; }
 .skullking .hill { fill: none; stroke: #c2772d; stroke-width: 3; opacity: .8; }
 .skullking .pines { fill: none; stroke: #f0c65f; stroke-width: 2; opacity: .75; }
@@ -55,6 +56,14 @@ h1 {
 .bloodbound .hill { fill: none; stroke: #d988a3; stroke-width: 3; opacity: .75; }
 .bloodbound .pines { fill: none; stroke: #efc274; stroke-width: 2; opacity: .8; }
 .bloodbound .seats circle { fill: #351225; stroke: #efc274; }
+.space-stars circle { fill: #d9eaff; opacity: .8; }
+.planet { stroke: #9ec7ff; stroke-opacity: .55; stroke-width: 1.5; }
+.planet-ring { fill: none; stroke: #9ec7ff; stroke-width: 3; stroke-linecap: round; opacity: .72; }
+.rocket { fill: #ecf5ff; stroke: #8bc4ff; stroke-width: 2; }
+.rocket-window { fill: #234a9c; stroke: #b9dcff; stroke-width: 2; }
+.rocket-flame { fill: #ffcf67; }
+.rocket { transform-box: fill-box; transform-origin: center; transition: transform .6s var(--ease); }
+.spacecrew:hover .rocket, .spacecrew:focus-visible .rocket { transform: translate(8px, -10px); }
 
 .art { display: block; width: 100%; height: auto; aspect-ratio: 8 / 5; border-bottom: 1px solid var(--line); }
 .game-copy { display: grid; gap: 8px; padding: 24px 28px 0; }
@@ -92,5 +101,5 @@ h1 {
 }
 @media (prefers-reduced-motion: reduce) {
   .games { animation: none; }
-  .game-card, .enter svg, .seats, .moon-glow { transition: none; }
+  .game-card, .enter svg, .seats, .moon-glow, .rocket { transition: none; }
 }
