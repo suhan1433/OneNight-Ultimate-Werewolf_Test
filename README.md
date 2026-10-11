@@ -35,6 +35,16 @@ docker compose up --build
 
 인메모리 모드는 서버 간 상태 공유가 없으므로 Docker의 복수 서버 구성에는 적합하지 않습니다. 로컬에서는 `npm run dev`로 단일 서버를 실행하세요.
 
+## Render 배포
+
+저장소 루트의 `Dockerfile`은 게임 선택 화면과 모든 게임 서버를 하나의
+Render Web Service로 실행합니다. Render에서 **Language: Docker**, **Root
+Directory: 저장소 루트**로 생성하면 된다. Build/Start Command는 비워 두고,
+Render가 제공하는 `PORT`는 변경하지 않는다. 상태 확인 경로는 `/health`다.
+
+스페이스크루는 `/spacecrew/`와 `/api/spacecrew/socket/`을 사용하며, 같은
+도메인의 다른 게임 Socket.IO 서버와 분리되어 있다.
+
 ## GitHub + Vercel 배포
 
 배포 첫 화면(`/`)에서는 게임을 선택할 수 있습니다. 한밤의 늑대인간은

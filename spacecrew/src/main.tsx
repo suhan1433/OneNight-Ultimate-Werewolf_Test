@@ -40,7 +40,9 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   useEffect(() => {
-    const next = io({ transports: ['websocket', 'polling'] }); setSocket(next);
+    // Keep this game's Socket.IO traffic separate from the werewolf server
+    // when every game is served from the same Render domain.
+    const next = io({ path: '/api/spacecrew/socket/', transports: ['websocket', 'polling'] }); setSocket(next);
     next.on('ROOM_STATE', (state: Game) => { setGame(state); setCommOpen(false); });
     next.on('ERROR', ({ message }: { message: string }) => setError(message));
     next.on('connect', () => { const previous = readSession(); if (previous) next.emit('ROOM_JOIN', previous, (reply: { ok: boolean }) => { if (!reply.ok) localStorage.removeItem(storageKey); }); });
