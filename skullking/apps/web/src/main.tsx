@@ -126,7 +126,7 @@ function Hand({cards,legal,canPlay,mode,resetKey,onPlay,bar}:{cards:Card[];legal
       {shown.map((c,i)=>{const dragging=drag?.id===c.id;const isSel=sel===c.id&&!dragging;const ok=mode==='play'&&canPlay&&legalSet.has(c.id);const dim=mode==='play'&&canPlay&&!ok;
         const arc=Math.pow(i-mid,2)*Math.min(.9,5/Math.max(n,1));const rot=dragging?0:(i-mid)*Math.min(2.6,16/Math.max(n,1));
         /* An unavailable card can still be selected to show its reason, but it should not jump as far as a playable one. */
-        const lift=isSel?(ok?-30:-20):dragging?-14:arc;
+        const lift=isSel?(ok?-30:-16):dragging?-14:arc;
         return <CardView key={c.id+':'+availabilityKey} card={c} className={'hcard'+(dragging?' dragging':'')+(isSel?' sel':'')+(ok?' ok':'')+(dim?' dim':'')} aria-pressed={isSel}
           onPointerDown={e=>down(e,c.id)} onPointerMove={move} onPointerUp={()=>finish(true)} onPointerCancel={()=>finish(false)} onClick={e=>{if(e.detail===0)tap(c.id);}}
           style={{width:cw,height:ch,left:dragging?drag!.x:slot(i),zIndex:dragging?200:isSel?100:i+1,'--y':lift+'px','--r':rot+'deg','--d':Math.min(i,10)*.04+'s'} as CSSProperties}/>;})}
