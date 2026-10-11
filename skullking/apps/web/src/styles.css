@@ -205,6 +205,8 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .tag-pill .tp-av{width:20px;height:20px;flex:none}
 .tag-pill.mine{background:var(--ink)!important;color:var(--paper)!important}.tag-pill.mine .ord{background:var(--paper);color:var(--ink)}
 .tag-pill.focused{box-shadow:0 0 0 2px var(--blood),var(--sh-2)!important;z-index:2}
+/* 상대 카드를 살펴볼 때는 이름표 뒤로 카드 일러스트가 조금 비치게 한다. */
+.tag-pill.focused:not(.mine){background:rgba(231,216,180,.76)!important}
 .tags:has(.focused) .tag-pill:not(.focused){opacity:.55}
 .felt[data-n="7"] .tag-pill:not(.focused) b,.felt[data-n="8"] .tag-pill:not(.focused) b,.felt[data-n="9"] .tag-pill:not(.focused) b{display:none}
 .seat.spot .portrait{box-shadow:0 0 0 2px var(--paper),var(--sh-2)}
@@ -250,7 +252,7 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .hand-title{font:700 .68rem var(--sans);letter-spacing:.16em;color:var(--bone-3)}.hand-title small{display:none;font-weight:400;letter-spacing:.02em;margin-left:.6rem}
 @media(min-width:720px){.hand-title small{display:inline}}
 .hand-box{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-.hcard{position:absolute;bottom:18px;margin:0;touch-action:none;cursor:grab;transform-origin:50% 130%;transform:translateY(var(--y,0px)) rotate(var(--r,0deg));transition:transform .3s var(--spring),filter .25s,box-shadow .25s;animation:deal .45s var(--ease) var(--d,0s) both}
+.hcard{position:absolute;bottom:12px;margin:0;touch-action:none;cursor:grab;transform-origin:50% 130%;transform:translateY(var(--y,0px)) rotate(var(--r,0deg));transition:transform .3s var(--spring),filter .25s,box-shadow .25s;animation:deal .45s var(--ease) var(--d,0s) both}
 .hcard:hover:not(.dragging):not(.sel){transform:translateY(calc(var(--y,0px) - 12px)) rotate(var(--r,0deg))}
 .hcard.dim{filter:brightness(.5) saturate(.5)}
 .hcard.sel{box-shadow:var(--sh-3)}.hcard.sel.ok{outline:2px solid var(--gold);outline-offset:1px}
@@ -447,7 +449,7 @@ button:disabled{opacity:.38;cursor:not-allowed}
 }
 @media(max-width:640px){
   /* Keep the larger mobile cards vertically centred in their hand area. */
-  .hcard{bottom:42px}
+  .hcard{bottom:36px}
   /* 키보드가 열린 동안에는 손패 대신 탁자와 좌석을 우선한다. JS가
      visual viewport 높이를 넣어 iOS의 자동 화면 이동도 같은 기준으로 맞춘다. */
   .game.is-play.chat-focus{height:var(--chat-viewport-height,100dvh)}

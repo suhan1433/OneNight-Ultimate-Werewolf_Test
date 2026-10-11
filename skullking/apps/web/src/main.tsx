@@ -110,6 +110,11 @@ function Hand({cards,legal,canPlay,mode,resetKey,onPlay,bar}:{cards:Card[];legal
   const pad=Math.round(cw*.16);const U=Math.max(cw,W-pad*2);/* 회전한 양 끝 카드가 화면 밖으로 잘리지 않게 좌우 여백 */
   const step=n>1?Math.max(10,Math.min(cw*.8,(U-cw)/(n-1))):0;const total=cw+step*Math.max(0,n-1);const left0=Math.max(0,pad+(U-total)/2);const H=ch+84;const mid=(n-1)/2;
   const slot=(i:number)=>left0+i*step;
+  /* When following suit leaves both legal and blocked cards in the hand, lower
+     the whole fan a little so the raised blocked card keeps clear of chat. */
+  const hasLegal=mode==='play'&&canPlay&&shown.some(c=>legalSet.has(c.id));
+  const hasBlocked=mode==='play'&&canPlay&&shown.some(c=>!legalSet.has(c.id));
+  const mixedAvailability=hasLegal&&hasBlocked;
   const tap=(id:string)=>{const c=list.find(x=>x.id===id);if(!c)return;if(sel!==id){setSel(id);return;}if(mode==='play'&&canPlay&&legalSet.has(id)&&onPlay){setSel(null);onPlay(c);}else setSel(null);};
   const down=(e:ReactPointerEvent<HTMLButtonElement>,id:string)=>{if(e.pointerType==='mouse'&&e.button!==0)return;const br=box.current!.getBoundingClientRect();const i=shown.findIndex(c=>c.id===id);info.current={id,sx:e.clientX,sy:e.clientY,off:e.clientX-br.left-slot(i),moved:false,over:i};try{e.currentTarget.setPointerCapture(e.pointerId);}catch{/* 일부 브라우저 예외 무시 */}};
   const move=(e:ReactPointerEvent<HTMLButtonElement>)=>{const d=info.current;if(!d)return;if(!d.moved){if(Math.hypot(e.clientX-d.sx,e.clientY-d.sy)<8)return;d.moved=true;setSel(null);}
@@ -126,7 +131,7 @@ function Hand({cards,legal,canPlay,mode,resetKey,onPlay,bar}:{cards:Card[];legal
       {shown.map((c,i)=>{const dragging=drag?.id===c.id;const isSel=sel===c.id&&!dragging;const ok=mode==='play'&&canPlay&&legalSet.has(c.id);const dim=mode==='play'&&canPlay&&!ok;
         const arc=Math.pow(i-mid,2)*Math.min(.9,5/Math.max(n,1));const rot=dragging?0:(i-mid)*Math.min(2.6,16/Math.max(n,1));
         /* An unavailable card can still be selected to show its reason, but it should not jump as far as a playable one. */
-        const lift=isSel?(ok?-30:-16):dragging?-14:arc;
+        const lift=(isSel?(ok?-24:-12):dragging?-10:arc)+(mixedAvailability?8:0);
         return <CardView key={c.id+':'+availabilityKey} card={c} className={'hcard'+(dragging?' dragging':'')+(isSel?' sel':'')+(ok?' ok':'')+(dim?' dim':'')} aria-pressed={isSel}
           onPointerDown={e=>down(e,c.id)} onPointerMove={move} onPointerUp={()=>finish(true)} onPointerCancel={()=>finish(false)} onClick={e=>{if(e.detail===0)tap(c.id);}}
           style={{width:cw,height:ch,left:dragging?drag!.x:slot(i),zIndex:dragging?200:isSel?100:i+1,'--y':lift+'px','--r':rot+'deg','--d':Math.min(i,10)*.04+'s'} as CSSProperties}/>;})}
