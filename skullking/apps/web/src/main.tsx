@@ -105,7 +105,8 @@ function Hand({cards,legal,canPlay,mode,resetKey,onPlay,bar}:{cards:Card[];legal
   const list=useMemo(()=>{const byId=new Map(cards.map(c=>[c.id,c] as const));const kept=order.filter(id=>byId.has(id));const keptSet=new Set(kept);return [...kept.map(id=>byId.get(id)!),...sortCards(cards.filter(c=>!keptSet.has(c.id)),'suit')];},[cards,order]);
   const shown=useMemo(()=>{if(!drag)return list;const from=list.findIndex(c=>c.id===drag.id);if(from<0)return list;const next=[...list];const [c]=next.splice(from,1);next.splice(Math.max(0,Math.min(next.length,drag.over)),0,c);return next;},[list,drag?.id,drag?.over]);
   const n=shown.length;const W=width||360;
-  const cw=W<460?Math.round(Math.min(76,Math.max(62,W*.2))):W<820?96:112;const ch=Math.round(cw*156/110);
+  // Mobile cards are a touch larger while remaining compact enough to keep a full hand visible.
+  const cw=W<460?Math.round(Math.min(82,Math.max(66,W*.21))):W<820?96:112;const ch=Math.round(cw*156/110);
   const pad=Math.round(cw*.16);const U=Math.max(cw,W-pad*2);/* 회전한 양 끝 카드가 화면 밖으로 잘리지 않게 좌우 여백 */
   const step=n>1?Math.max(10,Math.min(cw*.8,(U-cw)/(n-1))):0;const total=cw+step*Math.max(0,n-1);const left0=Math.max(0,pad+(U-total)/2);const H=ch+84;const mid=(n-1)/2;
   const slot=(i:number)=>left0+i*step;
@@ -124,9 +125,11 @@ function Hand({cards,legal,canPlay,mode,resetKey,onPlay,bar}:{cards:Card[];legal
     <div className="hand-box" ref={box} style={{height:H}} onPointerDown={e=>{if(e.target===e.currentTarget)setSel(null);}}>
       {shown.map((c,i)=>{const dragging=drag?.id===c.id;const isSel=sel===c.id&&!dragging;const ok=mode==='play'&&canPlay&&legalSet.has(c.id);const dim=mode==='play'&&canPlay&&!ok;
         const arc=Math.pow(i-mid,2)*Math.min(.9,5/Math.max(n,1));const rot=dragging?0:(i-mid)*Math.min(2.6,16/Math.max(n,1));
+        /* An unavailable card can still be selected to show its reason, but it should not jump as far as a playable one. */
+        const lift=isSel?(ok?-30:-20):dragging?-14:arc;
         return <CardView key={c.id+':'+availabilityKey} card={c} className={'hcard'+(dragging?' dragging':'')+(isSel?' sel':'')+(ok?' ok':'')+(dim?' dim':'')} aria-pressed={isSel}
           onPointerDown={e=>down(e,c.id)} onPointerMove={move} onPointerUp={()=>finish(true)} onPointerCancel={()=>finish(false)} onClick={e=>{if(e.detail===0)tap(c.id);}}
-          style={{width:cw,height:ch,left:dragging?drag!.x:slot(i),zIndex:dragging?200:isSel?100:i+1,'--y':(isSel?-30:dragging?-14:arc)+'px','--r':rot+'deg','--d':Math.min(i,10)*.04+'s'} as CSSProperties}/>;})}
+          style={{width:cw,height:ch,left:dragging?drag!.x:slot(i),zIndex:dragging?200:isSel?100:i+1,'--y':lift+'px','--r':rot+'deg','--d':Math.min(i,10)*.04+'s'} as CSSProperties}/>;})}
       {selCard&&mode==='play'&&<span className={'hand-tip'+(okSel?'':' no')} style={{left:Math.max(72,Math.min(W-72,slot(selIdx)+cw/2)),top:Math.max(0,H-ch-74)}}>{okSel?'한 번 더 눌러서 내기':canPlay?'지금은 낼 수 없는 카드예요':'내 차례가 아니에요'}</span>}
     </div>
   </section>;

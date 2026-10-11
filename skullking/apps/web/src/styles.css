@@ -446,6 +446,8 @@ button:disabled{opacity:.38;cursor:not-allowed}
   .chart{height:70%}
 }
 @media(max-width:640px){
+  /* Keep the larger mobile cards vertically centred in their hand area. */
+  .hcard{bottom:42px}
   /* 키보드가 열린 동안에는 손패 대신 탁자와 좌석을 우선한다. JS가
      visual viewport 높이를 넣어 iOS의 자동 화면 이동도 같은 기준으로 맞춘다. */
   .game.is-play.chat-focus{height:var(--chat-viewport-height,100dvh)}
