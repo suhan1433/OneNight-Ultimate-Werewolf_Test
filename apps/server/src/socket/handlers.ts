@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { AVATAR_IDS, NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type ClientGameState, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
 import { z } from 'zod';
-import { assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, startNightIntro, validateNightAction } from '../game/engine.js';
+import { assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, nextRoomVersion, startNightIntro, validateNightAction } from '../game/engine.js';
 import { appendChat, appendLobbyChat, canCreateRoom, clearChat, clearLobbyChat, clearReadiness, clearVotes, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, removeVotesForPlayer, saveRoom, sweepExpiredRooms, toggleReady, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 
@@ -124,7 +124,7 @@ export function registerHandlers(io: Server, socket: Socket) {
         joinedId = randomUUID(); joinedToken = token(); room.players.push({ id: joinedId, nickname: data.nickname, sessionToken: joinedToken, socketId: socket.id, originalRole: null, currentRole: null, isReady: false, hasConfirmedCard: false, hasActedTonight: false, vote: null, connected: true });
       }
       room.allOfflineExpiresAt = null;
-      room.updatedAt = Date.now(); await saveRoom(room); return room;
+      room.updatedAt = nextRoomVersion(room); await saveRoom(room); return room;
     });
     bind(socket, room, joinedId); await emitRoomState(io, room);
     if (room.phase === 'lobby') socket.emit('LOBBY_CHAT_HISTORY', await getLobbyChatHistory(room.roomCode));
@@ -149,7 +149,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       if (room.phase === 'card_reveal' && room.players.length && room.players.every((p) => p.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startNightIntro(room)); }
       if (room.phase === 'voting' && room.players.length && Object.keys(room.votes).length === room.players.length) { room.result = calculateResult(room); room.phase = 'result'; room.resultExpiresAt = Date.now() + RESULT_TTL_MS; }
       if (room.players.every((player) => !player.connected)) room.allOfflineExpiresAt = Date.now() + ALL_OFFLINE_GRACE_MS;
-      room.updatedAt = Date.now();
+      room.updatedAt = nextRoomVersion(room);
       if (room.players.length) { await saveRoom(room, data.requestId); } else await deleteRoom(room.roomCode);
       return room;
     }, data.requestId);
@@ -222,7 +222,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       const error = validateNightAction(room, playerId, base.actionId, base.command); if (error) throw new Error(error);
       if (room.pendingNightCommands?.[playerId]) throw new Error('밤 행동은 한 번만 선택할 수 있습니다.');
       room.pendingNightCommands = { ...(room.pendingNightCommands ?? {}), [playerId]: base.command };
-      room.updatedAt = Date.now(); await saveRoom(room, base.requestId); return room;
+      room.updatedAt = nextRoomVersion(room); await saveRoom(room, base.requestId); return room;
     }, base.requestId);
     if (duplicate) return {};
     await emitRoomState(io, room); io.to(roomChannel(room.roomCode)).emit('NIGHT_ACTION_COMPLETED', { actionId: base.actionId });
@@ -238,7 +238,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       const command: NightCommand = { type: 'confirm' }; const error = validateNightAction(room, playerId, base.actionId, command); if (error) throw new Error(error);
       if (room.pendingNightCommands?.[playerId]) throw new Error('밤 행동은 한 번만 선택할 수 있습니다.');
       room.pendingNightCommands = { ...(room.pendingNightCommands ?? {}), [playerId]: command };
-      room.updatedAt = Date.now(); await saveRoom(room, base.requestId); return room;
+      room.updatedAt = nextRoomVersion(room); await saveRoom(room, base.requestId); return room;
     }, base.requestId);
     if (duplicate) return {};
     await emitRoomState(io, room); await processExpiredRoom(io, room.roomCode); return {};
@@ -297,8 +297,8 @@ export function registerHandlers(io: Server, socket: Socket) {
       }
       locked.votes = votes;
       const currentEligible = locked.players.filter((p) => p.connected).length;
-      if (Object.keys(votes).length < currentEligible) { locked.updatedAt = Date.now(); await saveRoom(locked, data.requestId); return locked; }
-      locked.votes = votes; locked.result = calculateResult(locked); locked.players = locked.players.map((p) => ({ ...p, currentRole: locked.result!.players.find((x) => x.id === p.id)!.currentRole })); locked.phase = 'result'; locked.resultExpiresAt = Date.now() + RESULT_TTL_MS; locked.updatedAt = Date.now(); await saveRoom(locked, data.requestId); return locked;
+      if (Object.keys(votes).length < currentEligible) { locked.updatedAt = nextRoomVersion(locked); await saveRoom(locked, data.requestId); return locked; }
+      locked.votes = votes; locked.result = calculateResult(locked); locked.players = locked.players.map((p) => ({ ...p, currentRole: locked.result!.players.find((x) => x.id === p.id)!.currentRole })); locked.phase = 'result'; locked.resultExpiresAt = Date.now() + RESULT_TTL_MS; locked.updatedAt = nextRoomVersion(locked); await saveRoom(locked, data.requestId); return locked;
     }, data.requestId);
     const votesCompleted = Object.keys(completed.votes).length;
     io.to(roomChannel(data.roomCode)).emit('VOTE_PROGRESS', { playerId, votesCompleted });
@@ -325,7 +325,7 @@ async function mutate(io: Server, socket: Socket, raw: unknown, change: (room: R
     if (alreadyProcessed) return room;
     const player = room.players.find((p) => p.id === playerId);
     if (!player || !player.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
-    await change(room, playerId, data); room.updatedAt = Date.now(); await saveRoom(room, data.requestId); return room;
+    await change(room, playerId, data); room.updatedAt = nextRoomVersion(room); await saveRoom(room, data.requestId); return room;
   }, data.requestId);
   await emitRoomState(io, room); if (event) io.to(roomChannel(room.roomCode)).emit(event, { at: Date.now() }); after?.(room); return {};
 }

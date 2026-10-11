@@ -171,6 +171,8 @@ export interface ClientGameState {
     };
     result: GameResult | null;
     nightEndsAt?: number | null;
+    /** While set, ordered night effects are complete and private results are being shown before dawn. */
+    nightResolutionEndsAt?: number | null;
 }
 export interface Ack<T = unknown> {
     ok: boolean;

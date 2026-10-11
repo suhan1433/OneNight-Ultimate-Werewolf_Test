@@ -23,13 +23,23 @@ export function buildNightActionQueue(selectedRoles: RoleType[], players: Player
   })).filter((action) => action.playerIds.length > 0);
 }
 
+/**
+ * Socket snapshots are discarded by the client when their revision is not
+ * newer. Date.now() alone can repeat within one submit/resolve turn, which
+ * used to let the private-result snapshot be discarded after the submit
+ * snapshot. Keep revisions strictly increasing within a room.
+ */
+export function nextRoomVersion(room: Pick<Room, 'updatedAt'>, now = Date.now()): number {
+  return Math.max(now, room.updatedAt + 1);
+}
+
 export function startCurrentAction(room: Room, now = Date.now()): Room {
   if (!room.nightActionQueue.length) return startDay(room, now);
   // Every owner chooses at the same time. Commands are deliberately applied
   // later, in queue order, so concurrent input cannot change rule ordering.
   const duration = room.actionTimeLimitSeconds * 1000;
   const queue = room.nightActionQueue.map((action) => ({ ...action, status: 'active' as const, startedAt: now, expiresAt: now + duration }));
-  return { ...room, nightActionQueue: queue, currentNightActionIndex: 0, pendingNightCommands: {}, nightResolutionExpiresAt: null, updatedAt: now };
+  return { ...room, nightActionQueue: queue, currentNightActionIndex: 0, pendingNightCommands: {}, nightResolutionExpiresAt: null, updatedAt: nextRoomVersion(room, now) };
 }
 
 // The opening narration is 3.984 seconds. Keep a small transport/rendering
@@ -41,7 +51,7 @@ export function startNightIntro(room: Room, now = Date.now()): Room {
   const current = queue[room.currentNightActionIndex];
   if (!current) return startDay(room, now);
   queue[room.currentNightActionIndex] = { ...current, status: 'pending', startedAt: now, expiresAt: now + NIGHT_INTRO_DURATION_MS };
-  return { ...room, nightActionQueue: queue, updatedAt: now };
+  return { ...room, nightActionQueue: queue, updatedAt: nextRoomVersion(room, now) };
 }
 
 export function advanceNight(room: Room, status: 'completed' | 'timeout' | 'skipped', now = Date.now()): Room {
@@ -49,7 +59,7 @@ export function advanceNight(room: Room, status: 'completed' | 'timeout' | 'skip
   const action = queue[room.currentNightActionIndex];
   if (action) queue[room.currentNightActionIndex] = { ...action, status };
   const nextIndex = room.currentNightActionIndex + 1;
-  const next = { ...room, nightActionQueue: queue, currentNightActionIndex: nextIndex, nightLog: action ? [...room.nightLog, { actionId: action.id, role: action.role, status, at: now }] : room.nightLog, updatedAt: now };
+  const next = { ...room, nightActionQueue: queue, currentNightActionIndex: nextIndex, nightLog: action ? [...room.nightLog, { actionId: action.id, role: action.role, status, at: now }] : room.nightLog, updatedAt: nextRoomVersion(room, now) };
   return nextIndex >= queue.length ? startDay(next, now) : startCurrentAction(next, now);
 }
 
@@ -58,7 +68,9 @@ export function allNightActionsSubmitted(room: Room): boolean {
   return room.nightActionQueue.every((action) => action.playerIds.every((id) => !!submitted[id]));
 }
 
-/** Applies the choices after everyone has chosen (or the common timer elapsed). */
+/** Applies choices after everyone has chosen, then reserves time to show private results before day. */
+export const NIGHT_RESULT_DURATION_MS = 6_000;
+
 export function resolveParallelNight(room: Room, now = Date.now()): Room {
   const commands = room.pendingNightCommands ?? {};
   let resolved = { ...room, nightActionQueue: room.nightActionQueue.map((action) => ({ ...action })) };
@@ -77,7 +89,7 @@ export function resolveParallelNight(room: Room, now = Date.now()): Room {
     resolved.nightActionQueue = queue;
     resolved.nightLog = [...resolved.nightLog, { actionId: action.id, role: action.role, status: queue[index]!.status, at: now }];
   }
-  return { ...resolved, currentNightActionIndex: 0, pendingNightCommands: {}, nightResolutionExpiresAt: now + 2_500, updatedAt: now };
+  return { ...resolved, currentNightActionIndex: 0, pendingNightCommands: {}, nightResolutionExpiresAt: now + NIGHT_RESULT_DURATION_MS, updatedAt: nextRoomVersion(room, now) };
 }
 
 export function validateNightAction(room: Room, playerId: string, actionId: string, command: NightCommand): string | null {
@@ -166,7 +178,7 @@ export function applyNightAction(room: Room, playerId: string, command: NightCom
 const privateRole = (p: Player) => ({ nickname: p.nickname });
 
 export function startDay(room: Room, now = Date.now()): Room {
-  return { ...room, phase: 'day', dayExpiresAt: now + room.dayTimeLimitSeconds * 1000, updatedAt: now };
+  return { ...room, phase: 'day', dayExpiresAt: now + room.dayTimeLimitSeconds * 1000, nightResolutionExpiresAt: null, updatedAt: nextRoomVersion(room, now) };
 }
 
 export function calculateVotes(room: Pick<Room, 'players' | 'votes'>): Record<string, number> {
@@ -222,7 +234,7 @@ export function calculateResult(room: Room): GameResult {
   return { winners: [...new Set(winners)], executedIds, voteCounts, receivedVoteCounts, votes: room.votes, players: players.map((p) => ({ id: p.id, nickname: p.nickname, originalRole: p.originalRole!, currentRole: p.currentRole! })) };
 }
 
-export function buildPlayerGameState(room: Room, playerId: string, actionResults: Record<string, Record<string, unknown>> = {}): ClientGameState {
+export function buildPlayerGameState(room: Room, playerId: string, actionResults: Record<string, Record<string, unknown>> = room.privateResults): ClientGameState {
   const self = room.players.find((p) => p.id === playerId)!;
   const ownActions = room.nightActionQueue.filter((candidate) => candidate.playerIds.includes(playerId));
   const action = ownActions.find((candidate) => candidate.status === 'active')
@@ -243,6 +255,7 @@ export function buildPlayerGameState(room: Room, playerId: string, actionResults
     selectedRoles: room.selectedRoles, currentNightAction: action ? { id: action.id, role: action.role, order: action.order, startedAt: action.startedAt, expiresAt: action.expiresAt, status: action.status, copied: action.copied } : null,
     isNightActor: isActor, actionContext, actionResult: room.nightResolutionExpiresAt ? actionResults[playerId] : undefined, nightActions: room.privateNightActions?.[playerId] ?? [], votesCompleted: Object.keys(room.votes).length, dayVoteRequests: (room.voteStartRequests ?? []).length, hasRequestedDayVote: (room.voteStartRequests ?? []).includes(playerId), totalPlayers: room.players.length,
     dayExpiresAt: room.dayExpiresAt, serverNow: Date.now(), chat: room.chat.slice(-100), lobbyChat: [], publicReveals: room.publicReveals,
-    settings: { actionTimeLimitSeconds: room.actionTimeLimitSeconds, dayTimeLimitSeconds: room.dayTimeLimitSeconds }, result: room.result, nightEndsAt: room.nightResolutionExpiresAt ?? action?.expiresAt ?? null
+    settings: { actionTimeLimitSeconds: room.actionTimeLimitSeconds, dayTimeLimitSeconds: room.dayTimeLimitSeconds }, result: room.result, nightEndsAt: room.nightResolutionExpiresAt ?? action?.expiresAt ?? null,
+    nightResolutionEndsAt: room.nightResolutionExpiresAt ?? null
   };
 }

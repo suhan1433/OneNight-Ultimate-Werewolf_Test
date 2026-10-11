@@ -1420,17 +1420,19 @@ function Reveal({ game }: { game: ClientGameState }) {
 function Night({ game }: { game: ClientGameState }) {
   const a = game.currentNightAction;
   const role = a && ROLE_DEFINITIONS[a.role];
-  const remain = useCountdown(a?.expiresAt ?? game.nightEndsAt ?? null, game.serverNow);
+  const remain = useCountdown(game.nightResolutionEndsAt ?? a?.expiresAt ?? game.nightEndsAt ?? null, game.serverNow);
   const syncedAction = useRef<string>();
   useEffect(() => {
     // The opening narration is pending on the first role itself, so its
     // subsequent active deadline needs a distinct recovery key.
     const transitionKey = a && `${a.id}:${a.status}:${a.expiresAt}`;
-    if (a && transitionKey && remain <= 0 && syncedAction.current !== transitionKey) {
+    if (!game.nightResolutionEndsAt && a && transitionKey && remain <= 0 && syncedAction.current !== transitionKey) {
       syncedAction.current = transitionKey;
       recoverExpiredAction(a.id, a.status === "active");
     }
-  }, [a?.expiresAt, a?.id, a?.status, remain]);
+  }, [a?.expiresAt, a?.id, a?.status, game.nightResolutionEndsAt, remain]);
+  if (game.nightResolutionEndsAt)
+    return <NightResolution game={game} />;
   if (a?.status === "pending")
     return (
       <section className="center night night-intro">
@@ -1476,6 +1478,29 @@ function Night({ game }: { game: ClientGameState }) {
           </p>
         </Panel>
       )}
+    </section>
+  );
+}
+
+/** The server has applied every queued role in canonical order. */
+function NightResolution({ game }: { game: ClientGameState }) {
+  const remain = useCountdown(game.nightResolutionEndsAt, game.serverNow);
+  return (
+    <section className="center night night-resolution">
+      <div className="crescent">☾</div>
+      <div className="eyebrow">NIGHT RESULTS</div>
+      <h1>밤 행동 결과</h1>
+      <p>모든 밤 행동이 규칙 순서대로 처리되었습니다.</p>
+      {game.actionResult ? (
+        <PrivateResult data={game.actionResult} />
+      ) : (
+        <Panel className="private-result">
+          <small><Icon.Lock /> 나만 보는 정보</small>
+          <h3>오늘 밤의 결과</h3>
+          <p>당신이 직접 수행한 밤 행동은 없습니다.</p>
+        </Panel>
+      )}
+      <p className="transitioning">낮이 밝기까지 {Math.max(0, remain).toFixed(1)}초</p>
     </section>
   );
 }

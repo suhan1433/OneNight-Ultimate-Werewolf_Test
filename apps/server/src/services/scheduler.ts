@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
 import { NARRATOR_LINES, type NightCommand, type Room } from '@werewolf/shared';
-import { allNightActionsSubmitted, buildNightActionQueue, calculateResult, resolveParallelNight, startCurrentAction, startDay, startNightIntro } from '../game/engine.js';
+import { allNightActionsSubmitted, buildNightActionQueue, calculateResult, nextRoomVersion, resolveParallelNight, startCurrentAction, startDay, startNightIntro } from '../game/engine.js';
 import { emitDayStart, emitRoomState } from '../socket/handlers.js';
 import { getRoom, getRoomCodes, getVotes, recordVote, saveRoom, withRoomLock } from './redis.js';
 
@@ -78,7 +78,6 @@ export async function processExpiredRoom(io: Server, code: string): Promise<Room
       if (room.phase === 'night') {
         if (room.nightResolutionExpiresAt && room.nightResolutionExpiresAt <= now) {
           room = startDay(room, now);
-          room.nightResolutionExpiresAt = null;
           transitioned = true; dayTransition = true;
           await saveRoom(room);
         } else {
@@ -96,7 +95,7 @@ export async function processExpiredRoom(io: Server, code: string): Promise<Room
         }
         }
       } else if (room.phase === 'day' && room.dayExpiresAt && room.dayExpiresAt <= now) {
-        room.phase = 'voting'; room.dayExpiresAt = null; room.updatedAt = now;
+        room.phase = 'voting'; room.dayExpiresAt = null; room.updatedAt = nextRoomVersion(room, now);
         transitioned = true;
         await saveRoom(room);
       }
@@ -121,9 +120,9 @@ export async function processExpiredRoom(io: Server, code: string): Promise<Room
         const eligible = room.players.filter((player) => player.connected || !player.disconnectedAt || player.disconnectedAt + DISCONNECT_GRACE_MS > now);
         if (eligible.every((player) => !!room.votes[player.id])) {
           room.result = calculateResult(room); room.players = room.players.map((p) => ({ ...p, currentRole: room.result!.players.find((x) => x.id === p.id)!.currentRole }));
-          room.phase = 'result'; room.resultExpiresAt = now + 30 * 60 * 1000; transitioned = true; await saveRoom(room);
+          room.phase = 'result'; room.resultExpiresAt = now + 30 * 60 * 1000; room.updatedAt = nextRoomVersion(room, now); transitioned = true; await saveRoom(room);
         } else if (botsVoted) {
-          room.updatedAt = now; transitioned = true; await saveRoom(room);
+          room.updatedAt = nextRoomVersion(room, now); transitioned = true; await saveRoom(room);
         }
       }
       return room;

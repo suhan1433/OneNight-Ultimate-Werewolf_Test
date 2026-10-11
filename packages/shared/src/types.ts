@@ -78,5 +78,7 @@ export interface ClientGameState {
   publicReveals: string[]; settings: { actionTimeLimitSeconds: number; dayTimeLimitSeconds: number };
   result: GameResult | null;
   nightEndsAt?: number | null;
+  /** While set, ordered night effects are complete and private results are being shown before dawn. */
+  nightResolutionEndsAt?: number | null;
 }
 export interface Ack<T = unknown> { ok: boolean; data?: T; error?: string; }
