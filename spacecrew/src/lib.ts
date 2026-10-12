@@ -98,3 +98,11 @@ export function cue(kind: FxKind) {
     osc.connect(gain); gain.connect(audio.destination); osc.start(); osc.stop(audio.currentTime + tone[kind][1]);
   } catch { /* 오디오 불가 시 무시 */ }
 }
+
+/* 주소창·소프트 키보드로 바뀌는 "실제 보이는 높이"를 --app-h(px)에 넣는다. dvh 미지원 웹뷰에서도 레이아웃이 같게 나온다. */
+export function watchAppHeight() {
+  const set = () => document.documentElement.style.setProperty('--app-h', `${Math.round(window.visualViewport?.height ?? window.innerHeight)}px`);
+  set();
+  window.addEventListener('resize', set); window.addEventListener('orientationchange', set); window.visualViewport?.addEventListener('resize', set);
+  return () => { window.removeEventListener('resize', set); window.removeEventListener('orientationchange', set); window.visualViewport?.removeEventListener('resize', set); };
+}

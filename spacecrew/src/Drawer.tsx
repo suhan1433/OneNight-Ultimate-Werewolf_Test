@@ -7,7 +7,7 @@ import { HelpBody } from './Help';
 const NAMES: Record<DrawerTab, string> = { mission: '미션', log: '기록', help: '도움말' };
 
 /** 서랍: 데스크톱은 오른쪽 서랍, 모바일은 하단 시트. 탭 = 미션 / 기록 / 도움말 */
-export function Drawer({ tab, setTab, onClose, game }: { tab: DrawerTab; setTab: (t: DrawerTab) => void; onClose: () => void; game: Game | null }) {
+export function Drawer({ tab, setTab, onClose, onLeave, game }: { tab: DrawerTab; setTab: (t: DrawerTab) => void; onClose: () => void; onLeave: () => void; game: Game | null }) {
   const tabs: DrawerTab[] = game && game.phase !== 'lobby' ? ['mission', 'log', 'help'] : ['help'];
   const active = tabs.includes(tab) ? tab : 'help';
   const logEnd = useRef<HTMLLIElement>(null);
@@ -32,6 +32,7 @@ export function Drawer({ tab, setTab, onClose, game }: { tab: DrawerTab; setTab:
         {active === 'log' && game && <ol className="log">{game.log.length ? game.log.map((l, i) => <li key={i}>{l}</li>) : <li className="none">아직 기록이 없어요.</li>}<li ref={logEnd} aria-hidden="true" /></ol>}
         {active === 'help' && <HelpBody />}
       </div>
+      {game && <footer className="drawer-foot"><button type="button" className="leave" onClick={onLeave}>방 나가기</button></footer>}
     </aside>
   </div>;
 }

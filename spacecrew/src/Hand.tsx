@@ -27,7 +27,7 @@ export function Hand({ game, view, send, recordPlay, compact }: { game: Game; vi
   const picked = hand.find(c => c.id === sel);
   const why = !view.myTurn ? (view.resolving ? '판정이 끝나면 낼 수 있어요' : '내 차례가 아니에요') : '먼저 나온 카드와 같은 색을 내야 해요';
 
-  return <section className={`hand-zone ${compact ? 'compact' : ''}`} aria-label={`내 손패 ${hand.length}장`}>
+  return <section className={`hand-zone ${compact ? 'compact' : ''} ${view.canComm ? 'has-comm' : ''}`} aria-label={`내 손패 ${hand.length}장`}>
     {picked && <div className="pick-bar" role="status">
       <b>{cardName(picked)}</b>
       {playable(picked) ? <span>한 번 더 누르거나 버튼으로 내세요</span> : <span>{why}</span>}

@@ -87,6 +87,11 @@ export function deriveView(game: Game, reveal: Reveal | null, briefing: boolean,
     : game.trick.length ? '통신 창 닫힘 · 다음 트릭 전에 열려요'
     : '통신 가능 · 첫 카드가 놓이기 전까지';
 
+  // 진행 순서: 이번 트릭의 선도부터 시계 방향(배열 순). 과제 배정 중에는 배정 차례부터, 그 밖의 단계는 커맨더부터.
+  const startId = kind === 'play' ? game.trick[0]?.playerId ?? reveal?.cards[0]?.playerId ?? game.leaderId ?? game.turnId ?? game.players[0].id
+    : kind === 'assign' ? assigner.id : game.commanderId ?? game.players[0].id;
+  const s0 = Math.max(0, game.players.findIndex(p => p.id === startId));
+  const queue = game.players.map((_, k) => game.players[(s0 + k) % n]);
   const activeId = kind === 'play' ? game.turnId : kind === 'assign' ? assigner.id : kind === 'target' || kind === 'token' ? game.commanderId : null;
   const answered = (map?: Record<string, boolean>) => map !== undefined && game.playerId in map;
   let status: { text: string; tone: Tone };
@@ -103,7 +108,7 @@ export function deriveView(game: Game, reveal: Reveal | null, briefing: boolean,
   }
 
   return {
-    kind, me, meIdx, seats, byId, assigner, isCommander, playing, resolving, legal, myTurn,
+    kind, me, meIdx, seats, queue, byId, assigner, isCommander, playing, resolving, legal, myTurn,
     shown, lead, reveal, activeId, status, commNote: playing ? commNote : '', canComm, eligible,
     briefing, showResult: kind === 'result' && !resolving,
     finalTrick, missed: game.tasks.filter(t => !t.done),

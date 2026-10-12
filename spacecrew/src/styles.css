@@ -2,6 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700;800&display=swap');
 
 :root{
+  --app-h:100vh;
   --ink:#060d1c; --navy:#0a1630; --navy2:#10224a; --glass:rgba(12,27,54,.74); --line:#27426c;
   --text:#e9f0ff; --mute:#93a7ca; --cyan:#5ee6d3; --cyan-d:#2aa797;
   --ivory:#efe6cf; --ivory-d:#d8cba6; --paper-ink:#2a2415; --paper-mute:#6a5d3c;
@@ -98,10 +99,10 @@ button.card{cursor:pointer}
 .comm-slot .rail{width:7px}.comm-slot .rail .pin{width:7px;height:7px}
 
 /* ───── 타이틀 ───── */
-.title-scene{min-height:100dvh;display:grid;align-content:center;justify-items:center;gap:0;padding:max(20px,var(--safe-t)) 16px calc(28px + var(--safe-b))}
+.title-scene{min-height:var(--app-h);display:grid;align-content:center;justify-items:center;gap:0;padding:max(20px,var(--safe-t)) 16px calc(28px + var(--safe-b))}
 .help-fab{position:fixed;top:calc(12px + var(--safe-t));right:12px;z-index:30;display:flex;gap:.4rem;align-items:center;font-size:.82rem;padding:.45rem .8rem}
 .help-fab b{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--brass);color:#1d1707;font:700 .75rem var(--mono)}
-.window{position:relative;width:min(960px,100%);aspect-ratio:16/8;max-height:46dvh;border-radius:26px;overflow:hidden;background:radial-gradient(ellipse at 20% 70%,#14305e,#071026 70%);border:2px solid #4b6590;box-shadow:inset 0 0 0 6px #0a1630,inset 0 0 0 7px var(--brass),0 30px 80px #000b}
+.window{position:relative;width:min(960px,100%);aspect-ratio:16/8;max-height:calc(var(--app-h) * 0.46);border-radius:26px;overflow:hidden;background:radial-gradient(ellipse at 20% 70%,#14305e,#071026 70%);border:2px solid #4b6590;box-shadow:inset 0 0 0 6px #0a1630,inset 0 0 0 7px var(--brass),0 30px 80px #000b}
 .window::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,#ffffff14 0,#ffffff00 28%,#ffffff00 70%,#ffffff0a 100%)}
 .solar{position:absolute;inset:0;width:100%;height:100%}
 .pulse circle{fill:none;stroke:var(--cyan);opacity:0}
@@ -129,7 +130,7 @@ button.card{cursor:pointer}
 .foot{text-align:center;font-size:.76rem;color:var(--mute)}
 
 /* ───── 대기실 ───── */
-.lobby{width:min(1000px,100% - 28px);margin:auto;min-height:100dvh;display:grid;align-content:start;gap:1.2rem;padding:max(14px,var(--safe-t)) 0 0}
+.lobby{width:min(1000px,100% - 28px);margin:auto;min-height:var(--app-h);display:grid;align-content:start;gap:1.2rem;padding:max(14px,var(--safe-t)) 0 0}
 .lobby-top{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
 .bar-btn{padding:.45rem .8rem;font-size:.82rem;border-radius:9px}
 .bar-btn.round{width:34px;height:34px;padding:0;border-radius:50%;font-family:var(--mono)}
@@ -202,7 +203,7 @@ button.card{cursor:pointer}
 .wait-host{font-size:.84rem;color:var(--paper-mute)}
 
 /* ───── 플레이 화면 ───── */
-.table-scene{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;max-width:1400px;margin:auto;padding:var(--safe-t) 14px 0;position:relative}
+.table-scene{height:var(--app-h);display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;max-width:1400px;margin:auto;padding:var(--safe-t) 14px 0;position:relative}
 .topbar{position:relative;display:flex;align-items:center;gap:.5rem;height:50px;border-bottom:1px solid #27426c88}
 .mission-pill{flex:1;min-width:0;display:flex;align-items:center;gap:.7rem;text-align:left;padding:.4rem .8rem;background:#0f244b66}
 .mission-pill b{flex:none;font:500 .8rem var(--mono);color:var(--brass-l)}
@@ -307,7 +308,7 @@ button.card{cursor:pointer}
 .comm-sheet header{display:flex;justify-content:space-between;gap:1rem}
 .comm-sheet h3{font-size:1.05rem}.comm-sheet header p{font-size:.8rem;color:var(--mute);margin-top:.2rem;line-height:1.5}
 .x{flex:none;height:34px;padding:0 .7rem;border:0;background:transparent;font-size:1.4rem;line-height:1}
-.cands{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;padding:.9rem 0;min-height:140px;align-items:flex-start;max-height:44dvh;overflow-y:auto}
+.cands{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;padding:.9rem 0;min-height:140px;align-items:flex-start;max-height:calc(var(--app-h) * 0.44);overflow-y:auto}
 .cand{display:grid;justify-items:center;gap:.3rem}.cand small{font:500 .74rem var(--mono);color:var(--brass-l)}
 .cand .card{--cw:70px;--ch:100px}
 .cand.on small{color:var(--cyan)}
@@ -334,7 +335,7 @@ button.card{cursor:pointer}
 .fail-card .big{width:100%;min-height:62px;font-size:1.15rem}.fail-card .wait-host{color:#e9b8c4}
 .table-scene.failed .seat:not(.has-miss){opacity:.5}
 .epilogue{z-index:50;background:radial-gradient(ellipse at 50% 45%,#0c1f45,#03060f 75%);grid-template-rows:1fr auto;place-items:center;animation-duration:var(--t-scene)}
-.epilogue svg{width:min(640px,96vw);max-height:56dvh}
+.epilogue svg{width:min(640px,96vw);max-height:calc(var(--app-h) * 0.56)}
 .orbit-line{opacity:0;transform-box:fill-box;transform-origin:center;transform:scale(.12);animation:converge 2.6s cubic-bezier(.6,0,.3,1) both}
 @keyframes converge{0%{opacity:.85;transform:scale(1)}85%{opacity:.9}100%{opacity:0;transform:scale(.12)}}
 .p9-glow,.p9{animation:rise 1.8s ease-out 3.2s both}
@@ -385,7 +386,7 @@ button.card{cursor:pointer}
   .node:nth-child(10n)::after{display:block}.node:nth-child(5n)::after{display:none}
   .node>*{width:44px;height:44px}
   .map.strip .node:nth-child(5n)::after{display:block}.map.strip .node{width:44px}.map.strip .node>*{width:38px;height:38px}
-  .window{aspect-ratio:4/3;max-height:42dvh}
+  .window{aspect-ratio:4/3;max-height:calc(var(--app-h) * 0.42)}
   .table-scene{grid-template-rows:auto auto minmax(0,1fr) auto auto;padding:var(--safe-t) 10px 0}
   .topbar{gap:.35rem}.tricks{font-size:.74rem}.bar-btn{padding:.4rem .6rem}
   .center{position:relative;inset:auto;left:auto;top:auto;translate:none;width:100%;height:100%;margin:auto}
@@ -405,7 +406,7 @@ button.card{cursor:pointer}
   .hand.row .card.picked{transform:translateY(-44px) scale(1.3);z-index:20;filter:none}
   .pick-bar{position:fixed;left:50%;bottom:calc(var(--safe-b) + 190px);width:calc(100% - 20px)}
   .comm-sheet{border-radius:18px 18px 0 0}.cand .card{--cw:62px;--ch:89px}
-  .drawer{top:auto;left:0;right:0;width:100%;max-height:82dvh;border-left:0;border-top:1px solid var(--brass);border-radius:20px 20px 0 0;animation-name:sheet-in}
+  .drawer{top:auto;left:0;right:0;width:100%;max-height:calc(var(--app-h) * 0.82);border-left:0;border-top:1px solid var(--brass);border-radius:20px 20px 0 0;animation-name:sheet-in}
   @keyframes sheet-in{from{translate:0 100%}}
   .fail-card .big{min-height:64px}
 }
@@ -448,3 +449,128 @@ html,body{max-width:100%;overflow-x:hidden}
   .mission-pill{order:-1;flex:1 1 100%}
   .tricks{margin-right:auto}
 }
+
+/* ═════ v3: 모바일 버튼 가림 수정 + 하단 승무원 보드 ═════ */
+/* 모달류: 화면보다 길어지면 안에서 스크롤하고, 주요 버튼은 아래에 붙여 항상 보이게 */
+.layer>.paper,.fail-card,.tut{max-height:calc(var(--app-h) - 24px - var(--safe-t) - var(--safe-b));overflow-y:auto;overscroll-behavior:contain}
+.brief .primary,.success .primary,.tut-nav{position:sticky;bottom:0;z-index:3}
+.brief .primary{box-shadow:0 -12px 14px var(--ivory),0 6px 20px #b99a4b30}
+.success .primary{box-shadow:0 -12px 14px var(--ivory)}
+.tut-nav{background:var(--ivory);padding-top:.4rem;box-shadow:0 -10px 12px var(--ivory)}
+.fail-card .big{position:sticky;bottom:0;z-index:3;box-shadow:0 -12px 14px #210c1a}
+.epilogue{overflow-y:auto}
+.drawer{grid-template-rows:auto 1fr auto}
+.drawer-foot{padding:.7rem 1rem calc(.7rem + var(--safe-b));border-top:1px solid var(--line);display:flex;justify-content:flex-end}
+/* 통신 시트: 길어져도 헤더·확정 버튼이 화면 안에 남는다 */
+.comm-sheet{display:flex;flex-direction:column;max-height:calc(var(--app-h) - 10px - var(--safe-t))}
+.comm-sheet header,.comm-sheet footer{flex:none}
+.comm-sheet .cands{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain}
+.comm-sheet footer{position:sticky;bottom:0;padding-top:.5rem}
+.status-row{position:relative;z-index:5}
+
+@media (max-width:760px){
+  .table-scene.compact{grid-template-rows:auto minmax(0,1fr) auto auto;padding:var(--safe-t) 10px 0}
+  /* 상단 바: 미션 줄 + 트릭 + ☰ (기록·도움말·나가기는 서랍으로) */
+  .topbar{height:44px;min-height:44px;flex-wrap:nowrap;padding:0}
+  .mission-pill{order:0;flex:1 1 auto}
+  .tricks{margin:0}
+  .bar-btn.menu{width:40px;height:36px;padding:0;font-size:1.15rem}
+  .stage{min-height:0}
+  /* 하단 승무원 보드 */
+  .crew-board{max-height:clamp(78px,calc(var(--app-h) - 450px),230px);overflow-y:auto;overscroll-behavior:contain;margin:0 0 6px;border:1px solid var(--line);border-radius:12px;background:var(--glass)}
+  .panel-phase .crew-board{max-height:84px}
+  .crew-board{--cols:34px minmax(0,1fr) minmax(0,1.35fr) 78px}
+  .b-head{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:var(--cols);gap:4px;padding:3px 8px;font:500 .6rem var(--mono);color:var(--mute);background:#0b1a38;border-bottom:1px solid var(--line)}
+  .b-row{display:grid;grid-template-columns:var(--cols);gap:4px;align-items:center;min-height:40px;padding:3px 8px;border-bottom:1px solid #1d3359;border-left:3px solid transparent}
+  .b-row:last-child{border-bottom:0}
+  .b-row.active{border-left-color:var(--cyan);background:linear-gradient(90deg,#5ee6d329,transparent 80%)}
+  .b-row.me .b-who b{color:var(--text)}
+  .b-row.off{opacity:.55}
+  .ord{display:flex;align-items:center;gap:2px;font:500 .86rem var(--mono);color:var(--mute)}
+  .ord i{font-style:normal;font-size:.62rem;color:var(--cyan)}
+  .b-row.active .ord b{color:var(--cyan)}
+  .b-who{min-width:0}
+  .b-who b{display:flex;align-items:center;gap:3px;font-size:.78rem;white-space:nowrap}
+  .b-who b>em{flex:none;font:700 .56rem var(--mono);font-style:normal;color:#1d1707;background:var(--brass-l);border-radius:4px;padding:1px 4px}
+  .b-who b>em.cmd{background:transparent;color:var(--brass-l);padding:0;font-size:.8rem}
+  .b-who small{display:block;margin:0;font:400 .64rem var(--mono);color:var(--mute);white-space:nowrap}
+  .b-tasks{display:flex;flex-wrap:wrap;align-items:center;gap:2px 3px;min-width:0}
+  .b-tasks .none,.b-comm .none{margin:0;font-size:.64rem;color:#6a7fa5}
+  .b-tasks .card.xs{--cw:22px;--ch:32px;border-radius:4px}
+  .b-tasks .card.xs .tl{left:4px;top:2px}.b-tasks .card.xs .k b{font-size:11px}.b-tasks .card.xs .k i{font-size:7px}
+  .b-tasks .token{right:-4px;bottom:-5px;font-size:.52rem;min-width:1.2em;padding:0 3px}
+  .b-tasks .task-chip .tick{width:11px;height:11px;font-size:.5rem;left:-3px;top:-4px}
+  .b-comm{display:flex;align-items:center}
+  .comm-fill{display:flex;align-items:center;gap:4px}
+  .b-comm .card.xs{--cw:26px;--ch:37px;box-shadow:0 0 0 1px var(--brass),0 3px 6px #0008}
+  .b-comm .rail{width:6px}.b-comm .rail .pin{width:7px;height:7px}
+  .mk{margin:0;font:500 .64rem var(--mono);color:var(--text);white-space:nowrap;line-height:1.2}.mk i{font-style:normal;color:var(--cyan);margin-right:2px}
+  /* 하단 독: 한 줄 안내 + 통신 버튼은 같은 줄, 손패는 겹치지 않음 */
+  .status-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:center;min-height:44px;text-align:left}
+  .status{justify-content:flex-start;text-align:left;gap:.1rem .6rem;font-size:.84rem}
+  .status b{font-size:.9rem}.status small{font-size:.68rem}
+  .comm-btn{width:auto;min-height:44px;padding:.4rem .8rem;white-space:nowrap}
+  .hand.row{margin-top:0;padding:60px 14px 6px}
+  .hand.row .card{--cw:clamp(48px,13.5vw,60px);margin-left:calc(var(--cw)*-.38)}
+  .hand.row .card.live{transform:translateY(-10px)}
+  .hand.row .card.picked{transform:translateY(-6px) scale(1.2);transform-origin:50% 100%;z-index:20}
+  .pick-bar{position:absolute;left:0;right:0;top:2px;bottom:auto;translate:none;width:auto;height:42px;flex-wrap:nowrap;justify-content:space-between;gap:.4rem;padding:.2rem .5rem;z-index:25;max-width:none}
+  .pick-bar span{flex:1;min-width:0;font-size:.7rem;line-height:1.25}
+  .pick-bar button{flex:none;min-height:34px;padding:.3rem .6rem;font-size:.78rem}
+  /* 중앙 패널·과제 펼침: 테이블 영역 안에서 안전하게(넘치면 그 안에서만 스크롤) */
+  .panel-phase .center{place-items:start center;overflow-y:auto;overscroll-behavior:contain}
+  .phase-panel{width:100%;padding:.7rem .8rem;gap:.5rem}
+  .phase-panel h2{font-size:1.05rem}.phase-panel p{font-size:.8rem;line-height:1.45}.phase-panel .rules{display:none}
+  .phase-panel .card{--cw:46px;--ch:66px}
+  .choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .choices button{min-height:42px;padding:.4rem .5rem;font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .spread{gap:.5rem;width:100%}.spread-note{font-size:.84rem}
+  .spread-cards{gap:8px;padding:2px}.spread-cards .card{--cw:48px;--ch:69px}
+  /* 시트·모달 */
+  .comm-sheet footer .primary{flex:1 1 100%;min-height:52px}
+  .brief{padding:1rem 1.1rem}.brief h2{font-size:1.2rem}
+}
+
+/* ═════ v3.1: 보드 정렬 · 트릭 존 높이 · 손패 여백 ═════ */
+@media (max-width:760px){
+  .crew-board{--cols:32px minmax(0,.95fr) minmax(0,1.25fr) 94px}
+  .b-who b .nm{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .b-who small{overflow:hidden;text-overflow:ellipsis}
+  .trick-zone{height:min(100%,270px);width:auto;max-width:100%}
+  .slot small{max-width:64px;overflow:hidden;text-overflow:ellipsis}
+  .hand.row{padding-top:34px}
+  .hand.row .card.picked{transform:translateY(-4px) scale(1.2)}
+  /* 선택 바: 한 줄 안내 자리에 겹쳐 뜨고, 통신 버튼은 오른쪽에 그대로 남긴다 */
+  .pick-bar{top:auto;bottom:100%;height:44px;right:0;background:#0b1b3bfa;border-radius:10px}
+  .hand-zone.has-comm .pick-bar{right:128px}
+  .pick-bar span{display:none}
+  .pick-bar b{font-size:.8rem;white-space:nowrap}
+  .panel-phase .crew-board{max-height:72px}
+  .phase-panel .tag{display:none}
+  .phase-panel>p:not(.sub){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .phase-panel .card{--cw:42px;--ch:60px}
+}
+
+/* v3.2: 키가 큰 화면에서는 규칙 단계에서도 보드를 더 펼치고 과제 카드를 키운다 */
+@media (max-width:760px){
+  .panel-phase .crew-board{max-height:clamp(72px,calc(var(--app-h) - 600px),230px)}
+  .spread-cards .card{--cw:clamp(48px,14vw,64px);--ch:calc(var(--cw)*1.43)}
+}
+
+
+/* ═════ v3.3: 기기별 터치 문제 대응 ═════ */
+/* 더블탭 확대·300ms 지연 제거(일부 폰에서 버튼이 "안 눌리는" 대표 원인) */
+button,summary,label,.card{touch-action:manipulation}
+/* 통신 버튼: 48px 이상 + 보이지 않는 터치 영역 확장 + 선택 바보다 항상 위 */
+.comm-btn{position:relative;z-index:30;min-width:48px;min-height:48px}
+.comm-btn::after{content:'';position:absolute;inset:-6px}
+.status-row{z-index:auto}
+.pick-bar{z-index:25}
+@media (max-width:760px){.hand-zone.has-comm .pick-bar{right:150px}}
+/* 과제 달성 금색 선: 화면 전체에 겹쳐 그리며 터치를 막지 않는다(스타일이 빠져 있던 부분) */
+.gold-links{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:45}
+.gold-links line{stroke:var(--brass-l);stroke-width:3;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:0;filter:drop-shadow(0 0 6px #dcc27a);animation:draw var(--t-judge) ease-out both}
+.gold-links circle{fill:none;stroke:var(--brass-l);stroke-width:2;opacity:0;animation:gold-pop var(--t-judge) ease-out .2s both}
+@keyframes draw{from{stroke-dashoffset:1}}
+@keyframes gold-pop{from{opacity:1;transform:scale(.4)}to{opacity:0;transform:scale(1.6)}}
+.gold-links circle{transform-box:fill-box;transform-origin:center}

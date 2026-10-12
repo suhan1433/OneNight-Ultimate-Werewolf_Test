@@ -6,6 +6,7 @@ import { Seat } from './Seat';
 import { Hand } from './Hand';
 import { CommSheet } from './CommSheet';
 import { PhasePanel } from './PhasePanel';
+import { CrewBoard } from './CrewBoard';
 import { Briefing } from './Briefing';
 import { Result } from './Result';
 import { Rules } from './ui';
@@ -20,9 +21,10 @@ function TopBar({ game, compact, rulesOpen, setRulesOpen, openDrawer, onLeave }:
       <b>미션 {game.missionId}</b><span>{game.mission.text}</span><i aria-hidden="true">{compact ? '≡' : rulesOpen ? '▴' : '▾'}</i>
     </button>
     <span className="tricks" aria-label={`트릭 ${Math.min(game.trickNo + 1, game.totalTricks)} / ${game.totalTricks}`}>트릭 <b>{Math.min(game.trickNo + 1, game.totalTricks)}/{game.totalTricks}</b></span>
-    <button type="button" className="bar-btn" onClick={() => openDrawer('log')}>기록</button>
-    <button type="button" className="bar-btn round" onClick={() => openDrawer('help')} aria-label="도움말">?</button>
-    <button type="button" className="bar-btn leave" onClick={onLeave}>나가기</button>
+    {compact ? <button type="button" className="bar-btn menu" onClick={() => openDrawer('mission')} aria-label="메뉴: 미션, 기록, 도움말, 나가기">☰</button> : <>
+      <button type="button" className="bar-btn" onClick={() => openDrawer('log')}>기록</button>
+      <button type="button" className="bar-btn round" onClick={() => openDrawer('help')} aria-label="도움말">?</button>
+      <button type="button" className="bar-btn leave" onClick={onLeave}>나가기</button></>}
     {!compact && rulesOpen && <div className="rules-pop"><Rules mission={game.mission} /></div>}
   </header>;
 }
@@ -87,9 +89,8 @@ export function Table({ game, view, send, recordPlay, dismissBriefing, openDrawe
   useEffect(() => { if (!view.canComm) setCommOpen(false); }, [view.canComm]);
   const meSeat = view.seats.find(s => s.isMe)!; const failed = view.kind === 'result' && !game.result?.win;
   const panel = ['target', 'token', 'transfer', 'vote', 'pass'].includes(view.kind);
-  return <main className={`table-scene ${compact ? 'compact' : ''} k-${view.kind} ${failed ? 'failed' : ''}`}>
+  return <main className={`table-scene ${compact ? 'compact' : ''} k-${view.kind} ${panel || view.kind === 'assign' ? 'panel-phase' : ''} ${failed ? 'failed' : ''}`}>
     <TopBar game={game} compact={compact} rulesOpen={rulesOpen} setRulesOpen={setRulesOpen} openDrawer={openDrawer} onLeave={onLeave} />
-    {compact && <ul className="crew-strip" aria-label="승무원">{view.seats.filter(s => !s.isMe).map(s => <Seat key={s.player.id} player={s.player} game={game} view={view} variant="chip" />)}</ul>}
     <section className="stage" aria-label="테이블">
       {!compact && <div className="oval" aria-hidden="true" />}
       {!compact && view.seats.filter(s => !s.isMe).map(s => <Seat key={s.player.id} player={s.player} game={game} view={view} variant="ring" angle={s.angle} />)}
@@ -98,7 +99,7 @@ export function Table({ game, view, send, recordPlay, dismissBriefing, openDrawe
       </div>
       {!compact && <Seat player={meSeat.player} game={game} view={view} variant="me" />}
     </section>
-    {compact && <Seat player={meSeat.player} game={game} view={view} variant="me" />}
+    {compact && <CrewBoard game={game} view={view} />}
     {!compact && view.lastLine && <button type="button" className="last-line" onClick={() => openDrawer('log')} title="기록 열기"><span>최근</span>{view.lastLine}</button>}
     <div className="dock">
       <StatusLine view={view} onComm={() => setCommOpen(true)} />

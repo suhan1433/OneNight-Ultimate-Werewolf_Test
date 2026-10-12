@@ -15,6 +15,7 @@
  *     데드 존(mission.deadZone) 미션은 마커 미리보기를 숨긴다.
  *  6. GAME_RESTART 는 대기실(lobby)로 돌아가는 이벤트이며 방장만 호출한다(원본과 동일). 실패 화면의 "재도전" 버튼도 이 이벤트를 쓴다.
  *  7. 과제 달성 연출은 판정 직전/직후 tasks[].done 변화로 감지한다. 달성된 과제 카드 id 가 트릭의 카드 id 와 같다고 가정.
+ *  9. 진행 순서는 players 배열 순서로 이어지며, 트릭 선도(trick[0] → leaderId → turnId)부터 시계 방향이라고 가정한다(하단 승무원 보드의 번호).
  *  8. mission.special==='noComm', 'finalPattern' 등 special 값은 원본 코드에 나온 것만 처리한다.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -22,7 +23,7 @@ import { createRoot } from 'react-dom/client';
 import { io, type Socket } from 'socket.io-client';
 import './styles.css';
 import type { DrawerTab, Game, Request, Send, Session } from './types';
-import { clearSession, readSession, saveSession, tutorialSeen } from './lib';
+import { clearSession, readSession, saveSession, tutorialSeen, watchAppHeight } from './lib';
 import { useGameView } from './view';
 import { Starfield } from './ui';
 import { Title } from './Title';
@@ -40,6 +41,7 @@ function App() {
   const leavingRef = useRef(false);
   const { view, recordPlay, dismissBriefing } = useGameView(game);
 
+  useEffect(() => watchAppHeight(), []);
   useEffect(() => {
     const next = io({ path: '/api/spacecrew/socket/', transports: ['websocket', 'polling'] }); setSocket(next);
     next.on('ROOM_STATE', (state: Game) => { if (leavingRef.current) return; setGame(state); });
@@ -75,7 +77,7 @@ function App() {
     {!game ? <Title request={request} onSession={reply => saveSession(reply as Session)} onHelp={() => openDrawer('help')} />
       : game.phase === 'lobby' ? <Lobby game={game} send={send} onLeave={leave} onHelp={() => openDrawer('help')} />
       : view && <Table game={game} view={view} send={send} recordPlay={recordPlay} dismissBriefing={dismissBriefing} openDrawer={openDrawer} onLeave={leave} />}
-    {drawer.open && <Drawer tab={drawer.tab} setTab={tab => setDrawer({ open: true, tab })} onClose={() => setDrawer(d => ({ ...d, open: false }))} game={game} />}
+    {drawer.open && <Drawer tab={drawer.tab} setTab={tab => setDrawer({ open: true, tab })} onClose={() => setDrawer(d => ({ ...d, open: false }))} onLeave={leave} game={game} />}
     {!game && tutorial && <Tutorial onDone={() => setTutorial(false)} />}
     {error && <div className="toast" role="alert">{error}</div>}
   </>;

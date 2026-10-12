@@ -54,10 +54,10 @@ export function useFlip<T extends HTMLElement>(id: string, key: string | null) {
   });
   return ref;
 }
-export function TaskChip({ task, size = 'xs', fail = false, onPick }: { task: Task; size?: Size; fail?: boolean; onPick?: () => void }) {
+export function TaskChip({ task, size = 'xs', fail = false, selected, onPick }: { task: Task; size?: Size; fail?: boolean; selected?: boolean; onPick?: () => void }) {
   const ref = useFlip<HTMLSpanElement>(task.id, task.ownerId);
   return <span ref={ref} className={`task-chip ${task.done ? 'done' : ''} ${fail ? 'fail' : ''}`} data-task-id={task.id}>
-    <CardFace card={task} size={size} onClick={onPick} />
+    <CardFace card={task} size={size} onClick={onPick} selected={onPick ? !!selected : undefined} />
     <TaskToken task={task} />
     {task.done && <em className="tick" aria-label="완료">✓</em>}
   </span>;

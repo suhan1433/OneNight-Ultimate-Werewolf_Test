@@ -1,14 +1,16 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Game, Send } from './types';
 import { cardLabel } from './lib';
-import { CardFace, Rules, TaskToken } from './ui';
+import { CardFace, Rules, TaskChip, TaskToken } from './ui';
 import type { View } from './view';
 
 /** 테이블 중앙에 뜨는 규칙 단계 패널(대상 지정·토큰 조정·과제 전달·조난 신호). 손패는 아래에 그대로 보인다. */
+const Shell = ({ tag, title, children }: { tag: string; title: string; children: ReactNode }) => <section className="phase-panel" aria-label={title}><p className="tag">{tag}</p><h2>{title}</h2>{children}</section>;
+
 export function PhasePanel({ game, view, send }: { game: Game; view: View; send: Send }) {
   const commander = view.isCommander;
+  const [pickedId, setPickedId] = useState<string | null>(null);
   const count = (m?: Record<string, boolean>) => game.players.filter(p => p.id in (m ?? {})).length;
-  const Shell = ({ tag, title, children }: { tag: string; title: string; children: ReactNode }) => <section className="phase-panel" aria-label={title}><p className="tag">{tag}</p><h2>{title}</h2>{children}</section>;
 
   if (view.kind === 'vote') {
     const mine = game.distressVotes?.[game.playerId]; const all = game.players.every(p => p.id in (game.distressVotes ?? {}));
@@ -32,11 +34,12 @@ export function PhasePanel({ game, view, send }: { game: Game; view: View; send:
     </Shell>;
   }
   if (view.kind === 'transfer') {
-    const mine = game.tasks.filter(t => t.ownerId === game.playerId);
+    const mine = game.tasks.filter(t => t.ownerId === game.playerId); const picked = mine.find(t => t.id === pickedId);
     return <Shell tag="5인 선택 규칙" title="과제 한 장을 전달할 수 있어요">
-      <p>원하면 담당자가 자기 과제 한 장을 다른 승무원에게 넘겨요. 전달하지 않으려면 커맨더가 진행을 누르세요.</p>
-      <div className="choices">{mine.flatMap(t => game.players.filter(p => p.id !== game.playerId).map(p => <button key={`${t.id}-${p.id}`} onClick={() => send('TASK_TRANSFER', { taskId: t.id, recipientId: p.id })}>{cardLabel(t)} → {p.nickname}</button>))}</div>
-      <div className="choices"><button className="primary" disabled={!commander} onClick={() => send('TASK_TRANSFER_SKIP')}>전달 없이 진행</button></div>
+      <p>원하면 담당자가 자기 과제 한 장을 다른 승무원에게 넘겨요. 먼저 넘길 카드를 고르세요. 전달하지 않으려면 커맨더가 진행을 누르세요.</p>
+      <div className="cards-row">{mine.length ? mine.map(t => <TaskChip key={t.id} task={t} size="md" selected={t.id === pickedId} onPick={() => setPickedId(t.id)} />) : <span className="sub">내가 맡은 과제가 없어요.</span>}</div>
+      {picked && <div className="choices">{game.players.filter(p => p.id !== game.playerId).map(p => <button key={p.id} className="primary" onClick={() => send('TASK_TRANSFER', { taskId: picked.id, recipientId: p.id })}>{cardLabel(picked)} → {p.nickname}</button>)}</div>}
+      <div className="choices"><button disabled={!commander} onClick={() => send('TASK_TRANSFER_SKIP')}>전달 없이 진행</button></div>
     </Shell>;
   }
   // chooseTarget
