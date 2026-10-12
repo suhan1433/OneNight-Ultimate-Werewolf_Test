@@ -9,23 +9,16 @@ import { PhasePanel } from './PhasePanel';
 import { CrewBoard } from './CrewBoard';
 import { Briefing } from './Briefing';
 import { Result } from './Result';
-import { Rules } from './ui';
 import type { View } from './view';
 
 type Props = { game: Game; view: View; send: Send; recordPlay: (c: Card) => void; dismissBriefing: () => void; openDrawer: (tab: DrawerTab) => void; onLeave: () => void };
 
 /* ───────── 상단 바 ───────── */
-function TopBar({ game, compact, rulesOpen, setRulesOpen, openDrawer, onLeave }: { game: Game; compact: boolean; rulesOpen: boolean; setRulesOpen: (v: boolean) => void; openDrawer: (t: DrawerTab) => void; onLeave: () => void }) {
+function TopBar({ game, openDrawer, onLeave }: { game: Game; openDrawer: (t: DrawerTab) => void; onLeave: () => void }) {
   return <header className="topbar">
-    <button type="button" className="mission-pill" aria-expanded={compact ? undefined : rulesOpen} onClick={() => compact ? openDrawer('mission') : setRulesOpen(!rulesOpen)}>
-      <b>미션 {game.missionId}</b><span>{game.mission.text}</span><i aria-hidden="true">{compact ? '≡' : rulesOpen ? '▴' : '▾'}</i>
-    </button>
+    <button type="button" className="bar-btn leave" onClick={onLeave}>나가기</button>
     <span className="tricks" aria-label={`트릭 ${Math.min(game.trickNo + 1, game.totalTricks)} / ${game.totalTricks}`}>트릭 <b>{Math.min(game.trickNo + 1, game.totalTricks)}/{game.totalTricks}</b></span>
-    {compact ? <button type="button" className="bar-btn menu" onClick={() => openDrawer('mission')} aria-label="메뉴: 미션, 기록, 도움말, 나가기">☰</button> : <>
-      <button type="button" className="bar-btn" onClick={() => openDrawer('log')}>기록</button>
-      <button type="button" className="bar-btn round" onClick={() => openDrawer('help')} aria-label="도움말">?</button>
-      <button type="button" className="bar-btn leave" onClick={onLeave}>나가기</button></>}
-    {!compact && rulesOpen && <div className="rules-pop"><Rules mission={game.mission} /></div>}
+    <button type="button" className="bar-btn round" onClick={() => openDrawer('help')} aria-label="도움말">?</button>
   </header>;
 }
 
@@ -53,10 +46,12 @@ function TrickZone({ game, view }: { game: Game; view: View }) {
 /* ───────── 과제 배정: 테이블 위에 펼친 과제 카드를 내 차례에 눌러 가져간다 ───────── */
 function TaskSpread({ game, view, send }: { game: Game; view: View; send: Send }) {
   const pending = game.tasks.filter(t => !t.ownerId); const mine = view.assigner.id === game.playerId; const dist = !!game.mission.distribute;
+  const responded = game.decisionResponses?.[game.playerId]; const everyoneResponded = game.players.every(player => player.id in (game.decisionResponses ?? {}));
   return <div className="spread">
-    <p className="spread-note"><b>과제 배정</b> · {mine ? (dist ? '과제를 맡길 승무원을 고르세요' : '가져갈 과제 카드를 누르세요') : `${view.assigner.nickname} 님이 고르는 중`}<small>{pending.length}장 남음</small></p>
+    <p className="spread-note"><b>과제 배정</b> · {dist ? (everyoneResponded ? (mine ? '누가 이 과제를 맡을지 고르세요' : `${view.assigner.nickname} 님이 담당자를 정하는 중`) : '현재 과제를 맡을 의향을 답하세요') : (mine ? '가져갈 과제 카드를 누르세요' : `${view.assigner.nickname} 님이 고르는 중`)}<small>{pending.length}장 남음</small></p>
     <div className="spread-cards">{(dist ? pending.slice(0, 1) : pending).map(t => <TaskChip key={t.id} task={t} size="lg" onPick={mine && !dist ? () => send('TASK_ASSIGN', { taskId: t.id }) : undefined} />)}</div>
-    {dist && mine && pending[0] && <div className="choices">{game.players.map(p => <button key={p.id} className="primary" onClick={() => send('TASK_ASSIGN', { taskId: pending[0].id, ownerId: p.id })}>{p.nickname} 에게 맡기기</button>)}</div>}
+    {dist && !everyoneResponded && <><div className="choices"><button disabled={responded !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: true })}>맡을 수 있어요</button><button disabled={responded !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: false })}>이번엔 어려워요</button></div><p className="sub">{game.players.filter(player => player.id in (game.decisionResponses ?? {})).length}/{game.players.length}명 응답</p></>}
+    {dist && everyoneResponded && mine && pending[0] && <div className="choices">{game.players.map(p => <button key={p.id} className="primary" onClick={() => send('TASK_ASSIGN', { taskId: pending[0].id, ownerId: p.id })}>{p.nickname} 에게 맡기기</button>)}</div>}
   </div>;
 }
 
@@ -85,12 +80,11 @@ function StatusLine({ view, onComm }: { view: View; onComm: () => void }) {
 export function Table({ game, view, send, recordPlay, dismissBriefing, openDrawer, onLeave }: Props) {
   const compact = useMedia('(max-width: 760px)');
   const [commOpen, setCommOpen] = useState(false);
-  const [rulesOpen, setRulesOpen] = useState(false);
   useEffect(() => { if (!view.canComm) setCommOpen(false); }, [view.canComm]);
   const meSeat = view.seats.find(s => s.isMe)!; const failed = view.kind === 'result' && !game.result?.win;
   const panel = ['target', 'token', 'transfer', 'vote', 'pass'].includes(view.kind);
   return <main className={`table-scene ${compact ? 'compact' : ''} k-${view.kind} ${panel || view.kind === 'assign' ? 'panel-phase' : ''} ${failed ? 'failed' : ''}`}>
-    <TopBar game={game} compact={compact} rulesOpen={rulesOpen} setRulesOpen={setRulesOpen} openDrawer={openDrawer} onLeave={onLeave} />
+    <TopBar game={game} openDrawer={openDrawer} onLeave={onLeave} />
     <section className="stage" aria-label="테이블">
       {!compact && <div className="oval" aria-hidden="true" />}
       {!compact && view.seats.filter(s => !s.isMe).map(s => <Seat key={s.player.id} player={s.player} game={game} view={view} variant="ring" angle={s.angle} />)}
@@ -100,7 +94,7 @@ export function Table({ game, view, send, recordPlay, dismissBriefing, openDrawe
       {!compact && <Seat player={meSeat.player} game={game} view={view} variant="me" />}
     </section>
     {compact && <CrewBoard game={game} view={view} />}
-    {!compact && view.lastLine && <button type="button" className="last-line" onClick={() => openDrawer('log')} title="기록 열기"><span>최근</span>{view.lastLine}</button>}
+    {!compact && view.lastLine && <div className="last-line"><span>최근</span>{view.lastLine}</div>}
     <div className="dock">
       <StatusLine view={view} onComm={() => setCommOpen(true)} />
       <Hand game={game} view={view} send={send} recordPlay={recordPlay} compact={compact} />

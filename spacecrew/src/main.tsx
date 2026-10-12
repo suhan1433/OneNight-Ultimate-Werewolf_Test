@@ -77,7 +77,7 @@ function App() {
     {!game ? <Title request={request} onSession={reply => saveSession(reply as Session)} onHelp={() => openDrawer('help')} />
       : game.phase === 'lobby' ? <Lobby game={game} send={send} onLeave={leave} onHelp={() => openDrawer('help')} />
       : view && <Table game={game} view={view} send={send} recordPlay={recordPlay} dismissBriefing={dismissBriefing} openDrawer={openDrawer} onLeave={leave} />}
-    {drawer.open && <Drawer tab={drawer.tab} setTab={tab => setDrawer({ open: true, tab })} onClose={() => setDrawer(d => ({ ...d, open: false }))} onLeave={leave} game={game} />}
+    {drawer.open && <Drawer onClose={() => setDrawer(d => ({ ...d, open: false }))} game={game} />}
     {!game && tutorial && <Tutorial onDone={() => setTutorial(false)} />}
     {error && <div className="toast" role="alert">{error}</div>}
   </>;

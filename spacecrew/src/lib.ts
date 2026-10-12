@@ -48,7 +48,9 @@ export const markerOf = (card: Card, hand: Card[]): Spot => {
 
 /* ───────── 미션 규칙 풀어쓰기 ───────── */
 export const missionRules = (m: Mission): string[] => {
-  const r = [`과제 카드 ${m.tasks}장을 정해진 담당자가 트릭에서 따내야 해요.`];
+  const r = m.tasks
+    ? [`과제 카드 ${m.tasks}장을 정해진 담당자가 트릭에서 따내야 해요.`]
+    : ['과제 카드 없이 특수 목표를 달성해야 해요.'];
   if (m.order) r.push(`순서 과제 ${m.order}개: 숫자 1부터 차례대로 달성해야 해요.`);
   if (m.arrows) r.push(`화살표 과제 ${m.arrows}개: › 표시 순서대로 달성해야 해요.`);
   if (m.omega) r.push('Ω 과제: 다른 과제를 모두 끝낸 맨 마지막에 달성해야 해요.');

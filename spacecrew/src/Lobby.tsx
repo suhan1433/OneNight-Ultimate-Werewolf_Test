@@ -6,9 +6,9 @@ import { Avatar, MissionMap, Rules } from './ui';
 export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send; onLeave: () => void; onHelp: () => void }) {
   const [copied, setCopied] = useState(false);
   const host = game.hostId === game.playerId; const me = game.players.find(p => p.id === game.playerId)!;
-  const filled = game.players.length === game.maxPlayers; const allReady = game.players.every(p => p.ready || p.id === game.hostId);
+  const filled = game.players.length === game.maxPlayers; const allReady = game.players.every(p => p.ready);
   const copy = async () => { try { await navigator.clipboard?.writeText(game.code); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch { /* 클립보드 불가 */ } };
-  const state = (p: Game['players'][number]) => !p.connected ? ['off', '연결 끊김'] : p.ready || p.id === game.hostId ? ['on', '준비됨'] : ['wait', '준비 중'];
+  const state = (p: Game['players'][number]) => !p.connected ? ['off', '연결 끊김'] : p.ready ? ['on', '준비됨'] : ['wait', '준비 중'];
   const seats = Array.from({ length: game.maxPlayers }, (_, i) => game.players[i]);
   return <main className="lobby">
     <header className="lobby-top">
@@ -43,7 +43,7 @@ export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send;
       </article>
     </section>
     <footer className="lobby-actions">
-      {host ? <>{!filled && <button type="button" className="secondary bot-add" onClick={() => send('TEST_BOT_ADD')}>🤖 테스트 봇 추가</button>}<button type="button" className="primary big" disabled={!filled || !allReady} onClick={() => send('GAME_START')}>미션 시작</button>
+      {host ? <>{!filled && <button type="button" className="secondary bot-add" onClick={() => send('TEST_BOT_ADD')}>🤖 테스트 봇 추가</button>}<button type="button" className={`big ready ${me.ready ? 'active' : 'primary'}`} aria-pressed={me.ready} onClick={() => send('PLAYER_READY')}>{me.ready ? '준비 취소' : '준비 완료'}</button><button type="button" className="primary big" disabled={!filled || !allReady} onClick={() => send('GAME_START')}>미션 시작</button>
         <p>{!filled ? `모든 좌석(${game.maxPlayers}명)이 채워져야 해요.` : !allReady ? '모든 승무원의 준비를 기다리는 중…' : '출발 준비 완료'}</p></>
       : <><button type="button" className={`big ready ${me.ready ? 'active' : 'primary'}`} aria-pressed={me.ready} onClick={() => send('PLAYER_READY')}>{me.ready ? '준비 취소' : '준비 완료'}</button><p>방장이 시작하면 손패가 배정돼요.</p></>}
     </footer>

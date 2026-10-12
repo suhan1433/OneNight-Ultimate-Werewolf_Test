@@ -7,11 +7,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { Card, Game, Player, TrickCard } from './types';
 import { prefersReducedMotion, seatAngle } from './lib';
 
-export type PhaseKind = 'lobby' | 'play' | 'assign' | 'target' | 'token' | 'transfer' | 'vote' | 'pass' | 'result';
+export type PhaseKind = 'lobby' | 'play' | 'assign' | 'target' | 'token' | 'transfer' | 'vote' | 'direction' | 'pass' | 'result';
 export type Reveal = { cards: TrickCard[]; winnerId: string; stage: 'show' | 'lens' | 'sweep'; doneTaskIds: string[] };
 export type Tone = 'act' | 'wait' | 'lock' | 'info';
 
-const KIND: Record<string, PhaseKind> = { lobby: 'lobby', result: 'result', assign: 'assign', chooseTarget: 'target', tokenEdit: 'token', taskTransfer: 'transfer', distressVote: 'vote', distressPass: 'pass' };
+const KIND: Record<string, PhaseKind> = { lobby: 'lobby', result: 'result', assign: 'assign', chooseTarget: 'target', tokenEdit: 'token', taskTransfer: 'transfer', distressVote: 'vote', distressDirection: 'direction', distressPass: 'pass' };
 // 트릭 판정 연출 시간(ms): 전부 공개 → 렌즈 → 쓸어가기. 모션 줄이기면 렌즈·쓸기 생략.
 const T = { show: 1600, lens: 600, sweep: 500 };
 
@@ -68,7 +68,8 @@ export function deriveView(game: Game, reveal: Reveal | null, briefing: boolean,
   const resolving = !!reveal;
   const legal = new Set(game.legalCardIds);
   const myTurn = playing && game.turnId === game.playerId && !resolving;
-  const shown: TrickCard[] = game.trick.length ? game.trick : reveal?.cards ?? [];
+  // Do not replace a resolving trick with the next trick's first card.
+  const shown: TrickCard[] = reveal?.cards ?? game.trick;
   const lead = game.trick[0]?.card ?? reveal?.cards[0]?.card ?? null;
 
   // 통신: 트릭의 첫 카드가 놓이기 전 + 아직 통신 안 한 사람이면 누구나(차례 무관)
@@ -98,11 +99,12 @@ export function deriveView(game: Game, reveal: Reveal | null, briefing: boolean,
   switch (kind) {
     case 'play': status = resolving ? { text: '트릭 판정 중 · 카드가 모두 공개돼요', tone: 'lock' } : myTurn ? { text: '내 차례 · 빛나는 카드 중 한 장을 내세요', tone: 'act' } : { text: `${byId(game.turnId)?.nickname ?? '다른 승무원'} 님의 차례를 기다리는 중`, tone: 'wait' }; break;
     case 'assign': status = assigner.id === me.id ? { text: game.mission.distribute ? '내 차례 · 과제를 맡길 승무원을 고르세요' : '내 차례 · 가져갈 과제 카드를 누르세요', tone: 'act' } : { text: `${assigner.nickname} 님이 과제를 고르는 중`, tone: 'wait' }; break;
-    case 'target': status = !answered(game.decisionResponses) ? { text: '먼저 예/아니오로 대답하세요', tone: 'act' } : isCommander ? { text: '모두 대답하면 대상을 지정하세요', tone: 'act' } : { text: '커맨더가 대상을 고르는 중', tone: 'wait' }; break;
+    case 'target': status = game.mission.special === 'noComm' ? (isCommander ? { text: '통신할 수 없는 승무원을 지정하세요', tone: 'act' } : { text: '커맨더가 승무원을 지정하는 중', tone: 'wait' }) : !answered(game.decisionResponses) ? { text: '먼저 예/아니오로 대답하세요', tone: 'act' } : isCommander ? { text: '모두 대답하면 대상을 지정하세요', tone: 'act' } : { text: '커맨더가 대상을 고르는 중', tone: 'wait' }; break;
     case 'token': status = isCommander ? { text: '토큰을 조정하거나 그대로 진행하세요', tone: 'act' } : { text: '커맨더가 토큰을 정하는 중', tone: 'wait' }; break;
     case 'transfer': status = { text: '과제를 넘길지 정하세요', tone: 'act' }; break;
     case 'vote': status = answered(game.distressVotes) ? { text: '다른 승무원의 응답을 기다리는 중', tone: 'wait' } : { text: '조난 신호를 쓸지 투표하세요', tone: 'act' }; break;
-    case 'pass': status = game.distressPassed ? { text: '다른 승무원을 기다리는 중', tone: 'wait' } : { text: '오른쪽 이웃에게 보낼 카드를 고르세요', tone: 'act' }; break;
+    case 'direction': status = game.playerId in (game.distressDirections ?? {}) ? { text: '다른 승무원의 방향 선택을 기다리는 중', tone: 'wait' } : { text: '카드를 전달할 방향을 고르세요', tone: 'act' }; break;
+    case 'pass': status = game.distressPassed ? { text: '다른 승무원을 기다리는 중', tone: 'wait' } : { text: '선택한 방향의 이웃에게 보낼 카드를 고르세요', tone: 'act' }; break;
     case 'result': status = { text: game.result?.win ? '미션 성공' : '미션 실패', tone: 'info' }; break;
     default: status = { text: '', tone: 'info' };
   }
