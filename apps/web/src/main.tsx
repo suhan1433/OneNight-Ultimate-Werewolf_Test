@@ -118,7 +118,7 @@ const syncAvatar = (game: ClientGameState, avatar: string) => {
    players/myId 를 안 넘겨도 현재 게임 상태(store)에서 찾아 쓴다 → 어느 화면에서든 같은 캐릭터 */
 function useCharacterResolver(players?: { id: string }[], myId?: string) {
   const mine = useMyAvatarId();
-  const game = useGame((s) => s.game);
+  const game = useGame((s) => players ? null : s.game);
   const me = myId ?? game?.playerId;
   return (playerId: string): Character => {
     const server =
@@ -204,7 +204,14 @@ function ProfileDialog({ game, onClose }: { game: ClientGameState; onClose: () =
 }
 
 function App() {
-  const { game, tts, help, error, connectionState, setTts, setHelp, setError } = useGame();
+  const game = useGame((s) => s.game);
+  const tts = useGame((s) => s.tts);
+  const help = useGame((s) => s.help);
+  const error = useGame((s) => s.error);
+  const connectionState = useGame((s) => s.connectionState);
+  const setTts = useGame((s) => s.setTts);
+  const setHelp = useGame((s) => s.setHelp);
+  const setError = useGame((s) => s.setError);
   const [nightRecordOpen, setNightRecordOpen] = useState(false);
   // 웹폰트가 준비되기 전에는 인트로를 시작하지 않는다(타이틀이 폰트 교체로 튀는 것 방지)
   const [fontsReady, setFontsReady] = useState(false);
@@ -302,14 +309,10 @@ function App() {
         <motion.div
           className="shell"
           key={game?.phase ?? "home"}
-          initial={
-            game?.phase === "lobby"
-              ? { opacity: 0, scale: 1.14, filter: "blur(12px)" } // 마을에서 방 안으로 들어가는 카메라
-              : { opacity: 0, y: 14, filter: "blur(10px)" }
-          }
-          animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-          exit={{ opacity: 0, filter: "blur(8px)" }}
-          transition={{ duration: game?.phase === "lobby" ? 0.9 : 0.5, ease: [0.16, 1, 0.3, 1] }}
+          initial={game?.phase === "lobby" ? { opacity: 0, scale: 1.04 } : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.24, ease: "easeOut" }}
         >
           {game ? <Game game={game} dawn={dawn} /> : <Home />}
         </motion.div>
@@ -1259,30 +1262,37 @@ function Lobby({ game }: { game: ClientGameState }) {
     </section>
   );
 }
-const REVEAL_HOLD_MS = 1400;
-/* 카드 공개: 어둠 속 한 장 → 꾹 눌러 금빛이 차오름 → 0.45초 정적 → 뒤집힘 + 진영 색 충격파
+const REVEAL_HOLD_MS = 900;
+/* 카드 공개: 어둠 속 한 장 → 꾹 눌러 금빛이 차오름 → 짧은 정적 → 뒤집힘 + 진영 색 충격파
    진영 색은 뒤집히는 순간 전까지 DOM에 클래스로 존재하지 않는다(곁눈질 방지). */
 function Reveal({ game }: { game: ClientGameState }) {
   const me = game.players.find((p) => p.id === game.playerId)!;
   const r = game.selfRole && ROLE_DEFINITIONS[game.selfRole];
   const [stage, setStage] = useState<"idle" | "holding" | "hush" | "revealed">("idle");
-  const [hold, setHold] = useState(0);
   const [tint, setTint] = useState(false);
   const [sent, setSent] = useState(false);
   const raf = useRef(0);
   const hushTimer = useRef<number>();
   const startedAt = useRef(0);
   const tiltRef = useRef<HTMLDivElement>(null);
+  const tiltBounds = useRef<DOMRect>();
+  const flipRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<SVGRectElement>(null);
+  const setHold = (value: number) => {
+    flipRef.current?.style.setProperty("--hold", String(value));
+    ringRef.current?.setAttribute("stroke-dasharray", `${value} 1`);
+  };
   const tilt = (e: React.PointerEvent) => {
     const el = tiltRef.current;
     if (!el) return;
-    const b = el.getBoundingClientRect();
+    const b = tiltBounds.current ?? el.getBoundingClientRect();
     const x = (e.clientX - b.left) / b.width - 0.5;
     const y = (e.clientY - b.top) / b.height - 0.5;
     el.style.setProperty("--tx", `${(-y * 14).toFixed(2)}deg`);
     el.style.setProperty("--ty", `${(x * 18).toFixed(2)}deg`);
   };
   const untilt = () => {
+    tiltBounds.current = undefined;
     tiltRef.current?.style.setProperty("--tx", "0deg");
     tiltRef.current?.style.setProperty("--ty", "0deg");
   };
@@ -1314,7 +1324,7 @@ function Reveal({ game }: { game: ClientGameState }) {
     cancelAnimationFrame(raf.current);
     setHold(1);
     setStage("hush");
-    hushTimer.current = window.setTimeout(() => setStage("revealed"), 450);
+    hushTimer.current = window.setTimeout(() => setStage("revealed"), 180);
   };
   const begin = () => {
     if (stage !== "idle" || locked) return;
@@ -1347,16 +1357,17 @@ function Reveal({ game }: { game: ClientGameState }) {
       <div className="moon smallmoon">☾</div>
       <Header kicker="YOUR SECRET" title={`${me.nickname}님의 카드`} />
       <p>주변에 아무도 보고 있지 않은지 확인하세요.</p>
-      <div className="card-stage" onPointerMove={tilt} onPointerLeave={untilt} onPointerUp={untilt}>
+      <div className="card-stage" onPointerEnter={() => { tiltBounds.current = tiltRef.current?.getBoundingClientRect(); }} onPointerMove={tilt} onPointerLeave={untilt} onPointerUp={untilt}>
         <div className="card-tilt" ref={tiltRef}>
         <motion.div
+          ref={flipRef}
           className="flip"
           role="button"
           tabIndex={0}
           aria-label="카드를 꾹 눌러 내 역할 확인 (키보드: Enter)"
-          style={{ ["--hold" as string]: hold } as never}
+          style={{ ["--hold" as string]: 0 } as React.CSSProperties}
           animate={{ rotateY: stage === "revealed" ? 180 : 0 }}
-          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           onPointerDown={(e) => {
             if (e.button !== 0) return;
             e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -1373,7 +1384,7 @@ function Reveal({ game }: { game: ClientGameState }) {
           }}
         >
           <svg className="hold-ring" viewBox="0 0 248 358" aria-hidden="true">
-            <rect x="4" y="4" width="240" height="350" rx="22" pathLength={1} strokeDasharray={`${hold} 1`} />
+            <rect ref={ringRef} x="4" y="4" width="240" height="350" rx="22" pathLength={1} strokeDasharray="0 1" />
           </svg>
           <div className="card-face back">
             <Sigil size={84} />
@@ -1420,29 +1431,10 @@ function Reveal({ game }: { game: ClientGameState }) {
 function Night({ game }: { game: ClientGameState }) {
   const a = game.currentNightAction;
   const role = a && ROLE_DEFINITIONS[a.role];
-  const remain = useCountdown(game.nightResolutionEndsAt ?? a?.expiresAt ?? game.nightEndsAt ?? null, game.serverNow);
-  const syncedAction = useRef<string>();
-  useEffect(() => {
-    // The opening narration is pending on the first role itself, so its
-    // subsequent active deadline needs a distinct recovery key.
-    const transitionKey = a && `${a.id}:${a.status}:${a.expiresAt}`;
-    if (!game.nightResolutionEndsAt && a && transitionKey && remain <= 0 && syncedAction.current !== transitionKey) {
-      syncedAction.current = transitionKey;
-      recoverExpiredAction(a.id, a.status === "active");
-    }
-  }, [a?.expiresAt, a?.id, a?.status, game.nightResolutionEndsAt, remain]);
   if (game.nightResolutionEndsAt)
     return <NightResolution game={game} />;
   if (a?.status === "pending")
-    return (
-      <section className="center night night-intro">
-        <div className="eclipse" aria-hidden="true" />
-        <div className="eyebrow">THE NIGHT BEGINS</div>
-        <h1>밤이 시작되었습니다.</h1>
-        <p>모두 눈을 감아주세요.</p>
-        <div className="dots">● ● ●</div>
-      </section>
-    );
+    return <NightIntro game={game} />;
   if (!a)
     return (
       <section className="center night">
@@ -1450,41 +1442,81 @@ function Night({ game }: { game: ClientGameState }) {
         <div className="eyebrow">NIGHT</div>
         <h1>밤 행동 진행 중</h1>
         <p>당신은 오늘 밤 별도의 행동이 없습니다.</p>
-        <NightTimer remain={remain} total={game.settings.actionTimeLimitSeconds} />
+        <NightCountdown expires={game.nightEndsAt} serverNow={game.serverNow} total={game.settings.actionTimeLimitSeconds} />
       </section>
     );
   return (
     <section className="center night" data-faction={role?.faction}>
       <div className="crescent">☾</div>
-      <div className="eyebrow">NIGHT · {a?.order ?? "—"}</div>
-      <h1>
-        <RoleIcon id={a?.role} faction={role?.faction} size={20} /> {role?.name}
-      </h1>
+      <div className="eyebrow">NIGHT · {a.order ?? "—"}</div>
+      <h1><RoleIcon id={a.role} faction={role?.faction} size={20} /> {role?.name}</h1>
       <p>{role?.description}</p>
-      <NightTimer remain={remain} total={game.settings.actionTimeLimitSeconds} />
-      {remain <= 0 && useGame.getState().transitioningActionId === a?.id && (
-        <p className="transitioning">다음 역할을 준비 중…</p>
-      )}
-      {game.actionResult && <PrivateResult data={game.actionResult} />}{" "}
-      {game.isNightActor && a ? (
-        <NightControls game={game} />
-      ) : (
+      <NightCountdown expires={a.expiresAt} serverNow={game.serverNow} total={game.settings.actionTimeLimitSeconds} actionId={a.id} status={a.status} />
+      {game.actionResult && <PrivateResult data={game.actionResult} />}
+      {game.isNightActor ? <NightControls game={game} /> : (
         <Panel>
           <div className="dots">● ● ●</div>
-          <p>
-            선택은 기록되었습니다.
-            <br />
-            제한 시간이 끝나면 다음 역할로 넘어갑니다.
-          </p>
+          <p>선택은 기록되었습니다.<br />제한 시간이 끝나면 다음 역할로 넘어갑니다.</p>
         </Panel>
       )}
     </section>
   );
 }
 
+function NightIntro({ game }: { game: ClientGameState }) {
+  const a = game.currentNightAction;
+  return (
+    <section className="center night night-intro">
+      {a && <NightExpiry expires={a.expiresAt} serverNow={game.serverNow} actionId={a.id} status={a.status} />}
+      <div className="eclipse" aria-hidden="true" />
+      <div className="eyebrow">THE NIGHT BEGINS</div>
+      <h1>밤이 시작되었습니다.</h1>
+      <p>모두 눈을 감아주세요.</p>
+      <div className="dots">● ● ●</div>
+    </section>
+  );
+}
+
+type NightActionStatus = NonNullable<ClientGameState["currentNightAction"]>["status"];
+function NightExpiry({ expires, serverNow, actionId, status }: { expires: number; serverNow: number; actionId: string; status: NightActionStatus }) {
+  const remain = useCountdown(expires, serverNow, 100);
+  useNightRecovery(remain, expires, actionId, status);
+  return null;
+}
+function useNightRecovery(remain: number, expires?: number | null, actionId?: string, status?: NightActionStatus) {
+  const syncedAction = useRef<string>();
+  useEffect(() => {
+    if (!actionId || !status || expires == null) return;
+    const transitionKey = `${actionId}:${status}:${expires}`;
+    if (remain <= 0 && syncedAction.current !== transitionKey) {
+      syncedAction.current = transitionKey;
+      recoverExpiredAction(actionId, status === "active");
+    }
+  }, [actionId, status, expires, remain]);
+}
+
+function NightCountdown({ expires, serverNow, total, actionId, status }: { expires?: number | null; serverNow: number; total: number; actionId?: string; status?: NightActionStatus }) {
+  const remain = useCountdown(expires, serverNow, 100);
+  useNightRecovery(remain, expires, actionId, status);
+  const syncedDeadline = useRef<number>();
+  useEffect(() => {
+    if (!actionId && expires && remain <= 0 && syncedDeadline.current !== expires) {
+      syncedDeadline.current = expires;
+      void syncRoom();
+    }
+  }, [actionId, expires, remain]);
+  return (
+    <>
+      <NightTimer remain={remain} total={total} />
+      {remain <= 0 && actionId && useGame.getState().transitioningActionId === actionId && (
+        <p className="transitioning">다음 역할을 준비 중…</p>
+      )}
+    </>
+  );
+}
+
 /** The server has applied every queued role in canonical order. */
 function NightResolution({ game }: { game: ClientGameState }) {
-  const remain = useCountdown(game.nightResolutionEndsAt, game.serverNow);
   return (
     <section className="center night night-resolution">
       <div className="crescent">☾</div>
@@ -1500,9 +1532,13 @@ function NightResolution({ game }: { game: ClientGameState }) {
           <p>당신이 직접 수행한 밤 행동은 없습니다.</p>
         </Panel>
       )}
-      <p className="transitioning">낮이 밝기까지 {Math.max(0, remain).toFixed(1)}초</p>
+      <ResolutionCountdown expires={game.nightResolutionEndsAt} serverNow={game.serverNow} />
     </section>
   );
+}
+function ResolutionCountdown({ expires, serverNow }: { expires?: number | null; serverNow: number }) {
+  const remain = useCountdown(expires, serverNow, 100);
+  return <p className="transitioning">낮이 밝기까지 {remain.toFixed(1)}초</p>;
 }
 function NightControls({ game }: { game: ClientGameState }) {
   const a = game.currentNightAction!;
@@ -1883,7 +1919,7 @@ function ChatComposer({ text, setText, placeholder, onSend, inputRef, autoFocus 
 }
 
 // status(ReactNode) 대신 원시값으로 받는다: 새 JSX 객체가 매 틱 생성돼 memo 가 깨지는 것을 막는다.
-const ChatPanel = React.memo(function ChatPanel({ game, scope, title, placeholder, timerLabel, timerUrgent }: { game: ClientGameState; scope: 'day' | 'lobby'; title: string; placeholder: string; timerLabel?: string; timerUrgent?: boolean }) {
+const ChatPanel = React.memo(function ChatPanel({ game, scope, title, placeholder, timerExpiresAt }: { game: ClientGameState; scope: 'day' | 'lobby'; title: string; placeholder: string; timerExpiresAt?: number | null }) {
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const focusOnOpen = useRef(false);
@@ -1990,7 +2026,7 @@ const ChatPanel = React.memo(function ChatPanel({ game, scope, title, placeholde
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
             </button>
             <strong className="chat-sheet-title">{title}</strong>
-            {timerLabel && <span className={`chat-sheet-timer${timerUrgent ? " urgent" : ""}`}>☀ {timerLabel}</span>}
+            {timerExpiresAt && <ChatSheetTimer expires={timerExpiresAt} serverNow={game.serverNow} />}
           </div>
           <ChatMessages messages={messages} myId={game.playerId} players={game.players} />
           <div className="chat-sheet-foot">
@@ -2002,6 +2038,10 @@ const ChatPanel = React.memo(function ChatPanel({ game, scope, title, placeholde
     </Panel>
   );
 });
+function ChatSheetTimer({ expires, serverNow }: { expires: number; serverNow: number }) {
+  const remain = useCountdown(expires, serverNow);
+  return <span className={`chat-sheet-timer${remain <= 10 ? " urgent" : ""}`}>☀ {formatTime(remain)}</span>;
+}
 function Day({ game, fresh }: { game: ClientGameState; fresh: boolean }) {
   const remain = useCountdown(game.dayExpiresAt, game.serverNow);
   const synced = useRef(false);
@@ -2050,8 +2090,7 @@ function Day({ game, fresh }: { game: ClientGameState; fresh: boolean }) {
           scope="day"
           title="마을 대화"
           placeholder="의심과 단서를 나누세요"
-          timerLabel={`${formatTime(remain)}`}
-          timerUrgent={urgent}
+          timerExpiresAt={game.dayExpiresAt}
         />
       ) : (
         <>
@@ -2115,12 +2154,13 @@ function HoldConfirm({
   doneLabel: string;
   onConfirm: () => void;
 }) {
-  const [p, setP] = useState(0);
   const [holding, setHolding] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const raf = useRef(0);
   const t0 = useRef(0);
   const fired = useRef(false);
   const off = disabled || done;
+  const setProgress = (value: number) => buttonRef.current?.style.setProperty("--hold", String(value));
   useEffect(
     () => () => {
       cancelAnimationFrame(raf.current);
@@ -2129,17 +2169,17 @@ function HoldConfirm({
     [],
   );
   useEffect(() => {
-    if (done) setP(1);
+    if (done) setProgress(1);
     else {
       fired.current = false; // 서버 거절로 롤백되면 다시 누를 수 있다
-      setP(0);
+      setProgress(0);
     }
   }, [done]);
   const stop = () => {
     cancelAnimationFrame(raf.current);
     setHolding(false);
     if (!fired.current) {
-      setP(0);
+      setProgress(0);
       setVignette(0);
     }
   };
@@ -2150,7 +2190,7 @@ function HoldConfirm({
     t0.current = performance.now();
     const tick = (now: number) => {
       const v = Math.min(1, (now - t0.current) / VOTE_HOLD_MS);
-      setP(v);
+      setProgress(v);
       setVignette(v);
       if (v >= 1) {
         fired.current = true;
@@ -2163,8 +2203,9 @@ function HoldConfirm({
   };
   return (
     <button
+      ref={buttonRef}
       className={`hold-confirm${done ? " done" : ""}${holding ? " holding" : ""}`}
-      style={{ ["--hold" as string]: p } as React.CSSProperties}
+      style={{ ["--hold" as string]: done ? 1 : 0 } as React.CSSProperties}
       disabled={off}
       onPointerDown={start}
       onPointerUp={stop}
@@ -2922,7 +2963,7 @@ function PrivateResult({ data }: { data: Record<string, unknown> }) {
     </div>
   );
 }
-function useCountdown(expires?: number | null, serverNow?: number) {
+function useCountdown(expires?: number | null, serverNow?: number, tickMs = 1000) {
   const [now, setNow] = useState(Date.now());
   const offset = useRef(0);
   const received = useRef<number>();
@@ -2931,9 +2972,9 @@ function useCountdown(expires?: number | null, serverNow?: number) {
     received.current = serverNow;
   }
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 100);
+    const t = setInterval(() => setNow(Date.now()), tickMs);
     return () => clearInterval(t);
-  }, []);
+  }, [tickMs]);
   return Math.max(0, ((expires ?? now) - (now + offset.current)) / 1000);
 }
 const factionName = (f: string) =>

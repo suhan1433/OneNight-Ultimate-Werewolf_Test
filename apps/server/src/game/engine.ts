@@ -289,7 +289,7 @@ export function buildPlayerGameState(room: Room, playerId: string, actionResults
     selectedRoles: room.selectedRoles, currentNightAction: action ? { id: action.id, role: action.role, order: action.order, startedAt: action.startedAt, expiresAt: action.expiresAt, status: action.status, copied: action.copied } : null,
     isNightActor: isActor, actionContext, actionResult: room.nightResolutionExpiresAt ? actionResults[playerId] : undefined, nightActions: room.privateNightActions?.[playerId] ?? [], votesCompleted: Object.keys(room.votes).length, dayVoteRequests: (room.voteStartRequests ?? []).length, hasRequestedDayVote: (room.voteStartRequests ?? []).includes(playerId), totalPlayers: room.players.length,
     dayExpiresAt: room.dayExpiresAt, serverNow: Date.now(), chat: room.chat.slice(-100), lobbyChat: [], publicReveals: room.publicReveals,
-    settings: { actionTimeLimitSeconds: room.actionTimeLimitSeconds, dayTimeLimitSeconds: room.dayTimeLimitSeconds }, result: room.result, nightEndsAt: room.nightResolutionExpiresAt ?? action?.expiresAt ?? null,
+    settings: { actionTimeLimitSeconds: room.actionTimeLimitSeconds, dayTimeLimitSeconds: room.dayTimeLimitSeconds }, result: room.result, nightEndsAt: room.nightResolutionExpiresAt ?? room.nightActionQueue.find((candidate) => candidate.status === 'pending' || candidate.status === 'active')?.expiresAt ?? null,
     nightResolutionEndsAt: room.nightResolutionExpiresAt ?? null
   };
 }

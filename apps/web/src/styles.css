@@ -21,7 +21,7 @@ button,input,select{font:inherit}button{border:0}
 
 /* ---------- 무대: 별밤 ↔ 새벽 ---------- */
 main{
-  min-height:100vh;position:relative;overflow:hidden;transition:background 1.2s,color 1.2s;
+  min-height:100vh;position:relative;overflow:hidden;
   background:
     radial-gradient(ellipse 70% 45% at 50% -8%,#3a2f78 0,transparent 70%),
     radial-gradient(ellipse 120% 60% at 50% 115%,#1b1440 0,transparent 65%),
@@ -102,7 +102,6 @@ header h1{margin-top:2px}
   position:relative;margin:14px 0;padding:18px;border-radius:18px;border:1px solid var(--line);
   background:linear-gradient(160deg,#1d1a45ee,#12102bee);
   box-shadow:inset 0 1px 0 #ffffff14,0 18px 44px #0006;
-  backdrop-filter:blur(10px);
 }
 .panel:before{content:'';position:absolute;left:18px;right:18px;top:-1px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.55}
 main.day .panel{background:linear-gradient(160deg,#fff9ea,#fbedcb);border-color:#dcb86c;box-shadow:inset 0 1px 0 #fff,0 14px 30px #a0602033}

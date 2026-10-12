@@ -96,7 +96,7 @@ main:not([data-ready]) .hero *{animation-play-state:paused!important}
   background:radial-gradient(ellipse,#dcbc6a22,transparent 65%)}
 .reveal.s-holding .card-stage:before{opacity:.9}
 .reveal.s-hush .card-stage:before{opacity:.98}
-.reveal.s-revealed .card-stage:before{opacity:0;transition:opacity 1.6s 1.1s}
+.reveal.s-revealed .card-stage:before{opacity:0;transition:opacity .45s .15s}
 .reveal.confirmed .card-stage:before{opacity:.55}
 /* 꾹 누르는 동안 테두리에 금빛이 차오른다 */
 .hold-ring{position:absolute;left:-4px;top:-4px;width:calc(100% + 8px);height:calc(100% + 8px);overflow:visible;pointer-events:none;
@@ -107,15 +107,15 @@ main:not([data-ready]) .hero *{animation-play-state:paused!important}
 .reveal.s-revealed .hold-ring{display:none}
 .reveal.s-holding .card-face.back{animation:none;
   box-shadow:0 26px 60px #000a,0 0 calc(50px + var(--hold,0)*90px) rgba(220,188,106,calc(.12 + var(--hold,0)*.5))}
-/* 직전 정적 0.45초: 모든 빛과 움직임이 멈춘다 */
+/* 뒤집기 직전 짧은 정적: 모든 빛과 움직임이 멈춘다 */
 .reveal.s-hush *,.reveal.s-hush *:before,.reveal.s-hush *:after{animation-play-state:paused!important}
 /* 뒤집히는 순간 이후에만: 아이콘 → 이름 각인 → 설명 */
 .reveal .card-face.front>span,.reveal .card-face.front h2{animation:none}
-.reveal.s-revealed .card-face.front>span{animation:emblem 1.1s .45s var(--ease-out) both}
-.reveal.s-revealed .card-face.front h2{animation:role-name 1.1s .75s var(--ease-out) both}
-.reveal.s-revealed .card-face.front b,.reveal.s-revealed .card-face.front p{animation:fadeup .9s 1.5s both}
+.reveal.s-revealed .card-face.front>span{animation:emblem .5s .12s var(--ease-out) both}
+.reveal.s-revealed .card-face.front h2{animation:role-name .5s .2s var(--ease-out) both}
+.reveal.s-revealed .card-face.front b,.reveal.s-revealed .card-face.front p{animation:fadeup .45s .38s both}
 .shell section>button.reveal-confirm{opacity:0;transform:translateY(18px);pointer-events:none;
-  transition:opacity .9s 1.7s,transform .9s 1.7s,filter .2s,box-shadow .2s}
+  transition:opacity .4s .4s,transform .4s .4s,filter .2s,box-shadow .2s}
 .shell section>button.reveal-confirm.up{opacity:1;transform:none;pointer-events:auto}
 .shell section>button.reveal-confirm.up:disabled{opacity:.5}
 

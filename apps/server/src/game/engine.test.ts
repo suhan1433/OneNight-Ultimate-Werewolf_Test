@@ -17,6 +17,17 @@ describe('public game state', () => {
     players[0]!.avatar = 'fox';
     expect(buildPlayerGameState(room(players), 'a').players).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'a', avatar: 'fox' })]));
   });
+  it('shares the night deadline with players who have no night action', () => {
+    let r = room([player('seer', 'seer'), player('villager')]);
+    r.phase = 'night';
+    r.nightActionQueue = buildNightActionQueue(['seer', 'villager'], r.players);
+    r = startNightIntro(r, 1_000);
+    expect(buildPlayerGameState(r, 'villager').nightEndsAt).toBe(5_300);
+    r = startCurrentAction(r, 5_300);
+    const state = buildPlayerGameState(r, 'villager');
+    expect(state.currentNightAction).toBeNull();
+    expect(state.nightEndsAt).toBe(10_300);
+  });
 });
 describe('night queue',()=>{
   it('keeps only assigned roles in canonical order',()=>{const q=buildNightActionQueue(['seer','mason','werewolf','shield_bearer','doppelganger','drunk','villager'],[player('a','seer')]);expect(q.map(x=>x.role)).toEqual(['seer']);expect(q[0]!.playerIds).toEqual(['a'])});
