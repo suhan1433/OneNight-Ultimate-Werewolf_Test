@@ -61,7 +61,28 @@ export const missionRules = (m: Mission): string[] => {
   if (m.pick === 'notCommander') r.push('커맨더가 아닌 승무원 중에서 대상을 지정해요.');
   if (m.deadZone) r.push('데드 존: 통신 카드는 공개하지만 최고·유일·최저 마커는 표시되지 않아요.');
   if (m.commFrom && m.commFrom > 1) r.push(`${m.commFrom}번째 트릭부터 통신할 수 있어요.`);
-  if (m.special) r.push('특수 규칙이 있어요. 미션 설명을 꼭 확인하세요.');
+  const specialRules: Record<string, string> = {
+    sick: '커맨더가 지정한 아픈 승무원은 단 한 트릭도 이기면 안 돼요.',
+    winOne: '색 카드 값 1로 트릭을 최소 한 번 이겨야 해요.',
+    winTwoOnes: '색 카드 값 1로 서로 다른 두 트릭을 이겨야 해요.',
+    noComm: '커맨더가 지정한 승무원은 이 미션에서 통신할 수 없어요.',
+    swap: '첫 트릭 직후, 모두 오른쪽 이웃의 손패에서 무작위 카드 한 장을 가져와요.',
+    rockets: '로켓 1·2·3·4 각각으로 트릭을 한 번 이상 이겨야 해요.',
+    noNine: '값 9인 카드로 트릭을 이기면 즉시 실패해요.',
+    allTasks: '커맨더가 지정한 한 명이 모든 과제의 담당자가 돼요.',
+    balanced: '진행 중 누구끼리든 딴 트릭 수 차이가 2 이상이면 즉시 실패해요.',
+    oneTrick: '지정된 승무원은 로켓 없이 정확히 한 트릭만 이겨야 해요.',
+    balancedCommander: '딴 트릭 수 차이는 항상 2 미만이어야 하고, 커맨더가 첫·마지막 트릭을 이겨야 해요.',
+    firstLast: '지정된 승무원이 로켓 없이 첫·마지막 트릭만 이겨야 해요.',
+    rocketOrder: '로켓 1→2→3→4 순서로 각각 트릭을 이겨야 해요.',
+    pink: '분홍 9를 가진 승무원의 왼쪽 이웃이 모든 분홍 카드를 가져와야 해요.',
+    omegaLastTrick: 'Ω 과제는 마지막 트릭에서 완료해야 해요.',
+    finalPattern: '지정한 한 명은 1~4번째, 다른 한 명은 마지막 트릭을 이기고, 나머지는 중간 트릭을 이겨야 해요.',
+  };
+  if (m.special && specialRules[m.special]) r.push(specialRules[m.special]);
+  if (m.special === 'sick') r.push('시작 전에 손패 상태를 “좋음/나쁨”으로만 알리고, 커맨더가 그 힌트를 참고해 아픈 승무원을 정해요. 답은 선택 후보를 제한하지 않아요.');
+  if (['allTasks', 'oneTrick', 'firstLast'].includes(m.special ?? '')) r.push('시작 전에 역할을 맡을 의향을 예/아니오로만 알리고, 커맨더가 그 힌트를 참고해 최종 대상을 정해요. 답은 선택 후보를 제한하지 않아요.');
+  if (m.special === 'finalPattern') r.push('각자 선호 역할을 알린 뒤, 손패 내용을 말하지 않고 함께 두 담당자를 정해요.');
   return r;
 };
 

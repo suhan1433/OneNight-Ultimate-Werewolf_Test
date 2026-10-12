@@ -62,9 +62,14 @@ export function PhasePanel({ game, view, send }: { game: Game; view: View; send:
   // chooseTarget
   const excluded = game.mission.pick === 'notCommander' ? game.commanderId : game.targetStep === 1 ? game.targetId : null;
   const needsResponses = game.mission.special !== 'noComm'; const answered = game.decisionResponses?.[game.playerId]; const all = !needsResponses || game.players.every(p => p.id in (game.decisionResponses ?? {}));
+  const response = game.mission.special === 'sick'
+    ? { question: '내 손패 상태는 어떤가요? (높은 카드가 많아 트릭을 따기 쉬우면 “좋음”, 피하기 쉬우면 “나쁨”)', yes: '좋음', no: '나쁨', note: '이 정보는 커맨더가 아픈 승무원을 정하기 위한 힌트예요. 좋음/나쁨 어느 쪽을 골라도 모두 선택 후보입니다.' }
+    : game.mission.special === 'finalPattern'
+      ? { question: game.targetStep === 1 ? '마지막 트릭 담당을 선호하나요?' : '1~4번째 트릭 담당을 선호하나요?', yes: '예, 선호해요', no: '아니오, 다른 역할 선호', note: '선호를 알리는 단계예요. 손패 내용은 말하지 말고, 이후 함께 담당자를 정합니다.' }
+      : { question: '이 역할을 맡을 의향이 있나요?', yes: '예', no: '아니오', note: '응답은 커맨더에게 주는 힌트예요. 예/아니오 어느 쪽을 골라도 모두 선택 후보입니다.' };
   return <Shell tag="커맨더의 결정" title={game.mission.special === 'finalPattern' && game.targetStep === 1 ? '마지막 트릭 담당자를 지정하세요' : '특수 미션 대상을 지정하세요'}>
     <p>{game.mission.text}</p><Rules mission={game.mission} />
-    {needsResponses && <><p className="sub">먼저 각자 예/아니오로 대답한 뒤, 커맨더가 결정해요.</p><div className="choices"><button disabled={answered !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: true })}>예</button><button disabled={answered !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: false })}>아니오</button></div><p className="sub">{all ? '모든 응답 완료 · 커맨더가 선택하세요' : `${count(game.decisionResponses)}/${game.players.length}명 응답`}</p></>}
+    {needsResponses && <><p className="sub">{response.question}</p><div className="choices"><button disabled={answered !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: true })}>{response.yes}</button><button disabled={answered !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: false })}>{response.no}</button></div><p className="sub">{all ? `모든 응답 완료 · ${response.note}` : `${count(game.decisionResponses)}/${game.players.length}명 응답`}</p></>}
     <div className="choices">{game.players.filter(p => p.id !== excluded).map(p => <button key={p.id} className={commander && all ? 'primary' : ''} disabled={!commander || !all} onClick={() => send('TARGET_SELECT', { targetId: p.id })}>{p.nickname}</button>)}</div>
   </Shell>;
 }

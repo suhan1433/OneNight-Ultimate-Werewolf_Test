@@ -47,11 +47,12 @@ function TrickZone({ game, view }: { game: Game; view: View }) {
 function TaskSpread({ game, view, send }: { game: Game; view: View; send: Send }) {
   const pending = game.tasks.filter(t => !t.ownerId); const mine = view.assigner.id === game.playerId; const dist = !!game.mission.distribute;
   const responded = game.decisionResponses?.[game.playerId]; const everyoneResponded = game.players.every(player => player.id in (game.decisionResponses ?? {}));
+  const candidates = game.players.filter(player => game.tasks.filter(task => task.ownerId === player.id).length < Math.ceil(game.tasks.length / game.players.length));
   return <div className="spread">
     <p className="spread-note"><b>과제 배정</b> · {dist ? (everyoneResponded ? (mine ? '누가 이 과제를 맡을지 고르세요' : `${view.assigner.nickname} 님이 담당자를 정하는 중`) : '현재 과제를 맡을 의향을 답하세요') : (mine ? '가져갈 과제 카드를 누르세요' : `${view.assigner.nickname} 님이 고르는 중`)}<small>{pending.length}장 남음</small></p>
     <div className="spread-cards">{(dist ? pending.slice(0, 1) : pending).map(t => <TaskChip key={t.id} task={t} size="lg" onPick={mine && !dist ? () => send('TASK_ASSIGN', { taskId: t.id }) : undefined} />)}</div>
-    {dist && !everyoneResponded && <><div className="choices"><button disabled={responded !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: true })}>맡을 수 있어요</button><button disabled={responded !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: false })}>이번엔 어려워요</button></div><p className="sub">{game.players.filter(player => player.id in (game.decisionResponses ?? {})).length}/{game.players.length}명 응답</p></>}
-    {dist && everyoneResponded && mine && pending[0] && <div className="choices">{game.players.map(p => <button key={p.id} className="primary" onClick={() => send('TASK_ASSIGN', { taskId: pending[0].id, ownerId: p.id })}>{p.nickname} 에게 맡기기</button>)}</div>}
+    {dist && !everyoneResponded && <><p className="sub">현재 과제를 맡을 의향이 있나요? 예/아니오는 커맨더에게 주는 힌트이며, 배정 후보를 제한하지 않아요.</p><div className="choices"><button disabled={responded !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: true })}>예</button><button disabled={responded !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: false })}>아니오</button></div><p className="sub">{game.players.filter(player => player.id in (game.decisionResponses ?? {})).length}/{game.players.length}명 응답</p></>}
+    {dist && everyoneResponded && mine && pending[0] && <div className="choices">{candidates.map(p => <button key={p.id} className="primary" onClick={() => send('TASK_ASSIGN', { taskId: pending[0].id, ownerId: p.id })}>{p.nickname} 에게 맡기기</button>)}</div>}
   </div>;
 }
 
