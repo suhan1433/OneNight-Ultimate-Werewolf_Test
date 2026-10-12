@@ -234,6 +234,7 @@ button.card{cursor:pointer}
 .turn-tag{font:700 .68rem var(--mono);font-style:normal;color:#04221e;background:var(--cyan);border-radius:5px;padding:2px 7px}.turn-tag.off{background:#7a3a4a;color:#ffd9e0}
 .seat-tasks{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;min-height:38px;align-items:center}
 .seat-tasks .none{font-size:.68rem;color:#6a7fa5}
+.mission-role{display:inline-flex;align-items:center;min-height:1.6em;padding:.2em .45em;border:1px solid #c9a24e88;border-radius:999px;background:#3e2e1055;color:var(--brass-l);font:700 .68rem/1.2 var(--mono);text-align:center}
 .comm-slot{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;min-width:84px;min-height:40px;padding:3px 8px;border:1px dashed #4a6aa0;border-radius:8px;font-size:.68rem;color:#6a7fa5}
 .comm-slot.full{border-style:solid;border-color:var(--brass);color:var(--brass-l);background:#13264a}
 .comm-slot.full .card{animation:slot-in var(--t-card) cubic-bezier(.2,.8,.2,1) both}
@@ -496,6 +497,7 @@ html,body{max-width:100%;overflow-x:hidden}
   .b-who small{display:block;margin:0;font:400 .64rem var(--mono);color:var(--mute);white-space:nowrap}
   .b-tasks{display:flex;flex-wrap:wrap;align-items:center;gap:2px 3px;min-width:0}
   .b-tasks .none,.b-comm .none{margin:0;font-size:.64rem;color:#6a7fa5}
+.b-tasks .mission-role{font-size:.55rem;white-space:normal}
   .b-tasks .card.xs{--cw:22px;--ch:32px;border-radius:4px}
   .b-tasks .card.xs .tl{left:4px;top:2px}.b-tasks .card.xs .k b{font-size:11px}.b-tasks .card.xs .k i{font-size:7px}
   .b-tasks .token{right:-4px;bottom:-5px;font-size:.52rem;min-width:1.2em;padding:0 3px}
@@ -533,6 +535,8 @@ html,body{max-width:100%;overflow-x:hidden}
 
 /* ═════ v3.1: 보드 정렬 · 트릭 존 높이 · 손패 여백 ═════ */
 @media (max-width:760px){
+  /* iOS Safari는 16px 미만 입력칸에 포커스할 때 화면을 확대한다. */
+  .join-card input:not([type=radio]),.join-card select{font-size:16px}
   .crew-board{--cols:32px minmax(0,.95fr) minmax(0,1.25fr) 94px}
   .b-who b .nm{min-width:0;overflow:hidden;text-overflow:ellipsis}
   .b-who small{overflow:hidden;text-overflow:ellipsis}

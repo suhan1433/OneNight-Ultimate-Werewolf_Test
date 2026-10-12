@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Card, Mission, Session, Suit } from './types';
+import type { Card, Game, Mission, Session, Suit } from './types';
 
 /* ───────── 카드 4색 + 로켓: 색 + 모양 + 글자 ───────── */
 export const SUITS: Record<Suit, { name: string; icon: string; cls: string }> = {
@@ -85,6 +85,23 @@ export const missionRules = (m: Mission): string[] => {
   if (m.special === 'finalPattern') r.push('각자 선호 역할을 알린 뒤, 손패 내용을 말하지 않고 함께 두 담당자를 정해요.');
   return r;
 };
+
+/** 과제 카드가 없는 특수 미션에서도, 지정된 승무원의 역할을 좌석에 표시한다. */
+export function missionRoleForPlayer(game: Pick<Game, 'mission' | 'targetId' | 'targetBId'>, playerId: string): string | null {
+  const { special } = game.mission;
+  if (game.targetId === playerId) {
+    const labels: Record<string, string> = {
+      sick: '아픈 요원',
+      noComm: '통신 금지 요원',
+      oneTrick: '정확히 한 번 승리 요원',
+      firstLast: '첫·마지막 트릭 요원',
+      pink: '분홍 수집 요원',
+      finalPattern: '1~4번째 트릭 요원',
+    };
+    return special ? labels[special] ?? null : null;
+  }
+  return special === 'finalPattern' && game.targetBId === playerId ? '마지막 트릭 요원' : null;
+}
 
 /* ───────── 좌석 배치: 나는 항상 아래(90°), 다음 순번이 시계 방향 ───────── */
 export const seatAngle = (index: number, myIndex: number, n: number) => ((90 + (((index - myIndex + n) % n) * 360) / n) * Math.PI) / 180;

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { Game } from './types';
-import { SUITS, cardLabel, spotInfo, spotOf } from './lib';
+import { missionRoleForPlayer, SUITS, cardLabel, spotInfo, spotOf } from './lib';
 import { Rules, TaskChip } from './ui';
 import { HelpBody } from './Help';
 
@@ -27,10 +27,11 @@ export function Drawer({ onClose, game }: { onClose: () => void; game: Game | nu
           <h4>과제 현황 <small>{game.tasks.filter(task => task.done).length}/{game.tasks.length}</small></h4>
           <ul className="crew-tasks">{game.players.map(player => {
             const assigned = game.tasks.filter(task => task.ownerId === player.id);
+            const missionRole = missionRoleForPlayer(game, player.id);
             const spot = player.comm ? spotOf(player.comm.marker) : null;
             return <li key={player.id}>
               <b>{player.nickname}{game.commanderId === player.id && <em className="badge">⌖ 커맨더</em>}</b>
-              <span className="row">{assigned.length ? assigned.map(task => <TaskChip key={task.id} task={task} />) : <small>과제 없음</small>}</span>
+              <span className="row">{assigned.length || missionRole ? <>{assigned.map(task => <TaskChip key={task.id} task={task} />)}{missionRole && <small className="mission-role">{missionRole}</small>}</> : <small>과제 없음</small>}</span>
               <small>{player.comm ? `통신 ${cardLabel(player.comm.card)} ${spot ? spotInfo[spot].long : player.comm.marker}` : '통신 전'} · {player.cardsLeft}장 · 트릭 {player.wins}</small>
             </li>;
           })}</ul>
