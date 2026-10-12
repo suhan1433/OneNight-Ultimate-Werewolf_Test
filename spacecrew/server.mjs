@@ -105,7 +105,7 @@ function validName(value) { const name = String(value || '').trim().slice(0, 16)
 function mission(room) { return MISSIONS[room.missionId]; }
 function requireSession(socket, roomCode) { if (socket.data.room !== roomCode || !socket.data.playerId) throw Error('유효하지 않은 게임 세션입니다.'); return socket.data.playerId; }
 function bind(socket, room, player) { socket.data.room = room.code; socket.data.playerId = player.id; socket.join(roomChannel(room.code)); }
-function playerPublic(room, p) { return { id: p.id, nickname: p.nickname, connected: p.connected, ready: p.ready, cardsLeft: p.hand.length, wins: p.wins, comm: p.comm }; }
+function playerPublic(room, p) { return { id: p.id, nickname: p.nickname, isBot: !!p.isBot, connected: p.connected, ready: p.ready, cardsLeft: p.hand.length, wins: p.wins, comm: p.comm }; }
 function legalCards(room, player) { if (room.turnId !== player.id) return []; if (!room.trick.length) return player.hand.map(c => c.id); const lead = room.trick[0].card.suit; const follows = player.hand.filter(card => card.suit === lead); return (follows.length ? follows : player.hand).map(card => card.id); }
 function taskPublic(task) { return { ...task }; }
 function view(room, playerId) {
@@ -117,7 +117,7 @@ function view(room, playerId) {
     trickNo: room.trickNo, totalTricks: room.totalTricks, assignmentCursor: room.assignmentCursor, sickId: room.sickId, targetId: room.targetId, targetBId: room.targetBId, targetStep: room.targetStep, decisionResponses: room.decisionResponses, distressVotes: room.distressVotes, distressActive: !!room.distressActive, distressPassed: !!room.distressPasses[playerId], distressPassCount: Object.keys(room.distressPasses).length, result: room.result, log: room.log.slice(-10),
   };
 }
-function send(room) { room.players.forEach(player => { if (player.socketId) io.to(player.socketId).emit('ROOM_STATE', view(room, player.id)); }); }
+function send(room) { room.players.forEach(player => { if (player.socketId) io.to(player.socketId).emit('ROOM_STATE', view(room, player.id)); }); scheduleBotTurn(room); }
 function roomByPayload(payload) { const room = rooms.get(String(payload?.code || '').toUpperCase()); if (!room) throw Error('방을 찾을 수 없습니다.'); return room; }
 function appendLog(room, message) { room.log.push(message); room.log = room.log.slice(-30); }
 
@@ -197,6 +197,50 @@ function isEligibleComm(player, card) {
   const values = same.map(c => c.value); return card.value === Math.min(...values) || card.value === Math.max(...values);
 }
 
+// Test bots are server-side seats: they never receive another player's hidden
+// state, but the server can advance their required acknowledgements and turns.
+function botName(room) { return `테스트 봇 ${room.players.filter(player => player.isBot).length + 1}`; }
+function scheduleBotTurn(room) {
+  if (room.botTimer || room.phase === 'lobby' || room.phase === 'result') return;
+  const needsBot = (room.phase === 'chooseTarget' && (room.players.some(player => player.isBot && !(player.id in room.decisionResponses)) || getPlayer(room, room.commanderId)?.isBot))
+    || (room.phase === 'assign' && getPlayer(room, mission(room).distribute ? room.commanderId : currentAssigner(room).id)?.isBot)
+    || (room.phase === 'tokenEdit' && getPlayer(room, room.commanderId)?.isBot)
+    || (room.phase === 'taskTransfer' && room.players.some(player => player.isBot && room.tasks.some(task => task.ownerId === player.id)))
+    || (room.phase === 'distressVote' && room.players.some(player => player.isBot && !(player.id in room.distressVotes)))
+    || (room.phase === 'distressPass' && room.players.some(player => player.isBot && !room.distressPasses[player.id]))
+    || (room.phase === 'play' && getPlayer(room, room.turnId)?.isBot);
+  if (!needsBot) return;
+  room.botTimer = setTimeout(() => { room.botTimer = null; runBotTurn(room); send(room); }, 450);
+}
+function runBotTurn(room) {
+  const rule = mission(room);
+  if (room.phase === 'chooseTarget') {
+    const responder = room.players.find(player => player.isBot && !(player.id in room.decisionResponses));
+    if (responder) { room.decisionResponses[responder.id] = true; appendLog(room, `🤖 ${responder.nickname} 님이 예라고 답했습니다.`); return; }
+    const commander = getPlayer(room, room.commanderId);
+    if (!commander?.isBot || room.players.some(player => !(player.id in room.decisionResponses))) return;
+    const target = room.players.find(player => (rule.pick !== 'notCommander' || player.id !== commander.id) && (rule.special !== 'finalPattern' || player.id !== room.targetId));
+    if (!target) return;
+    if (rule.special === 'finalPattern' && room.targetStep === 0) { room.targetId = target.id; room.targetStep = 1; room.decisionResponses = {}; appendLog(room, '🤖 첫 4트릭 담당자를 지정했습니다.'); return; }
+    room.targetId ??= target.id; if (rule.special === 'finalPattern') room.targetBId = target.id; if (rule.special === 'sick') room.sickId = target.id;
+    if (rule.special === 'allTasks') room.tasks.forEach(task => { task.ownerId = target.id; });
+    if (room.tasks.length && rule.special !== 'allTasks') room.phase = 'assign'; else startPrePlay(room);
+    appendLog(room, '🤖 특수 미션 대상을 지정했습니다.'); return;
+  }
+  if (room.phase === 'assign') {
+    const actor = getPlayer(room, rule.distribute ? room.commanderId : currentAssigner(room).id); if (!actor?.isBot) return;
+    const task = room.tasks.find(item => !item.ownerId && actor.hand.some(card => card.id === item.id)) || room.tasks.find(item => !item.ownerId); if (!task) return;
+    const owner = rule.distribute ? room.players.find(player => player.hand.some(card => card.id === task.id) && room.tasks.filter(item => item.ownerId === player.id).length < Math.ceil(room.tasks.length / room.players.length)) || room.players[0] : actor;
+    task.ownerId = owner.id; room.assignmentCursor += 1; appendLog(room, `🤖 ${owner.nickname} 님이 ${cardLabel(task)} 과제를 맡았습니다.`);
+    if (room.tasks.every(item => item.ownerId)) startPrePlay(room); return;
+  }
+  if (room.phase === 'tokenEdit' && getPlayer(room, room.commanderId)?.isBot) { appendLog(room, '🤖 순서 토큰 조정을 건너뜁니다.'); startPrePlay(room); return; }
+  if (room.phase === 'taskTransfer') { const actor = room.players.find(player => player.isBot && room.tasks.some(task => task.ownerId === player.id)); const task = actor && room.tasks.find(item => item.ownerId === actor.id); if (!actor || !task) return; task.ownerId = nextPlayer(room, actor.id).id; room.phase = 'distressVote'; appendLog(room, '🤖 과제를 오른쪽 승무원에게 전달했습니다.'); return; }
+  if (room.phase === 'distressVote') { const actor = room.players.find(player => player.isBot && !(player.id in room.distressVotes)); if (!actor) return; room.distressVotes[actor.id] = false; appendLog(room, `🤖 ${actor.nickname} 님이 조난 신호를 사용하지 않습니다.`); if (room.players.every(player => player.id in room.distressVotes)) startPlay(room); return; }
+  if (room.phase === 'distressPass') { const actor = room.players.find(player => player.isBot && !room.distressPasses[player.id]); const card = actor?.hand.find(item => item.suit !== 'R'); if (!actor || !card) return; room.distressPasses[actor.id] = card.id; return; }
+  if (room.phase === 'play') { const actor = getPlayer(room, room.turnId); if (!actor?.isBot) return; const card = actor.hand.find(item => legalCards(room, actor).includes(item.id)); if (!card) return; actor.hand = actor.hand.filter(item => item.id !== card.id); room.trick.push({ playerId: actor.id, card }); appendLog(room, `🤖 ${actor.nickname} 님이 ${cardLabel(card)}를 냈습니다.`); if (room.trick.length === room.players.length) resolveTrick(room); else room.turnId = nextPlayer(room, actor.id).id; }
+}
+
 function ack(socket, event, handler) {
   socket.on(event, (payload = {}, callback) => { try { const data = handler(payload); callback?.({ ok: true, data }); } catch (error) { const message = error instanceof Error ? error.message : '요청을 처리하지 못했습니다.'; callback?.({ ok: false, error: message }); socket.emit('ERROR', { message }); } });
 }
@@ -213,6 +257,7 @@ io.on('connection', socket => {
     bind(socket, room, player); send(room); return { code: room.code, playerId: player.id, sessionToken: player.sessionToken };
   });
   ack(socket, 'PLAYER_READY', data => { const room = roomByPayload(data); const player = getPlayer(room, requireSession(socket, room.code)); if (room.phase !== 'lobby') throw Error('대기실에서만 준비할 수 있습니다.'); player.ready = !player.ready; send(room); });
+  ack(socket, 'TEST_BOT_ADD', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (actor !== room.hostId || room.phase !== 'lobby') throw Error('방장만 테스트 봇을 추가할 수 있습니다.'); if (room.players.length >= room.maxPlayers) throw Error('빈 좌석이 없습니다.'); const player = { id: randomUUID(), nickname: botName(room), isBot: true, sessionToken: null, socketId: null, connected: true, ready: true, hand: [], wins: 0, comm: null }; room.players.push(player); appendLog(room, `🤖 ${player.nickname} 님이 검증용 승무원으로 합류했습니다.`); send(room); });
   ack(socket, 'ROOM_LEAVE', data => { const room = rooms.get(String(data?.code || socket.data.room || '').toUpperCase()); if (!room) return; const player = getPlayer(room, socket.data.playerId); if (!player) return; if (room.phase === 'lobby') { room.players = room.players.filter(item => item.id !== player.id); if (!room.players.length) { rooms.delete(room.code); return; } if (room.hostId === player.id) room.hostId = room.players[0].id; } else { player.connected = false; player.socketId = null; } socket.leave(roomChannel(room.code)); socket.data.room = null; socket.data.playerId = null; send(room); });
   ack(socket, 'MISSION_SET', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (actor !== room.hostId || room.phase !== 'lobby') throw Error('방장만 미션을 고를 수 있습니다.'); if (!MISSIONS[Number(data.missionId)]) throw Error('지원하지 않는 미션입니다.'); room.missionId = Number(data.missionId); send(room); });
   ack(socket, 'GAME_START', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (actor !== room.hostId) throw Error('방장만 시작할 수 있습니다.'); if (room.phase !== 'lobby') throw Error('이미 시작했습니다.'); if (room.players.length < 3) throw Error('최소 3명이 필요합니다.'); if (room.players.length !== room.maxPlayers) throw Error(`모든 좌석(${room.maxPlayers}명)이 채워져야 합니다.`); if (!room.players.every(p => p.ready || p.id === actor)) throw Error('모든 승무원이 준비해야 합니다.'); deal(room); send(room); });

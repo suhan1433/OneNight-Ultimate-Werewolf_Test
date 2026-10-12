@@ -25,7 +25,7 @@ export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send;
             <span className={`lamp ${st}`} aria-hidden="true" />
             <span className="head" aria-hidden="true" />
             {p ? <Avatar name={p.nickname} /> : <span className="avatar ghost" aria-hidden="true">+</span>}
-            <b>{p ? p.nickname : '빈 좌석'}</b>
+            <b>{p ? <>{p.nickname}{p.isBot && ' 🤖'}</> : '빈 좌석'}</b>
             <small>{p ? <>{p.id === game.hostId && '방장 · '}{st === 'on' ? '●' : st === 'wait' ? '○' : '×'} {word}</> : '코드를 공유하세요'}</small>
             <i className={`stem ${p ? 'lit' : ''}`} aria-hidden="true" />
             {i < seats.length - 1 && <i className={`link ${p && next ? 'lit' : ''}`} aria-hidden="true" />}
@@ -43,7 +43,7 @@ export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send;
       </article>
     </section>
     <footer className="lobby-actions">
-      {host ? <><button type="button" className="primary big" disabled={!filled || !allReady} onClick={() => send('GAME_START')}>미션 시작</button>
+      {host ? <>{!filled && <button type="button" className="secondary bot-add" onClick={() => send('TEST_BOT_ADD')}>🤖 테스트 봇 추가</button>}<button type="button" className="primary big" disabled={!filled || !allReady} onClick={() => send('GAME_START')}>미션 시작</button>
         <p>{!filled ? `모든 좌석(${game.maxPlayers}명)이 채워져야 해요.` : !allReady ? '모든 승무원의 준비를 기다리는 중…' : '출발 준비 완료'}</p></>
       : <><button type="button" className={`big ready ${me.ready ? 'active' : 'primary'}`} aria-pressed={me.ready} onClick={() => send('PLAYER_READY')}>{me.ready ? '준비 취소' : '준비 완료'}</button><p>방장이 시작하면 손패가 배정돼요.</p></>}
     </footer>

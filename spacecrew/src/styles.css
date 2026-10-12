@@ -165,6 +165,7 @@ button.card{cursor:pointer}
 .lobby-actions{position:sticky;bottom:0;display:grid;justify-items:center;gap:.4rem;padding:.9rem 0 calc(.9rem + var(--safe-b));background:linear-gradient(transparent,var(--ink) 40%);margin-top:auto}
 .lobby-actions p{font-size:.8rem;color:var(--mute)}
 .lobby-actions .big{min-width:min(340px,100%)}
+.lobby-actions .bot-add{min-width:min(340px,100%)}
 .ready.active{border-color:var(--cyan);color:var(--cyan)}
 
 /* ───── 미션 지도(50 노드) ───── */
