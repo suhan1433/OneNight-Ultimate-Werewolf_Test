@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import ReactDOM from "react-dom/client";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -1715,8 +1715,20 @@ function NightControls({ game }: { game: ClientGameState }) {
 const CHAT_MOBILE_QUERY = "(max-width: 640px), (pointer: coarse) and (max-width: 900px)";
 const CHAT_GROUP_MS = 3 * 60_000;
 type ChatMsg = ClientGameState["chat"][number];
-const formatChatTime = (at: number) =>
-  new Date(at).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+// toLocaleTimeString 은 호출할 때마다 포맷터를 새로 만들어 모바일에서 매우 느리다.
+// 포맷터를 한 번만 만들고, 분 단위로 결과를 캐시한다.
+const chatTimeFormat = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit" });
+const chatTimeCache = new Map<number, string>();
+const formatChatTime = (at: number) => {
+  const minute = Math.floor(at / 60_000);
+  let label = chatTimeCache.get(minute);
+  if (label === undefined) {
+    label = chatTimeFormat.format(at);
+    if (chatTimeCache.size > 500) chatTimeCache.clear();
+    chatTimeCache.set(minute, label);
+  }
+  return label;
+};
 
 function useChatMobile() {
   const [mobile, setMobile] = useState(() => window.matchMedia(CHAT_MOBILE_QUERY).matches);
@@ -1729,7 +1741,30 @@ function useChatMobile() {
   return mobile;
 }
 
-function ChatMessages({ messages, myId, players, inline, onTap }: { messages: ChatMsg[]; myId: string; players: ClientGameState["players"]; inline?: boolean; onTap?: () => void }) {
+// 한 줄(메시지) 컴포넌트: 원시값 props 만 받아 memo 로 감싼다.
+// 카운트다운(0.1초마다 리렌더)이 돌아도 바뀐 메시지만 다시 그려진다.
+const ChatRow = React.memo(function ChatRow({ text, nickname, at, mine, first, last, emoji, bg }: {
+  text: string; nickname: string; at: number; mine: boolean; first: boolean; last: boolean; emoji: string; bg: string;
+}) {
+  return (
+    <div className={`chat-msg${mine ? " mine" : ""}${first ? " first" : ""}${last ? " last" : ""}`}>
+      {!mine && (
+        <i className={`chat-avatar${first ? " has-char" : ""}`} style={first ? { background: bg } : undefined} aria-hidden="true">
+          {first ? emoji : ""}
+        </i>
+      )}
+      <div className="chat-msg-main">
+        {!mine && first && <b>{nickname}</b>}
+        <div className="chat-bubble-row">
+          <span className="chat-bubble">{text}</span>
+          {last && <time>{formatChatTime(at)}</time>}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const ChatMessages = React.memo(function ChatMessages({ messages, myId, players, inline, onTap }: { messages: ChatMsg[]; myId: string; players: ClientGameState["players"]; inline?: boolean; onTap?: () => void }) {
   const resolve = useCharacterResolver(players, myId);
   const listRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -1778,22 +1813,8 @@ function ChatMessages({ messages, myId, players, inline, onTap }: { messages: Ch
           const mine = m.playerId === myId;
           const first = !joins(prev, m);
           const last = !next || !joins(m, next) || formatChatTime(next.at) !== formatChatTime(m.at);
-          return (
-            <div key={m.id} className={`chat-msg${mine ? " mine" : ""}${first ? " first" : ""}${last ? " last" : ""}`}>
-              {!mine && (
-                <i className={`chat-avatar${first ? " has-char" : ""}`} style={first ? { background: resolve(m.playerId).bg } : undefined} aria-hidden="true">
-                  {first ? resolve(m.playerId).emoji : ""}
-                </i>
-              )}
-              <div className="chat-msg-main">
-                {!mine && first && <b>{m.nickname}</b>}
-                <div className="chat-bubble-row">
-                  <span className="chat-bubble">{m.text}</span>
-                  {last && <time>{formatChatTime(m.at)}</time>}
-                </div>
-              </div>
-            </div>
-          );
+          const c = !mine && first ? resolve(m.playerId) : null;
+          return <ChatRow key={m.id} text={m.text} nickname={m.nickname} at={m.at} mine={mine} first={first} last={last} emoji={c?.emoji ?? ""} bg={c?.bg ?? ""} />;
         })}
       </div>
       {unread > 0 && (
@@ -1803,7 +1824,7 @@ function ChatMessages({ messages, myId, players, inline, onTap }: { messages: Ch
       )}
     </div>
   );
-}
+});
 
 const SendArrow = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1826,7 +1847,7 @@ function ChatComposer({ text, setText, placeholder, onSend, inputRef, autoFocus 
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [text]);
-  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const coarse = useMemo(() => window.matchMedia("(pointer: coarse)").matches, []);
   return (
     <form className="chat-composer" onSubmit={(e) => { e.preventDefault(); onSend(); }}>
       <textarea
@@ -1861,7 +1882,8 @@ function ChatComposer({ text, setText, placeholder, onSend, inputRef, autoFocus 
   );
 }
 
-function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGameState; scope: 'day' | 'lobby'; title: string; placeholder: string; status?: React.ReactNode }) {
+// status(ReactNode) 대신 원시값으로 받는다: 새 JSX 객체가 매 틱 생성돼 memo 가 깨지는 것을 막는다.
+const ChatPanel = React.memo(function ChatPanel({ game, scope, title, placeholder, timerLabel, timerUrgent }: { game: ClientGameState; scope: 'day' | 'lobby'; title: string; placeholder: string; timerLabel?: string; timerUrgent?: boolean }) {
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const focusOnOpen = useRef(false);
@@ -1871,10 +1893,12 @@ function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGa
   const sheetRef = useRef<HTMLDivElement>(null);
   const messages = scope === 'lobby' ? game.lobbyChat : game.chat;
 
-  const openSheet = (withKeyboard: boolean) => {
+  const openSheet = useCallback((withKeyboard: boolean) => {
     focusOnOpen.current = withKeyboard;
     setOpen(true);
-  };
+  }, []);
+  // onTap 이 매번 새 함수면 ChatMessages 의 memo 가 무력화되므로 고정한다.
+  const openFromList = useCallback(() => openSheet(false), [openSheet]);
   // Unmounting the focused textarea dismisses the keyboard without first
   // forcing a separate keyboard/layout pass while the sheet is still visible.
   const closeSheet = () => setOpen(false);
@@ -1947,11 +1971,10 @@ function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGa
       });
   };
 
-  const host = document.querySelector("main") ?? document.body;
   return (
     <Panel className="chat-panel">
       <h3>{title}</h3>
-      <ChatMessages messages={messages} myId={game.playerId} players={game.players} inline onTap={isMobile ? () => openSheet(false) : undefined} />
+      <ChatMessages messages={messages} myId={game.playerId} players={game.players} inline onTap={isMobile ? openFromList : undefined} />
       {isMobile ? (
         <button type="button" className="chat-fake-input" onClick={() => openSheet(true)}>
           <span>{placeholder}</span>
@@ -1967,18 +1990,18 @@ function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGa
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
             </button>
             <strong className="chat-sheet-title">{title}</strong>
-            {status}
+            {timerLabel && <span className={`chat-sheet-timer${timerUrgent ? " urgent" : ""}`}>☀ {timerLabel}</span>}
           </div>
           <ChatMessages messages={messages} myId={game.playerId} players={game.players} />
           <div className="chat-sheet-foot">
             <ChatComposer text={text} setText={setText} placeholder={placeholder} onSend={sendChat} inputRef={inputRef} autoFocus={focusOnOpen.current} />
           </div>
         </div>,
-        host,
+        document.querySelector("main") ?? document.body,
       )}
     </Panel>
   );
-}
+});
 function Day({ game, fresh }: { game: ClientGameState; fresh: boolean }) {
   const remain = useCountdown(game.dayExpiresAt, game.serverNow);
   const synced = useRef(false);
@@ -2027,7 +2050,8 @@ function Day({ game, fresh }: { game: ClientGameState; fresh: boolean }) {
           scope="day"
           title="마을 대화"
           placeholder="의심과 단서를 나누세요"
-          status={<span className={`chat-sheet-timer${urgent ? " urgent" : ""}`}>☀ {formatTime(remain)}</span>}
+          timerLabel={`${formatTime(remain)}`}
+          timerUrgent={urgent}
         />
       ) : (
         <>

@@ -107,3 +107,21 @@ main.day .chat-sheet-head,main.day .chat-sheet-foot{border-color:#e0c27f}
   .chat-send{width:40px;height:40px}
   .chat-msg{max-width:70%}
 }
+
+/* ---------- 성능: 채팅 시트가 열려 있는 동안 가려진 배경 작업 중단 ----------
+   시트가 화면을 전부 덮는데도 별 반짝임 / 안개(blur 90px) / 달 떠오름 같은 무한 애니메이션과
+   패널의 backdrop-filter 가 뒤에서 계속 다시 그려져 모바일에서 버벅였다. */
+html.chat-open main:before,
+html.chat-open main .mist,
+html.chat-open main .moon,
+html.chat-open main .crescent,
+html.chat-open main .flip,
+html.chat-open main .card-face.back,
+html.chat-open main .ring-wrap,
+html.chat-open main .timer,
+html.chat-open main .sun-timer b,
+html.chat-open main .winner>div,
+html.chat-open main .dots{animation-play-state:paused!important}
+html.chat-open main .panel,
+html.chat-open .help-fab,
+html.chat-open .audio-fab{backdrop-filter:none;-webkit-backdrop-filter:none}
