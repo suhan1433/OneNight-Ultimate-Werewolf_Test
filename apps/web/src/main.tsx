@@ -1733,7 +1733,10 @@ function ChatMessages({ messages, myId, players, inline, onTap }: { messages: Ch
   const resolve = useCharacterResolver(players, myId);
   const listRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
-  const seen = useRef(messages.length);
+  // The store retains only the newest 100 messages.  Once that limit is
+  // reached a new message replaces the oldest one, so list length no longer
+  // changes; track the newest ID as well as the length.
+  const seen = useRef({ length: messages.length, lastId: messages.at(-1)?.id });
   const [unread, setUnread] = useState(0);
   const toBottom = (smooth = false) => {
     const el = listRef.current;
@@ -1741,21 +1744,23 @@ function ChatMessages({ messages, myId, players, inline, onTap }: { messages: Ch
   };
   useLayoutEffect(() => { toBottom(); }, []);
   useLayoutEffect(() => {
-    const added = messages.length - seen.current;
-    seen.current = messages.length;
-    if (added <= 0) return;
+    const previous = seen.current;
+    const last = messages.at(-1);
+    const changed = last?.id !== previous.lastId;
+    const added = Math.max(0, messages.length - previous.length);
+    seen.current = { length: messages.length, lastId: last?.id };
+    if (!changed) return;
     // 내가 보냈거나 맨 아래를 보고 있으면 따라가고, 위쪽을 읽는 중이면 위치를 지킨다.
-    if (stick.current || messages[messages.length - 1]?.playerId === myId) { toBottom(); setUnread(0); }
-    else setUnread((n) => n + added);
-  }, [messages.length]);
-  useEffect(() => {
-    // 키보드가 열리거나 입력창이 늘어나 목록 높이가 바뀌어도 맨 아래를 유지한다.
-    const el = listRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => { if (stick.current) toBottom(); });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    if (stick.current || last?.playerId === myId) {
+      toBottom();
+      // Flex layout and text wrapping can finalize one frame after React has
+      // committed a long chat list.  Re-check then so the bottom is exact.
+      const frame = window.requestAnimationFrame(() => { if (stick.current) toBottom(); });
+      setUnread(0);
+      return () => window.cancelAnimationFrame(frame);
+    }
+    setUnread((n) => n + Math.max(1, added));
+  }, [messages.length, messages.at(-1)?.id, myId]);
   const onScroll = () => {
     const el = listRef.current;
     if (!el) return;
@@ -1866,8 +1871,13 @@ function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGa
   const sheetRef = useRef<HTMLDivElement>(null);
   const messages = scope === 'lobby' ? game.lobbyChat : game.chat;
 
-  const openSheet = (withKeyboard: boolean) => { focusOnOpen.current = withKeyboard; setOpen(true); };
-  const closeSheet = () => { inputRef.current?.blur(); setOpen(false); };
+  const openSheet = (withKeyboard: boolean) => {
+    focusOnOpen.current = withKeyboard;
+    setOpen(true);
+  };
+  // Unmounting the focused textarea dismisses the keyboard without first
+  // forcing a separate keyboard/layout pass while the sheet is still visible.
+  const closeSheet = () => setOpen(false);
 
   // 시트가 열려 있는 동안: 배경 스크롤 잠금 + 키보드를 뺀 보이는 영역에 높이 맞춤.
   useEffect(() => {
@@ -1876,21 +1886,36 @@ function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGa
     root.classList.add("chat-open");
     const vv = window.visualViewport;
     const sheet = sheetRef.current;
+    let frame = 0;
+    let lastHeight = "";
+    let lastTop = "";
+    let lastKeyboard = "";
     const fit = () => {
+      frame = 0;
       if (!sheet) return;
       const h = vv?.height ?? window.innerHeight;
-      sheet.style.setProperty("--chat-h", `${h}px`);
-      sheet.style.setProperty("--chat-top", `${vv?.offsetTop ?? 0}px`);
-      sheet.dataset.keyboard = String(window.innerHeight - h > 120);
+      const height = `${Math.round(h)}px`;
+      const top = `${Math.round(vv?.offsetTop ?? 0)}px`;
+      const keyboard = String(window.innerHeight - h > 120);
+      // Keyboard animation emits many viewport events.  Avoid synchronously
+      // forcing layout for every one; update once per rendered frame and only
+      // write values that really changed.
+      if (height !== lastHeight) { sheet.style.setProperty("--chat-h", height); lastHeight = height; }
+      if (top !== lastTop) { sheet.style.setProperty("--chat-top", top); lastTop = top; }
+      if (keyboard !== lastKeyboard) { sheet.dataset.keyboard = keyboard; lastKeyboard = keyboard; }
+    };
+    const scheduleFit = () => {
+      if (!frame) frame = window.requestAnimationFrame(fit);
     };
     fit();
-    vv?.addEventListener("resize", fit);
-    vv?.addEventListener("scroll", fit);
-    window.addEventListener("resize", fit);
+    vv?.addEventListener("resize", scheduleFit);
+    vv?.addEventListener("scroll", scheduleFit);
+    window.addEventListener("resize", scheduleFit);
     return () => {
-      vv?.removeEventListener("resize", fit);
-      vv?.removeEventListener("scroll", fit);
-      window.removeEventListener("resize", fit);
+      if (frame) window.cancelAnimationFrame(frame);
+      vv?.removeEventListener("resize", scheduleFit);
+      vv?.removeEventListener("scroll", scheduleFit);
+      window.removeEventListener("resize", scheduleFit);
       root.classList.remove("chat-open");
     };
   }, [sheetOpen]);
@@ -1944,7 +1969,7 @@ function ChatPanel({ game, scope, title, placeholder, status }: { game: ClientGa
             <strong className="chat-sheet-title">{title}</strong>
             {status}
           </div>
-          <ChatMessages messages={messages} myId={game.playerId} players={game.players} onTap={() => inputRef.current?.blur()} />
+          <ChatMessages messages={messages} myId={game.playerId} players={game.players} />
           <div className="chat-sheet-foot">
             <ChatComposer text={text} setText={setText} placeholder={placeholder} onSend={sendChat} inputRef={inputRef} autoFocus={focusOnOpen.current} />
           </div>

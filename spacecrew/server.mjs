@@ -124,6 +124,23 @@ function view(room, playerId) {
   };
 }
 function send(room) { room.players.forEach(player => { if (player.socketId) io.to(player.socketId).emit('ROOM_STATE', view(room, player.id)); }); scheduleBotTurn(room); }
+// A trick stays on screen briefly before its winner leads the next one.  The
+// first state sent after resolving deliberately has no legal cards, but a
+// human player also needs a fresh state when that delay ends.  Previously only
+// bot turns caused another broadcast, leaving an all-human winner unable to
+// select a card until they refreshed.
+function scheduleTurnReady(room) {
+  if (room.turnReadyTimer) clearTimeout(room.turnReadyTimer);
+  const readyAt = room.nextTurnReadyAt ?? 0;
+  if (room.phase !== 'play' || !readyAt) return;
+  // Add a tiny cushion so legalCards() cannot be evaluated a millisecond
+  // before the timestamp becomes valid.
+  room.turnReadyTimer = setTimeout(() => {
+    room.turnReadyTimer = null;
+    // Do not publish stale readiness if the room advanced or ended meanwhile.
+    if (room.phase === 'play' && room.nextTurnReadyAt === readyAt) send(room);
+  }, Math.max(0, readyAt - Date.now()) + 10);
+}
 function roomByPayload(payload) { const room = rooms.get(String(payload?.code || '').toUpperCase()); if (!room) throw Error('방을 찾을 수 없습니다.'); return room; }
 function appendLog(room, message) { room.log.push(message); room.log = room.log.slice(-30); }
 
@@ -213,6 +230,7 @@ function resolveTrick(room) {
   if (allDone && goalsMet && !['noNine', 'sick', 'balanced', 'balancedCommander', 'firstLast', 'finalPattern', 'pink', 'rockets', 'rocketOrder', 'oneTrick'].includes(rule)) return finishMission(room, true, '모든 과제를 완료했습니다.');
   if (room.trickNo >= room.totalTricks) return goalsMet && allDone ? finishMission(room, true, '모든 목표를 완료했습니다.') : finishMission(room, false, '남은 트릭이 없는데 목표를 완료하지 못했습니다.');
   room.trick = []; room.leaderId = winner.id; room.turnId = winner.id;
+  scheduleTurnReady(room);
 }
 function isEligibleComm(player, card) {
   if (card.suit === 'R') return false;

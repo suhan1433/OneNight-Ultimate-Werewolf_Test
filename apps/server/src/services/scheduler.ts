@@ -118,7 +118,11 @@ export async function processExpiredRoom(io: Server, code: string): Promise<Room
         }
         room.votes = await getVotes(room.roomCode);
         const eligible = room.players.filter((player) => player.connected || !player.disconnectedAt || player.disconnectedAt + DISCONNECT_GRACE_MS > now);
-        if (eligible.every((player) => !!room.votes[player.id])) {
+        // Bots may cast their deterministic ballot as soon as voting opens,
+        // but they must never turn the voting screen into an automatic result.
+        // A connected human must explicitly confirm a ballot first.
+        const humanHasVoted = room.players.some((player) => !player.isBot && !!room.votes[player.id]);
+        if (humanHasVoted && eligible.every((player) => !!room.votes[player.id])) {
           room.result = calculateResult(room); room.players = room.players.map((p) => ({ ...p, currentRole: room.result!.players.find((x) => x.id === p.id)!.currentRole }));
           room.phase = 'result'; room.resultExpiresAt = now + 30 * 60 * 1000; room.updatedAt = nextRoomVersion(room, now); transitioned = true; await saveRoom(room);
         } else if (botsVoted) {

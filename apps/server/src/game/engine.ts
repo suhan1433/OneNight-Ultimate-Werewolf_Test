@@ -65,7 +65,11 @@ export function advanceNight(room: Room, status: 'completed' | 'timeout' | 'skip
 
 export function allNightActionsSubmitted(room: Room): boolean {
   const submitted = room.pendingNightCommands ?? {};
-  return room.nightActionQueue.every((action) => action.playerIds.every((id) => !!submitted[id]));
+  // Completed actions must not keep a copied Doppelganger action from
+  // waiting for their old commands a second time.
+  return room.nightActionQueue
+    .filter((action) => action.status === 'active')
+    .every((action) => action.playerIds.every((id) => !!submitted[id]));
 }
 
 /** Applies choices after everyone has chosen, then reserves time to show private results before day. */
@@ -74,8 +78,10 @@ export const NIGHT_RESULT_DURATION_MS = 6_000;
 export function resolveParallelNight(room: Room, now = Date.now()): Room {
   const commands = room.pendingNightCommands ?? {};
   let resolved = { ...room, nightActionQueue: room.nightActionQueue.map((action) => ({ ...action })) };
+  const copiedActions: NightAction[] = [];
   for (let index = 0; index < resolved.nightActionQueue.length; index += 1) {
     const action = resolved.nightActionQueue[index]!;
+    if (action.status !== 'active') continue;
     resolved.currentNightActionIndex = index;
     for (const playerId of action.playerIds) {
       const command = commands[playerId];
@@ -83,11 +89,39 @@ export function resolveParallelNight(room: Room, now = Date.now()): Room {
       const applied = applyNightAction(resolved, playerId, command);
       resolved = applied.room;
       resolved.privateResults[playerId] = applied.result;
+      // A Doppelganger uses the copied card's night ability as a distinct
+      // follow-up choice.  It cannot share the first command slot: the copy
+      // target and, for example, a Seer's inspection are two separate inputs.
+      if (action.role === 'doppelganger' && typeof applied.result.role === 'string') {
+        const copiedRole = applied.result.role as RoleType;
+        const definition = ROLE_DEFINITIONS[copiedRole];
+        if (definition.nightOrder !== null && copiedRole !== 'doppelganger') {
+          copiedActions.push({
+            id: randomUUID(), role: copiedRole, playerIds: [playerId], actedPlayerIds: [],
+            // This happens immediately after copying, before dawn.  Its order
+            // only affects presentation because all ordinary choices were
+            // already collected in the current resolution pass.
+            order: action.order + 0.1, startedAt: now, expiresAt: now + room.actionTimeLimitSeconds * 1000,
+            status: 'active', copied: true
+          });
+        }
+      }
     }
     const queue = [...resolved.nightActionQueue];
     queue[index] = { ...queue[index]!, status: action.playerIds.every((id) => !!commands[id]) ? 'completed' : 'timeout' };
     resolved.nightActionQueue = queue;
     resolved.nightLog = [...resolved.nightLog, { actionId: action.id, role: action.role, status: queue[index]!.status, at: now }];
+  }
+  if (copiedActions.length) {
+    const queue = [...resolved.nightActionQueue, ...copiedActions];
+    return {
+      ...resolved,
+      nightActionQueue: queue,
+      currentNightActionIndex: queue.length - copiedActions.length,
+      pendingNightCommands: {},
+      nightResolutionExpiresAt: null,
+      updatedAt: nextRoomVersion(room, now)
+    };
   }
   return { ...resolved, currentNightActionIndex: 0, pendingNightCommands: {}, nightResolutionExpiresAt: now + NIGHT_RESULT_DURATION_MS, updatedAt: nextRoomVersion(room, now) };
 }
@@ -225,7 +259,7 @@ export function calculateResult(room: Room): GameResult {
   // With no wolves in play, the minion wins only by surviving an execution.
   // If every minion is executed (even alongside villagers), that condition
   // fails and the village wins.
-  if ((wolves.length > 0 && wolfDied) || (wolves.length === 0 && (executed.size === 0 || minions.every((p) => executed.has(p.id))))) winners.push('village');
+  if ((wolves.length > 0 && wolfDied) || (wolves.length === 0 && (executed.size === 0 || (minions.length > 0 && minions.every((p) => executed.has(p.id)))))) winners.push('village');
   // The minion shares a werewolf victory even when they were executed.  A
   // minion only needs to survive for its separate "no werewolves in play"
   // victory condition below.

@@ -73,6 +73,7 @@ html.chat-open,html.chat-open body{overflow:hidden;overscroll-behavior:none}
   position:fixed;left:0;right:0;z-index:70;
   top:var(--chat-top,0px);height:var(--chat-h,100dvh); /* JS 가 visualViewport(키보드 제외 영역)로 갱신 */
   display:flex;flex-direction:column;overscroll-behavior:contain;
+  contain:layout paint style;will-change:transform;
   padding-bottom:env(safe-area-inset-bottom);
   background:linear-gradient(#14112f,#0b0a22);color:var(--text);
   animation:chatsheet .22s cubic-bezier(.2,.8,.2,1) both;
