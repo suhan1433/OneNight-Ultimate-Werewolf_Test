@@ -1,0 +1,74 @@
+/* ============================================================
+   성능 패치 — 맨 마지막에 로드. 되돌리려면 main.tsx 의 import 한 줄만 지우면 된다.
+   원인: (1) 매 프레임 다시 그려야 하는 효과(box-shadow/filter/background-position/left 애니메이션,
+   blur 키프레임)  (2) 전체 화면 blend-mode · backdrop-filter  (3) 가려진 배경의 무한 애니메이션
+   ============================================================ */
+
+/* ---------- 전역: 전체 화면 합성 비용 줄이기 ---------- */
+/* 전체 화면 mix-blend-mode 는 화면이 바뀔 때마다 아래 모든 레이어와 다시 합성된다 → 모바일/터치에서는 끈다 */
+@media (pointer:coarse),(max-width:900px){
+  .grain,.meteor{display:none}
+}
+/* 안개: blur(90px) 필터 대신 그라디언트 (모양은 같고 비용은 거의 0) */
+.mist{filter:none;background:radial-gradient(ellipse 50% 50% at 50% 55%,#5a4fa0,#5a4fa000 70%)}
+main.day .mist{background:radial-gradient(ellipse 50% 50% at 50% 55%,#fff2c4,#fff2c400 70%)}
+/* backdrop-filter: 배경이 계속 움직이는 화면에서 가장 비싼 효과. 배경색이 이미 80%+ 불투명이라 차이는 거의 없다 */
+.panel,.leave-fab,.night-record-fab,.night-record,.help-fab,.audio-fab,.overlay,.profile-backdrop,
+.voice-fab,.ghost-fab{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.leave-fab,.night-record-fab,.help-fab,.audio-fab{background:#141232e6}
+main.day .leave-fab,main.day .night-record-fab,main.day .help-fab,main.day .audio-fab{background:#fff8e8f2}
+.overlay{background:#04030be6}
+.profile-backdrop{background:#050412cc}
+/* 달의 호흡: drop-shadow(110px) 를 프레임마다 바꾸던 애니메이션 제거 (떠오르는 float 는 유지) */
+.crescent{animation:float 7s ease-in-out infinite}
+/* 낮 빛줄기: 160% 크기 마스크 레이어를 계속 돌리던 것 → 터치 기기에서는 정지 */
+@media (pointer:coarse),(max-width:900px){
+  .day-scene:before,.day-scene.fresh:before{animation:none}
+}
+/* 시작 버튼 빛줄기: left(레이아웃) 대신 transform(합성만) 으로 */
+.lobby-actions .lobby-start:after{left:0;transform:translateX(-160%) skewX(-20deg);animation:start-sheen2 3.8s ease-in-out infinite}
+@keyframes start-sheen2{0%,55%{transform:translateX(-160%) skewX(-20deg)}100%{transform:translateX(420%) skewX(-20deg)}}
+
+/* ---------- 키프레임: 블러·자간 애니메이션 제거 (opacity/transform 만 사용) ---------- */
+@keyframes scene-in{from{opacity:0;transform:translateY(26px)}}
+@keyframes emblem{from{opacity:0;transform:scale(.4) rotate(-20deg)}}
+@keyframes role-name{from{opacity:0;transform:translateY(8px)}}
+@keyframes intro-in{from{opacity:0;transform:translateY(12px)}}
+@keyframes secret-in{from{opacity:0;transform:translateY(14px) scale(.97)}}
+@keyframes msg-in{from{opacity:0;transform:translateY(10px)}}
+@keyframes moonrise{from{opacity:0;transform:translate(10px,90px) scale(.7)}}
+@keyframes titleopen{from{opacity:0;transform:translateY(8px)}}
+@keyframes winner-stamp{0%{opacity:0;transform:scale(2.4)}55%{opacity:1;transform:scale(.94)}100%{transform:scale(1)}}
+@keyframes char-in{from{opacity:0;transform:translateY(.45em) scale(1.5)}}
+
+/* ---------- 밤 시작 연출 ---------- */
+/* 눈꺼풀: 90px 블러 inset box-shadow 를 4.5초간 매 프레임 다시 그리던 것 → 고정 그라디언트의 opacity 만 변화 */
+main:has(.night-intro):after{animation:none}
+.night-intro:before{content:'';position:fixed;inset:0;z-index:3;pointer-events:none;opacity:0;
+  background:linear-gradient(#010108,#01010800 24vh,#01010800 calc(100% - 24vh),#010108);
+  animation:eyelids2 4.5s .5s ease-in forwards}
+@keyframes eyelids2{to{opacity:1}}
+/* 코로나: box-shadow 애니메이션 제거 (정적 빛무리만 유지) */
+.eclipse{animation:none;box-shadow:0 0 56px #e5c56aaa,0 0 110px #dcbc6a44}
+
+/* ---------- 역할(카드) 공개 ---------- */
+/* 화면에 보이지 않는 배경 효과는 멈춘다 */
+main.phase-card_reveal:before,main.phase-card_reveal .mist,main.phase-card_reveal .meteor,main.phase-card_reveal .grain{animation:none}
+/* 뒷면: 무한 box-shadow / background-position 애니메이션이 가장 큰 상시 부하였다 */
+.card-face.back,.reveal .card-face.back{animation:none}
+.card-face.back:after{animation:none;opacity:.8}
+/* 스포트라이트: 150vmax 그림자 → 110vmax, 투명도만 전환 */
+.reveal .card-stage:before{box-shadow:0 0 0 110vmax #02010add}
+/* 누르는 동안: 프레임마다 반경이 변하는 box-shadow / drop-shadow(filter) 를 정적 값으로 대체
+   (진행 표시는 금빛 테두리 링 + 스포트라이트가 계속 담당) */
+.reveal.s-holding .card-face.back{box-shadow:0 26px 60px #000a,0 0 110px #dcbc6a66}
+.reveal.s-holding .hold-ring rect,.reveal .hold-ring rect{filter:none;stroke-width:4}
+.reveal.s-hush .hold-ring rect{filter:none}
+/* 공개 연출: 글자 각인·설명·버튼이 더 빨리 이어진다 (기존 ~2.5초 → ~1.2초) */
+.reveal.s-revealed .card-face.front>span{animation:emblem .4s .05s var(--ease-out) both}
+.reveal.s-revealed .card-face.front h2 .ch{display:inline-block;animation:char-in .45s calc(.18s + var(--c,0)*.05s) var(--ease-out) both}
+.reveal.s-revealed .card-face.front b,.reveal.s-revealed .card-face.front p{animation:fadeup .35s .3s both}
+.shell section>button.reveal-confirm{transition:opacity .3s .35s,transform .3s .35s,filter .2s,box-shadow .2s}
+/* 섬광: 전체 화면 mix-blend-mode 제거 */
+.impact-flash{mix-blend-mode:normal}
+@keyframes impact-flash{0%{opacity:0}10%{opacity:.5}100%{opacity:0}}

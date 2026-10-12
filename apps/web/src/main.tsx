@@ -34,6 +34,7 @@ import "./entry.css";
 import "./storyboard.css";
 import "./chat-mobile.css";
 import "./profile.css";
+import "./perf.css"; // 성능 패치: 항상 마지막에 로드
 import { Candle, CheckIcon, CopyIcon, CrownIcon, HeroScene, Icon, IconDefs, RoleIcon, Sigil, SunArc, VillageStrip, WaxSeal, WolfSilhouette } from "./icons";
 
 const req = (game: ClientGameState) => ({
@@ -311,7 +312,7 @@ function App() {
           key={game?.phase ?? "home"}
           initial={game?.phase === "lobby" ? { opacity: 0, scale: 1.04 } : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0, transition: { duration: 0.12 } }}
           transition={{ duration: 0.24, ease: "easeOut" }}
         >
           {game ? <Game game={game} dawn={dawn} /> : <Home />}
@@ -1262,7 +1263,7 @@ function Lobby({ game }: { game: ClientGameState }) {
     </section>
   );
 }
-const REVEAL_HOLD_MS = 900;
+const REVEAL_HOLD_MS = 650;
 /* 카드 공개: 어둠 속 한 장 → 꾹 눌러 금빛이 차오름 → 짧은 정적 → 뒤집힘 + 진영 색 충격파
    진영 색은 뒤집히는 순간 전까지 DOM에 클래스로 존재하지 않는다(곁눈질 방지). */
 function Reveal({ game }: { game: ClientGameState }) {
@@ -1324,7 +1325,7 @@ function Reveal({ game }: { game: ClientGameState }) {
     cancelAnimationFrame(raf.current);
     setHold(1);
     setStage("hush");
-    hushTimer.current = window.setTimeout(() => setStage("revealed"), 180);
+    hushTimer.current = window.setTimeout(() => setStage("revealed"), 90);
   };
   const begin = () => {
     if (stage !== "idle" || locked) return;
@@ -1496,7 +1497,7 @@ function useNightRecovery(remain: number, expires?: number | null, actionId?: st
 }
 
 function NightCountdown({ expires, serverNow, total, actionId, status }: { expires?: number | null; serverNow: number; total: number; actionId?: string; status?: NightActionStatus }) {
-  const remain = useCountdown(expires, serverNow, 100);
+  const remain = useCountdown(expires, serverNow, 250);
   useNightRecovery(remain, expires, actionId, status);
   const syncedDeadline = useRef<number>();
   useEffect(() => {
