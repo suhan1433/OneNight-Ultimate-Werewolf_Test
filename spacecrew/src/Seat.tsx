@@ -7,10 +7,11 @@ import type { View } from './view';
 /* 통신 슬롯: 카드가 슬롯으로 들어오고 마커가 떨어지며 신호 링이 퍼진다(마운트 시 1회) */
 export function CommSlot({ player }: { player: Player }) {
   const c = player.comm; const spot = c ? spotOf(c.marker) : null;
-  if (!c) return <div className="comm-slot" aria-label={`${player.nickname} 통신 전`}><span>통신 전</span></div>;
+  if (!c) return <div className="comm-slot" aria-label={`${player.nickname} 통신 전`}><span className="sec-label" aria-hidden="true">📡 통신</span><span>통신 전</span></div>;
   return <div className="comm-slot full" key={c.card.id} aria-label={`${player.nickname} 통신: ${SUITS[c.card.suit].name} ${c.card.value} ${spot ? spotInfo[spot].long : c.marker}`}>
+    <span className="sec-label" aria-hidden="true">📡 통신</span>
     <span className="with-rail"><CardFace card={c.card} size="xs" />{spot && <MarkerRail spot={spot} />}</span>
-    <small>{spot ? spotInfo[spot].short : c.marker}</small>
+    {!spot && <small>{c.marker}</small>}
     <span className="signal-ring" aria-hidden="true" />
   </div>;
 }
@@ -51,7 +52,7 @@ export function Seat({ player, game, view, variant, angle = 0 }: Props) {
     </div>
     <p className="nums"><span className="backs" aria-hidden="true">{Array.from({ length: Math.min(player.cardsLeft, 7) }, (_, i) => <i key={i} style={{ '--i': i } as CSSProperties} />)}</span><b>{player.cardsLeft}</b>장 · 트릭 <b>{player.wins}</b></p>
     {active && <span className="turn-tag">{turnWord}</span>}
-    <div className="seat-tasks">{tasks.length || missionRole ? <>{tasks.map(t => <TaskChip key={t.id} task={t} fail={failed && !t.done} />)}{missionRole && <span className="mission-role">{missionRole}</span>}</> : <span className="none">과제 없음</span>}</div>
+    <div className="seat-tasks"><span className="sec-label" aria-hidden="true">🃏 과제{tasks.length > 0 && <small>{doneCount}/{tasks.length}</small>}</span>{tasks.length || missionRole ? <>{tasks.map(t => <TaskChip key={t.id} task={t} fail={failed && !t.done} />)}{missionRole && <span className="mission-role">{missionRole}</span>}</> : <span className="none">과제 없음</span>}</div>
     <CommSlot player={player} />
   </div>;
 }

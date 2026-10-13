@@ -578,3 +578,49 @@ button,summary,label,.card{touch-action:manipulation}
 @keyframes draw{from{stroke-dashoffset:1}}
 @keyframes gold-pop{from{opacity:1;transform:scale(.4)}to{opacity:0;transform:scale(1.6)}}
 .gold-links circle{transform-box:fill-box;transform-origin:center}
+
+
+/* ───────── 데스크톱: 과제 카드 ↔ 통신 카드 구분 ─────────
+   과제 = 황동(금색) 트레이 + 금테 카드 / 통신 = 청록 트레이 + 청록 신호 프레임. 구역마다 이름표를 붙인다. */
+.seat .sec-label{position:absolute;left:8px;top:-8px;z-index:3;display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:999px;font:700 .62rem/1.5 var(--mono);letter-spacing:.02em;white-space:nowrap}
+.seat .sec-label small{font:inherit;opacity:.85}
+.seat-tasks,.seat .comm-slot{position:relative;margin-top:7px;width:100%;box-sizing:border-box}
+/* 과제 구역 */
+.seat-tasks{padding:9px 6px 6px;border:1px solid #c9a24e88;border-radius:10px;background:linear-gradient(180deg,#dcc27a1f,#dcc27a0a)}
+.seat-tasks .sec-label{background:var(--brass-l);color:#211906}
+.seat-tasks .none{font-size:.7rem}
+.seat .task-chip:not(.done):not(.fail) .card{box-shadow:0 0 0 2px var(--brass-l),0 4px 10px #02060f99}
+/* 통신 구역 */
+.seat .comm-slot{padding:9px 6px 6px;min-height:46px;border:1px dashed #5ee6d3aa;border-radius:10px;background:#5ee6d30d;color:#7fb9b2}
+.seat .comm-slot.full{border-style:solid;border-color:var(--cyan);background:linear-gradient(180deg,#5ee6d31f,#5ee6d30a);color:#bff7ef;box-shadow:0 0 12px #5ee6d333}
+.seat .comm-slot .sec-label{background:var(--cyan);color:#04221e}
+.seat .comm-slot.full .card{box-shadow:0 0 0 2px var(--cyan),0 0 10px #5ee6d388}
+.seat .comm-slot .rail{border-color:var(--cyan)}.seat .comm-slot .rail i{background:var(--cyan)}
+.seat .comm-slot.full .pin{background:#fff;box-shadow:0 0 9px var(--cyan)}
+/* 내 좌석(가로 배치)에서는 두 구역이 같은 폭으로 나란히 */
+.seat.me .seat-tasks,.seat.me .comm-slot{width:auto;min-width:104px}
+/* 모니터급 큰 화면: 좌석과 카드를 키워 한눈에 읽히게 */
+@media (min-width:1100px) and (min-height:760px){
+  .seat:not(.me){width:196px}
+  .seat .card.xs{--cw:34px;--ch:49px}
+  .seat .comm-slot small{font-size:.76rem}
+  .seat .sec-label{font-size:.68rem}
+  .seat.me .seat-tasks,.seat.me .comm-slot{min-width:130px}
+}
+
+
+/* ───────── 통신 마커 레일: 글자 대신 "핀 위치"로 읽는다 ─────────
+   세 자리(맨 위 / 가운데 / 맨 아래)를 항상 점으로 보여 주고, 핀이 실제 위치에 앉는다.
+   최고 = 핀이 맨 위, 유일 = 가운데, 최저 = 맨 아래. */
+.rail{width:14px;border-radius:8px;border:1px solid var(--cyan);background:#04101f}
+.rail i{box-sizing:border-box;width:6px;height:6px;border-radius:50%;background:transparent;border:1px solid #5ee6d399;translate:-50% -50%}
+.rail .pin{width:12px;height:12px;background:var(--cyan);box-shadow:0 0 0 2px #04101f,0 0 10px var(--cyan)}
+.rail.top{background:linear-gradient(180deg,#5ee6d355,#04101f 60%)}
+.rail.bottom{background:linear-gradient(0deg,#5ee6d355,#04101f 60%)}
+.rail.mid{background:radial-gradient(ellipse 100% 40% at 50% 50%,#5ee6d355,#04101f 80%)}
+.seat .comm-slot .rail{width:13px}.seat .comm-slot .rail .pin{width:11px;height:11px}
+.b-comm .rail{width:12px}.b-comm .rail .pin{width:10px;height:10px}
+.b-comm .card.xs{box-shadow:0 0 0 1px var(--cyan),0 3px 6px #0008}
+@media (min-width:1100px) and (min-height:760px){
+  .seat .comm-slot .rail{width:15px}.seat .comm-slot .rail .pin{width:13px;height:13px}
+}
