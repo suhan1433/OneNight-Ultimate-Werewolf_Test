@@ -38,7 +38,7 @@ function TrickZone({ game, view }: { game: Game; view: View }) {
     {view.seats.map(s => {
       const item = view.shown.find(t => t.playerId === s.player.id); const cx = Math.cos(s.angle); const cy = Math.sin(s.angle);
       const win = reveal?.winnerId === s.player.id; const spun = ((s.player.id.charCodeAt(0) + view.seats.indexOf(s) * 7) % 11) - 5;
-      return <div key={s.player.id} className={`slot ${win && reveal && reveal.stage !== 'show' ? 'win' : ''}`} style={{ left: `${50 + cx * 33}%`, top: `${50 + cy * 33}%`, '--ex': cx.toFixed(3), '--ey': cy.toFixed(3), '--rot': `${spun}deg` } as CSSProperties}>
+      return <div key={s.player.id} className={`slot ${win && reveal && reveal.stage !== 'show' ? 'win' : ''}`} style={{ '--ex': cx.toFixed(3), '--ey': cy.toFixed(3), '--rot': `${spun}deg` } as CSSProperties}>
         {item ? (item.card ? <CardFace key={item.card.id} card={item.card} size="md" className="played" data={{ 'data-trick-card-id': item.card.id }} /> : <CardBack size="md" className="played" />) : <span className="slot-mark" aria-hidden="true" />}
         {win && reveal && reveal.stage !== 'show' && <span className="lens" aria-hidden="true" />}
         <small>{s.player.nickname}{win && reveal && reveal.stage !== 'show' ? ' · 승리' : ''}</small>
@@ -116,10 +116,13 @@ export function Table({ game, view, send, recordPlay, dismissBriefing, openDrawe
   const doneTasks = game.tasks.filter(x => x.done).length;
   const signal = failed ? 0.06 : won ? 1 : game.tasks.length ? doneTasks / game.tasks.length : Math.min(1, game.trickNo / Math.max(1, game.totalTricks));
   const panel = ['target', 'token', 'transfer', 'vote', 'pass', 'direction'].includes(view.kind);
+  // 차례인 좌석 방향을 CSS 변수로 넘겨 테이블 위 조명이 따라가게 한다.
+  const act = view.seats.find(x => x.player.id === view.activeId);
+  const stageVars = { '--ax': act ? Math.cos(act.angle).toFixed(3) : '0', '--ay': act ? Math.sin(act.angle).toFixed(3) : '0', '--act': act ? 1 : 0 } as CSSProperties;
   return <main className={`table-scene ${compact ? 'compact' : ''} k-${view.kind} ${panel || view.kind === 'assign' ? 'panel-phase' : ''} ${failed ? 'failed' : ''} ${won ? 'won' : ''} ${myTurnNow ? 'my-turn' : ''}`} style={{ '--signal': signal } as CSSProperties}>
     <Ambient />
     <TopBar game={game} signal={signal} lost={failed} openDrawer={openDrawer} onLeave={onLeave} />
-    <section className="stage" aria-label="테이블">
+    <section className="stage" aria-label="테이블" data-n={game.players.length} style={stageVars}>
       {!compact && <div className="oval" aria-hidden="true" />}
       {!compact && view.seats.filter(s => !s.isMe).map(s => <Seat key={s.player.id} player={s.player} game={game} view={view} variant="ring" angle={s.angle} />)}
       <div className="center">

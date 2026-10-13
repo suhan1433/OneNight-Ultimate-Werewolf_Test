@@ -749,3 +749,155 @@ button.danger:hover:not(:disabled){border-color:var(--bad);background:#58203a99}
 /* 대기실 초대 링크 */
 .invite-btn{margin:0 0 .7rem;padding:.4rem .8rem;font-size:.82rem;font-weight:500;border-color:#5ee6d366;color:var(--cyan);background:#5ee6d310}
 @media (max-width:760px){.phase-banner b{letter-spacing:.2em}}
+
+
+/* ═════════════════════════════════════════════════════════════════
+   v4: 큰 화면 겹침 해결 + 몰입도 강화 (작은 화면·큰 화면 공통)
+   · 좌석/트릭 존은 "남는 공간"을 계산해 배치한다 → 상단 바·손패·서로를 덮지 않는다.
+   · 차례인 좌석 쪽으로 테이블 조명이 이동하고, 내 차례엔 화면 가장자리가 숨 쉰다.
+   ═════════════════════════════════════════════════════════════════ */
+@property --ax{syntax:'<number>';inherits:true;initial-value:0}
+@property --ay{syntax:'<number>';inherits:true;initial-value:0}
+@property --act{syntax:'<number>';inherits:true;initial-value:0}
+
+/* ── 트릭 존: 카드가 항상 존 안에 들어온다(공통) ── */
+.trick-zone{--tcw:clamp(44px,12vw,58px);--tch:calc(var(--tcw)*1.43);--lbl:64px}
+.slot{left:calc(50% + var(--ex)*(50% - max(var(--tcw),var(--lbl))/2));top:calc(50% + var(--ey)*(50% - (var(--tch) + 20px)/2))}
+.slot .card{--cw:var(--tcw);--ch:var(--tch)}
+.slot-mark{width:var(--tcw);height:var(--tch);aspect-ratio:auto;border-radius:8px;background:#5ee6d308}
+.lens{top:calc(var(--tch)/2);width:calc(var(--tcw)*1.9)}
+.trick-no{top:calc(50% - 4px);translate:-50% -100%}
+@keyframes trick-in{from{opacity:0;letter-spacing:.9em}}
+.center-note{top:calc(50% + 2px);translate:-50% 0}
+/* 카드가 내려앉을 때 충격파 링 */
+.slot:has(>.played)::after{content:'';position:absolute;left:50%;top:calc(var(--tch)/2);width:calc(var(--tcw)*1.1);aspect-ratio:1;translate:-50% -50%;border-radius:50%;border:2px solid var(--cyan);pointer-events:none;animation:impact .75s ease-out .14s both}
+@keyframes impact{from{opacity:.95;scale:.5}to{opacity:0;scale:2.6}}
+
+/* ── 데스크톱 배치 ── */
+@media (min-width:761px){
+  .stage{--sw:clamp(184px,19vw,240px);--seat-h:132px;--bar-h:92px;--me-h:92px;--rsv-top:calc(var(--seat-h) + 16px)}
+  .stage[data-n="3"]{--rsv-top:10px}
+  .stage[data-n="4"]{--rsv-top:calc(var(--bar-h) + 14px)}
+  .oval{inset:calc(var(--rsv-top)*.45) 4% calc(var(--me-h)*.45) 4%}
+
+  /* 가운데: 좌석 사이, 위 좌석 아래, 내 좌석 위의 남는 영역 */
+  .center{container-type:size;left:50%;top:var(--rsv-top);bottom:calc(var(--me-h) + 14px);translate:-50% 0;width:min(calc(100% - 2*(var(--sw) + 24px)),720px);height:auto}
+  .trick-zone{--tcw:clamp(40px,min(8vh,calc((50cqh - 56px)/1.43)),82px);--lbl:92px;width:min(100cqw,240cqh);height:100cqh;aspect-ratio:auto;max-width:none}
+  .slot small{max-width:92px;overflow:hidden;text-overflow:ellipsis}
+  .panel-phase .center{overflow-y:auto;place-items:start center;overscroll-behavior:contain}
+  .panel-phase .center>*{margin-block:auto}
+
+  /* 좌석: 내 좌석 위쪽 공간 안에서만 배치(--cx 가로 -1~1, --t 세로 0~1) */
+  .seat{background:linear-gradient(170deg,rgba(19,42,82,.88),rgba(8,20,44,.84));border-color:#2f4d7e;box-shadow:inset 0 1px 0 #ffffff12,0 12px 30px #0009;text-align:left}
+  .seat:not(.me){left:calc(50% + var(--cx,0)*(50% - var(--sw)/2 - 10px));top:calc(var(--t,0)*(100% - var(--me-h) - 14px));translate:-50% calc(var(--t,0)*-100%)}
+  .seat:not(.me):not(.wide){width:var(--sw);display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);grid-template-areas:"who who" "tasks comm";gap:.8rem .4rem;padding:.65rem .5rem .55rem;align-items:stretch;justify-items:stretch}
+  .seat:not(.me):not(.wide) .who{grid-area:who}
+  .seat:not(.me):not(.wide) .seat-tasks{grid-area:tasks}
+  .seat:not(.me):not(.wide) .comm-slot{grid-area:comm}
+  /* 가로 바: 내 좌석 · 4인 맞은편 좌석 */
+  .seat.me,.seat.wide{width:auto;max-width:min(96%,860px);display:flex;align-items:center;justify-content:center;gap:.9rem;padding:.7rem 1rem .55rem}
+  .seat.me{left:50%;top:auto;bottom:0;translate:-50% 0}
+  .seat.me .backs,.seat.wide .backs{display:none}
+  .seat .who{display:flex;align-items:center;gap:.6rem;min-width:0;justify-items:initial}
+  .seat .id{min-width:0;display:grid;gap:1px;text-align:left}
+  .seat .nm{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.92rem}
+  .seat .nums{font-size:.74rem;gap:.4rem}
+  .seat .backs{display:none}
+  .seat .avatar{width:38px;height:38px;font-size:.95rem}
+  .seat .turn-ring{inset:-5px}
+  .seat .flags{position:absolute;left:12px;top:-10px;z-index:4;display:flex;gap:4px}
+  .seat .flags:empty{display:none}
+  .seat .flags .badge,.seat .flags .turn-tag{box-shadow:0 2px 8px #0008}
+  .seat .seat-tasks,.seat .comm-slot{margin-top:0;width:auto;min-width:0;min-height:54px}
+  .seat .seat-tasks{justify-content:center;align-content:center}
+  .seat.me .seat-tasks,.seat.wide .seat-tasks{min-width:120px;max-width:340px}
+  .seat.me .comm-slot,.seat.wide .comm-slot{min-width:112px}
+  .seat .card.xs{--cw:30px;--ch:43px}
+  .seat.many .seat-tasks .card.xs{--cw:26px;--ch:37px}
+  .last-line{margin-top:8px}
+
+  /* 손패: 가라앉아도 화면 아래로 잘리지 않게 바닥 여유를 둔다 */
+  .hand.fan{--hcw:clamp(60px,9.6vh,94px);--gap:min(calc(var(--hcw)*.68),calc((100vw - 260px)/var(--n)));height:calc(var(--hcw)*1.43 + 76px)}
+  .hand.fan .card{--cw:var(--hcw);bottom:48px}
+}
+@media (min-width:1100px) and (min-height:760px){
+  .stage{--seat-h:148px;--bar-h:94px;--me-h:94px}
+  .seat .card.xs{--cw:36px;--ch:52px}
+  .seat.many .seat-tasks .card.xs{--cw:30px;--ch:43px}
+  .seat .avatar{width:42px;height:42px}
+  .seat:not(.me):not(.wide) .backs{display:inline-block}
+}
+@media (min-width:761px) and (max-height:860px){
+  .phase-panel{gap:.45rem;padding:.8rem 1rem}
+  .phase-panel h2{font-size:1.1rem}.phase-panel p{font-size:.8rem;line-height:1.5}
+  .phase-panel .rules{display:none}
+  .phase-panel .card{--cw:52px;--ch:75px}
+  .spread{gap:.5rem}.spread-cards .card{--cw:60px;--ch:86px}
+}
+@media (min-width:761px) and (max-height:700px){
+  .stage{--seat-h:120px;--bar-h:92px;--me-h:78px}
+  .seat .card.xs{--cw:26px;--ch:37px}
+  .seat .avatar{width:32px;height:32px}
+  .seat .seat-tasks,.seat .comm-slot{min-height:46px}
+  .last-line{display:none}
+  .topbar{height:44px}
+}
+
+/* ── 몰입: 테이블 조명이 차례인 좌석을 따라간다 ── */
+.stage{transition:--ax .7s cubic-bezier(.2,.8,.2,1),--ay .7s cubic-bezier(.2,.8,.2,1),--act .5s ease}
+.stage::before{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;mix-blend-mode:screen;background:radial-gradient(ellipse 34% 46% at calc(50% + var(--ax)*40%) calc(50% + var(--ay)*40%),rgba(94,230,211,calc(var(--act)*.17)),transparent 70%)}
+.oval{background:radial-gradient(ellipse at 50% 40%,rgba(94,230,211,calc(.05 + var(--signal)*.08)),transparent 55%),repeating-linear-gradient(0deg,rgba(143,182,255,.045) 0 1px,transparent 1px 26px),repeating-linear-gradient(90deg,rgba(143,182,255,.035) 0 1px,transparent 1px 26px),radial-gradient(ellipse at 50% 38%,#17407a,#0c2147 62%,#09162f);transition:box-shadow .8s}
+.table-scene.my-turn .oval{box-shadow:inset 0 0 0 10px #0a1b3a,inset 0 0 0 11px #5ee6d388,inset 0 0 90px #5ee6d33a,0 0 0 1px #5ee6d344,0 30px 70px #000a}
+
+/* ── 몰입: 가장자리 비네트 · 내 차례/결과 가장자리 빛 ── */
+.ambient::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 75% 70% at 50% 46%,transparent 52%,rgba(2,5,14,.7) 100%)}
+.table-scene::after{content:'';position:fixed;inset:0;z-index:6;pointer-events:none;opacity:0;transition:opacity .6s;box-shadow:inset 0 0 90px 10px rgba(94,230,211,.22)}
+.table-scene.my-turn::after{opacity:1;animation:edge-breathe 2.6s ease-in-out infinite alternate}
+.table-scene.failed::after{opacity:1;box-shadow:inset 0 0 110px 14px rgba(255,107,130,.26);animation:none}
+.table-scene.won::after{opacity:1;box-shadow:inset 0 0 110px 14px rgba(220,194,122,.24);animation:none}
+@keyframes edge-breathe{from{opacity:.4}to{opacity:1}}
+
+/* ── 몰입: 손패 아래 조종 콘솔 + 카드를 나눠 주는 연출 ── */
+.hand-zone::before{content:'';position:absolute;left:50%;bottom:-8px;width:min(1020px,calc(100% + 40px));height:78%;translate:-50% 0;border-radius:50% 50% 0 0/100% 100% 0 0;background:radial-gradient(ellipse 60% 100% at 50% 100%,rgba(40,90,170,.42),transparent 72%);border-top:1px solid rgba(143,182,255,.16);pointer-events:none}
+.hand .card{animation:deal .7s cubic-bezier(.2,.9,.3,1) backwards;animation-delay:calc(var(--i,0)*55ms)}
+@keyframes deal{from{translate:0 150px;opacity:0;scale:.72}}
+
+/* ── 몰입: 카드 질감 · 로켓은 금박 네이비 ── */
+.card{--paper:radial-gradient(120% 90% at 20% 0%,rgba(255,255,255,.55),transparent 55%),linear-gradient(160deg,#f7f0dd,#e7dcbd);background:var(--paper)}
+button.card:hover:not(:disabled){background:var(--paper)}
+.card.back:hover:not(:disabled){background:repeating-linear-gradient(135deg,#0c1b3a 0 6px,#122a58 6px 7px)}
+.card .mid{text-shadow:0 1px 0 rgba(255,255,255,.5),0 -1px 0 rgba(0,0,0,.1)}
+.card.s-r{--sc:#ffd98a;--sb:#8fb6ff;--paper:radial-gradient(110% 80% at 25% 0%,rgba(143,182,255,.38),transparent 60%),linear-gradient(160deg,#1f3260,#0d1832 75%);border-color:#8fb6ff66}
+.card.s-r .mid{text-shadow:none}
+
+/* ── 몰입: 승무원마다 고유한 아바타 색 ── */
+.avatar{background:linear-gradient(145deg,hsl(var(--h,210) 85% 76%),hsl(calc(var(--h,210) + 50) 72% 58%))}
+.avatar.ghost{background:transparent}
+
+/* 5인: 좌석 폭을 줄이고 과제 카드를 작게 → 한 줄에 3장 */
+@media (min-width:761px){
+  .stage[data-n="5"]{--sw:clamp(168px,16.5vw,204px)}
+  .stage[data-n="5"] .seat:not(.me):not(.wide){grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+  .stage[data-n="5"] .seat:not(.me) .card.xs{--cw:26px;--ch:37px}
+}
+/* 낮은 창: 좌석 안쪽 여백과 손패를 줄여 테이블 공간을 확보 */
+@media (min-width:761px) and (max-height:700px){
+  .seat:not(.me):not(.wide){gap:.7rem .3rem;padding:.5rem .4rem .45rem}
+  .seat.me,.seat.wide{padding:.55rem .8rem .45rem}
+  .seat .seat-tasks,.seat .comm-slot{padding-top:7px;padding-bottom:4px}
+  .hand.fan{--hcw:clamp(50px,8.6vh,94px);height:calc(var(--hcw)*1.43 + 62px)}
+  .hand.fan .card{bottom:36px}
+  .status-row{min-height:34px}
+}
+
+/* 4인: 옆 좌석은 맞은편 바와 내 좌석 사이 공간의 한가운데에 앉는다 */
+@media (min-width:761px){
+  .stage[data-n="4"] .seat:not(.wide):not(.me){top:calc(var(--bar-h) + 10px + var(--t,0)*(100% - var(--me-h) - var(--bar-h) - 26px))}
+}
+
+/* 모바일: 스테이지 칸이 트릭 존 폭(높이×1.5)만큼 늘어나 화면 밖으로 나가지 않게 고정 */
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .trick-zone{width:min(100%,380px);max-width:100%;aspect-ratio:auto;height:min(100%,270px);min-height:210px}
+  .center{min-width:0}
+}

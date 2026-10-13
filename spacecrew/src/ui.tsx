@@ -39,7 +39,9 @@ export const spotText = (spot: Spot) => `${spotInfo[spot].glyph} ${spotInfo[spot
 
 export const taskTokenText = (task: Task) => task.omega ? 'Ω' : task.arrow ? '›'.repeat(task.arrow) : task.order ? String(task.order) : '';
 export const TaskToken = ({ task }: { task: Task }) => { const t = taskTokenText(task); return t ? <span className="token" aria-label={`순서 표시 ${t}`}>{t}</span> : null; };
-export const Avatar = ({ name }: { name: string }) => <span className="avatar" aria-hidden="true">{name.slice(0, 1)}</span>;
+const hueOf = (s: string) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
+/** 이름마다 고유한 색상(첫 글자가 같은 봇도 구분된다) */
+export const Avatar = ({ name }: { name: string }) => <span className="avatar" style={{ '--h': hueOf(name) } as CSSProperties} aria-hidden="true">{name.slice(0, 1)}</span>;
 export const Rules = ({ mission }: { mission: Mission }) => <ul className="rules">{missionRules(mission).map(r => <li key={r}>{r}</li>)}</ul>;
 
 /* ───────── FLIP: 과제 카드가 중앙 → 좌석으로 날아가 붙는다 ───────── */
