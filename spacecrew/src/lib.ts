@@ -36,9 +36,9 @@ export const spotInfo: Record<Spot, { glyph: string; short: string; long: string
 // 서버 marker 문자열 형식을 모르므로 한글/영문/기호 키워드로 넓게 해석(원본 로직 유지).
 export const spotOf = (marker: string): Spot | null => {
   const m = marker.toLowerCase();
-  if (/높|high|top|max|▲|↑/.test(m)) return 'top';
-  if (/낮|low|bottom|min|▼|↓/.test(m)) return 'bottom';
-  if (/유일|only|single|unique|mid|cent|●|•/.test(m)) return 'mid';
+  if (/높|최고|최대|high|highest|top|max|▲|↑/.test(m)) return 'top';
+  if (/낮|최저|최소|low|lowest|bottom|min|▼|↓/.test(m)) return 'bottom';
+  if (/유일|단독|하나|가운데|중간|only|single|unique|mid|middle|cent|●|•/.test(m)) return 'mid';
   return null;
 };
 export const markerOf = (card: Card, hand: Card[]): Spot => {
@@ -146,3 +146,10 @@ export function watchAppHeight() {
   window.addEventListener('resize', set); window.addEventListener('orientationchange', set); window.visualViewport?.addEventListener('resize', set);
   return () => { window.removeEventListener('resize', set); window.removeEventListener('orientationchange', set); window.visualViewport?.removeEventListener('resize', set); };
 }
+
+
+/* ───────── 닉네임 기억 · 초대 링크 ───────── */
+const nickKey = 'planet-nine-nick';
+export const readNick = () => { try { return localStorage.getItem(nickKey) ?? ''; } catch { return ''; } };
+export const saveNick = (nick: string) => { try { localStorage.setItem(nickKey, nick); } catch { /* 무시 */ } };
+export const inviteLink = (code: string) => `${location.origin}${location.pathname}?code=${encodeURIComponent(code)}`;

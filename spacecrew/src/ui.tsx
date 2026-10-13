@@ -74,3 +74,27 @@ export function MissionMap({ current, onPick, strip = 0 }: { current: number; on
     return <li key={n} className={`node ${n === current ? 'now' : ''} ${done ? 'cleared' : ''}`}>{onPick ? <button type="button" aria-label={label} aria-current={n === current} onClick={() => onPick(n)}>{body}</button> : <span role="img" aria-label={label}>{body}</span>}</li>;
   })}</ol></nav>;
 }
+
+
+/* ───────── 심야 당직 분위기: 성운 · 먼 행성 9 · 필름 입자(전부 장식, 신호 강도 --signal 에 반응) ───────── */
+export const Ambient = () => <div className="ambient" aria-hidden="true"><i className="amb-neb" /><i className="amb-planet" /><i className="amb-grain" /></div>;
+
+/** 행성 9 신호 강도: 과제 달성률(과제가 없는 미션은 트릭 진행률)을 5칸 막대로 보여 준다. */
+export function SignalMeter({ signal, lost }: { signal: number; lost: boolean }) {
+  const pct = Math.round(signal * 100); const lit = lost ? 0 : Math.ceil(signal * 5);
+  return <span className={`signal ${lost ? 'lost' : ''}`} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={lost ? 0 : pct} aria-label={lost ? '행성 9 신호 소실' : `행성 9 신호 강도 ${pct}%`}>
+    <em>신호</em><i className="bars" aria-hidden="true">{[0, 1, 2, 3, 4].map(k => <i key={k} className={k < lit ? 'on' : ''} />)}</i><b>{lost ? '소실' : `${pct}%`}</b>
+  </span>;
+}
+
+
+/** 인앱 확인 창: window.confirm 대신 쓴다(장면 톤 유지 · 안전한 쪽이 기본 포커스). */
+export function Confirm({ title, body, confirmLabel, cancelLabel = '계속 플레이', onConfirm, onCancel }: { title: string; body: string; confirmLabel: string; cancelLabel?: string; onConfirm: () => void; onCancel: () => void }) {
+  useEffect(() => { const k = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') onCancel(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onCancel]);
+  return <div className="layer confirm-layer" onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+    <section className="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h2 id="confirm-title">{title}</h2><p>{body}</p>
+      <div className="choices"><button type="button" className="primary" autoFocus onClick={onCancel}>{cancelLabel}</button><button type="button" className="danger" onClick={onConfirm}>{confirmLabel}</button></div>
+    </section>
+  </div>;
+}

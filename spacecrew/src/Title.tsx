@@ -1,17 +1,19 @@
 import { useState, type FormEvent } from 'react';
 import type { Request } from './types';
+import { readNick, saveNick } from './lib';
 import { Starfield } from './ui';
 
 /** 타이틀/참가: 관측창 너머 태양계 외곽. 방 만들기/참가는 한 카드 안에서 전환한다. */
 export function Title({ request, onSession, onHelp }: { request: Request; onSession: (reply: unknown) => void; onHelp: () => void }) {
-  const [mode, setMode] = useState<'create' | 'join'>('create');
+  const invite = (new URLSearchParams(window.location.search).get('code') ?? '').toUpperCase().slice(0, 6); // 초대 링크(?code=ABC123)
+  const [mode, setMode] = useState<'create' | 'join'>(invite ? 'join' : 'create');
   const [busy, setBusy] = useState(false);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, unknown>; // 원본과 같은 페이로드(문자열)
     if (mode === 'join') form.code = String(form.code).toUpperCase();
     setBusy(true);
-    try { const reply = await request(mode === 'create' ? 'ROOM_CREATE' : 'ROOM_JOIN', form); if (reply) onSession(reply); }
+    try { const reply = await request(mode === 'create' ? 'ROOM_CREATE' : 'ROOM_JOIN', form); if (reply) { saveNick(String(form.nickname ?? '')); if (invite) window.history.replaceState(null, '', window.location.pathname); onSession(reply); } }
     catch { /* 오류 토스트는 App 에서 표시 */ }
     finally { setBusy(false); }
   };
@@ -38,11 +40,11 @@ export function Title({ request, onSession, onHelp }: { request: Request; onSess
         <button type="button" role="tab" aria-selected={mode === 'create'} onClick={() => setMode('create')}>새 탐사대</button>
         <button type="button" role="tab" aria-selected={mode === 'join'} onClick={() => setMode('join')}>합류하기</button>
       </div>
-      <label>내 호출명<input name="nickname" maxLength={16} required placeholder={mode === 'create' ? '예: 루나' : '예: 솔'} autoComplete="nickname" /></label>
+      <label>내 호출명<input name="nickname" defaultValue={readNick()} maxLength={16} required placeholder={mode === 'create' ? '예: 루나' : '예: 솔'} autoComplete="nickname" /></label>
       {mode === 'create' ? <>
         <fieldset className="pick"><legend>승무원 수</legend>{[3, 4, 5].map(n => <label key={n}><input type="radio" name="maxPlayers" value={n} defaultChecked={n === 4} /><span>{n}명</span></label>)}</fieldset>
         <label>첫 미션<select name="missionId" defaultValue="1">{Array.from({ length: 50 }, (_, i) => <option key={i} value={i + 1}>미션 {i + 1}</option>)}</select></label>
-      </> : <label>방 코드<input name="code" maxLength={6} required className="code-input" placeholder="ABC123" autoCapitalize="characters" autoComplete="off" /></label>}
+      </> : <label>방 코드<input name="code" defaultValue={invite} maxLength={6} required className="code-input" placeholder="ABC123" autoCapitalize="characters" autoComplete="off" /></label>}
       <button className="primary big" disabled={busy}>{mode === 'create' ? '탐사대 만들기' : '방에 합류하기'}</button>
       <p className="foot">3–5명의 승무원 · 총 50개 미션 · 손패는 나만 볼 수 있어요</p>
     </form>

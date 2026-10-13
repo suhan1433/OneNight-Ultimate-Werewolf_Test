@@ -1,7 +1,7 @@
-import { useLayoutEffect, useEffect, useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Card, DrawerTab, Game, Send } from './types';
-import { SUITS, useMedia } from './lib';
-import { CardBack, CardFace, TaskChip } from './ui';
+import { SUITS, cue, useMedia } from './lib';
+import { Ambient, CardBack, CardFace, SignalMeter, TaskChip } from './ui';
 import { Seat } from './Seat';
 import { Hand } from './Hand';
 import { CommSheet } from './CommSheet';
@@ -14,10 +14,13 @@ import type { View } from './view';
 type Props = { game: Game; view: View; send: Send; recordPlay: (c: Card) => void; dismissBriefing: () => void; openDrawer: (tab: DrawerTab) => void; onLeave: () => void };
 
 /* ───────── 상단 바 ───────── */
-function TopBar({ game, openDrawer, onLeave }: { game: Game; openDrawer: (t: DrawerTab) => void; onLeave: () => void }) {
+function TopBar({ game, signal, lost, openDrawer, onLeave }: { game: Game; signal: number; lost: boolean; openDrawer: (t: DrawerTab) => void; onLeave: () => void }) {
   return <header className="topbar">
     <button type="button" className="bar-btn leave" onClick={onLeave}>나가기</button>
-    <span className="tricks" aria-label={`트릭 ${Math.min(game.trickNo + 1, game.totalTricks)} / ${game.totalTricks}`}>트릭 <b>{Math.min(game.trickNo + 1, game.totalTricks)}/{game.totalTricks}</b></span>
+    <div className="top-mid">
+      <span className="tricks" aria-label={`트릭 ${Math.min(game.trickNo + 1, game.totalTricks)} / ${game.totalTricks}`}>트릭 <b>{Math.min(game.trickNo + 1, game.totalTricks)}/{game.totalTricks}</b></span>
+      <SignalMeter signal={signal} lost={lost} />
+    </div>
     <button type="button" className="bar-btn round" onClick={() => openDrawer('help')} aria-label="도움말">?</button>
   </header>;
 }
@@ -30,6 +33,7 @@ function TrickZone({ game, view }: { game: Game; view: View }) {
     : view.lead ? `선도 ${SUITS[view.lead.suit].icon} ${SUITS[view.lead.suit].name}` : '첫 카드를 기다리는 중';
   return <div className={`trick-zone ${reveal ? `rv-${reveal.stage}` : ''}`} style={style} aria-live="polite">
     <svg className="orbit" viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true"><ellipse cx="150" cy="100" rx="146" ry="96" /><ellipse cx="150" cy="100" rx="96" ry="62" /><ellipse cx="150" cy="100" rx="46" ry="30" /></svg>
+    <p className="trick-no" key={game.trickNo} aria-hidden="true">TRICK {String(Math.min(game.trickNo + 1, game.totalTricks)).padStart(2, '0')}</p>
     <p className="center-note">{note}</p>
     {view.seats.map(s => {
       const item = view.shown.find(t => t.playerId === s.player.id); const cx = Math.cos(s.angle); const cy = Math.sin(s.angle);
@@ -78,14 +82,43 @@ function StatusLine({ view, onComm }: { view: View; onComm: () => void }) {
   </div>;
 }
 
+/* ───────── 장면 전환 배너: 단계가 바뀔 때 1.9초간 가로 띠로 알린다(첫 진입·재접속에는 띄우지 않음) ───────── */
+const BANNER: Record<string, string> = { assign: '과제 배정', target: '대상 지정', token: '토큰 조정', transfer: '과제 전달', vote: '조난 신호', pass: '조난 신호 활성화', direction: '조난 신호 활성화' };
+function useBanner(kind: string, trickNo: number) {
+  const [banner, setBanner] = useState<{ id: number; text: string } | null>(null);
+  const prev = useRef<string | null>(null); const seq = useRef(0);
+  useEffect(() => {
+    const before = prev.current; prev.current = kind;
+    if (before === null || before === kind) return;
+    const text = kind === 'play' && before !== 'result' && trickNo === 0 ? '미션 개시' : BANNER[kind];
+    if (!text) return;
+    setBanner({ id: ++seq.current, text });
+    const id = window.setTimeout(() => setBanner(null), 1900); return () => window.clearTimeout(id);
+  }, [kind, trickNo]);
+  return banner;
+}
+
 export function Table({ game, view, send, recordPlay, dismissBriefing, openDrawer, onLeave }: Props) {
   const compact = useMedia('(max-width: 760px)');
   const [commOpen, setCommOpen] = useState(false);
+  const [peek, setPeek] = useState(false); // 결과 창을 잠시 접고 마지막 테이블을 본다
+  const banner = useBanner(view.kind, game.trickNo);
   useEffect(() => { if (!view.canComm) setCommOpen(false); }, [view.canComm]);
-  const meSeat = view.seats.find(s => s.isMe)!; const failed = view.kind === 'result' && !game.result?.win;
-  const panel = ['target', 'token', 'transfer', 'vote', 'pass'].includes(view.kind);
-  return <main className={`table-scene ${compact ? 'compact' : ''} k-${view.kind} ${panel || view.kind === 'assign' ? 'panel-phase' : ''} ${failed ? 'failed' : ''}`}>
-    <TopBar game={game} openDrawer={openDrawer} onLeave={onLeave} />
+  useEffect(() => { if (!view.showResult) setPeek(false); }, [view.showResult]);
+  // 내 차례 알림: 탭 제목 + (설정 시) 진동·효과음. 다른 탭에 있어도 알 수 있다.
+  const myTurnNow = view.myTurn && view.kind === 'play';
+  const baseTitle = useRef(document.title);
+  useEffect(() => { if (myTurnNow) { cue('tap'); document.title = '▶ 내 차례 · 더 크루'; } return () => { document.title = baseTitle.current; }; }, [myTurnNow]);
+  // 과제 달성 연출 순간의 효과음
+  const rStage = view.reveal?.stage; const rDone = view.reveal?.doneTaskIds.length ?? 0;
+  useEffect(() => { if (rStage === 'sweep' && rDone > 0) cue('win'); }, [rStage, rDone]);
+  const meSeat = view.seats.find(s => s.isMe)!; const failed = view.kind === 'result' && !game.result?.win; const won = view.kind === 'result' && !!game.result?.win;
+  const doneTasks = game.tasks.filter(x => x.done).length;
+  const signal = failed ? 0.06 : won ? 1 : game.tasks.length ? doneTasks / game.tasks.length : Math.min(1, game.trickNo / Math.max(1, game.totalTricks));
+  const panel = ['target', 'token', 'transfer', 'vote', 'pass', 'direction'].includes(view.kind);
+  return <main className={`table-scene ${compact ? 'compact' : ''} k-${view.kind} ${panel || view.kind === 'assign' ? 'panel-phase' : ''} ${failed ? 'failed' : ''} ${won ? 'won' : ''} ${myTurnNow ? 'my-turn' : ''}`} style={{ '--signal': signal } as CSSProperties}>
+    <Ambient />
+    <TopBar game={game} signal={signal} lost={failed} openDrawer={openDrawer} onLeave={onLeave} />
     <section className="stage" aria-label="테이블">
       {!compact && <div className="oval" aria-hidden="true" />}
       {!compact && view.seats.filter(s => !s.isMe).map(s => <Seat key={s.player.id} player={s.player} game={game} view={view} variant="ring" angle={s.angle} />)}
@@ -103,6 +136,8 @@ export function Table({ game, view, send, recordPlay, dismissBriefing, openDrawe
     {commOpen && view.canComm && <CommSheet game={game} view={view} send={send} onClose={() => setCommOpen(false)} />}
     <GoldLinks view={view} />
     {view.briefing && <Briefing game={game} onClose={dismissBriefing} />}
-    {view.showResult && <Result game={game} view={view} send={send} />}
+    {banner && <div key={banner.id} className="phase-banner" aria-hidden="true"><b>{banner.text}</b></div>}
+    {view.showResult && !peek && <Result game={game} view={view} send={send} onPeek={() => setPeek(true)} />}
+    {view.showResult && peek && <button type="button" className="primary peek-fab" onClick={() => setPeek(false)}>결과 다시 보기</button>}
   </main>;
 }

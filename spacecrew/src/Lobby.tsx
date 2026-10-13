@@ -1,13 +1,19 @@
 import { useState, type CSSProperties } from 'react';
 import type { Game, Send } from './types';
+import { inviteLink } from './lib';
 import { Avatar, MissionMap, Rules } from './ui';
 
 /** 대기실: 관측선 브리지. 참가자가 앉으면 좌석 표시등이 켜지고 통신선이 이어진다. */
 export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send; onLeave: () => void; onHelp: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const host = game.hostId === game.playerId; const me = game.players.find(p => p.id === game.playerId)!;
   const filled = game.players.length === game.maxPlayers; const allReady = game.players.every(p => p.ready);
   const copy = async () => { try { await navigator.clipboard?.writeText(game.code); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch { /* 클립보드 불가 */ } };
+  const share = async () => { // 모바일은 공유 시트, 그 외는 링크 복사
+    const url = inviteLink(game.code);
+    try { if (navigator.share) { await navigator.share({ title: '더 크루: 행성 9를 찾아서', text: `방 코드 ${game.code}`, url }); return; } await navigator.clipboard?.writeText(url); setLinkCopied(true); window.setTimeout(() => setLinkCopied(false), 1600); } catch { /* 공유 취소·불가 */ }
+  };
   const state = (p: Game['players'][number]) => !p.connected ? ['off', '연결 끊김'] : p.ready ? ['on', '준비됨'] : ['wait', '준비 중'];
   const seats = Array.from({ length: game.maxPlayers }, (_, i) => game.players[i]);
   return <main className="lobby">
@@ -18,6 +24,7 @@ export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send;
     </header>
     <section className="bridge-sec" aria-label="관측선 브리지">
       <h2>관측선 브리지 <small>{game.players.length}/{game.maxPlayers}</small></h2>
+      <button type="button" className="invite-btn" onClick={share}>{linkCopied ? '✓ 초대 링크 복사됨' : '🔗 초대 링크 보내기'}</button>
       <div className="bridge" style={{ '--n': game.maxPlayers } as CSSProperties}>
         <ul className="chairs">{seats.map((p, i) => {
           const next = seats[i + 1]; const [st, word] = p ? state(p) : ['empty', '빈 좌석'];

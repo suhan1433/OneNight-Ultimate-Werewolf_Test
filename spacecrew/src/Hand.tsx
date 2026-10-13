@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 import type { Card, Game, Send } from './types';
-import { cardName, cue, sortHand, useMedia } from './lib';
+import { SUITS, cardName, cue, sortHand, useMedia } from './lib';
 import { CardFace } from './ui';
 import type { View } from './view';
 
@@ -15,7 +15,7 @@ export function Hand({ game, view, send, recordPlay, compact }: { game: Game; vi
   const playable = (c: Card) => view.myTurn && view.legal.has(c.id);
   const play = (c: Card) => { if (!playable(c)) return; cue('play'); recordPlay(c); setSel(null); send('CARD_PLAY', { cardId: c.id }); };
   // 마우스 클릭(데스크톱)은 바로 내기, 터치·키보드는 "선택 → 한 번 더(또는 내기 버튼)".
-  const onCard = (c: Card, e: MouseEvent<HTMLButtonElement>) => { cue('tap'); if (!touch && e.detail > 0) play(c); else if (sel === c.id) play(c); else setSel(c.id); };
+  const onCard = (c: Card, e: MouseEvent<HTMLButtonElement>) => { cue('tap'); if (!touch && e.detail > 0 && playable(c)) play(c); else if (sel === c.id) play(c); else setSel(c.id); };
   const onKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
     if (e.key === 'Escape') { setSel(null); return; }
     const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : e.key === 'Home' ? -i : e.key === 'End' ? hand.length - 1 - i : 0;
@@ -25,7 +25,7 @@ export function Hand({ game, view, send, recordPlay, compact }: { game: Game; vi
   };
   const fi = Math.min(focus, Math.max(0, hand.length - 1));
   const picked = hand.find(c => c.id === sel);
-  const why = !view.myTurn ? (view.resolving ? '판정이 끝나면 낼 수 있어요' : '내 차례가 아니에요') : '먼저 나온 카드와 같은 색을 내야 해요';
+  const why = !view.myTurn ? (view.resolving ? '판정이 끝나면 낼 수 있어요' : '내 차례가 아니에요') : view.lead ? `${SUITS[view.lead.suit].icon} ${SUITS[view.lead.suit].name} 카드를 내야 해요` : '지금은 낼 수 없는 카드예요';
 
   return <section className={`hand-zone ${compact ? 'compact' : ''} ${view.canComm ? 'has-comm' : ''}`} aria-label={`내 손패 ${hand.length}장`}>
     {picked && <div className="pick-bar" role="status">

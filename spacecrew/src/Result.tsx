@@ -11,7 +11,7 @@ function Restart({ game, send, big = false }: { game: Game; send: Send; big?: bo
     : <p className="wait-host">방장이 {big ? '재도전을' : '대기실로 돌아가기를'} 누르면 이어서 진행해요.</p>;
 }
 
-export function Result({ game, view, send }: { game: Game; view: View; send: Send }) {
+export function Result({ game, view, send, onPeek }: { game: Game; view: View; send: Send; onPeek?: () => void }) {
   const win = !!game.result?.win;
   const [saved, setSaved] = useState(false);
   useEffect(() => { if (win) markCleared(game.missionId); setSaved(true); cue(win ? 'win' : 'fail'); }, [win, game.missionId]);
@@ -26,6 +26,7 @@ export function Result({ game, view, send }: { game: Game; view: View; send: Sen
       {saved && <MissionMap current={game.missionId} strip={3} />}
       <p className="signal-note">미션 지도에 새 신호가 켜졌어요.</p>
       <Restart game={game} send={send} />
+      {onPeek && <button type="button" className="peek-btn" onClick={onPeek}>테이블 살펴보기</button>}
     </section>
   </div>;
 
@@ -38,6 +39,7 @@ export function Result({ game, view, send }: { game: Game; view: View; send: Sen
       {view.missed.length > 0 && <div className="fail-row"><span>어긋난 과제</span>{view.missed.map(t => <TaskChip key={t.id} task={t} size="sm" fail />)}</div>}
       {view.finalTrick.some(t => t.card && missedIds.has(t.card.id)) && <div className="fail-row"><span>관련 트릭</span>{view.finalTrick.map(t => t.card ? <CardFace key={t.playerId} card={t.card} size="sm" className={missedIds.has(t.card.id) ? 'bad' : 'faded'} /> : null)}</div>}
       <Restart game={game} send={send} big />
+      {onPeek && <button type="button" className="peek-btn" onClick={onPeek}>마지막 테이블 살펴보기</button>}
     </section>
   </div>;
 }

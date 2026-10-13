@@ -25,7 +25,7 @@ import './styles.css';
 import type { DrawerTab, Game, Request, Send, Session } from './types';
 import { clearSession, readSession, saveSession, tutorialSeen, watchAppHeight } from './lib';
 import { useGameView } from './view';
-import { Starfield } from './ui';
+import { Confirm, Starfield } from './ui';
 import { Title } from './Title';
 import { Lobby } from './Lobby';
 import { Table } from './Table';
@@ -36,6 +36,8 @@ function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState('');
+  const [online, setOnline] = useState(true);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const [drawer, setDrawer] = useState<{ open: boolean; tab: DrawerTab }>({ open: false, tab: 'help' });
   const [tutorial, setTutorial] = useState(() => !tutorialSeen());
   const leavingRef = useRef(false);
@@ -47,11 +49,11 @@ function App() {
     next.on('ROOM_STATE', (state: Game) => { if (leavingRef.current) return; setGame(state); });
     next.on('ERROR', ({ message }: { message: string }) => setError(message));
     next.on('connect', () => { // 재접속 복구
-      leavingRef.current = false; setError('');
+      leavingRef.current = false; setError(''); setOnline(true);
       const previous = readSession();
       if (previous) next.emit('ROOM_JOIN', previous, (reply: { ok: boolean }) => { if (!reply.ok) clearSession(); });
     });
-    next.on('disconnect', () => { if (!leavingRef.current) setError('서버와 연결이 끊겼어요. 다시 연결하는 중…'); });
+    next.on('disconnect', () => { if (!leavingRef.current) setOnline(false); });
     return () => { next.close(); };
   }, []);
   useEffect(() => { if (!error) return; const id = window.setTimeout(() => setError(''), 3500); return () => window.clearTimeout(id); }, [error]);
@@ -65,11 +67,12 @@ function App() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : '요청을 처리하지 못했어요.'); throw reason; }
   };
   const send: Send = (event, payload) => { request(event, payload).catch(() => undefined); };
-  const leave = () => {
-    if (game && game.phase !== 'lobby' && game.phase !== 'result' && !window.confirm('미션 진행 중이에요. 정말 나갈까요? 다른 승무원의 게임이 중단될 수 있어요.')) return;
+  const doLeave = () => {
+    setConfirmLeave(false);
     leavingRef.current = true; socket?.emit('ROOM_LEAVE', { code: game?.code }); clearSession(); setGame(null); setDrawer(d => ({ ...d, open: false }));
     window.setTimeout(() => { socket?.disconnect(); socket?.connect(); }, 200);
   };
+  const leave = () => { if (game && game.phase !== 'lobby' && game.phase !== 'result') setConfirmLeave(true); else doLeave(); };
   const openDrawer = (tab: DrawerTab) => setDrawer({ open: true, tab });
 
   return <>
@@ -79,7 +82,9 @@ function App() {
       : view && <Table game={game} view={view} send={send} recordPlay={recordPlay} dismissBriefing={dismissBriefing} openDrawer={openDrawer} onLeave={leave} />}
     {drawer.open && <Drawer onClose={() => setDrawer(d => ({ ...d, open: false }))} game={game} />}
     {!game && tutorial && <Tutorial onDone={() => setTutorial(false)} />}
-    {error && <div className="toast" role="alert">{error}</div>}
+    {confirmLeave && <Confirm title="미션을 중단할까요?" body="진행 중인 미션에서 나가면 다른 승무원의 게임이 중단될 수 있어요." confirmLabel="나가기" onConfirm={doLeave} onCancel={() => setConfirmLeave(false)} />}
+    {!online && game && <div className="conn-banner" role="status"><i aria-hidden="true" />신호가 끊겼어요 · 다시 연결하는 중…</div>}
+    {error && <div className="toast" role="alert" onClick={() => setError('')} title="눌러서 닫기">{error}</div>}
   </>;
 }
 
