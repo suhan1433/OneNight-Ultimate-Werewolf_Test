@@ -690,9 +690,10 @@ function VoiceChat({ game }: { game: ClientGameState }) {
 }
 
 function Home() {
-  const [mode, setMode] = useState<"home" | "create" | "join">("home");
+  const inviteCode = new URLSearchParams(window.location.search).get("code")?.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) ?? "";
+  const [mode, setMode] = useState<"home" | "create" | "join">(inviteCode ? "join" : "home");
   const [nickname, setNickname] = useState("");
-  const [roomCode, setRoomCode] = useState("");
+  const [roomCode, setRoomCode] = useState(inviteCode);
   const [count, setCount] = useState(5);
   const [roles, setRoles] = useState<RoleType[]>(PRESETS.recommended!);
   const [busy, setBusy] = useState(false);
@@ -1005,6 +1006,7 @@ function Lobby({ game }: { game: ClientGameState }) {
   const me = game.players.find((p) => p.id === game.playerId)!;
   const full = game.players.length === game.maxPlayers;
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   // 입장하면 아직 안 쓰인 캐릭터를 자동 배정하고(저장된 선택이 있으면 그대로), 서버에 알린다.
@@ -1033,6 +1035,21 @@ function Lobby({ game }: { game: ClientGameState }) {
     buzz(12);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+  };
+  const shareInvite = async () => {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("code", game.roomCode);
+    url.hash = "";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "한밤의 늑대인간", text: `방 코드 ${game.roomCode}`, url: url.toString() });
+        return;
+      }
+      await navigator.clipboard?.writeText(url.toString());
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 1600);
+    } catch { /* 공유 취소 또는 클립보드 미지원 */ }
   };
   const deckReady = game.selectedRoles.length === game.maxPlayers + 3;
   const canStart = full && deckReady && game.players.every((p) => p.isReady);
@@ -1082,6 +1099,9 @@ function Lobby({ game }: { game: ClientGameState }) {
         <CodeTiles value={game.roomCode} />
         <button className={`chip copy-chip${copied ? " done" : ""}`} onClick={copyCode}>
           {copied ? <CheckIcon /> : <CopyIcon />} {copied ? "복사됨" : "코드 복사"}
+        </button>
+        <button className={`chip copy-chip invite-link${linkCopied ? " done" : ""}`} onClick={shareInvite}>
+          {linkCopied ? <CheckIcon /> : "🔗"} {linkCopied ? "링크 복사됨" : "초대 링크 보내기"}
         </button>
       </Panel>
       <div className="section-title">

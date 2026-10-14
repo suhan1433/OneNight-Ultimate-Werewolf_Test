@@ -137,6 +137,7 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .leave{background:none;border:0;box-shadow:none;color:var(--bone-2);font-size:.82rem;padding:.4rem .5rem 0}
 .harbor-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem}
 .harbor-head h1{font:400 clamp(2.8rem,7vw,4.2rem)/1 var(--display);text-shadow:2px 4px 0 rgba(0,0,0,.55)}.harbor-head p{color:var(--bone-2);font-size:.9rem;margin-top:.3rem}
+.harbor-invite{display:grid;justify-items:center;gap:.45rem}.invite-link{padding:.4rem .75rem;font-size:.72rem;color:var(--bone);border-color:rgba(233,220,196,.45);background:rgba(13,8,5,.55)}.invite-link.done{color:#a9e2b1;border-color:#a9e2b1}
 .roomcode{display:grid;justify-items:center;gap:.1rem;padding:.7rem 1.3rem;rotate:1.5deg;background:url('./textures/parchment.jpg') 0 0/512px!important;color:var(--ink)!important;border:0!important;box-shadow:var(--sh-2),inset 0 0 0 1px rgba(90,60,25,.4)!important;border-radius:3px}
 .roomcode small{font:700 .6rem var(--sans);letter-spacing:.24em;color:var(--ink-2)}.roomcode strong{font:900 2rem var(--serif);letter-spacing:.28em;padding-left:.28em}.roomcode span{font-size:.68rem;color:var(--blood);font-weight:700}
 .harbor-body{display:grid;grid-template-columns:1fr 270px;gap:1.4rem;align-items:start}

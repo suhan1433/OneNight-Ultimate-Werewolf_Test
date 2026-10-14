@@ -246,8 +246,9 @@ const deckSize=(c:CardOptions)=>70+(c.kraken?1:0)+(c.whale?1:0)+(c.loot?2:0)+(c.
 const sameCards=(a:CardOptions,b:CardOptions)=>(Object.keys(a) as Array<keyof CardOptions>).every(k=>a[k]===b[k]);
 const fan=['mermaid-alyra','pirate-rosie','skull-king','tigress','kraken'];
 function Landing() {
-  const [nickname,setNickname]=useState(localStorage.getItem('skullking-name')??'');const [roomCode,setRoomCode]=useState('');
-  const [tab,setTab]=useState<'create'|'join'>('create');const [detail,setDetail]=useState(false);
+  const inviteCode=new URLSearchParams(window.location.search).get('code')?.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)??'';
+  const [nickname,setNickname]=useState(localStorage.getItem('skullking-name')??'');const [roomCode,setRoomCode]=useState(inviteCode);
+  const [tab,setTab]=useState<'create'|'join'>(inviteCode?'join':'create');const [detail,setDetail]=useState(false);
   const [maxPlayers,setMaxPlayers]=useState(4);const [mode,setMode]=useState<GameConfig['roundMode']>('classic');const [cards,setCards]=useState<CardOptions>(emptyCards);const [help,setHelp]=useState(false);const [busy,setBusy]=useState(false);const error=useGame(s=>s.error);
   const restricted=maxPlayers<3;const active=restricted?emptyCards:cards;const deck=deckSize(active);const maxByDeck=Math.floor(deck/10);
   const current=sameCards(active,emptyCards)?'classic':sameCards(active,advancedCards)?'advanced':sameCards(active,fullCards)?'full':'custom';
@@ -465,15 +466,16 @@ function Score(){
 }
 const hue=(s:string)=>[...s].reduce((a,c)=>(a*31+c.charCodeAt(0))%360,7);
 function Lobby(){
-  const game=useGame(s=>s.game)!;const me=game.players.find(p=>p.id===game.playerId)!;const host=game.hostId===game.playerId;const [help,setHelp]=useState(false);const [copied,setCopied]=useState(false);
+  const game=useGame(s=>s.game)!;const me=game.players.find(p=>p.id===game.playerId)!;const host=game.hostId===game.playerId;const [help,setHelp]=useState(false);const [copied,setCopied]=useState(false);const [linkCopied,setLinkCopied]=useState(false);
   const cards=game.config.cards??emptyCards;const on=cardSettings.filter(([k])=>cards[k]);const readyN=game.players.filter(p=>p.ready).length;
   const canStart=host&&game.players.length>=2&&game.players.every(p=>p.ready);const modeInfo=modes.find(([id])=>id===game.config.roundMode);
   const copy=async()=>{try{await navigator.clipboard.writeText(game.roomCode);setCopied(true);setTimeout(()=>setCopied(false),1600);}catch{showError(new Error('복사하지 못했어요. 코드를 직접 선택해 주세요.'));}};
+  const share=async()=>{const url=new URL(window.location.href);url.search='';url.searchParams.set('code',game.roomCode);url.hash='';try{if(navigator.share){await navigator.share({title:'Skull King',text:`방 코드 ${game.roomCode}`,url:url.toString()});return;}await navigator.clipboard.writeText(url.toString());setLinkCopied(true);setTimeout(()=>setLinkCopied(false),1600);}catch{showError(new Error('초대 링크를 공유하지 못했어요.'));}};
   const hint=host?(canStart?'모두 준비됐어요. 출항하세요!':game.players.length<2?'최소 2명이 필요해요. 봇으로 채울 수도 있어요.':'모든 선원이 준비하면 출항할 수 있어요 ('+readyN+'/'+game.players.length+')'):'선장이 출항하기를 기다리는 중이에요.';
   return <main className="harbor">
     <header className="topbar"><button className="leave" onClick={()=>leaveRoom(game.roomCode)}><Icon name="back"/><span>나가기</span></button><button className="help-orb" onClick={()=>setHelp(true)} aria-label="도움말 열기"><Icon name="help"/></button></header>
     <div className="harbor-head"><div><h1>선원 모집</h1><p>친구에게 방 코드를 알려 주세요.</p></div>
-      <button type="button" className="roomcode" onClick={copy} aria-label={'방 코드 '+game.roomCode+' 복사'}><small>방 코드</small><strong>{game.roomCode}</strong><span>{copied?'복사했어요':'눌러서 복사'}</span></button></div>
+      <div className="harbor-invite"><button type="button" className="roomcode" onClick={copy} aria-label={'방 코드 '+game.roomCode+' 복사'}><small>방 코드</small><strong>{game.roomCode}</strong><span>{copied?'복사했어요':'눌러서 복사'}</span></button><button type="button" className={'invite-link'+(linkCopied?' done':'')} onClick={share}>{linkCopied?'✓ 링크 복사됨':'🔗 초대 링크 보내기'}</button></div></div>
     <div className="harbor-body">
       <ul className="roster" aria-label="선원 목록">{Array.from({length:game.config.maxPlayers},(_,i)=>{const p=game.players[i];
         if(!p)return <li className="berth vacant" key={'v'+i}><span className="avatar"><Icon name="plus"/></span><b>빈 자리</b><small>기다리는 중…</small></li>;

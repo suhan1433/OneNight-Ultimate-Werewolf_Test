@@ -131,9 +131,10 @@ function ConfirmDialog({title,body,confirmLabel,cancelLabel,onConfirm,onCancel}:
 /* ---------- screens ---------- */
 function Home(){
   const[nickname,setNickname]=useState('');
-  const[code,setCode]=useState('');
+  const inviteCode=new URLSearchParams(window.location.search).get('code')?.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)??'';
+  const[code,setCode]=useState(inviteCode);
   const[count,setCount]=useState(5);
-  const[tab,setTab]=useState<'create'|'join'>('create');
+  const[tab,setTab]=useState<'create'|'join'>(inviteCode?'join':'create');
   const[opts,setOpts]=useState<AvalonOptions>(base);
   const[nickError,setNickError]=useState(false);
   const nickRef=useRef<HTMLInputElement>(null);
@@ -313,7 +314,9 @@ function Role({game}:{game:ClientGameState}){
 function Lobby({game,starting=false}:{game:ClientGameState;starting?:boolean}){
   const me=game.players.find(p=>p.id===game.playerId)!;
   const[copied,setCopied]=useState(false);
+  const[linkCopied,setLinkCopied]=useState(false);
   const copy=async()=>{try{await navigator.clipboard.writeText(game.roomCode);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{}};
+  const share=async()=>{const url=new URL(window.location.href);url.search='';url.searchParams.set('code',game.roomCode);url.hash='';try{if(navigator.share){await navigator.share({title:'아발론',text:`방 코드 ${game.roomCode}`,url:url.toString()});return;}await navigator.clipboard.writeText(url.toString());setLinkCopied(true);setTimeout(()=>setLinkCopied(false),1600);}catch{}};
   const readyCount=game.players.filter(p=>p.ready).length;
   const total=game.maxPlayers;
   const glow=useRef<GlowHandle>(null);
@@ -356,6 +359,7 @@ function Lobby({game,starting=false}:{game:ClientGameState;starting?:boolean}){
       <RoomCode code={game.roomCode}/>
       <em className={copied?'done':''}>{copied?<><CheckIcon size={13}/> 복사되었습니다</>:'눌러서 초대 코드 복사'}</em>
     </button>
+    <button type="button" className={`lb-invite${linkCopied?' done':''}`} onClick={share}>{linkCopied?<><CheckIcon size={13}/> 초대 링크 복사됨</>:'🔗 초대 링크 보내기'}</button>
     <div className="lb-table-wrap">
       <LobbyGlow ref={glow}/>
       <div ref={tableRef} className={`lb-table lb-t${total}`} style={{'--ready':`${(readyCount/total)*100}%`} as React.CSSProperties}>
