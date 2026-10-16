@@ -48,6 +48,7 @@ function App() {
     const next = io({ path: '/api/spacecrew/socket/', transports: ['websocket', 'polling'] }); setSocket(next);
     next.on('ROOM_STATE', (state: Game) => { if (leavingRef.current) return; setGame(state); });
     next.on('ERROR', ({ message }: { message: string }) => setError(message));
+    next.on('ROOM_KICKED', ({ message }: { message: string }) => { leavingRef.current = true; clearSession(); setGame(null); setDrawer(d => ({ ...d, open: false })); setError(message); });
     next.on('connect', () => { // 재접속 복구
       leavingRef.current = false; setError(''); setOnline(true);
       const previous = readSession();

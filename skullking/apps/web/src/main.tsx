@@ -471,6 +471,8 @@ function Lobby(){
   const canStart=host&&game.players.length>=2&&game.players.every(p=>p.ready);const modeInfo=modes.find(([id])=>id===game.config.roundMode);
   const copy=async()=>{try{await navigator.clipboard.writeText(game.roomCode);setCopied(true);setTimeout(()=>setCopied(false),1600);}catch{showError(new Error('복사하지 못했어요. 코드를 직접 선택해 주세요.'));}};
   const share=async()=>{const url=new URL(window.location.href);url.search='';url.searchParams.set('code',game.roomCode);url.hash='';try{if(navigator.share){await navigator.share({title:'Skull King',text:`방 코드 ${game.roomCode}`,url:url.toString()});return;}await navigator.clipboard.writeText(url.toString());setLinkCopied(true);setTimeout(()=>setLinkCopied(false),1600);}catch{showError(new Error('초대 링크를 공유하지 못했어요.'));}};
+  const setSize=(maxPlayers:number)=>emit('LOBBY_SIZE_SET',{roomCode:game.roomCode,maxPlayers}).catch(showError);
+  const kick=(playerId:string,nickname:string)=>{if(window.confirm(`${nickname}님을 대기실에서 내보낼까요?`))emit('PLAYER_KICK',{roomCode:game.roomCode,playerId}).catch(showError);};
   const hint=host?(canStart?'모두 준비됐어요. 출항하세요!':game.players.length<2?'최소 2명이 필요해요. 봇으로 채울 수도 있어요.':'모든 선원이 준비하면 출항할 수 있어요 ('+readyN+'/'+game.players.length+')'):'선장이 출항하기를 기다리는 중이에요.';
   return <main className="harbor">
     <header className="topbar"><button className="leave" onClick={()=>leaveRoom(game.roomCode)}><Icon name="back"/><span>나가기</span></button><button className="help-orb" onClick={()=>setHelp(true)} aria-label="도움말 열기"><Icon name="help"/></button></header>
@@ -480,9 +482,9 @@ function Lobby(){
       <ul className="roster" aria-label="선원 목록">{Array.from({length:game.config.maxPlayers},(_,i)=>{const p=game.players[i];
         if(!p)return <li className="berth vacant" key={'v'+i}><span className="avatar"><Icon name="plus"/></span><b>빈 자리</b><small>기다리는 중…</small></li>;
         return <li className={'berth'+(p.ready?' ready':'')+(p.id===game.playerId?' me':'')} key={p.id} style={{'--h':hue(p.nickname)} as CSSProperties}><span className="avatar"><Avatar name={p.nickname} bot={p.isBot}/><Bubble playerId={p.id}/></span>
-          <b>{p.nickname}{p.id===game.playerId&&<em className="tag">나</em>}{p.id===game.hostId&&<em className="tag host">선장</em>}</b><small className={p.ready?'ok':''}>{p.isBot?'봇 · ':''}{p.ready?'준비 완료':'준비 중'}</small></li>;})}</ul>
+          <b>{p.nickname}{p.id===game.playerId&&<em className="tag">나</em>}{p.id===game.hostId&&<em className="tag host">선장</em>}</b><small className={p.ready?'ok':''}>{p.isBot?'봇 · ':''}{p.ready?'준비 완료':'준비 중'}</small>{host&&p.id!==game.hostId&&<button className="kick" type="button" onClick={()=>kick(p.id,p.nickname)} aria-label={p.nickname+' 강퇴'}>내보내기</button>}</li>;})}</ul>
       <aside className="voyage paper"><h2>항해 설정</h2>
-        <dl><div><dt>인원</dt><dd>{game.players.length} / {game.config.maxPlayers}명</dd></div><div><dt>방식</dt><dd>{modeInfo?modeInfo[1]:game.config.roundMode}{modeInfo&&<small>{modeInfo[2]}</small>}</dd></div><div><dt>덱</dt><dd>{deckSize(cards)}장</dd></div></dl>
+        <dl><div><dt>인원</dt><dd>{host?<span className="lobby-stepper"><button type="button" aria-label="인원 줄이기" disabled={game.config.maxPlayers<=Math.max(2,game.players.length)} onClick={()=>setSize(game.config.maxPlayers-1)}><Icon name="minus"/></button><output>{game.players.length} / {game.config.maxPlayers}명</output><button type="button" aria-label="인원 늘리기" disabled={game.config.maxPlayers>=9} onClick={()=>setSize(game.config.maxPlayers+1)}><Icon name="plus"/></button></span>:<>{game.players.length} / {game.config.maxPlayers}명</>}</dd></div><div><dt>방식</dt><dd>{modeInfo?modeInfo[1]:game.config.roundMode}{modeInfo&&<small>{modeInfo[2]}</small>}</dd></div><div><dt>덱</dt><dd>{deckSize(cards)}장</dd></div></dl>
         <div className="chips">{on.length?on.map(([k,t])=><span className="chip" key={k}>{t}</span>):<span className="chip">Classic 기본 덱</span>}</div></aside>
     </div>
     <div className="harbor-actions"><ChatInput roomCode={game.roomCode} meId={game.playerId} wide/><p className="hint">{hint}</p>
@@ -495,5 +497,5 @@ function Lobby(){
 function App(){const game=useGame(s=>s.game);const error=useGame(s=>s.error);useChatSync();useEffect(()=>{if(!error)return;const timer=setTimeout(()=>useGame.getState().setError(null),3500);return()=>clearTimeout(timer);},[error]);
   useEffect(()=>{window.addEventListener('pointerdown',unlock);return()=>window.removeEventListener('pointerdown',unlock);},[]);
   const inRoom=!!game;useEffect(()=>{fx.ambience(inRoom);},[inRoom]);
-  return <><Scene mode={game?(game.phase==='lobby'?'lobby':'game'):'home'}/>{game?(game.phase==='lobby'?<Lobby/>:<Table/>):<Landing/>}{error&&game&&<div className="toast">{error}</div>}</>;}
+  return <><Scene mode={game?(game.phase==='lobby'?'lobby':'game'):'home'}/>{game?(game.phase==='lobby'?<Lobby/>:<Table/>):<Landing/>}{error&&<div className="toast">{error}</div>}</>;}
 createRoot(document.getElementById('root')!).render(<App/>);

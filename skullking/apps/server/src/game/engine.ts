@@ -140,6 +140,23 @@ export function scoreRound(room:SkullRoom){const cards=room.cardsThisRound;const
 export function advance(room:SkullRoom,actor:string){if(room.phase!=='roundScore')throw Error('The round score is not ready.');const sailor=player(room,actor);if(sailor.isBot)throw Error('Only human sailors can confirm the next round.');room.advanceReady.add(actor);const humans=room.players.filter(p=>!p.isBot);if(humans.length>0&&humans.every(p=>room.advanceReady.has(p.id))){room.advanceReady.clear();room.roundIndex++;room.dealerIndex=(room.dealerIndex+1)%room.players.length;beginRound(room);}}
 /** Keeps the crew and settings together while resetting a finished voyage to recruitment. */
 export function returnToLobby(room:SkullRoom,actor:string){if(room.hostId!==actor||room.phase!=='result')throw Error('Only the captain can return this crew to the lobby.');room.phase='lobby';room.roundIndex=0;room.schedule=schedule(room.config.roundMode);room.cardsThisRound=0;room.dealerIndex=0;room.leaderId=null;room.turnId=null;room.trick=[];room.trickPlayerIds=[];room.trickLead=undefined;room.lastTrick=undefined;room.deck=[];room.lootAlliances=[];room.pendingDecision=undefined;room.abilityQueue=undefined;room.advanceReady.clear();room.chat=[];room.history=[];room.players.forEach(p=>{p.ready=p.isBot;p.hand=[];p.bid=null;p.tricks=0;p.score=0;p.roundBonus=0;p.rascalBet=0;p.forcedCardId=undefined;p.peekedDeck=undefined;});room.log.push('⚓ The crew returned to the harbor for a new voyage.');}
+/** The captain may resize a table only while sailors are still being recruited. */
+export function setLobbyMaxPlayers(room:SkullRoom,actor:string,maxPlayers:number){
+  if(room.hostId!==actor||room.phase!=='lobby')throw Error('Only the captain can change the lobby size.');
+  if(!Number.isInteger(maxPlayers)||maxPlayers<2||maxPlayers>9)throw Error('Choose 2 to 9 players.');
+  if(maxPlayers<room.players.length)throw Error('The lobby already has more sailors than that.');
+  room.config={...room.config,maxPlayers};
+  room.log.push(`⚓ The captain set the crew size to ${maxPlayers}.`);
+}
+/** Removes a sailor before departure. The captain can never remove themself. */
+export function kickFromLobby(room:SkullRoom,actor:string,targetId:string){
+  if(room.hostId!==actor||room.phase!=='lobby')throw Error('Only the captain can remove sailors from the lobby.');
+  if(targetId===room.hostId)throw Error('The captain cannot remove themself.');
+  const target=room.players.find(p=>p.id===targetId);if(!target)throw Error('That sailor is no longer in this lobby.');
+  room.players=room.players.filter(p=>p.id!==targetId);
+  room.log.push(`⚓ ${target.nickname} was removed from the crew.`);
+  return target;
+}
 export function view(room:SkullRoom,playerId:string):ClientGameState {const self=player(room,playerId);const pending=room.pendingDecision&&room.pendingDecision.playerId===playerId?room.pendingDecision:undefined;const legalCardIds=room.turnId===playerId?(self.forcedCardId?[self.forcedCardId]:legalCards(self.hand,room.trick).map(c=>c.id)):[];return {roomCode:room.roomCode,playerId,hostId:room.hostId,config:room.config,phase:room.phase,round:room.roundIndex+1,cardsThisRound:room.cardsThisRound,dealerId:room.players[room.dealerIndex]?.id??null,leaderId:room.leaderId,turnId:room.turnId,players:room.players.map(p=>({id:p.id,nickname:p.nickname,connected:p.connected,ready:p.ready,isBot:p.isBot,cardsLeft:p.hand.length,bid:room.phase==='bidding'&&p.id!==playerId?null:p.bid,tricks:p.tricks,score:p.score})),hand:self.hand,legalCardIds,trick:room.trick,trickLead:room.trickLead,lastTrick:room.lastTrick,pendingDecision:pending,pendingPlayerId:room.pendingDecision?.playerId,pendingKind:room.pendingDecision?.kind,
   // Juanita's information is private: it is serialized only in the owner's state.
   ...(self.peekedDeck ? {peekedDeck:self.peekedDeck} : {}),advanceReady:[...room.advanceReady],chat:room.chat,history:room.history,log:room.log.slice(-8),canAdvance:room.phase==='roundScore'&&!self.isBot};}

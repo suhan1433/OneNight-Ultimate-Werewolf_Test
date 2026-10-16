@@ -374,6 +374,7 @@ function Lobby({game,starting=false}:{game:ClientGameState;starting?:boolean}){
               <span className="lb-avatar has-char" style={{'--pf-bg':resolve(p.id).bg} as React.CSSProperties}>{resolve(p.id).emoji}{p.ready&&<span className="lb-ok"><CheckIcon size={11}/></span>}<i className="lb-flame" aria-hidden="true"/></span>
               <span className="lb-name">{p.id===game.playerId?'나 · ':''}{p.nickname}{p.id===game.playerId&&<span className="lb-edit" aria-hidden="true"> ✎</span>}</span>
               {p.isBot&&<small>TEST BOT</small>}
+              {game.playerId===game.hostId&&p.id!==game.hostId&&<button type="button" className="lb-kick" onClick={()=>{if(window.confirm(`${p.nickname} 님을 대기실에서 내보낼까요?`))call('PLAYER_KICK',{roomCode:game.roomCode,playerId:p.id});}}>내보내기</button>}
             </div>
             :<div className="lb-seat empty" style={seatAt(i)} key={`e${i}`}><span className="lb-avatar"><i>{i+1}</i></span><span className="lb-name">빈 자리</span></div>;
         })}

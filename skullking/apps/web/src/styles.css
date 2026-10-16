@@ -153,6 +153,7 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .voyage{padding:1.3rem 1.3rem 1.4rem;display:grid;gap:.9rem}.voyage h2{font-size:1.05rem}
 .voyage dl{margin:0;display:grid;gap:.5rem}.voyage dl div{display:flex;justify-content:space-between;gap:.6rem;border-bottom:1px dotted rgba(42,28,16,.35);padding-bottom:.4rem}
 .voyage dt{font-size:.74rem;color:var(--ink-2);letter-spacing:.1em}.voyage dd{margin:0;font:700 .86rem var(--serif);text-align:right}.voyage dd small{display:block;font:400 .66rem var(--sans);color:var(--ink-3)}
+.lobby-stepper{display:inline-flex;align-items:center;justify-content:flex-end;gap:.3rem}.lobby-stepper button{display:grid;place-items:center;width:1.45rem;height:1.45rem;padding:0;border-radius:50%;font-size:.7rem}.lobby-stepper output{min-width:3.85rem;white-space:nowrap}.kick{margin-top:.15rem;padding:.2rem .48rem;font-size:.62rem;color:var(--blood);border-color:rgba(130,38,28,.5);background:rgba(255,255,255,.3)}
 .chips{display:flex;flex-wrap:wrap;gap:.3rem}.chip{font-size:.68rem;border:1px solid rgba(42,28,16,.4);padding:.12rem .5rem;border-radius:2px;color:var(--ink-2)}
 .harbor-actions{display:grid;gap:.8rem;justify-items:center;text-align:center}.harbor-actions .hint{color:var(--bone-2)}
 .btnrow{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center}

@@ -10,6 +10,7 @@ socket.on('ASSASSIN_AIM',(message:AssassinAimState)=>{lastAssassinAim=message;})
 socket.on('TEAM_SELECTION',(message:TeamSelectionState)=>{lastTeamSelection=message;});
 socket.on('ROOM_STATE',(game:ClientGameState)=>{if(game.phase!=='assassination')lastAssassinAim=null;if(game.phase!=='team_build')lastTeamSelection=null;});
 socket.on('ROOM_STATE',(game:ClientGameState)=>useGame.getState().setGame(game)); socket.on('ERROR',({message})=>useGame.getState().setError(message));
+socket.on('ROOM_KICKED',({message}:{message:string})=>{localStorage.removeItem('avalon-session');useGame.getState().setGame(null);useGame.getState().setError(message);});
 socket.on('CHAT_MESSAGE',(message:ChatMessage)=>useGame.getState().addChat(message)); socket.on('CHAT_HISTORY',(messages:ChatMessage[])=>useGame.getState().setChatHistory(messages));
 export const emit=(event:string,data:unknown)=>new Promise<any>((resolve,reject)=>socket.emit(event,data,(a:Ack)=>a.ok?resolve(a.data):reject(Error(a.error))));
 export const session=()=>{try{return JSON.parse(localStorage.getItem('avalon-session')??'null');}catch{return null;}};

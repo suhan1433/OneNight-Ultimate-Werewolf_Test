@@ -57,6 +57,7 @@
 /* ---------- 좌석: 촛불 하나 = 플레이어 하나 ---------- */
 .lb-seat{animation:seatPop .55s var(--ease-spring) calc(.55s + var(--i)*.07s) backwards;
   transition:left .7s var(--ease-out) .1s,top .7s var(--ease-out) .1s}
+.lb-kick{position:absolute;top:calc(100% + 4px);left:50%;translate:-50% 0;z-index:3;white-space:nowrap;padding:3px 7px;border:1px solid #c15c5c99;border-radius:5px;background:#381c22e8;color:#ffd9d9;font:700 10px var(--sans);opacity:0;transition:opacity .18s ease}.lb-seat:hover .lb-kick,.lb-seat:focus-within .lb-kick{opacity:1}
 .lb-flame{position:absolute;top:-11px;right:-6px;width:7px;height:15px;border-radius:50% 50% 50% 50%/65% 65% 35% 35%;pointer-events:none;transform-origin:50% 100%;
   background:radial-gradient(circle at 50% 65%,#fff6dc 0,#ffc266 40%,#ff8a2b 80%,transparent 100%);
   box-shadow:0 0 10px 3px rgba(255,150,60,.65),0 0 24px 8px rgba(255,120,40,.28);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Card, SkullPlayer } from '@skullking/shared';
-import { advance, createRoom, leadSuit, legalCards, makeDeck, play, resolveDecision, returnToLobby, scoreRound, start, view } from './engine.js';
+import { advance, createRoom, kickFromLobby, leadSuit, legalCards, makeDeck, play, resolveDecision, returnToLobby, scoreRound, setLobbyMaxPlayers, start, view } from './engine.js';
 
 const card=(id:string,kind:Card['kind'],rank?:number,suit:Card['suit']='treasure',extra:Partial<Card>={}):Card=>({id,kind,name:id,suit:kind==='number'?suit:undefined,rank,...extra});
 const sailor=(id:string):SkullPlayer=>({id,nickname:id,sessionToken:id,socketId:null,connected:true,ready:true,isBot:false,hand:[],bid:null,tricks:0,score:0,roundBonus:0});
@@ -55,6 +55,11 @@ describe('Skull King engine',()=>{
   });
   it('returns a finished crew to the lobby with a clean scorecard',()=>{
     const room=createRoom('ABC123','a','a',config,'token');room.players.push(sailor('b'));room.phase='result';room.roundIndex=9;room.cardsThisRound=10;room.history=[{round:10,cards:10,scores:[]}];room.players[0]!.score=125;room.players[0]!.hand=[card('old','escape')];room.players[1]!.score=80;returnToLobby(room,'a');expect(room.phase).toBe('lobby');expect(room.roundIndex).toBe(0);expect(room.history).toEqual([]);expect(room.players.map(p=>({ready:p.ready,score:p.score,hand:p.hand.length}))).toEqual([{ready:false,score:0,hand:0},{ready:false,score:0,hand:0}]);expect(()=>returnToLobby(room,'b')).toThrow('captain');
+  });
+  it('lets only the captain resize and remove sailors while in the lobby',()=>{
+    const room=createRoom('ABC123','a','a',{...config,maxPlayers:4},'token');room.players.push(sailor('b'),sailor('c'));
+    setLobbyMaxPlayers(room,'a',3);expect(room.config.maxPlayers).toBe(3);expect(()=>setLobbyMaxPlayers(room,'b',4)).toThrow('captain');expect(()=>setLobbyMaxPlayers(room,'a',2)).toThrow('already has');
+    expect(kickFromLobby(room,'a','b').nickname).toBe('b');expect(room.players.map(p=>p.id)).toEqual(['a','c']);expect(()=>kickFromLobby(room,'a','a')).toThrow('cannot remove');room.phase='bidding';expect(()=>kickFromLobby(room,'a','c')).toThrow('captain');
   });
   it('chooses a random sailor to lead the first round',()=>{
     const room=createRoom('ABC123','a','a',{...config,maxPlayers:3},'token');room.players.push(sailor('b'),sailor('c'));

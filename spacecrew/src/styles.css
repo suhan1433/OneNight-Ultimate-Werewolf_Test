@@ -147,6 +147,7 @@ button.card{cursor:pointer}
 .chair.on .head,.chair.wait .head{background:var(--brass)}
 .chair b{font-size:.88rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chair small{font-size:.7rem;color:var(--mute)}
+.kick-crew{padding:.2rem .45rem;border-color:#ff6b8277;background:#3a1830aa;color:#ffdce3;font-size:.62rem;line-height:1.2}
 .chair.empty{opacity:.62}
 .chair.me .avatar{box-shadow:0 0 0 3px var(--cyan)}
 .avatar{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:linear-gradient(145deg,#8fb8ff,#4fd9c5);color:#06203a;font-weight:800;border:2px solid #ffffff55}

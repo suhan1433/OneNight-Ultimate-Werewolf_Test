@@ -34,6 +34,7 @@ export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send;
             {p ? <Avatar name={p.nickname} /> : <span className="avatar ghost" aria-hidden="true">+</span>}
             <b>{p ? <>{p.nickname}{p.isBot && ' 🤖'}</> : '빈 좌석'}</b>
             <small>{p ? <>{p.id === game.hostId && '방장 · '}{st === 'on' ? '●' : st === 'wait' ? '○' : '×'} {word}</> : '코드를 공유하세요'}</small>
+            {host && p && p.id !== game.hostId && <button type="button" className="kick-crew" onClick={() => { if (window.confirm(`${p.nickname} 님을 대기실에서 내보낼까요?`)) send('PLAYER_KICK', { playerId: p.id }); }}>내보내기</button>}
             <i className={`stem ${p ? 'lit' : ''}`} aria-hidden="true" />
             {i < seats.length - 1 && <i className={`link ${p && next ? 'lit' : ''}`} aria-hidden="true" />}
           </li>;
