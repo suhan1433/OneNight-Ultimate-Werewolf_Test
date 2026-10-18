@@ -9,6 +9,7 @@ RUN npm ci \
   && npm --prefix bloodbound ci \
   && npm --prefix skullking ci \
   && npm --prefix spacecrew ci \
+  && npm --prefix rummikub ci \
   && npm run build
 
 FROM node:22-alpine

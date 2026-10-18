@@ -48,6 +48,7 @@ h1 {
 .bloodbound { --accent: #e58a9e; background: linear-gradient(160deg, #661d3e 0, #361226 55%, #190c18); }
 .skullking { --accent: #e7bb55; background: linear-gradient(160deg, #5a310e 0, #2b1708 55%, #130a03); }
 .spacecrew { --accent: #7bc8ff; background: linear-gradient(160deg, #172d68 0, #0c173d 55%, #070b22); }
+.rummikub { --accent: #80e3bd; background: linear-gradient(160deg, #166b65 0, #0a3c43 55%, #05252e); }
 .skullking .table { fill: rgba(231, 187, 85, .1); stroke: #eac469; }
 .skullking .hill { fill: none; stroke: #c2772d; stroke-width: 3; opacity: .8; }
 .skullking .pines { fill: none; stroke: #f0c65f; stroke-width: 2; opacity: .75; }
@@ -64,6 +65,12 @@ h1 {
 .rocket-flame { fill: #ffcf67; }
 .rocket { transform-box: fill-box; transform-origin: center; transition: transform .6s var(--ease); }
 .spacecrew:hover .rocket, .spacecrew:focus-visible .rocket { transform: translate(8px, -10px); }
+.rummikub-table { stroke: #69d6b1; stroke-opacity: .65; stroke-width: 2; }
+.rummikub-line { fill: none; stroke: #a2f0d0; stroke-opacity: .45; stroke-width: 2; stroke-dasharray: 3 6; }
+.rummikub-tiles rect { fill: #f7f0d9; stroke: #1f6b68; stroke-width: 2; }
+.rummikub-tiles text { fill: #dc4b4b; font: 700 23px "Noto Serif KR", serif; text-anchor: middle; }
+.rummikub-tiles { transform-box: fill-box; transform-origin: center; transition: transform .6s var(--ease); }
+.rummikub:hover .rummikub-tiles, .rummikub:focus-visible .rummikub-tiles { transform: translateY(-7px); }
 
 .art { display: block; width: 100%; height: auto; aspect-ratio: 8 / 5; border-bottom: 1px solid var(--line); }
 .game-copy { display: grid; gap: 8px; padding: 24px 28px 0; }
@@ -101,5 +108,5 @@ h1 {
 }
 @media (prefers-reduced-motion: reduce) {
   .games { animation: none; }
-  .game-card, .enter svg, .seats, .moon-glow, .rocket { transition: none; }
+  .game-card, .enter svg, .seats, .moon-glow, .rocket, .rummikub-tiles { transition: none; }
 }

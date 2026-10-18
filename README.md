@@ -42,8 +42,9 @@ Render Web Service로 실행합니다. Render에서 **Language: Docker**, **Root
 Directory: 저장소 루트**로 생성하면 된다. Build/Start Command는 비워 두고,
 Render가 제공하는 `PORT`는 변경하지 않는다. 상태 확인 경로는 `/health`다.
 
-스페이스크루는 `/spacecrew/`와 `/api/spacecrew/socket/`을 사용하며, 같은
-도메인의 다른 게임 Socket.IO 서버와 분리되어 있다.
+스페이스크루는 `/spacecrew/`와 `/api/spacecrew/socket/`, 루미큐브는
+`/rummikub/`와 `/api/rummikub/socket/`을 사용하며, 같은 도메인의 다른 게임
+Socket.IO 서버와 분리되어 있다.
 
 ## GitHub + Vercel 배포
 

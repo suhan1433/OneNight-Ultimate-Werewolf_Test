@@ -1,0 +1,3 @@
+import { describe, expect, it } from 'vitest';
+import { createRoom, joinRoom, publicView, startGame } from './game.js';
+describe('private game view', () => { it('never serializes another player hand', () => { const { room, player: first } = createRoom('NEON42', 'A', 2); room.players[0]!.ready = true; const second = joinRoom(room, 'B'); second.ready = true; startGame(room, first.id); const view = publicView(room, first.id); expect(view.hand).toHaveLength(14); expect(JSON.stringify(view)).not.toContain(JSON.stringify(room.hands[second.id]!)); expect(view.players.find(player => player.id === second.id)?.handCount).toBe(14); }); });

@@ -32,6 +32,15 @@ COPY spacecrew/package*.json spacecrew/
 WORKDIR /app/spacecrew
 RUN npm ci --include=dev
 WORKDIR /app
+COPY rummikub/package*.json rummikub/
+COPY rummikub/packages/rules/package.json rummikub/packages/rules/package.json
+COPY rummikub/packages/protocol/package.json rummikub/packages/protocol/package.json
+COPY rummikub/packages/platform/package.json rummikub/packages/platform/package.json
+COPY rummikub/apps/server/package.json rummikub/apps/server/package.json
+COPY rummikub/apps/client/package.json rummikub/apps/client/package.json
+WORKDIR /app/rummikub
+RUN npm ci --include=dev
+WORKDIR /app
 COPY packages/shared packages/shared
 COPY apps/server apps/server
 COPY apps/web apps/web
@@ -40,6 +49,7 @@ COPY avalon avalon
 COPY bloodbound bloodbound
 COPY skullking skullking
 COPY spacecrew spacecrew
+COPY rummikub rummikub
 COPY game-selector game-selector
 # All browser apps share /app/apps/web/dist.
 RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web \
@@ -47,6 +57,7 @@ RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && np
   && npm --prefix bloodbound run build \
   && npm --prefix skullking run build \
   && npm --prefix spacecrew run build \
+  && npm --prefix rummikub run build \
   && cp game-selector/index.html apps/web/dist/index.html \
   && cp game-selector/launcher.css apps/web/dist/launcher.css
 
@@ -54,4 +65,4 @@ RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && np
 # and routes each Socket.IO endpoint to its own internal game server.
 RUN apk add --no-cache nginx gettext
 COPY infra/render-nginx.conf.template /etc/nginx/http.d/default.conf.template
-CMD ["sh", "-c", "envsubst '$PORT' < /etc/nginx/http.d/default.conf.template > /etc/nginx/http.d/default.conf && RUN_STANDALONE_SERVER=true PORT=3001 node apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3002 node avalon/apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3003 node bloodbound/apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3004 node skullking/apps/server/dist/server.js & PORT=3005 node spacecrew/server.mjs & nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "envsubst '$PORT' < /etc/nginx/http.d/default.conf.template > /etc/nginx/http.d/default.conf && RUN_STANDALONE_SERVER=true PORT=3001 node apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3002 node avalon/apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3003 node bloodbound/apps/server/dist/server.js & RUN_STANDALONE_SERVER=true PORT=3004 node skullking/apps/server/dist/server.js & PORT=3005 node spacecrew/server.mjs & PORT=3006 node rummikub/apps/server/dist/server.js & nginx -g 'daemon off;'"]

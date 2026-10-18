@@ -52,6 +52,15 @@ server {
     proxy_read_timeout 3600s;
   }
 
+  location /api/rummikub/socket/ {
+    proxy_pass http://127.0.0.1:3006/socket.io/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_read_timeout 3600s;
+  }
+
   location = /health {
     proxy_pass http://127.0.0.1:3001/health;
   }
@@ -79,6 +88,11 @@ server {
   location /spacecrew/ {
     alias /app/apps/web/dist/spacecrew/;
     try_files $uri $uri/ /spacecrew/index.html;
+  }
+
+  location /rummikub/ {
+    alias /app/apps/web/dist/rummikub/;
+    try_files $uri $uri/ /rummikub/index.html;
   }
 
   location / {
