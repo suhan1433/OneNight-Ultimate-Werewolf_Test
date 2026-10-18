@@ -267,3 +267,73 @@ button:disabled{opacity:.38;cursor:not-allowed}
   .meld-meta{max-width:none}
   .hand{max-height:30dvh}
 }
+
+/* ───────── 가로 모바일 보드 (game) ───────── */
+.game{position:relative;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) 104px;grid-template-rows:46px minmax(0,1fr) minmax(96px,40dvh);grid-template-areas:"top top" "felt side" "rack side";gap:6px 8px;padding:calc(4px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));overflow:hidden;background:var(--grain),radial-gradient(ellipse at 50% 38%,#4a3220,var(--wood1) 50%,var(--wood0))}
+.game.dragging{cursor:grabbing;user-select:none}
+.game .tile{margin-bottom:4px;border-radius:calc(var(--tw)*.14);box-shadow:inset 0 1px 0 #fff,inset 0 -2px 0 #d9cba6,0 3px 0 var(--edge),0 4px 0 var(--edge2),0 6px 8px -3px #000c}
+.game .tile.selected{transform:translateY(-9px)}
+.gtop{grid-area:top;display:flex;align-items:center;gap:8px;min-width:0}
+.chips{display:flex;gap:6px;flex:1;min-width:0;overflow:hidden}
+.chip2{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 4px;border-radius:99px;background:#0000004d;box-shadow:inset 0 0 0 1px #ffffff1f;min-width:0}
+.chip2.active{box-shadow:inset 0 0 0 2px var(--lamp);background:#ffbf6b24}
+.chip2 .ring{--s:34px}.chip2 .who b{font-size:.78rem;max-width:64px}.chip2 .who small{font-size:.66rem}
+.chip2.active .who small{color:var(--lamp);font-weight:800}
+.cnt{font:800 .95rem var(--f-num);padding:2px 8px;border-radius:6px;background:var(--ivory);color:var(--ink);box-shadow:0 2px 0 var(--edge)}
+.mytimer{padding:6px 12px;border-radius:99px;background:#0000004d;font-weight:800;font-size:.85rem;white-space:nowrap;color:var(--mute)}
+.mytimer.on{background:var(--lamp);color:#2a1a08}.mytimer.danger{background:var(--bad);color:#fff}
+.gtop .snd{position:static;width:34px;height:34px}
+.gfelt{grid-area:felt;position:relative;min-height:0;padding:22px 8px 8px;border-radius:14px;overflow:hidden;background:var(--grain),radial-gradient(ellipse 70% 80% at 50% 45%,#5a3c25,#3a2516 60%,#2a190e);box-shadow:inset 0 0 0 1px #ffffff14,inset 0 10px 30px #0009;transition:box-shadow .15s}
+.gfelt.over{box-shadow:inset 0 0 0 3px #ffffff80,inset 0 10px 30px #0009}
+.say{position:absolute;left:12px;right:12px;top:4px;margin:0;font-size:.74rem;font-weight:700;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.game.mine .say{color:var(--lamp)}
+.empty2{position:absolute;inset:0;display:grid;place-items:center;color:#ffffff59;font-weight:700;pointer-events:none}
+.gmelds{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
+.m{position:relative;display:flex;gap:2px;padding:5px 6px 2px;border-radius:calc(var(--tw)*.2);background:#0000002e;box-shadow:inset 0 0 0 2px #8fc19766}
+.m.bad{background:#ee6a5730;box-shadow:inset 0 0 0 2px var(--bad)}
+.m.tap{box-shadow:inset 0 0 0 2px #ffffffaa}
+.m.over{background:#ffffff33;box-shadow:inset 0 0 0 3px #fff}
+.mb{position:absolute;right:-5px;top:-9px;min-width:20px;padding:1px 6px;border-radius:99px;background:#1f3a26;color:#b9edc0;font:800 .66rem var(--f-num);text-align:center;font-style:normal;box-shadow:0 1px 3px #000a;pointer-events:none}
+.m.bad .mb{background:var(--bad);color:#fff}
+.newslot{align-self:stretch;min-width:calc(var(--tw)*2);padding:0 10px;border-radius:calc(var(--tw)*.2);background:#ffffff12;box-shadow:inset 0 0 0 2px #ffffff80;font-weight:800;font-size:.8rem;color:#fff;min-height:calc(var(--tw)*1.4 + 12px)}
+.newslot.over,.newslot:hover{background:#ffffff33}
+.grack{grid-area:rack;min-height:0;display:flex;flex-direction:column;gap:4px;padding:6px 8px 6px;border-radius:12px 12px 6px 6px;background:var(--grain),linear-gradient(#5a3d28,var(--rail) 18%,#3b2617);box-shadow:inset 0 1px 0 #ffffff26,0 3px 0 #1b0f08}
+.grack.over{box-shadow:inset 0 0 0 3px #ffffff80,0 3px 0 #1b0f08}
+.sugg{display:flex;align-items:center;gap:6px;overflow-x:auto;flex:none;padding:2px 0;scrollbar-width:none}
+.sugg>span{flex:none;font-size:.68rem;font-weight:800;color:var(--lamp)}
+.sg{flex:none;display:flex;gap:1px;padding:3px 4px 0;border-radius:7px;background:#0000004d;box-shadow:inset 0 0 0 2px #ffbf6b88;--tw:20px}
+.sg .tile{margin-bottom:2px;pointer-events:none}
+.ghand{flex:1;min-height:0;display:flex;flex-wrap:wrap;align-content:flex-start;gap:5px 3px;padding:10px 6px 2px;border-radius:6px;background:var(--groove);box-shadow:inset 0 6px 10px #000b;overflow:hidden}
+.ghand>span{position:relative;display:flex}.ghand .gap{margin-left:12px}
+.ghand>span.ins-b::before,.ghand>span.ins-a::after{content:'';position:absolute;top:-6px;bottom:2px;width:4px;border-radius:2px;background:var(--lamp);box-shadow:0 0 10px var(--lamp);z-index:2}
+.ghand>span.ins-b::before{left:-4px}.ghand>span.ins-a::after{right:-4px}
+.gside{grid-area:side;display:flex;flex-direction:column;gap:6px;min-height:0;justify-content:flex-end}
+.gside button{padding:10px 4px;font-size:.82rem;border-radius:10px;flex:none}
+.gside .go{flex:1;max-height:130px;font-size:1.15rem;display:grid;place-content:center;gap:2px}
+.gside .go small{font-size:.68rem;font-weight:700;opacity:.7}
+.srt{display:grid;grid-template-columns:1fr 1fr;gap:5px}.srt button{padding:9px 2px;font-size:.72rem}
+.gside .meter{padding:0 0 6px;font-size:.66rem;text-align:center;white-space:normal}
+.rotate{display:none}
+@media(orientation:portrait) and (max-width:760px){
+  .rotate{position:fixed;inset:0;z-index:60;display:grid;place-content:center;gap:10px;text-align:center;background:#120b07f2;font-weight:800;font-size:1.1rem}
+  .rotate b{font-size:3rem;color:var(--lamp)}
+}
+@media(min-width:900px) and (min-height:600px){.game{grid-template-columns:minmax(0,1fr) 150px;grid-template-rows:56px minmax(0,1fr) minmax(120px,34dvh)}}
+
+/* ───────── 전략 플레이: 묶음 / 필요 타일 / 움직임 ───────── */
+.ghand{gap:6px;padding:8px 6px 2px;overflow-y:auto;overflow-x:hidden}
+.grp{display:flex;flex-direction:column;gap:2px;padding:4px 5px 3px;border-radius:9px;background:#ffffff0a;box-shadow:inset 0 0 0 1px #ffffff26}
+.grp.ok{background:#8fc1971f;box-shadow:inset 0 0 0 2px #8fc197aa}
+.grp .gt{display:flex;gap:3px}
+.gplay{padding:3px 6px!important;border-radius:6px!important;font-size:.66rem!important;background:var(--ok)!important;color:#10240f!important;box-shadow:none!important}
+.need{font-size:.64rem;font-weight:800;color:#d6c8ae;white-space:nowrap;line-height:1.2}
+.need b{margin-left:4px;padding:0 4px;border-radius:4px;background:var(--ivory);font-family:var(--f-num)}
+.need b.red{color:var(--red)}.need b.blue{color:var(--blue)}.need b.orange{color:var(--orange)}.need b.black{color:var(--ink)}
+.need b.dead{opacity:.35;text-decoration:line-through}
+.gnew{align-self:stretch;min-width:64px;padding:0 10px;border-radius:9px;background:#ffffff12;box-shadow:inset 0 0 0 2px #ffffff80;font-weight:800;font-size:.72rem;color:#fff}
+.gnew.over,.gnew:hover{background:#ffffff33}
+.m{animation:pop .24s cubic-bezier(.2,1.3,.4,1)}
+@keyframes pop{from{transform:scale(.9);opacity:0}}
+.gfelt.big{overflow:auto;touch-action:pan-x pan-y}
+.chip2.low .cnt{background:var(--bad);color:#fff;animation:blink 1s infinite}
+.game .tile{touch-action:none}
