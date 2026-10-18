@@ -337,3 +337,135 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .gfelt.big{overflow:auto;touch-action:pan-x pan-y}
 .chip2.low .cnt{background:var(--bad);color:#fff;animation:blink 1s infinite}
 .game .tile{touch-action:none}
+
+/* ═════════ 모바일 UX 개편: 카메라(확대/이동) 테이블 · 선택 중심 조작 · 조합 편집 시트 ═════════ */
+.game{--side:92px;--tp:40px;--rack:38dvh;grid-template-columns:minmax(0,1fr) var(--side);grid-template-rows:var(--tp) minmax(0,1fr) var(--rack);grid-template-areas:"top top" "felt side" "rack side";-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.fwrap{grid-area:felt;position:relative;min-height:0;min-width:0}
+.gfelt{position:absolute;inset:0;padding:0;overflow:hidden;touch-action:none;cursor:grab}
+.gfelt.manual{cursor:grab}.game.dragging .gfelt{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;padding:58px 12px 52px;will-change:transform}
+.gmelds{gap:12px 14px;align-items:flex-start}
+.ts{position:relative;display:flex}.tw{display:flex;align-items:stretch}
+.m{animation:none}
+.m.ok{box-shadow:inset 0 0 0 2px #8fc19799}
+.m.bad{box-shadow:inset 0 0 0 2px var(--bad);outline:2px dashed var(--bad);outline-offset:1px}
+.m.open{box-shadow:inset 0 0 0 3px var(--lamp)}
+.mb{pointer-events:none}
+
+/* 타일 상태: 색 외에 모양으로도 구분 */
+.tile{position:relative}
+.tile.selected{outline:3px solid #fff;outline-offset:1px;z-index:2}
+.tile.fresh::before{content:'';position:absolute;top:3px;right:3px;width:calc(var(--tw)*.2);height:calc(var(--tw)*.2);border-radius:50%;background:var(--lamp);box-shadow:0 0 0 1px #0006}
+.tile.isnew::after{content:'NEW';position:absolute;left:0;right:0;bottom:-1px;font:800 calc(var(--tw)*.2)/1.5 var(--f-ui);color:#2a1a08;background:var(--lamp);border-radius:0 0 calc(var(--tw)*.14) calc(var(--tw)*.14);text-align:center}
+.tile .rep{position:absolute;left:50%;bottom:calc(var(--tw)*.06);transform:translateX(-50%);padding:0 3px;border-radius:4px;background:#fff;font:800 calc(var(--tw)*.24)/1.3 var(--f-num);font-style:normal;box-shadow:0 0 0 1px #0004;white-space:nowrap}
+.rep.red{color:var(--red)}.rep.blue{color:var(--blue)}.rep.orange{color:var(--orange)}.rep.black{color:var(--ink)}
+.ts.ins-b::before,.ts.ins-a::after{content:'';position:absolute;top:-4px;bottom:0;width:4px;border-radius:2px;background:var(--lamp);box-shadow:0 0 10px var(--lamp);z-index:3}
+.ts.ins-b::before{left:-4px}.ts.ins-a::after{right:-4px}
+
+/* 선택 컨텍스트 바 / 안내 */
+.ctxbar{position:absolute;left:4px;right:4px;top:4px;z-index:6;display:flex;align-items:center;gap:6px;height:40px;padding:3px 6px;border-radius:10px;background:#120b07d9;box-shadow:inset 0 0 0 1px #ffffff1f,0 4px 12px #0006;overflow-x:auto;scrollbar-width:none}
+.ctxbar.sel{box-shadow:inset 0 0 0 2px var(--lamp),0 4px 12px #0006}
+.ctxbar button{flex:none;min-height:34px;padding:6px 10px!important;font-size:.76rem;border-radius:8px}
+.ctxbar .primary{box-shadow:inset 0 1px 0 #fff,0 2px 0 var(--edge)}
+.ctxbar button.on{box-shadow:inset 0 0 0 2px var(--lamp)}
+.ctxbar .warn{margin-left:auto;background:#ee6a5733;color:#ffd0c8;box-shadow:inset 0 0 0 1px var(--bad)}
+.ctxbar .say{position:static;flex:1;min-width:0;margin:0;padding:0 4px;font-size:.78rem}
+.sinfo{flex:none;display:flex;align-items:center;gap:6px;font-size:.78rem}
+.sinfo b{font:800 1rem var(--f-num)}.sinfo small{color:var(--mute);font-size:.66rem;white-space:nowrap}
+.chips6{display:flex;gap:2px}.chips6 i{min-width:18px;padding:0 3px;border-radius:4px;background:var(--ivory);font:800 .72rem/1.5 var(--f-num);text-align:center;font-style:normal;color:var(--ink)}
+.chips6 i.red{color:var(--red)}.chips6 i.blue{color:var(--blue)}.chips6 i.orange{color:var(--orange)}.chips6 i.joker{color:#6b3a9e}
+
+/* 확대/축소·분할 컨트롤, 미니맵 */
+.fctl{position:absolute;right:6px;bottom:6px;z-index:6;display:flex;gap:5px}
+.fbtn{display:grid;place-items:center;min-width:38px;height:38px;padding:0 8px!important;border-radius:10px;background:#120b07d9!important;box-shadow:inset 0 0 0 1px #ffffff33!important;font-weight:800;font-size:1rem}
+.fbtn.txt{font-size:.74rem}.fbtn.on,.fbtn[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--lamp)!important;color:var(--lamp)}
+.minimap{position:absolute;left:6px;bottom:6px;z-index:6;border-radius:6px;background:#120b07cc;box-shadow:0 0 0 1px #ffffff40;touch-action:none;overflow:hidden}
+.minimap i{position:absolute;border-radius:1px;background:#8fc197}.minimap i.bad{background:var(--bad)}
+.minimap b{position:absolute;border:1.5px solid var(--lamp);background:#ffbf6b1f;pointer-events:none}
+
+/* 조합 편집 시트(확대 편집): 테이블 위에 크게 띄우고 손패는 그대로 보인다 */
+.sheet{position:absolute;left:4px;right:4px;top:48px;bottom:4px;z-index:5;display:flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:12px;background:#1a0f08f5;box-shadow:inset 0 0 0 2px #8fc197aa,0 8px 24px #000a}
+.sheet.bad{box-shadow:inset 0 0 0 2px var(--bad),0 8px 24px #000a}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px}
+.shead b{font-size:.8rem;color:#b9edc0;min-width:0}.sheet.bad .shead b{color:#ffb6aa}
+.sbtns{display:flex;gap:5px;flex:none}.sbtns button{padding:6px 10px!important;min-height:32px;font-size:.74rem}
+.srow{flex:1;min-height:0;display:flex;align-items:center;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;padding:12px 4px 4px}
+.srow .tile{margin-bottom:6px}.srow .gap{width:22px;margin:0 2px 6px}.srow .gap i{font-size:14px}
+.shint{margin:0;font-size:.66rem;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 손패: 35~40장도 34px 이상으로 유지, 넘치면 세로 스크롤 + 더 있음 표시 */
+.grack{padding:4px 8px 6px}
+.rhead{display:flex;align-items:center;gap:8px;min-height:26px;flex:none}
+.rcount{flex:none;font-size:.74rem;font-weight:700;color:#e9dcc2}.rcount b{font:800 .95rem var(--f-num)}
+.newbadge{margin-left:6px;padding:1px 6px;border-radius:99px;background:var(--lamp);color:#2a1a08;font:800 .62rem var(--f-ui);font-style:normal}
+.rhead .sugg{flex:1;min-width:0;padding:0}
+.hwrap{position:relative;flex:1;min-height:0;display:flex}
+.ghand{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:12px 6px 4px;align-content:flex-start}
+.ghand .tile{touch-action:pan-y}
+.hwrap.mu::before,.hwrap.md::after{content:'';position:absolute;left:0;right:0;height:22px;z-index:3;pointer-events:none;border-radius:6px}
+.hwrap.mu::before{top:0;background:linear-gradient(#150d07,#150d0700)}
+.hwrap.md::after{bottom:0;background:linear-gradient(#150d0700,#150d07)}
+.gnew,.gplay{min-height:30px}
+
+/* 고정 버튼 열(선택해도 위치가 바뀌지 않음) */
+.gside{gap:5px}
+.gside button{min-height:42px;padding:8px 2px}
+.gside .go{min-height:64px;max-height:none}
+.urow{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.urow button{display:grid;place-items:center;font-size:1.15rem;line-height:1;padding:6px 0}.urow small{font-size:.6rem;opacity:.7;min-height:.6rem}
+.sortbtn{font-size:.7rem}.sortbtn b{display:block;color:var(--lamp)}
+.ghost .dlabel{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);padding:3px 9px;border-radius:99px;background:#120b07e6;box-shadow:0 0 0 1px var(--lamp);font:800 .72rem var(--f-ui);white-space:nowrap}
+.rotate{display:none!important}
+
+/* 낮은 가로 화면(작은 스마트폰) */
+@media(max-height:430px){
+  .game{--side:84px;--tp:36px;gap:4px 6px}
+  .gside button{min-height:36px;font-size:.74rem}.gside .go{min-height:54px}
+  .ctxbar{height:36px}.ctxbar button{min-height:30px}.sheet{top:44px}
+}
+/* 세로 화면: 막지 않고 위(테이블) / 아래(손패) / 맨 아래(버튼 줄) 레이아웃 */
+@media(orientation:portrait) and (max-width:760px){
+  .game{grid-template-columns:minmax(0,1fr);grid-template-rows:var(--tp) minmax(0,1fr) var(--rack) 52px;grid-template-areas:"top" "felt" "rack" "side"}
+  .gside{flex-direction:row;align-items:stretch;justify-content:stretch}
+  .gside>*{flex:1;min-height:0}.gside .go{flex:2;max-height:none;min-height:0}
+  .gside .urow{flex:1.4}.gside .meter{display:none}
+  .chip2 .who{display:none}
+  .ctxbar button{padding:6px 8px!important}
+}
+@media(min-width:900px) and (min-height:600px){.game{--side:150px;--tp:56px}}
+
+/* ═════════ 2차 개선: 플레이어 시점 점검 반영 ═════════ */
+/* 타일 사이 ↓/✂ 칸 = 레이아웃을 밀지 않는 겹침 버튼(선택해도 조합 배치가 흔들리지 않음). 화면에서 18px 폭 유지 */
+.tw{position:relative}
+.gap{position:absolute;top:0;bottom:4px;z-index:4;width:calc(18px/var(--z,1));min-width:10px;padding:0!important;border-radius:6px;background:#ffbf6b55!important;box-shadow:inset 0 0 0 2px var(--lamp)!important;color:#fff}
+.gap.l{left:calc(-9px/var(--z,1) - 1px)}.gap.r{right:calc(-9px/var(--z,1) - 1px)}
+.gap i{display:grid;place-items:center;height:100%;font-style:normal;font-size:calc(13px/var(--z,1));font-weight:800}
+.gap.split{background:#ee6a5755!important;box-shadow:inset 0 0 0 2px #ff9d8f!important}
+.gap:hover,.gap:active{background:#fff7!important}
+.world.editing .m:not(.open){opacity:.28;filter:saturate(.5)}
+.world.editing .m.open{box-shadow:inset 0 0 0 3px var(--lamp),0 0 28px #ffbf6b66}
+
+/* 선택 안내 한 줄 / 컨텍스트 바 슬림화 */
+.selhint{position:absolute;left:10px;top:46px;z-index:5;margin:0;padding:2px 8px;border-radius:99px;background:#120b07b8;color:var(--lamp);font-size:.66rem;font-weight:700;pointer-events:none;max-width:calc(100% - 20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctxbar:not(.sel){height:34px}.ctxbar:not(.sel) button{min-height:28px}
+@media(max-width:700px){.sinfo small{display:none}.ctxbar button{padding:6px 8px!important;font-size:.72rem}}
+
+/* 손패 "새 묶음" 칸은 손패 머리줄에 고정 → 타일이 밀리지 않음 */
+.rhead .gnew{flex:none;margin-left:auto;align-self:center;padding:4px 12px!important;border-radius:8px;min-height:26px}
+
+/* 뽑기 오터치 방지: 한 번 더 눌러야 뽑음 */
+.go.arm{background:linear-gradient(180deg,#ffe7b8,var(--lamp));animation:armpulse .8s ease-in-out infinite}
+@keyframes armpulse{50%{transform:scale(.97)}}
+/* 확정 가능해지면 램프색으로 은은히 빛난다 */
+.gside .go:not(:disabled):not(.arm){animation:readyglow 1.8s ease-in-out infinite}
+@keyframes readyglow{50%{box-shadow:inset 0 1px 0 #fff,0 4px 0 var(--edge),0 6px 0 var(--edge2),0 0 22px #ffbf6bcc}}
+
+/* 몰입감: 내 차례 배너, 시간 임박 테두리, 조합 완성/오류 피드백 */
+.banner{position:fixed;left:50%;top:38%;z-index:50;transform:translate(-50%,-50%);padding:10px 28px;border-radius:14px;background:#120b07e0;box-shadow:0 0 0 2px var(--lamp),0 0 40px #ffbf6b88;color:var(--lamp);font:800 1.5rem var(--f-ui);pointer-events:none;animation:banner 1.3s ease-out forwards}
+@keyframes banner{0%{opacity:0;transform:translate(-50%,-30%) scale(.8)}18%{opacity:1;transform:translate(-50%,-50%) scale(1)}78%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%)}}
+.game.urgent::after{content:'';position:fixed;inset:0;z-index:45;pointer-events:none;box-shadow:inset 0 0 0 3px var(--bad),inset 0 0 36px #ee6a5788;animation:blink 1s infinite}
+.m.ok{animation:okpulse .5s ease-out}
+@keyframes okpulse{40%{box-shadow:inset 0 0 0 3px #b9edc0,0 0 22px #8fc197aa}}
+.m.bad{animation:shake .28s ease-in-out}
+@keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.world.editing .m{animation:none}
