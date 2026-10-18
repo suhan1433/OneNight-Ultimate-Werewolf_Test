@@ -1,4 +1,4 @@
-import { moveTiles, splitMeld, mergeMelds, swapJoker, signature, mergeHandOrder, whyInvalid, type Draft, type Ctx } from './editor';
+import { moveTiles, splitMeld, mergeMelds, swapJoker, signature, mergeHandOrder, whyInvalid, tidyMeld, type Draft, type Ctx } from './editor';
 import type { Meld, Tile } from '@rummikub/rules';
 let fails = 0; const ok = (c: boolean, m: string) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const T = (id: number, color: any, value: number): Tile => ({ id, kind: 'number', color, value } as Tile);
@@ -60,5 +60,29 @@ const run = (r: any) => { if (!r.ok) throw new Error(r.reason); return r.draft a
 { const d = run(moveTiles(base, [1], { to: 'new' }, ctx)); ok(signature(d) !== signature(base) && d.hand.length === base.hand.length, '테이블만 재배치해도 변경 감지'); }
 // 같은 상태로 되돌리면 변경 아님
 { let d = run(moveTiles(base, [6], { to: 'new' }, ctx)); d = run(moveTiles(d, [6], { to: 'meld', meldId: 'A' }, ctx)); ok(signature(d) === signature(base), '이동 후 원복 → 변경 아님'); }
+
+// ── 자동 분할 / 정리 ──
+add(T(41, 'red', 9));
+const validTiles = (m: Meld) => { const ts = m.tiles.map(e => pool.get(e.tileId)!); if (ts.length < 3 || ts.some(t => t.kind === 'joker')) return false; const ns = ts as Extract<Tile, { kind: 'number' }>[];
+  if (ns.every(t => t.color === ns[0]!.color)) { const v = ns.map(t => t.value).sort((a, b) => a - b); return v.every((x, i) => i === 0 || x === v[i - 1]! + 1); }
+  return ns.every(t => t.value === ns[0]!.value) && new Set(ns.map(t => t.color)).size === ns.length && ns.length <= 4; };
+const ctx2: Ctx = { ...ctx, ok: validTiles };
+const Rd = (list: number[]): Draft => ({ hand: [pool.get(41)!], table: [mk('R', 'run', list)] });
+const ids6 = [3, 4, 5, 6, 37, 38]; // red 5,6,7,8,9,10
+const tilesOfMeld = (d: Draft, i: number) => d.table[i]!.tiles.map(e => e.tileId).join();
+// G: 5..10 의 8·9 사이에 9를 끼우면 5·6·7·8·9 / 9·10 으로 나뉜다
+{ const r = moveTiles(Rd(ids6), [41], { to: 'meld', meldId: 'R', index: 4 }, ctx2); const d = run(r);
+  ok(d.table.length === 2 && tilesOfMeld(d, 0) === '3,4,5,6,41' && tilesOfMeld(d, 1) === '37,38' && !!(r as any).splitId, 'G 중간 삽입 → 끼운 자리에서 자동 분할'); }
+// H: 유효하게 이어지면 나누지 않는다
+{ const d = run(moveTiles(Rd([3, 4, 5, 6]), [41], { to: 'meld', meldId: 'R', index: 2 }, ctx2)); ok(d.table.length === 1 && tilesOfMeld(d, 0) === '3,4,5,6,41', 'H 유효한 삽입은 분할 없음'); }
+// I: ok가 없으면(기존 동작) 분할하지 않는다
+{ const d = run(moveTiles(Rd(ids6), [41], { to: 'meld', meldId: 'R', index: 4 }, ctx)); ok(d.table.length === 1, 'I ctx.ok 없으면 분할 없음(하위 호환)'); }
+// J: 맨 끝/맨 앞에 놓는 건 분할하지 않는다
+{ const d = run(moveTiles(Rd(ids6), [41], { to: 'meld', meldId: 'R', index: 0 }, ctx2)); ok(d.table.length === 1, 'J 가장자리 삽입은 분할 없음'); }
+// K: 무효 조합도 숫자/색 순서로 정리
+{ const g = (m: Meld) => m.tiles.map(e => e.tileId).join();
+  ok(g(tidyMeld(mk('X', 'run', [6, 5]), id => pool.get(id))) === '5,6', 'K 같은 색 2장은 오름차순');
+  ok(g(tidyMeld(mk('X', 'group', [23, 22, 21]), id => pool.get(id))) === '21,22,23', 'K 같은 숫자는 색 순서');
+  ok(g(tidyMeld(mk('X', 'run', [6, 40, 5]), id => pool.get(id))) === '5,6,40', 'K 조커는 뒤로'); }
 ok(whyInvalid([pool.get(1)!, pool.get(2)!]).includes('3장'), 'whyInvalid 3장 미만');
 console.log(fails ? `${fails} FAILED` : 'ALL PASSED'); process.exit(fails ? 1 : 0);

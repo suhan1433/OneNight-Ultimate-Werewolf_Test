@@ -15,12 +15,35 @@ export type Ctx = {
   /** 조합을 검증하고 정렬/조커 표현값을 갱신한다. 유효하지 않으면 그대로 돌려줘도 된다. */
   fix: (m: Meld) => Meld;
   newId: () => string;
+  /** 조합이 규칙상 유효한가. 주면 "중간에 끼워 넣어 무효가 된 조합"을 자동으로 나눈다. */
+  ok?: (m: Meld) => boolean;
 };
-export type Result = { ok: true; draft: Draft; meldId?: string; jokerId?: number } | { ok: false; reason: string };
+export type Result = { ok: true; draft: Draft; meldId?: string; jokerId?: number; splitId?: string } | { ok: false; reason: string };
 const fail = (reason: string): Result => ({ ok: false, reason });
 const insertAt = <T,>(arr: T[], at: number, items: T[]) => [...arr.slice(0, at), ...items, ...arr.slice(at)];
 
-/** 타일을 손패 / 기존 조합(원하는 위치) / 새 조합으로 옮긴다. */
+const COLOR_ORDER = ['red', 'blue', 'orange', 'black'];
+/**
+ * 유효하지 않은 조합도 보기 좋게 정리한다(검증은 하지 않는다).
+ * 같은 색이면 숫자 오름차순, 같은 숫자면 색 순서. 조커는 뒤로. 그 외(섞인 조합)는 그대로 둔다.
+ * → 2장만 놓았을 때 6,5처럼 거꾸로 보이던 문제를 막는다.
+ */
+export function tidyMeld(m: Meld, tile: (id: number) => Tile | undefined): Meld {
+  type N = Extract<Tile, { kind: 'number' }>;
+  const items = m.tiles.map(e => ({ e, t: tile(e.tileId) }));
+  const nums = items.filter((x): x is { e: typeof x.e; t: N } => !!x.t && x.t.kind !== 'joker');
+  const rest = items.filter(x => !x.t || x.t.kind === 'joker');
+  if (!nums.length) return m;
+  const c0 = nums[0]!.t.color, v0 = nums[0]!.t.value;
+  const sameColor = nums.every(x => x.t.color === c0), sameValue = nums.every(x => x.t.value === v0);
+  if (sameColor === sameValue) return m;
+  const sorted = [...nums].sort((a, b) => (sameColor ? a.t.value - b.t.value : COLOR_ORDER.indexOf(a.t.color) - COLOR_ORDER.indexOf(b.t.color)));
+  return { ...m, tiles: [...sorted, ...rest].map(x => x.e) };
+}
+
+/** 타일을 손패 / 기존 조합(원하는 위치) / 새 조합으로 옮긴다.
+ *  기존 조합 "중간"에 끼워 넣어 그 조합이 무효가 되면(ctx.ok 필요), 끼운 자리에서 둘로 나눠 더 많은 타일이 유효해지는 쪽을 택한다.
+ *  예) 5·6·7·8·9·10 의 8과 9 사이에 9를 놓으면 → 5·6·7·8·9 / 9·10 */
 export function moveTiles(d: Draft, ids: number[], dest: Dest, ctx: Ctx): Result {
   const want = new Set(ids);
   // 화면 순서(손패 → 테이블)를 유지해서 옮긴다. 선택한 순서가 아니라 보이는 순서가 자연스럽다.
@@ -47,6 +70,7 @@ export function moveTiles(d: Draft, ids: number[], dest: Dest, ctx: Ctx): Result
   });
 
   let meldId: string | undefined;
+  let split: { id: string; idx: number; base: { tileId: number }[]; ins: { tileId: number }[] } | undefined;
   if (dest.to === 'hand') {
     const raw = dest.at ?? d.hand.length;
     const at = Math.max(0, Math.min(hand.length, raw - d.hand.slice(0, raw).filter(t => set.has(t.id)).length));
@@ -54,6 +78,8 @@ export function moveTiles(d: Draft, ids: number[], dest: Dest, ctx: Ctx): Result
   } else if (dest.to === 'meld') {
     const raw = Math.max(0, Math.min(target!.tiles.length, dest.index ?? target!.tiles.length));
     const before = target!.tiles.slice(0, raw).filter(e => set.has(e.tileId)).length;
+    const base = table.find(m => m.id === dest.meldId)!.tiles;
+    if (!target!.tiles.some(e => set.has(e.tileId))) split = { id: dest.meldId, idx: raw - before, base, ins: entries };
     table = table.map(m => (m.id === dest.meldId ? { ...m, tiles: insertAt(m.tiles, raw - before, entries) } : m));
     touched.add(dest.meldId); meldId = dest.meldId;
   } else {
@@ -62,7 +88,22 @@ export function moveTiles(d: Draft, ids: number[], dest: Dest, ctx: Ctx): Result
     touched.add(meldId);
   }
   table = table.filter(m => m.tiles.length).map(m => (touched.has(m.id) ? ctx.fix(m) : m));
-  return { ok: true, draft: { hand, table }, meldId };
+
+  let splitId: string | undefined;
+  const ok = ctx.ok;
+  if (split && ok) {
+    const k = table.findIndex(m => m.id === split!.id), merged = table[k];
+    if (merged && !ok(merged) && split.idx > 0 && split.idx < split.base.length) {
+      const L = split.base.slice(0, split.idx), R = split.base.slice(split.idx), rid = ctx.newId();
+      const make = (id: string, tiles: { tileId: number }[]) => ctx.fix({ ...merged, id, tiles });
+      const optA = [make(split.id, [...L, ...split.ins]), make(rid, R)];   // 끼운 타일이 왼쪽에 붙는다
+      const optB = [make(split.id, L), make(rid, [...split.ins, ...R])];   // 끼운 타일이 오른쪽에 붙는다
+      const score = (o: Meld[]) => o.reduce((sum, m) => sum + (ok(m) ? m.tiles.length : 0), 0);
+      const a = score(optA), b = score(optB);
+      if (Math.max(a, b) > 0) { table = [...table.slice(0, k), ...(a >= b ? optA : optB), ...table.slice(k + 1)]; splitId = rid; }
+    }
+  }
+  return { ok: true, draft: { hand, table }, meldId, splitId };
 }
 
 /** index 앞에서 조합을 둘로 나눈다(1 ≤ index ≤ n-1). 두 조합은 나란히 놓인다. */

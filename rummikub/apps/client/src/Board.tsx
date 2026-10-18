@@ -6,7 +6,7 @@ import { webPlatform } from '@rummikub/platform';
 import { emit } from './socket.js';
 import { sfx } from './sound.js';
 import { COLORS, Ring, SortMode, SoundToggle, TileView, isNum, smartSort, sortByColor, sortByNumber, suggestedMelds } from './tiles.js';
-import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker, whyInvalid } from './editor.js';
+import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker, tidyMeld, whyInvalid } from './editor.js';
 import { fitHand, fitTable, handLine } from './layout.js';
 
 export type GameApi = { online: boolean; notice: string; setNotice: (s: string) => void; next: () => number };
@@ -21,6 +21,8 @@ type Gest = {
 
 const LONG_MS = 380;   // 이 시간 이상 누르면 "이어진 타일 늘리기" 시작
 const GROW_MS = 230;   // 계속 누르고 있으면 이 간격으로 한 장씩 늘어난다
+/** 첫 등록(30점) 전에는 테이블에 있던 타일/조합을 건드릴 수 없다(루미큐브 규칙). 서버 규칙이 다르면 false로. */
+const LOCK_TABLE_BEFORE_INITIAL = true;
 const stopTimers = (g: Gest | null | undefined) => { if (g?.timer) clearTimeout(g.timer); if (g?.grow) clearInterval(g.grow); };
 
 /** 요소 크기(content box)를 추적한다. */
@@ -67,7 +69,10 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const [flash, setFlash] = useState<Set<number>>(new Set());
   const [newIds, setNewIds] = useState<Set<number>>(new Set());
   const [banner, setBanner] = useState(false);
-  const [drawArm, setDrawArm] = useState(false);
+  const [drawBusy, setDrawBusy] = useState(false);
+  const [pulse, setPulse] = useState<Set<string>>(new Set());
+  const [tip, setTip] = useState('');
+  const committing = useRef(false);
   const [sortMode, setSortMode] = useState<SortMode>('smart');
   const order = useRef<number[]>([]);
   const seenTable = useRef<Set<number> | null>(null);
@@ -89,13 +94,14 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     const color = (e: Meld['tiles'][number]) => { const t = resolve(e.tileId); const c = t && isNum(t) ? t.color : e.represents?.color; return c ? COLORS.indexOf(c) : 4; };
     return { ...meld, tiles: [...meld.tiles].sort((a, b) => (meld.type === 'run' ? val(a) - val(b) : color(a) - color(b))) };
   };
-  const rebuild = (m: Meld): Meld => { const r = validateMeld(tilesOf(m), allow, m.id); return r.ok ? orderMeld(r.meld) : m; };
+  const rebuild = (m: Meld): Meld => { const r = validateMeld(tilesOf(m), allow, m.id); return r.ok ? orderMeld(r.meld) : tidyMeld(m, resolve); };
   const origIds = useMemo(() => new Set(view.table.flatMap(m => m.tiles.map(e => e.tileId))), [view.table]);
-  const ctx: Ctx = { tile: resolve, orig: origIds, fix: rebuild, newId: () => `draft-${crypto.randomUUID()}` };
+  const ctx: Ctx = { tile: resolve, orig: origIds, fix: rebuild, newId: () => `draft-${crypto.randomUUID()}`, ok: m => validateMeld(tilesOf(m), allow, m.id).ok };
 
   // 가로 화면 고정 시도(지원하는 브라우저/전체화면에서만 동작). 안 되면 CSS가 "가로로 돌려 주세요"를 띄운다.
   useEffect(() => { try { void (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {}); } catch { /* 미지원 */ } }, []);
   useEffect(() => () => stopTimers(gest.current), []);
+  useEffect(() => { if (!tip) return; const t = setTimeout(() => setTip(''), 2600); return () => clearTimeout(t); }, [tip]);
 
   // 서버 확정 상태가 오면 편집 중이던 임시 상태를 버리고 서버 기준으로 복구한다
   useEffect(() => {
@@ -122,18 +128,12 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const baseSig = useMemo(() => signature({ hand: view.hand, table: view.table }), [view.hand, view.table]);
   const changed = useMemo(() => signature(draft) !== baseSig, [draft, baseSig]);
   const handIds = useMemo(() => new Set(view.hand.map(t => t.id)), [view.hand]);
-  const originalMeldIds = useMemo(() => new Set(view.table.map(m => m.id)), [view.table]);
-  const newMelds = useMemo(() => draft.table.filter(m => !originalMeldIds.has(m.id)), [draft.table, originalMeldIds]);
-  // 첫 등록 점수는 기존 테이블에 붙인 타일이 아니라, 새로 만든 조합만으로 계산한다.
-  // 서버 validateTurn()의 initial-meld 판정과 같은 기준이다.
-  const placed = (self && !self.hasInitialMeld ? newMelds.flatMap(m => m.tiles) : draft.table.flatMap(m => m.tiles)).filter(e => handIds.has(e.tileId));
+  const placed = draft.table.flatMap(m => m.tiles).filter(e => handIds.has(e.tileId));
   const placedPoints = placed.reduce((s, e) => s + val(e), 0);
   const badIds = draft.table.filter(m => !info.get(m.id)?.ok).map(m => m.id);
   const needInitial = !!self && !self.hasInitialMeld;
-  const initialTableChanged = needInitial && view.table.some(before => JSON.stringify(before) !== JSON.stringify(draft.table.find(after => after.id === before.id)));
-  const initialMeldsUseOnlyHand = newMelds.every(m => m.tiles.every(e => handIds.has(e.tileId)));
   const initialReady = !needInitial || placedPoints >= view.config.initialMeldMin;
-  const canCommit = myTurn && changed && placed.length > 0 && badIds.length === 0 && initialReady && !initialTableChanged && initialMeldsUseOnlyHand;
+  const canCommit = myTurn && changed && placed.length > 0 && badIds.length === 0 && initialReady;
   const suggestions = useMemo(() => (myTurn ? suggestedMelds(draft.hand, allow) : []), [draft.hand, allow, myTurn]);
   const selHand = selected.filter(id => handSet.has(id));
   const returnable = selected.filter(id => !handSet.has(id) && !origIds.has(id));
@@ -164,15 +164,18 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     setDraft(r.draft); setSelected([]); return true;
   };
   const place = (ids: number[], dest: Dest) => {
-    if (!myTurn || !ids.length) return;
-    const changesOriginalMeld = dest.to === 'meld' && originalMeldIds.has(dest.meldId);
-    if (needInitial && (changesOriginalMeld || ids.some(id => origIds.has(id)))) {
-      game.setNotice('첫 등록은 손패만으로 새 조합을 만들어 30점 이상 내야 해요. 기존 테이블 조합은 등록 후에 바꿀 수 있어요.');
-      return;
+    if (!ids.length) return;
+    const toHandOnly = dest.to === 'hand' && ids.every(id => handSet.has(id)); // 손패 안 정렬은 내 차례가 아니어도 된다
+    if (!myTurn && !toHandOnly) return;
+    if (myTurn && needInitial && LOCK_TABLE_BEFORE_INITIAL) {
+      if (ids.some(id => origIds.has(id))) { game.setNotice('첫 등록 전에는 테이블에 있던 타일을 옮길 수 없어요.'); return; }
+      const t = dest.to === 'meld' ? draft.table.find(m => m.id === dest.meldId) : undefined;
+      if (t?.tiles.some(e => origIds.has(e.tileId))) { game.setNotice('첫 등록 전에는 기존 조합에 끼울 수 없어요. 새 조합으로 만들어 주세요.'); return; }
     }
-    const reorder = dest.to === 'hand' && ids.every(id => handSet.has(id));
-    if (!apply(moveTiles(draft, ids, dest, ctx), !reorder)) return;
+    const r = moveTiles(draft, ids, dest, ctx);
+    if (!apply(r, !toHandOnly)) return;
     if (dest.to === 'hand') { setBreaks(new Set()); setSortMode('custom'); sfx.pick(); } else sfx.clack();
+    if (r.ok && r.splitId) { setPulse(new Set([r.meldId ?? '', r.splitId])); setTimeout(() => setPulse(new Set()), 1000); setTip('끼운 자리에서 조합을 나눴어요'); }
     webPlatform.haptics.tick();
   };
   const placeMeld = (m: Meld) => place(m.tiles.map(e => e.tileId), { to: 'new' });
@@ -190,11 +193,17 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     setDraft(p => ({ ...p, hand: r.hand })); setBreaks(r.breaks); setSortMode(next); setNewIds(new Set());
   };
   const send = (event: string) => emit(event, { roomId: view.roomId, clientSeq: game.next() }).catch((e: Error) => game.setNotice(e.message));
-  const commit = () => { justCommitted.current = true; return emit('turn:commit', { roomId: view.roomId, version: view.version, table: draft.table, hand: draft.hand.map(t => t.id), clientSeq: game.next() }).then(() => { webPlatform.haptics.success(); sfx.chime(); }).catch((e: Error) => { justCommitted.current = false; game.setNotice(e.message); }); };
-  const onDraw = () => { if (!drawArm) { setDrawArm(true); setTimeout(() => setDrawArm(false), 2500); webPlatform.haptics.tick(); } else { setDrawArm(false); send('turn:draw'); } };
+  const commit = () => { if (committing.current) return; committing.current = true; justCommitted.current = true; return emit('turn:commit', { roomId: view.roomId, version: view.version, table: draft.table, hand: draft.hand.map(t => t.id), clientSeq: game.next() }).then(() => { webPlatform.haptics.success(); sfx.chime(); }).catch((e: Error) => { justCommitted.current = false; game.setNotice(e.message); }).finally(() => { committing.current = false; }); };
+  const onDraw = () => { if (drawBusy || !myTurn) return; setDrawBusy(true); webPlatform.haptics.tick(); send('turn:draw').finally(() => setTimeout(() => setDrawBusy(false), 700)); };
 
   // 끌기: "놓을 곳"은 손가락이 아니라 손가락 위에 뜬 타일(aim) 아래의 요소로 판정한다
-  const aim = (e: { clientX: number; clientY: number; pointerType: string }) => ({ x: e.clientX, y: e.pointerType === 'mouse' ? e.clientY : Math.max(8, e.clientY - 44) });
+  const aim = (e: { clientX: number; clientY: number; pointerType: string }) => {
+    if (e.pointerType === 'mouse') return { x: e.clientX, y: e.clientY };
+    // 손가락 위쪽에 타일을 띄우되, 손패 영역에 가까워지면 오프셋을 0으로 줄여 손패에도 정확히 놓을 수 있게 한다
+    const top = document.querySelector('[data-rack]')?.getBoundingClientRect().top ?? Infinity;
+    const k = Math.min(1, Math.max(0, 1 - (e.clientY - (top - 44)) / 64));
+    return { x: e.clientX, y: Math.max(8, e.clientY - 44 * k) };
+  };
   const nearest = (root: Element, x: number, y: number) => {
     let best: HTMLElement | undefined, bd = Infinity;
     root.querySelectorAll<HTMLElement>('[data-tid]').forEach(t => { const r = t.getBoundingClientRect(); const d = Math.hypot(x - (r.left + r.width / 2), (y - (r.top + r.height / 2)) * 0.6); if (d < bd) { bd = d; best = t; } });
@@ -214,6 +223,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     return { kind: 'none' };
   };
   const dropTo = (ids: number[], d: Drop) => {
+    if (!myTurn && d.kind !== 'rack') return;
     if (d.kind === 'new') return place(ids, { to: 'new' });
     if (d.kind === 'rack') { const at = d.tid !== undefined && !ids.includes(d.tid) ? draft.hand.findIndex(t => t.id === d.tid) + (d.after ? 1 : 0) : undefined; return place(ids, { to: 'hand', at: at !== undefined && at < 0 ? undefined : at }); }
     if (d.kind !== 'meld') return;
@@ -250,8 +260,10 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   };
 
   const onDown = (e: React.PointerEvent) => {
-    if (e.button > 0 || !myTurn) return;
+    if (e.button > 0) return;
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-t]'); if (!t) return;
+    if (!myTurn && !t.closest('[data-rack]')) return; // 상대 차례에도 손패는 미리 정리할 수 있다
+    if (myTurn && needInitial && LOCK_TABLE_BEFORE_INITIAL && origIds.has(Number(t.dataset.t))) { game.setNotice('첫 등록 전에는 테이블 타일을 옮길 수 없어요.'); return; }
     stopTimers(gest.current);
     const r = t.getBoundingClientRect();
     const g: Gest = { id: Number(t.dataset.t), sx: e.clientX, sy: e.clientY, pid: e.pointerId, tw: Math.max(34, r.width), started: false, long: false, line: [], lo: 0, hi: 0, dir: e.clientX >= r.left + r.width / 2 ? 1 : -1 };
@@ -295,9 +307,10 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
   });
 
-  const hint = !myTurn ? (view.message || `${current?.name ?? ''}님 차례예요`)
+  const hint = !myTurn ? (view.message || `${current?.name ?? ''}님 차례예요 · 손패는 미리 정리해 둘 수 있어요`)
+    : tip ? tip
     : selected.length ? `${selected.length}장 선택 · 끌어서 옮기세요`
-    : changed ? (canCommit ? '좋아요! ✓ 확정을 누르세요' : initialTableChanged || !initialMeldsUseOnlyHand ? '첫 등록은 손패만으로 만든 새 조합이어야 해요' : placed.length === 0 ? '손패 타일을 1장 이상 내야 해요' : !initialReady ? `첫 등록 ${placedPoints}/${view.config.initialMeldMin}점` : badIds.length ? (info.get(badIds[0]!)?.why ?? '고쳐야 할 조합이 있어요') : '확인이 필요해요')
+    : changed ? (canCommit ? '좋아요! ✓ 확정을 누르세요' : placed.length === 0 ? '손패 타일을 1장 이상 내야 해요' : !initialReady ? `첫 등록 ${placedPoints}/${view.config.initialMeldMin}점` : badIds.length ? (info.get(badIds[0]!)?.why ?? '고쳐야 할 조합이 있어요') : '확인이 필요해요')
     : needInitial ? `첫 등록 ${view.config.initialMeldMin}점 이상 · 타일을 끌어 놓으세요` : '끌어서 놓기 · 길게 누르면 이어진 타일이 늘어나요';
   const insOf = (id: number) => (drag && drag.drop.tid === id && (drag.drop.kind === 'meld' || drag.drop.kind === 'rack') ? (drag.drop.after ? 'a' : 'b') : null);
   const sortLabel = { smart: '조합순', num: '숫자순', color: '색상순', custom: '내 배열' }[sortMode];
@@ -320,7 +333,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
         <section ref={feltRef} className={`bd-felt ${drag?.drop.kind === 'new' ? 'over' : ''}`} data-felt aria-label="테이블">
           <div className="bd-melds">
             {draft.table.map(m => { const i = info.get(m.id); return (
-              <div key={m.id} data-m={m.id} className={`bm ${i?.ok ? 'ok' : 'bad'} ${drag?.drop.kind === 'meld' && drag.drop.meldId === m.id ? 'over' : ''}`}
+              <div key={m.id} data-m={m.id} className={`bm ${i?.ok ? 'ok' : 'bad'} ${drag?.drop.kind === 'meld' && drag.drop.meldId === m.id ? 'over' : ''} ${pulse.has(m.id) ? 'pulse' : ''}`}
                 onClick={() => { if (myTurn && selected.length) place(selected, { to: 'meld', meldId: m.id }); }}>
                 {m.tiles.map(e => { const t = resolve(e.tileId); return t ? tv(t, { repC: !isNum(t) ? e.represents?.color : undefined, repV: !isNum(t) ? e.represents?.value : undefined, fresh: !origIds.has(t.id), flash: flash.has(t.id) }) : null; })}
                 <i className="bm-badge">{i?.ok ? `✓ ${i.sum}` : '⚠'}</i>
@@ -360,7 +373,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
         </div>
         {changed
           ? <button className={`primary go ${canCommit ? 'ready' : ''}`} disabled={!canCommit} onClick={commit}>{canCommit ? '✓ 확정' : placed.length && !initialReady ? `${placedPoints}/${view.config.initialMeldMin}점` : '확인 필요'}</button>
-          : <button className={`primary go ${drawArm ? 'arm' : ''}`} disabled={!myTurn} onClick={onDraw}>{drawArm ? '한 번 더!' : '뽑기'}<small>{drawArm ? '눌러서 뽑기' : `남은 ${view.poolCount}`}</small></button>}
+          : <button className="primary go" disabled={!myTurn || drawBusy} onClick={onDraw}>뽑기<small>남은 {view.poolCount}</small></button>}
       </aside>
 
       {drag && (

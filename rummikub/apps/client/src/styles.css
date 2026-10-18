@@ -534,7 +534,6 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .bd-rack{grid-area:rack;padding:5px 6px 7px;border-radius:12px 12px 6px 6px;background:var(--grain),linear-gradient(#5a3d28,var(--rail) 18%,#3b2617);box-shadow:inset 0 1px 0 #ffffff26,0 3px 0 #1b0f08;transition:box-shadow .15s}
 .bd-rack.over{box-shadow:inset 0 0 0 3px #ffffff88,0 3px 0 #1b0f08}
 .bd-hand{--tw:var(--rtw);--th:calc(var(--rtw)*1.4);display:flex;flex-wrap:wrap;align-content:flex-start;gap:4px 3px;padding:10px 8px 4px;overflow-y:auto;overscroll-behavior:contain;border-radius:8px;background:var(--groove);box-shadow:inset 0 6px 10px #000b}
-.bd:not(.mine) .bd-hand{opacity:.78}
 .hs{position:relative;display:flex}.brk{display:block;width:10px}
 
 /* 오른쪽 열: 손패 정보 · 정렬/추천 · 되돌리기 · 확정/뽑기 */
@@ -578,3 +577,7 @@ button:disabled{opacity:.38;cursor:not-allowed}
 /* 큰 화면 / 낮은 가로 화면 */
 @media(min-width:900px) and (min-height:600px){.bd{grid-template-columns:minmax(0,1fr) 140px}.bd-act .go{max-height:150px}}
 @media(max-height:430px){.bd{grid-template-columns:minmax(0,1fr) 92px;gap:4px 6px}.bd-top{min-height:34px}.bd-act{gap:4px}.bd-act .go{min-height:52px}.chip2 .who{display:none}}
+
+/* 조합이 나뉘었을 때: 두 조합이 잠깐 빛난다 */
+.bm.pulse{animation:splitpulse 1s ease-out}
+@keyframes splitpulse{0%{box-shadow:inset 0 0 0 3px var(--lamp),0 0 26px var(--lamp)}100%{box-shadow:inset 0 0 0 2px #8fc19766,0 0 0 transparent}}
