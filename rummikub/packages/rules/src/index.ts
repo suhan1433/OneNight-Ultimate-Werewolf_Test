@@ -88,7 +88,13 @@ export function validateTurn({ before, after, config, tiles }: TurnValidationArg
   const beforeJokers = new Map(before.table.flatMap(meld => meld.tiles.filter(entry => lookup.get(entry.tileId)?.kind === 'joker').map(entry => [entry.tileId, entry.represents] as const)));
   for (const meld of after.table) for (const entry of meld.tiles) if (beforeJokers.has(entry.tileId)) { const old = beforeJokers.get(entry.tileId); if (old?.color !== entry.represents?.color || old?.value !== entry.represents?.value) return { ok: false, reason: '기존 조커의 지정 값은 교체 없이 바꿀 수 없습니다.' }; }
   if (!before.hasInitialMeld) {
-    if (!config.allowManipulationOnInitialMeldTurn && before.table.length && JSON.stringify(before.table) !== JSON.stringify(after.table)) return { ok: false, reason: '첫 등록 전에는 기존 테이블을 바꿀 수 없습니다.' };
+    // 새 첫 등록 조합은 추가할 수 있지만, 턴 시작 시 테이블에 있던 조합 자체는 그대로여야 한다.
+    // 테이블 전체를 비교하면 정상적인 새 조합 추가도 "기존 테이블 변경"으로 오인한다.
+    const existingTableChanged = before.table.some(previous => {
+      const current = after.table.find(meld => meld.id === previous.id);
+      return JSON.stringify(previous) !== JSON.stringify(current);
+    });
+    if (!config.allowManipulationOnInitialMeldTurn && existingTableChanged) return { ok: false, reason: '첫 등록 전에는 기존 테이블을 바꿀 수 없습니다.' };
     const newMelds = after.table.filter(meld => !before.table.some(old => old.id === meld.id));
     if (newMelds.some(meld => meld.tiles.some(tile => !before.hand.includes(tile.tileId)))) return { ok: false, reason: '첫 등록 조합은 손패 타일로만 만들어야 합니다.' };
     const points = newMelds.flatMap(meld => meld.tiles).reduce((sum, entry) => sum + (lookup.get(entry.tileId)?.kind === 'joker' ? entry.represents?.value ?? 0 : (lookup.get(entry.tileId) as NumberTile).value), 0);
