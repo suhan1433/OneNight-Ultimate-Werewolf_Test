@@ -12,7 +12,8 @@ type Game = ReturnType<typeof useGame>;
 type Draft = { hand: Tile[]; table: Meld[] };
 type Target = 'hand' | 'new' | string;
 type Num = Exclude<Tile, { kind: 'joker' }>;
-type Drag = { ids: number[]; x: number; y: number; over: string | null };
+type Anchor = { id: number; after: boolean };
+type Drag = { ids: number[]; x: number; y: number; over: string | null; ins: Anchor | null };
 const isNum = (t: Tile): t is Num => t.kind !== 'joker';
 const SUIT = { red: '●', blue: '◆', orange: '▲', black: '■' } as const;
 const COLORS = ['red', 'blue', 'orange', 'black'] as const;
@@ -23,10 +24,10 @@ const JokerMark = () => (
   </svg>
 );
 
-function TileView({ tile, selected, ghosted, fresh, flash, onPointerDown }: { tile: Tile; selected?: boolean; ghosted?: boolean; fresh?: boolean; flash?: boolean; onPointerDown?: (e: React.PointerEvent) => void }) {
+function TileView({ tile, selected, ghosted, fresh, flash, onPointerDown, onKeyDown }: { tile: Tile; selected?: boolean; ghosted?: boolean; fresh?: boolean; flash?: boolean; onPointerDown?: (e: React.PointerEvent) => void; onKeyDown?: (e: React.KeyboardEvent) => void }) {
   const j = !isNum(tile);
   return (
-    <button className={`tile ${j ? 'joker' : tile.color} ${selected ? 'selected' : ''} ${ghosted ? 'ghosted' : ''} ${fresh ? 'fresh' : ''} ${flash ? 'flash' : ''}`} onPointerDown={onPointerDown} aria-pressed={!!selected} aria-label={j ? '조커' : `${tile.color} ${tile.value}`}>
+    <button className={`tile ${j ? 'joker' : tile.color} ${selected ? 'selected' : ''} ${ghosted ? 'ghosted' : ''} ${fresh ? 'fresh' : ''} ${flash ? 'flash' : ''}`} onPointerDown={onPointerDown} onKeyDown={onKeyDown} aria-pressed={!!selected} aria-label={j ? '조커' : `${tile.color} ${tile.value}`}>
       <strong>{j ? <JokerMark /> : tile.value}</strong><span>{j ? '' : SUIT[tile.color]}</span>
     </button>
   );
@@ -90,6 +91,27 @@ function smartSort(hand: Tile[]) {
   if (rest.length) clusters.push([...rest]);
   const jokers = hand.filter(t => !isNum(t)); if (jokers.length) clusters.push(jokers);
   return { hand: clusters.flat(), breaks: new Set(clusters.slice(1).map(c => c[0]!.id)) };
+}
+
+/** 손패에서 바로 낼 수 있는 3장 조합을 겹치지 않게 골라 준다.
+ * 완전한 솔버가 아니라, 처음 플레이하는 사람이 한 번에 시작할 수 있게 하는 보조 기능이다. */
+function suggestedMelds(hand: Tile[], allowTwoJokers: boolean): Meld[] {
+  const rest = [...hand];
+  const out: Meld[] = [];
+  while (rest.length >= 3) {
+    const candidates: Array<{ meld: Meld; ids: number[]; value: number }> = [];
+    for (let a = 0; a < rest.length - 2; a += 1) for (let b = a + 1; b < rest.length - 1; b += 1) for (let c = b + 1; c < rest.length; c += 1) {
+      const sample = [rest[a]!, rest[b]!, rest[c]!];
+      const checked = validateMeld(sample, allowTwoJokers, `auto-${sample.map(tile => tile.id).join('-')}`);
+      if (checked.ok) candidates.push({ meld: checked.meld, ids: sample.map(tile => tile.id), value: sample.reduce((sum, tile) => sum + (isNum(tile) ? tile.value : 13), 0) });
+    }
+    const best = candidates.sort((a, b) => b.value - a.value)[0];
+    if (!best) break;
+    out.push(best.meld);
+    const used = new Set(best.ids);
+    for (let index = rest.length - 1; index >= 0; index -= 1) if (used.has(rest[index]!.id)) rest.splice(index, 1);
+  }
+  return out;
 }
 
 function useGame() {
@@ -193,6 +215,8 @@ function Board({ view, game }: { view: PublicView; game: Game }) {
   const [dealing, setDealing] = useState(() => view.table.length === 0 && view.players.every(p => !p.hasInitialMeld));
   const [flash, setFlash] = useState<Set<number>>(new Set());
   const seenTable = useRef<Set<number> | null>(null);
+  const order = useRef<number[]>([]);
+  const [newIds, setNewIds] = useState<Set<number>>(new Set());
   const justCommitted = useRef(false);
   const me = view.playerId, myTurn = view.turn?.playerId === me;
   const self = view.players.find(p => p.id === me);
@@ -201,7 +225,20 @@ function Board({ view, game }: { view: PublicView; game: Game }) {
   const resolve = (id: number) => pool.get(id);
   const tilesOf = (m: Meld) => m.tiles.map(e => resolve(e.tileId)).filter((t): t is Tile => !!t);
 
-  useEffect(() => { setDraft({ hand: view.hand, table: view.table }); setHist([]); setSelected([]); setBreaks(new Set()); }, [view.version, view.hand, view.table]);
+  // 손패 순서는 내가 정한 대로 유지한다. 처음에만 자동 정리하고, 새로 뽑은 타일은 맨 끝에 표시한다.
+  useEffect(() => {
+    const byId = new Map(view.hand.map(t => [t.id, t]));
+    let hand: Tile[]; let fresh = new Set<number>();
+    if (!order.current.length) { const s = smartSort(view.hand); hand = s.hand; setBreaks(s.breaks); }
+    else {
+      const kept = order.current.filter(id => byId.has(id)), known = new Set(kept);
+      const added = view.hand.filter(t => !known.has(t.id)); fresh = new Set(added.map(t => t.id));
+      hand = [...kept.map(id => byId.get(id)!), ...added];
+    }
+    order.current = hand.map(t => t.id); setNewIds(fresh);
+    setDraft({ hand, table: view.table }); setHist([]); setSelected([]);
+  }, [view.version]);
+  useEffect(() => { if (draft.hand.length === view.hand.length) order.current = draft.hand.map(t => t.id); }, [draft.hand]);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
   // 게임 시작 연출: 타일이 한 장씩 손패로 들어온다
   useEffect(() => { if (!dealing) return; sfx.deal(view.hand.length); const t = setTimeout(() => setDealing(false), 1700); return () => clearTimeout(t); }, []);
@@ -218,29 +255,65 @@ function Board({ view, game }: { view: PublicView; game: Game }) {
     return () => clearTimeout(t);
   }, [view.version]);
 
-  const rebuild = (m: Meld): Meld => { const r = validateMeld(tilesOf(m), allow, m.id); return r.ok ? r.meld : m; };
-  const info = useMemo(() => new Map(draft.table.map(m => { const ts = tilesOf(m); return [m.id, { ok: validateMeld(ts, allow, m.id).ok, sum: ts.reduce((s, t) => s + (isNum(t) ? t.value : 0), 0) }]; })), [draft.table, pool, allow]);
+  const orderMeld = (meld: Meld): Meld => {
+    const rank = (entry: Meld['tiles'][number]) => {
+      const tile = resolve(entry.tileId);
+      return tile && isNum(tile) ? tile.value : entry.represents?.value ?? 0;
+    };
+    const colorRank = (entry: Meld['tiles'][number]) => {
+      const tile = resolve(entry.tileId);
+      const color = tile && isNum(tile) ? tile.color : entry.represents?.color;
+      return color ? COLORS.indexOf(color) : COLORS.length;
+    };
+    return { ...meld, tiles: [...meld.tiles].sort((a, b) => meld.type === 'run' ? rank(a) - rank(b) : colorRank(a) - colorRank(b)) };
+  };
+  const rebuild = (m: Meld): Meld => { const r = validateMeld(tilesOf(m), allow, m.id); return r.ok ? orderMeld(r.meld) : m; };
+  const info = useMemo(() => new Map(draft.table.map(m => {
+    const ts = tilesOf(m);
+    const sum = m.tiles.reduce((total, entry) => {
+      const tile = resolve(entry.tileId);
+      return total + (tile && isNum(tile) ? tile.value : entry.represents?.value ?? 0);
+    }, 0);
+    return [m.id, { ok: validateMeld(ts, allow, m.id).ok, sum }];
+  })), [draft.table, pool, allow]);
   const handIds = useMemo(() => new Set(view.hand.map(t => t.id)), [view.hand]);
   const origIds = useMemo(() => new Set(view.table.flatMap(m => m.tiles.map(e => e.tileId))), [view.table]);
-  const placedPoints = draft.table.flatMap(m => m.tiles).reduce((s, e) => { const t = resolve(e.tileId); return t && isNum(t) && handIds.has(t.id) ? s + t.value : s; }, 0);
+  const placedPoints = draft.table.flatMap(m => m.tiles).reduce((sum, entry) => {
+    if (!handIds.has(entry.tileId)) return sum;
+    const tile = resolve(entry.tileId);
+    return sum + (tile && isNum(tile) ? tile.value : entry.represents?.value ?? 0);
+  }, 0);
   const changed = draft.hand.length !== view.hand.length;
   const allValid = [...info.values()].every(v => v.ok);
   const needInitial = !!self && !self.hasInitialMeld;
+  const initialReady = !needInitial || placedPoints >= view.config.initialMeldMin;
+  const canCommit = myTurn && changed && allValid && initialReady;
+  const suggestions = useMemo(() => suggestedMelds(draft.hand, allow), [draft.hand, allow]);
+  const suggestionPoints = suggestions.flatMap(meld => meld.tiles).reduce((sum, entry) => {
+    const tile = resolve(entry.tileId);
+    return sum + (tile && isNum(tile) ? tile.value : entry.represents?.value ?? 0);
+  }, 0);
+  const canPlaceSuggestions = suggestions.length > 0 && (!needInitial || suggestionPoints >= view.config.initialMeldMin);
+  const canReturnToHand = selected.every(id => !origIds.has(id));
   const validCount = [...info.values()].filter(v => v.ok).length;
   const prevValid = useRef(validCount);
   useEffect(() => { if (myTurn && changed && validCount > prevValid.current) sfx.chime(); prevValid.current = validCount; }, [validCount]);
   const wasMine = useRef(myTurn);
   useEffect(() => { if (myTurn && !wasMine.current) sfx.turn(); wasMine.current = myTurn; }, [myTurn]);
 
-  const place = (ids: number[], target: Target) => {
+  const place = (ids: number[], target: Target, anchor?: Anchor | null) => {
     if (!myTurn || !ids.length) return;
+    if (target === 'hand' && ids.some(id => origIds.has(id))) { game.setNotice('기존 테이블 타일은 손패로 가져올 수 없어요. 조합 안에서 다시 배치해 주세요.'); return; }
     setHist(h => [...h, draft]);
     setDraft(prev => {
       const set = new Set(ids);
       let hand = prev.hand.filter(t => !set.has(t.id));
       let table = prev.table.map(m => ({ ...m, tiles: m.tiles.filter(e => !set.has(e.tileId)) })).filter(m => m.tiles.length);
       const moved = ids.map(resolve).filter((t): t is Tile => !!t);
-      if (target === 'hand') hand = [...hand, ...moved];
+      if (target === 'hand') {
+        const i = anchor ? hand.findIndex(t => t.id === anchor.id) : -1;
+        if (i < 0) hand = [...hand, ...moved]; else { const k = i + (anchor!.after ? 1 : 0); hand = [...hand.slice(0, k), ...moved, ...hand.slice(k)]; }
+      }
       else {
         const id = target === 'new' ? `draft-${crypto.randomUUID()}` : target;
         const entries = moved.map(t => ({ tileId: t.id }));
@@ -248,10 +321,14 @@ function Board({ view, game }: { view: PublicView; game: Game }) {
       }
       return { hand, table: table.map(rebuild) };
     });
-    setSelected([]); webPlatform.haptics.tick();
+    setSelected([]); if (target === 'hand') setBreaks(new Set()); webPlatform.haptics.tick();
     if (target === 'hand') sfx.pick(); else sfx.clack();
   };
   const toggle = (id: number) => myTurn && setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const keyToggle = (id: number) => (event: React.KeyboardEvent) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault(); toggle(id);
+  };
 
   // 포인터 기반 드래그: 마우스·터치 공통. 움직이지 않고 떼면 '선택 토글'(탭).
   const down = (id: number) => (e: React.PointerEvent) => {
@@ -260,28 +337,36 @@ function Board({ view, game }: { view: PublicView; game: Game }) {
     const sx = e.clientX, sy = e.clientY, ids = selected.includes(id) ? selected : [id];
     let active = false;
     const at = (x: number, y: number) => (document.elementFromPoint(x, y)?.closest('[data-drop]') as HTMLElement | null)?.dataset.drop ?? null;
-    const move = (ev: PointerEvent) => { if (!active && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) return; active = true; setDrag({ ids, x: ev.clientX, y: ev.clientY, over: at(ev.clientX, ev.clientY) }); };
+    const hit = (x: number, y: number): Anchor | null => { const el = document.elementFromPoint(x, y)?.closest('[data-tid]') as HTMLElement | null; if (!el) return null; const r = el.getBoundingClientRect(); return { id: Number(el.dataset.tid), after: x > r.left + r.width / 2 }; };
+    const move = (ev: PointerEvent) => { if (!active && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) return; active = true; const over = at(ev.clientX, ev.clientY); setDrag({ ids, x: ev.clientX, y: ev.clientY, over, ins: over === 'hand' ? hit(ev.clientX, ev.clientY) : null }); };
     const up = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
       setDrag(null);
       if (!active) return toggle(id);
       const t = ev.type === 'pointerup' ? at(ev.clientX, ev.clientY) : null;
-      if (t) place(ids, t);
+      if (t === 'hand') { const a = hit(ev.clientX, ev.clientY); if (a && ids.includes(a.id)) return; place(ids, t, a); } else if (t) place(ids, t);
     };
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   };
 
   const sortSmart = () => { const r = smartSort(draft.hand); setDraft(p => ({ ...p, hand: r.hand })); setBreaks(r.breaks); };
   const sortNum = () => { setDraft(p => ({ ...p, hand: [...p.hand].sort((a, b) => (isNum(a) ? a.value : 99) - (isNum(b) ? b.value : 99) || (isNum(a) && isNum(b) ? a.color.localeCompare(b.color) : 0)) })); setBreaks(new Set()); };
+  const placeSuggestions = () => {
+    if (!myTurn || !canPlaceSuggestions) return;
+    const used = new Set(suggestions.flatMap(meld => meld.tiles.map(entry => entry.tileId)));
+    setHist(history => [...history, draft]);
+    setDraft(previous => ({ table: [...previous.table, ...suggestions], hand: previous.hand.filter(tile => !used.has(tile.id)) }));
+    setSelected([]); webPlatform.haptics.success(); sfx.clack();
+  };
   const undo = () => { const last = hist[hist.length - 1]; if (!last) return; setDraft(last); setHist(h => h.slice(0, -1)); setSelected([]); };
-  const reset = () => { setDraft({ hand: view.hand, table: view.table }); setHist([]); setSelected([]); };
+  const reset = () => { setDraft({ hand: order.current.map(id => pool.get(id)).filter((t): t is Tile => !!t), table: view.table }); setHist([]); setSelected([]); };
   const send = (event: string) => emit(event, { roomId: view.roomId, clientSeq: game.next() }).catch(e => game.setNotice(e.message));
   const commit = () => { justCommitted.current = true; return emit('turn:commit', { roomId: view.roomId, version: view.version, table: draft.table, hand: draft.hand.map(t => t.id), clientSeq: game.next() }).then(() => { webPlatform.haptics.success(); sfx.chime(); }).catch(e => { justCommitted.current = false; game.setNotice(e.message); }); };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!myTurn || document.activeElement !== document.body) return;
-      if (e.key === 'Enter' && changed && allValid) { e.preventDefault(); commit(); }
+      if (e.key === 'Enter' && canCommit) { e.preventDefault(); commit(); }
       else if (e.key === ' ' && !changed) { e.preventDefault(); send('turn:draw'); }
       else if (e.key === 'Escape') setSelected([]);
       else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
@@ -296,7 +381,7 @@ function Board({ view, game }: { view: PublicView; game: Game }) {
   const n = view.players.length, mineIdx = Math.max(0, view.players.findIndex(p => p.id === me));
   const opps = Array.from({ length: Math.max(0, n - 1) }, (_, i) => view.players[(mineIdx + i + 1) % n]!);
   const where = seatsFor(n).slice(1);
-  const hint = !myTurn ? `${current?.name ?? ''}님이 생각하고 있어요` : selected.length ? `${selected.length}개 선택됨 — 조합의 + 를 누르거나 끌어서 놓으세요` : changed ? (allValid ? '좋아요! 확정하거나 계속 배치해 보세요' : '빨간 조합을 고쳐 주세요') : '타일을 누르거나 끌어서 시작하세요';
+  const hint = !myTurn ? `${current?.name ?? ''}님이 생각하고 있어요` : selected.length ? `${selected.length}개를 골랐어요 — 아래 버튼 또는 조합의 ‘여기에 추가’를 누르세요.` : changed ? (canCommit ? '모든 준비가 됐어요. 아래에서 배치를 확정하세요.' : !initialReady ? `첫 등록은 ${view.config.initialMeldMin}점 이상이어야 해요.` : '빨간 조합을 고쳐 주세요.') : '아래 타일을 눌러 고른 뒤, 새 조합을 만들거나 기존 조합에 추가하세요.';
 
   return (
     <main className={`board ${myTurn ? 'mine' : ''} ${drag ? 'dragging' : ''}`}>
@@ -310,14 +395,15 @@ function Board({ view, game }: { view: PublicView; game: Game }) {
         <div className="tablewrap">
           <section className={`felt ${over === 'new' ? 'over' : ''}`} data-drop="new">
             <p className="hint" aria-live="polite">{view.message && !myTurn ? view.message : hint}</p>
-            {draft.table.length === 0 && <p className="empty">비어 있는 테이블<br /><small>타일을 이곳으로 끌어다 놓으면 새 조합이 만들어져요</small></p>}
+            {draft.table.length === 0 && <div className="empty"><b>아직 테이블이 비어 있어요</b><small>손패를 눌러 고른 뒤 ‘새 조합 만들기’를 누르세요.</small>{selected.length > 0 && <button className="primary" onClick={() => place(selected, 'new')}>선택한 {selected.length}개로 시작</button>}</div>}
             <div className="melds">
               {draft.table.map(m => { const i = info.get(m.id); return (
                 <div key={m.id} data-drop={m.id} className={`meld ${i?.ok ? 'ok' : 'bad'} ${over === m.id ? 'over' : ''}`}>
-                  <div className="tiles">{tilesOf(m).map(t => <TileView key={t.id} tile={t} fresh={!origIds.has(t.id)} flash={flash.has(t.id)} selected={selected.includes(t.id)} ghosted={!!drag?.ids.includes(t.id)} onPointerDown={down(t.id)} />)}
+                  <div className="tiles">{tilesOf(m).map(t => <TileView key={t.id} tile={t} fresh={!origIds.has(t.id)} flash={flash.has(t.id)} selected={selected.includes(t.id)} ghosted={!!drag?.ids.includes(t.id)} onPointerDown={down(t.id)} onKeyDown={keyToggle(t.id)} />)}
                     {selected.length > 0 && <button className="slot" onClick={() => place(selected, m.id)} aria-label="이 조합에 놓기">+</button>}</div>
-                  {(needInitial || !i?.ok) && <small className="tag">{i?.ok ? `${i.sum}점` : '조합이 맞지 않아요'}</small>}
+                  <div className="meld-meta"><span>{m.type === 'run' ? '런' : '그룹'} · {i?.ok ? `${i.sum}점` : '조합 확인 필요'}</span>{selected.length > 0 && <button onClick={() => place(selected, m.id)}>여기에 추가</button>}</div>
                 </div>); })}
+              {myTurn && (selected.length > 0 || drag) && <button data-drop="new" className={`newslot ${over === 'new' ? 'over' : ''}`} onClick={() => place(selected, 'new')}>＋<small>새 조합</small></button>}
             </div>
           </section>
           <button className="pile" disabled={!myTurn || changed} onClick={() => send('turn:draw')} aria-label={`남은 타일 ${view.poolCount}개, 눌러서 뽑고 넘기기`} title="타일 뽑고 넘기기">
@@ -326,25 +412,30 @@ function Board({ view, game }: { view: PublicView; game: Game }) {
         </div>
       </div>
 
+      <section className={`actionbar ${myTurn ? 'active' : ''}`} aria-label="이번 턴 작업">
+        {!myTurn && <><span className="step">다음 차례</span><b>{current?.name ?? '상대'}님이 배치하고 있어요</b></>}
+        {myTurn && selected.length > 0 && <><span className="step">선택됨</span><b>{selected.length}개 타일</b><div className="action-buttons"><button className="primary" onClick={() => place(selected, 'new')}>새 조합 만들기</button><button disabled={!canReturnToHand} onClick={() => place(selected, 'hand')}>손패로 되돌리기</button><button onClick={() => setSelected([])}>선택 해제</button></div></>}
+        {myTurn && !selected.length && !changed && <><span className="step">1. 손패에서 시작</span><b>{canPlaceSuggestions ? '타일을 눌러 고르거나, 추천 조합을 바로 놓으세요.' : needInitial ? `지금 가능한 조합은 ${suggestionPoints}점이에요. 첫 등록 ${view.config.initialMeldMin}점에 부족해 뽑기를 권장해요.` : '바로 낼 수 있는 조합이 없어요. 타일을 뽑아 보세요.'}</b><div className="action-buttons">{canPlaceSuggestions ? <button className="primary" onClick={placeSuggestions}>추천 조합 {suggestions.length}개 놓기</button> : null}<button onClick={sortSmart}>손패 추천 정리</button></div></>}
+        {myTurn && !selected.length && changed && <><span className={`step ${canCommit ? 'ready' : 'warn'}`}>{canCommit ? '준비 완료' : '조합 확인'}</span><b>{canCommit ? '모든 조합이 유효합니다. 확정하면 턴이 끝나요.' : !initialReady ? `첫 등록 ${placedPoints}/${view.config.initialMeldMin}점` : '빨간 표시가 있는 조합을 고쳐 주세요.'}</b></>}
+      </section>
+
       <section className={`rack ${over === 'hand' ? 'over' : ''}`} data-drop="hand">
         <div className="rack-head">
           <div className="me">
             <Ring active={myTurn} pct={myTurn ? pct : 0} danger={myTurn && remaining <= 10} sec={remaining}><div className="avatar">{self?.name.slice(0, 1)}</div></Ring>
             <div><b>{selected.length ? `${selected.length}개 선택` : `내 타일 ${draft.hand.length}`}</b><small>{myTurn ? `내 차례 · ${remaining}초` : `${current?.name ?? ''}의 차례`}</small></div>
           </div>
-          {!selected.length && needInitial && <span className={`meter ${placedPoints >= 30 ? 'done' : ''}`}><i style={{ width: `${Math.min(100, placedPoints / 30 * 100)}%` }} />첫 등록 {placedPoints}/30점</span>}
-          {selected.length
-            ? <span className="tools"><button className="primary" onClick={() => place(selected, 'new')}>새 조합 만들기</button><button onClick={() => place(selected, 'hand')}>손패로</button><button onClick={() => setSelected([])}>선택 해제</button></span>
-            : <span className="tools"><button onClick={sortSmart}>추천 정리</button><button onClick={sortNum}>숫자순</button></span>}
+          {needInitial && <span className={`meter ${initialReady ? 'done' : ''}`}><i style={{ width: `${Math.min(100, placedPoints / view.config.initialMeldMin * 100)}%` }} />첫 등록 {placedPoints}/{view.config.initialMeldMin}점</span>}
+          <span className="tools"><button onClick={sortSmart}>조합별 정리</button><button onClick={sortNum}>숫자순</button></span>
         </div>
-        <div className={`hand ${dealing ? 'deal' : ''}`}>{draft.hand.map((t, k) => <span key={t.id} className={breaks.has(t.id) ? 'gap' : ''} style={{ ['--n' as string]: k }}><TileView tile={t} selected={selected.includes(t.id)} ghosted={!!drag?.ids.includes(t.id)} onPointerDown={down(t.id)} /></span>)}</div>
+        <div className={`hand ${dealing ? 'deal' : ''}`}>{draft.hand.map((t, k) => <span key={t.id} data-tid={t.id} className={`${breaks.has(t.id) ? 'gap' : ''} ${drag?.ins?.id === t.id ? (drag.ins.after ? 'ins-a' : 'ins-b') : ''}`} style={{ ['--n' as string]: k }}><TileView tile={t} fresh={newIds.has(t.id)} selected={selected.includes(t.id)} ghosted={!!drag?.ids.includes(t.id)} onPointerDown={down(t.id)} onKeyDown={keyToggle(t.id)} /></span>)}</div>
       </section>
 
       <footer className="dock">
         <button disabled={!myTurn || !hist.length} onClick={undo}>한 단계 취소</button>
         <button disabled={!myTurn || !changed} onClick={reset}>처음으로</button>
         {changed
-          ? <button className="primary go" disabled={!myTurn || !allValid} onClick={commit}>{allValid ? '배치 확정' : '조합 확인 필요'}<kbd>Enter</kbd></button>
+          ? <button className="primary go" disabled={!canCommit} onClick={commit}>{canCommit ? '배치 확정' : initialReady ? '조합 확인 필요' : `첫 등록 ${placedPoints}/${view.config.initialMeldMin}점`}<kbd>Enter</kbd></button>
           : <button className="primary go" disabled={!myTurn} onClick={() => send('turn:draw')}>타일 뽑고 넘기기<kbd>Space</kbd></button>}
       </footer>
 
