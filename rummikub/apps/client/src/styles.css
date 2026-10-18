@@ -32,6 +32,9 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .primary:hover:not(:disabled){background:linear-gradient(180deg,#fff,#f8f0de 60%,#ebdfc2)}
 .primary:active:not(:disabled){transform:translateY(3px);box-shadow:inset 0 1px 0 #fff,0 1px 0 var(--edge),0 3px 0 var(--edge2),0 4px 6px -2px #000c}
 .wide{width:100%;padding:16px;font-size:1.05rem}
+.exit{background:#ee6a5722!important;box-shadow:inset 0 0 0 1px #ee6a5799!important;color:#ffd0c8!important}
+.exit:hover:not(:disabled){background:#ee6a5740!important}
+.exit.compact{padding:8px 10px!important;font-size:.76rem;white-space:nowrap}
 .snd{display:grid;place-items:center;width:40px;height:40px;padding:0;border-radius:50%;background:#ffffff0f;box-shadow:inset 0 0 0 1px #ffffff26;color:var(--text)}
 .snd svg{width:18px;height:18px}
 
@@ -469,3 +472,78 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .m.bad{animation:shake .28s ease-in-out}
 @keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
 .world.editing .m{animation:none}
+
+/* ═════════ v3: 직접 조작 중심 (Rummikub 온라인의 "잡고 끌기 → 초록 ✓" 흐름) ═════════ */
+/* 손패 타일도 바로 끌린다(세로 스크롤은 타일 사이 빈 곳/묶음 여백에서) */
+.ghand .tile{touch-action:none}
+/* 버튼 위계: 빛나는 건 '확정'뿐. 뽑기는 조용히 */
+.gside .go:not(.ready){animation:none}
+.gside .go.ready{background:linear-gradient(180deg,#e4f8e0,#9bd0a4 55%,#74b083);color:#0f2a14;box-shadow:inset 0 1px 0 #fff,0 4px 0 #4c8559,0 6px 0 #356042,0 10px 12px -4px #000c;animation:okglow 1.6s ease-in-out infinite}
+.gside .go.ready:active{transform:translateY(3px)}
+@keyframes okglow{50%{box-shadow:inset 0 1px 0 #fff,0 4px 0 #4c8559,0 6px 0 #356042,0 0 26px #8fc197cc}}
+/* 끄는 동안: 놓을 수 있는 곳이 한눈에 보이게 */
+.game.dragging .m{box-shadow:inset 0 0 0 2px #ffffff66}
+.game.dragging .m.over{box-shadow:inset 0 0 0 3px #fff,0 0 22px #ffffff55}
+.game.dragging .gfelt{box-shadow:inset 0 0 0 2px #ffffff2e,inset 0 10px 30px #0009}
+.ghost{transform:translate(-50%,-60%) scale(1.15) rotate(-3deg);filter:drop-shadow(0 22px 16px #000b)}
+/* 선택한 타일: 떠오르고 램프 빛 */
+.tile.selected{filter:drop-shadow(0 0 8px #ffbf6b99)}
+/* 터치 화면: 조작 줄 높이와 삽입 칸을 키운다 */
+@media(pointer:coarse){
+  .gap{min-width:16px}
+  .ctxbar button{min-height:38px}
+}
+
+/* ═════════ v3 보드: 위(상대·상태) / 가운데(테이블) / 아래(손패) / 오른쪽(확정·뽑기) ═════════ */
+.bd{--tw:44px;position:relative;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) 112px;grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-areas:"top top" "say say" "felt act" "rack act";gap:6px 10px;padding:calc(6px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;background:var(--grain),radial-gradient(ellipse at 50% 38%,#4a3220,var(--wood1) 50%,var(--wood0))}
+.bd.dragging{cursor:grabbing}
+.bd .tile{touch-action:none;margin-bottom:5px}
+.bd-top{grid-area:top;display:flex;align-items:center;gap:8px;min-width:0}
+.bd-top .snd{position:static;width:36px;height:36px}
+.bd-say{grid-area:say;margin:0;padding:0 4px;min-height:1.3em;font-size:.88rem;font-weight:700;color:#d6c8ae;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd.mine .bd-say{color:var(--lamp)}.bd-say.good{color:#b9edc0}
+/* 테이블: 일반 스크롤. 타일은 항상 같은 크기 */
+.bd-felt{grid-area:felt;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;padding:18px 14px 28px;border-radius:14px;background:var(--grain),radial-gradient(ellipse 70% 80% at 50% 45%,#5a3c25,#3a2516 60%,#2a190e);box-shadow:inset 0 0 0 1px #ffffff14,inset 0 10px 30px #0009;transition:box-shadow .15s}
+.bd-felt.over{box-shadow:inset 0 0 0 3px #ffffff88,inset 0 10px 30px #0009}
+.bd-melds{display:flex;flex-wrap:wrap;gap:18px 16px;align-items:flex-start;align-content:flex-start;min-height:100%}
+.bm{position:relative;display:flex;gap:2px;padding:7px 7px 2px;border-radius:12px;background:#0000002e;box-shadow:inset 0 0 0 2px #8fc19766;transition:background .12s}
+.bm.bad{background:#ee6a5724;box-shadow:inset 0 0 0 2px var(--bad)}
+.bm.over{background:#ffffff33;box-shadow:inset 0 0 0 3px #fff,0 0 22px #ffffff44}
+.bd.dragging .bm:not(.over){box-shadow:inset 0 0 0 2px #ffffff55}
+.bm-badge{position:absolute;right:-4px;top:-10px;min-width:22px;padding:1px 7px;border-radius:99px;background:#1f3a26;color:#b9edc0;font:800 .7rem var(--f-num);text-align:center;font-style:normal;box-shadow:0 1px 3px #000a;pointer-events:none}
+.bm.bad .bm-badge{background:var(--bad);color:#fff}
+.bd-new{align-self:stretch;display:grid;place-content:center;gap:0;min-width:calc(var(--tw)*1.5);min-height:calc(var(--tw)*1.4 + 14px);padding:0 14px;border-radius:12px;background:#ffffff0d;box-shadow:inset 0 0 0 2px #ffffff55;font-size:1.6rem;line-height:1;text-align:center;color:#fff}
+.bd-new small{font-size:.72rem;font-weight:800;color:#e9dcc2}
+.bd-new.over,.bd-new:hover{background:#ffffff2e;box-shadow:inset 0 0 0 3px #fff}
+.bd-empty{position:absolute;inset:0;display:grid;place-items:center;margin:0;color:#ffffff59;font-weight:700;pointer-events:none}
+/* 선택 바: 손패 바로 위에 떠서 엄지 가까이 */
+.bd-sel{position:absolute;left:50%;bottom:calc(var(--rackh,200px) + 20px);transform:translateX(-50%);z-index:8;display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:14px;background:#120b07ee;box-shadow:inset 0 0 0 2px var(--lamp),0 8px 20px #000a}
+.bd-sel b{font:800 1rem var(--f-num);padding:0 4px}.bd-sel button{padding:9px 14px!important;min-height:40px}
+/* 손패: 나무 받침 + 고정 크기 타일, 넘치면 세로 스크롤 */
+.bd-rack{grid-area:rack;display:flex;flex-direction:column;gap:4px;padding:6px 8px 8px;border-radius:14px 14px 6px 6px;background:var(--grain),linear-gradient(#5a3d28,var(--rail) 18%,#3b2617);box-shadow:inset 0 1px 0 #ffffff26,0 3px 0 #1b0f08;transition:box-shadow .15s}
+.bd-rack.over{box-shadow:inset 0 0 0 3px #ffffff88,0 3px 0 #1b0f08}
+.bd-rhead{display:flex;align-items:center;gap:8px;min-height:34px;font-size:.8rem;font-weight:700;color:#e9dcc2}
+.bd-rhead b{font:800 1rem var(--f-num)}
+.bd-rhead button{margin-left:auto;padding:6px 12px!important;min-height:34px;font-size:.78rem}
+.bd-rhead .bd-sug{margin-left:0;background:#ffbf6b30;box-shadow:inset 0 0 0 1px var(--lamp);color:var(--lamp)}
+.bd-rhead .meter{padding-bottom:5px}
+.bd-hand{display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px 3px;max-height:min(34dvh,230px);min-height:calc(var(--tw)*1.4 + 20px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;padding:12px 8px 2px;border-radius:8px;background:var(--groove);box-shadow:inset 0 6px 10px #000b}
+.hs{position:relative;display:flex}.brk{display:block;width:12px}
+/* 오른쪽 버튼 열: 확정/뽑기가 가장 크다 */
+.bd-act{grid-area:act;display:flex;flex-direction:column;justify-content:flex-end;gap:8px}
+.bd-act .go{flex:1;max-height:150px;min-height:76px;display:grid;place-content:center;gap:2px;font-size:1.25rem;border-radius:14px}
+.bd-act .go small{font-size:.7rem;font-weight:700;opacity:.7}
+.bd-act .urow{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.bd-act .urow button{padding:0!important;min-height:46px;font-size:1.25rem;border-radius:12px}
+.bd .go.ready{background:linear-gradient(180deg,#e4f8e0,#9bd0a4 55%,#74b083);color:#0f2a14;box-shadow:inset 0 1px 0 #fff,0 4px 0 #4c8559,0 6px 0 #356042,0 10px 12px -4px #000c;animation:okglow 1.6s ease-in-out infinite}
+.bd .go:not(.ready){animation:none}
+@keyframes okglow{50%{box-shadow:inset 0 1px 0 #fff,0 4px 0 #4c8559,0 6px 0 #356042,0 0 26px #8fc197cc}}
+.bd.urgent::after{content:'';position:fixed;inset:0;z-index:45;pointer-events:none;box-shadow:inset 0 0 0 3px var(--bad),inset 0 0 36px #ee6a5788;animation:blink 1s infinite}
+/* 세로 화면: 버튼 열이 맨 아래 한 줄로 */
+@media(orientation:portrait) and (max-width:760px){
+  .bd{--tw:40px;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto 60px;grid-template-areas:"top" "say" "felt" "rack" "act"}
+  .bd-act{flex-direction:row;align-items:stretch}.bd-act .go{flex:2;min-height:0;max-height:none}.bd-act .urow{flex:1.4}
+  .chip2 .who{display:none}.bd-sel{bottom:calc(var(--rackh,200px) + 80px)}
+}
+@media(min-width:900px) and (min-height:600px){.bd{--tw:50px;grid-template-columns:minmax(0,1fr) 150px}.bd-hand{max-height:min(36dvh,300px)}}
+@media(max-height:430px){.bd{--tw:36px;grid-template-columns:minmax(0,1fr) 92px;gap:4px 8px}.bd-act .go{min-height:56px}}

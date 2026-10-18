@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { PublicView } from '@rummikub/protocol';
 import { webPlatform } from '@rummikub/platform';
-import { clearSession, emit, saveSession, session, socket } from './socket.js';
+import { clearSession, emit, ensureConnected, saveSession, session, socket } from './socket.js';
 import { Letters, SoundToggle } from './tiles.js';
 import { Board } from './Board.js';
 import './styles.css';
@@ -41,6 +41,7 @@ function Landing({ game }: { game: Game }) {
     if (!name.trim()) return game.setNotice('닉네임을 입력해 주세요.');
     setBusy(true);
     try {
+      await ensureConnected();
       const data = type === 'create' ? await emit<Entry>('room:create', { name, maxPlayers: size, clientSeq: game.next() }) : await emit<Entry>('room:join', { roomId: code, name, clientSeq: game.next() });
       saveSession({ ...data, name }); location.hash = `#/join/${data.roomId}`;
     } catch (e) { game.setNotice(e instanceof Error ? e.message : '입장할 수 없습니다.'); } finally { setBusy(false); }
@@ -69,7 +70,7 @@ function Landing({ game }: { game: Game }) {
   );
 }
 
-function Lobby({ view, game }: { view: PublicView; game: Game }) {
+function Lobby({ view, game, onExit }: { view: PublicView; game: Game; onExit: () => void }) {
   const self = view.players.find(p => p.id === view.playerId)!;
   const host = view.hostId === view.playerId;
   const allReady = view.players.length >= 2 && view.players.every(p => p.ready);
@@ -98,13 +99,14 @@ function Lobby({ view, game }: { view: PublicView; game: Game }) {
         {host && <button onClick={() => action('room:fillBots')}>빈 자리 봇으로 채우기</button>}
         {host && <button className="primary" disabled={!allReady} onClick={() => action('game:start')}>게임 시작</button>}
       </div>
+      <button className="exit" onClick={onExit}>나가기</button>
       {host && !allReady && <p className="fine">모두 준비하면 시작할 수 있어요.</p>}
       {game.notice && <p className="toast" role="alert">{game.notice}</p>}
     </main>
   );
 }
 
-function Results({ view, game }: { view: PublicView; game: Game }) {
+function Results({ view, game, onExit }: { view: PublicView; game: Game; onExit: () => void }) {
   const winner = view.players.find(p => p.id === view.roundWinnerId);
   return (
     <main className="screen results">
@@ -113,15 +115,25 @@ function Results({ view, game }: { view: PublicView; game: Game }) {
       <Letters text={winner?.name.slice(0, 4) ?? '—'} />
       <section className="paper"><h2>점수표</h2>{[...view.players].sort((a, b) => b.score - a.score).map((p, i) => <div key={p.id} className={i === 0 ? 'first' : ''}><b>{p.name}</b><strong className={p.score < 0 ? 'neg' : ''}>{p.score > 0 ? '+' : ''}{p.score}</strong></div>)}</section>
       {view.hostId === view.playerId ? <button className="primary" onClick={() => emit('game:lobby', { roomId: view.roomId, clientSeq: game.next() })}>대기실로 돌아가기</button> : <p className="fine">방장이 다음 판을 준비하고 있어요.</p>}
+      <button className="exit" onClick={onExit}>나가기</button>
     </main>
   );
 }
 
 function App() {
   const game = useGame(); const view = game.view;
+  const leave = () => {
+    const message = view?.phase === 'playing' ? '진행 중인 게임에서 나가시겠어요? 다시 연결하려면 새로 입장해야 합니다.' : '방에서 나가시겠어요?';
+    if (!window.confirm(message)) return;
+    clearSession();
+    location.hash = '';
+    socket.disconnect();
+    game.setNotice('');
+    game.setView(null);
+  };
   if (!view) return <Landing game={game} />;
-  if (view.phase === 'lobby') return <Lobby view={view} game={game} />;
-  if (view.phase === 'roundEnd' || view.phase === 'matchEnd') return <Results view={view} game={game} />;
-  return <Board view={view} game={game} />;
+  if (view.phase === 'lobby') return <Lobby view={view} game={game} onExit={leave} />;
+  if (view.phase === 'roundEnd' || view.phase === 'matchEnd') return <Results view={view} game={game} onExit={leave} />;
+  return <Board view={view} game={game} onExit={leave} />;
 }
 createRoot(document.getElementById('root')!).render(<App />);
