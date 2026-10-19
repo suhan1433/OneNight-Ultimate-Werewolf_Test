@@ -110,18 +110,15 @@ export function validateTurn({ before, after, config, tiles }: TurnValidationArg
   for (const meld of after.table) { const checked = validateStoredMeld(meld, lookup, config); if (!checked.ok) return checked; }
   const moved = before.hand.filter(id => afterTable.includes(id)); if (!moved.length) return { ok: false, reason: '손패에서 적어도 한 타일을 내야 합니다.' };
   const beforeJokers = new Map(before.table.flatMap(meld => meld.tiles.filter(entry => lookup.get(entry.tileId)?.kind === 'joker').map(entry => [entry.tileId, entry.represents] as const)));
-  // 조커를 빼도 원래 조합이 유효하면(예: 서로 다른 색의 10 세 장 + 조커),
-  // 그 조커는 다른 조합에 옮겨 새 값을 나타낼 수 있다. 나머지 경우에는 조커의
-  // 표현값을 고정해, 실제 타일로 교체하지 않고 조커의 역할만 바꾸는 것을 막는다.
+  // 이번 턴에 추가한 타일까지 포함해, 조커를 뺀 원래 타일들이 모두 유효한
+  // 조합에 남으면 조커를 해제한다. 여러 조합으로 나누거나 ID를 바꿔도 허용한다.
   const releasedJokers = new Set(before.table.flatMap(previous => previous.tiles
     .filter(entry => lookup.get(entry.tileId)?.kind === 'joker')
     .filter(entry => {
-      const current = after.table.find(meld => meld.id === previous.id);
-      const remainder = { ...previous, tiles: previous.tiles.filter(tile => tile.tileId !== entry.tileId) };
+      const remainder = previous.tiles.filter(tile => tile.tileId !== entry.tileId);
+      const withoutJoker = after.table.filter(meld => !meld.tiles.some(tile => tile.tileId === entry.tileId));
       return config.allowJokerMeldManipulation
-        && !!current
-        && !current.tiles.some(tile => tile.tileId === entry.tileId)
-        && validateStoredMeld(remainder, lookup, config).ok;
+        && remainder.every(tile => withoutJoker.some(meld => meld.tiles.some(candidate => candidate.tileId === tile.tileId)));
     })
     .map(entry => entry.tileId)));
   for (const meld of after.table) for (const entry of meld.tiles) if (beforeJokers.has(entry.tileId) && !releasedJokers.has(entry.tileId)) { const old = beforeJokers.get(entry.tileId); if (old?.color !== entry.represents?.color || old?.value !== entry.represents?.value) return { ok: false, reason: '기존 조커의 지정 값은 교체 없이 바꿀 수 없습니다.' }; }

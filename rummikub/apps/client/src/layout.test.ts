@@ -1,4 +1,4 @@
-import { fitHand, handSpare, normalizeSlots, placeInSlots, arrangeSlots, slotLine, linked, layoutTable, findSpot, meldSize, MELD, type Rect, type Slots } from './layout';
+import { fitHand, fitMobileHand, handSpare, normalizeSlots, placeInSlots, arrangeSlots, slotLine, linked, layoutTable, findSpot, meldSize, MELD, type Rect, type Slots } from './layout';
 import type { Tile } from '@rummikub/rules';
 let fails = 0; const ok = (c: boolean, m: string) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const T = (id: number, color: any, value: number): Tile => ({ id, kind: 'number', color, value } as Tile);
@@ -15,6 +15,16 @@ const ids = (s: Slots) => s.filter((v): v is number => v !== null).sort((a, b) =
   ok(f14.cols * (f14.tw + 3) <= W + 3, '한 줄 칸 수가 폭을 넘지 않는다'); }
 
 /* ── 칸 배치 ── */
+for (const [W, H] of [[530, 320], [640, 390], [780, 430]]) {
+  const counts = [14, 24, 36, 44];
+  const fits = counts.map(n => fitMobileHand(n, W!, H!));
+  ok(fits.every((f, i) => f.cells >= counts[i]! + handSpare(counts[i]!) && f.h <= H! * 0.32), `모바일 ${W}×${H}: 손패가 늘어도 랙 높이 예산 준수`);
+  ok(fits.every((f, i) => i === 0 || f.tw <= fits[i - 1]!.tw) && fits[0]!.tw > fits[3]!.tw, `모바일 ${W}×${H}: 장수가 많아지면 자동 축소 (${fits.map(f => f.tw).join('/')})`);
+  const few = layoutTable([{ id: 'a', n: 3 }], W!, 140, 33);
+  const many = layoutTable(Array.from({ length: 16 }, (_, i) => ({ id: `${i}`, n: 4 })), W!, 140, 33);
+  ok(many.tw < few.tw && many.rects.size === 16, `모바일 ${W}×${H}: 테이블 조합 증가 시 자동 축소, 모든 조합 유지`);
+}
+
 { const cols = 10, cells = 20;
   const s0 = arrangeSlots([[1, 2, 3], [4, 5, 6, 7], [8]], cols, cells)!;
   ok(s0.slice(0, 9).join() === '1,2,3,,4,5,6,7,' && s0[8] === null && s0[9] === 8, 'arrange: 묶음 사이 빈 칸 1개 (' + s0.slice(0, 10).join('|') + ')');

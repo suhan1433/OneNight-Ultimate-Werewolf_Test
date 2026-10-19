@@ -25,6 +25,16 @@ export function fitHand(n: number, W: number, budgetH: number, max: number): Han
   return at(HAND.min);
 }
 
+/** 모바일은 랙 높이를 일정하게 유지하고, 장수와 화면 면적으로 타일 크기를 정한다. */
+export function fitMobileHand(n: number, W: number, H: number): HandFit {
+  const budget = Math.floor(H * 0.32);
+  const screenMax = Math.max(28, Math.min(40, Math.floor(H * 0.09)));
+  const densityMax = Math.floor(Math.sqrt(Math.max(0, W * (budget - HAND.padY)) / ((n + handSpare(n)) * 1.4)) - 7);
+  const fit = fitHand(n, W, budget, Math.max(HAND.min, Math.min(screenMax, densityMax)));
+  // 최소 크기에서도 넘치면 모든 칸을 유지하고 랙 안에서 스크롤한다.
+  return { ...fit, h: Math.min(fit.h, budget) };
+}
+
 /** 이전 배치를 최대한 유지하면서 칸 수/타일 구성에 맞춘다. 새 타일은 원래 자리(home) → 마지막 타일 뒤 → 앞쪽 빈 칸 순. */
 export function normalizeSlots(prev: Slots, ids: number[], cells: number, home?: ReadonlyMap<number, number>): Slots {
   const want = new Set(ids), out: Slots = Array(cells).fill(null), done = new Set<number>();

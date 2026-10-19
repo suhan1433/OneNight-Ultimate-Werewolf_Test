@@ -7,7 +7,7 @@ import { emit } from './socket.js';
 import { sfx } from './sound.js';
 import { Ring, SortMode, SoundToggle, TileView, isNum, smartSort, sortByColor, sortByNumber, suggestedMelds } from './tiles.js';
 import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker } from './editor.js';
-import { MELD, Pos, Slots, TableItem, arrangeSlots, findSpot, fitHand, layoutTable, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
+import { MELD, Pos, Slots, TableItem, arrangeSlots, findSpot, fitHand, fitMobileHand, layoutTable, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
 import { ORDER_HINT, checkMeld } from './meldRules.js';
 import { useTileMotion } from './motion.js';
 
@@ -179,16 +179,21 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const opps = Array.from({ length: Math.max(0, n - 1) }, (_, i) => view.players[(mineIdx + i + 1) % n]!);
 
   // 손패(칸 랙)와 테이블(자유 캔버스)은 한 화면을 나눠 쓴다.
-  // 손패가 많을수록 랙 몫을 늘려 타일이 지나치게 작아지지 않게 한다.
-  // 테이블은 남은 공간에서 줄이거나 스크롤할 수 있지만, 손패는 항상 조작해야 하므로 조금 더 우선한다.
-  const wide = bsz.w >= 900;
+  // 모바일은 손패가 늘어도 테이블 공간을 유지하고, 양쪽 타일을 각각 자동 축소한다.
+  const wide = bsz.w >= 900 && bsz.h >= 600;
   const { hf, layout } = useMemo(() => {
     const N = Math.max(draft.hand.length, view.hand.length);
-    const maxH = wide ? 64 : 54, maxT = wide ? 60 : 52;
+    const items: TableItem[] = draft.table.map(m => ({ id: m.id, n: m.tiles.length, pos: tpos[m.id] }));
+    if (!wide) {
+      const hf = fitMobileHand(N, hsz.w, bsz.h);
+      const feltH = Math.max(0, bsz.h - 104 - hf.h);
+      const maxT = Math.max(MELD.min, Math.min(38, Math.floor(bsz.h * 0.085)));
+      return { hf, layout: layoutTable(items, fsz.w, feltH, maxT, focus) };
+    }
+    const maxH = 64, maxT = 60;
     const handRatios = N >= 36 ? [0.48, 0.44, 0.40, 0.36]
       : N >= 24 ? [0.44, 0.40, 0.36, 0.32]
         : [0.38, 0.34, 0.30, 0.26];
-    const items: TableItem[] = draft.table.map(m => ({ id: m.id, n: m.tiles.length, pos: tpos[m.id] }));
     let best: { hf: ReturnType<typeof fitHand>; layout: ReturnType<typeof layoutTable>; score: number } | null = null;
     for (const f of handRatios) {
       const h = fitHand(N, hsz.w, Math.floor(bsz.h * f), maxH);

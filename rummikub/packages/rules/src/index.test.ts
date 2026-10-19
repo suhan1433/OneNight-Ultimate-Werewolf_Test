@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDeck, defaultRuleConfig, scoreStalemate, tileMap, validateMeld, validateTurn, type NumberTile, type Tile } from './index.js';
+import { createDeck, defaultRuleConfig, scoreStalemate, tileMap, validateMeld, validateTurn, type Meld, type NumberTile, type Tile } from './index.js';
 const tile = (id: number, color: NumberTile['color'], value: number): NumberTile => ({ id, kind: 'number', color, value });
 const joker = (id: number): Tile => ({ id, kind: 'joker' });
 describe('Sabra rules', () => {
@@ -41,6 +41,49 @@ describe('Sabra rules', () => {
         after: { table: [tens.meld, newRun.meld], hand: [] }, config: defaultRuleConfig, tiles: deck,
       })).toEqual({ ok: true });
     }
+  });
+  it.each(['original', 'rebuilt'])('releases the joker after extending 6-7-joker with 5 (%s meld ID)', id => {
+    const tiles = [tile(1, 'red', 6), tile(2, 'red', 7), joker(3), tile(4, 'red', 5), tile(5, 'blue', 10), tile(6, 'blue', 11)];
+    const original: Meld = { id: 'original', type: 'run', tiles: [{ tileId: 1 }, { tileId: 2 }, { tileId: 3, represents: { color: 'red', value: 8 } }] };
+    const remainder: Meld = { id, type: 'run', tiles: [{ tileId: 4 }, { tileId: 1 }, { tileId: 2 }] };
+    const reused: Meld = { id: 'reused', type: 'run', tiles: [{ tileId: 5 }, { tileId: 6 }, { tileId: 3, represents: { color: 'blue', value: 12 } }] };
+    const args = {
+      before: { table: [original], hand: [4, 5, 6], hasInitialMeld: true },
+      after: { table: [remainder, reused], hand: [] }, config: defaultRuleConfig, tiles,
+    };
+    expect(validateTurn(args)).toEqual({ ok: true });
+    // The joker must be used on the table, and the remaining run must stay valid.
+    expect(validateTurn({ ...args, after: { table: [remainder], hand: [3, 5, 6] } }).ok).toBe(false);
+    expect(validateTurn({ ...args, after: { table: [{ ...remainder, tiles: remainder.tiles.slice(1) }, reused], hand: [4] } }).ok).toBe(false);
+    expect(validateTurn({ ...args, config: { ...defaultRuleConfig, allowJokerMeldManipulation: false } }).ok).toBe(false);
+  });
+  it('allows replacing the represented tile and reusing the joker', () => {
+    const tiles = [tile(1, 'red', 6), tile(2, 'red', 7), joker(3), tile(4, 'red', 8), tile(5, 'blue', 10), tile(6, 'blue', 11)];
+    expect(validateTurn({
+      before: { table: [{ id: 'original', type: 'run', tiles: [{ tileId: 1 }, { tileId: 2 }, { tileId: 3, represents: { color: 'red', value: 8 } }] }], hand: [4, 5, 6], hasInitialMeld: true },
+      after: { table: [
+        { id: 'original', type: 'run', tiles: [{ tileId: 1 }, { tileId: 2 }, { tileId: 4 }] },
+        { id: 'reused', type: 'run', tiles: [{ tileId: 5 }, { tileId: 6 }, { tileId: 3, represents: { color: 'blue', value: 12 } }] },
+      ], hand: [] }, config: defaultRuleConfig, tiles,
+    })).toEqual({ ok: true });
+  });
+  it('rejects changing a joker value while it remains in the original run', () => {
+    const tiles = [tile(1, 'red', 6), tile(2, 'red', 7), joker(3), tile(4, 'red', 8)];
+    expect(validateTurn({
+      before: { table: [{ id: 'run', type: 'run', tiles: [{ tileId: 1 }, { tileId: 2 }, { tileId: 3, represents: { color: 'red', value: 8 } }] }], hand: [4], hasInitialMeld: true },
+      after: { table: [{ id: 'run', type: 'run', tiles: [{ tileId: 1 }, { tileId: 2 }, { tileId: 4 }, { tileId: 3, represents: { color: 'red', value: 9 } }] }], hand: [] },
+      config: defaultRuleConfig, tiles,
+    }).ok).toBe(false);
+  });
+  it.each([3, 6, 9])('releases a joker when a %i-tile run remains valid, including split runs', count => {
+    const numbers = Array.from({ length: count }, (_, i) => tile(i + 1, 'orange', i + 1));
+    const tiles = [...numbers, joker(20), tile(21, 'blue', 10), tile(22, 'blue', 11)];
+    const remaining: Meld[] = Array.from({ length: count / 3 }, (_, i) => ({ id: `part-${i}`, type: 'run', tiles: numbers.slice(i * 3, i * 3 + 3).map(t => ({ tileId: t.id })) }));
+    expect(validateTurn({
+      before: { table: [{ id: 'original', type: 'run', tiles: [...numbers.map(t => ({ tileId: t.id })), { tileId: 20, represents: { color: 'orange', value: count + 1 } }] }], hand: [21, 22], hasInitialMeld: true },
+      after: { table: [...remaining, { id: 'reused', type: 'run', tiles: [{ tileId: 21 }, { tileId: 22 }, { tileId: 20, represents: { color: 'blue', value: 12 } }] }], hand: [] },
+      config: defaultRuleConfig, tiles,
+    })).toEqual({ ok: true });
   });
   it('scores a stalemate to zero sum', () => { const scores = scoreStalemate({ a: [1], b: [2] }, [tile(1, 'red', 3), tile(2, 'blue', 8)]); expect(Object.values(scores.deltas).reduce((a, b) => a + b, 0)).toBe(0); });
   it('keeps a lookup stable', () => expect(tileMap(createDeck()).size).toBe(106));
