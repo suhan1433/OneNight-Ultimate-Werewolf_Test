@@ -8,7 +8,9 @@ type Flight = { node: HTMLElement; target: HTMLElement; opacity: string; animati
 const empty = (): Snapshot => ({ tiles: new Map(), melds: new Map() });
 
 /** Flights live above scroll containers, so rack ↔ table moves never get clipped. */
-export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: DependencyList) {
+export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: DependencyList, toLocal: (r: DOMRect) => DOMRect = r => r) {
+  const conv = useRef(toLocal); conv.current = toLocal;
+  const L = (el: Element) => conv.current(el.getBoundingClientRect());
   const baseline = useRef<Snapshot>(empty());
   const pending = useRef<Snapshot | null>(null);
   const keys = useRef<DependencyList>([]);
@@ -24,14 +26,14 @@ export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: Dependen
       const tile = wrapper.querySelector<HTMLElement>('.tile'); if (!tile) return;
       const style = getComputedStyle(tile);
       result.tiles.set(Number(wrapper.dataset.tid), {
-        rect: tile.getBoundingClientRect(), face: tile.cloneNode(true) as HTMLElement,
+        rect: L(tile), face: tile.cloneNode(true) as HTMLElement,
         width: style.width, height: style.height,
       });
     });
     root.current?.querySelectorAll<HTMLElement>('[data-m]').forEach(meld => {
-      result.melds.set(meld.dataset.m!, meld.getBoundingClientRect());
+      result.melds.set(meld.dataset.m!, L(meld));
     });
-    result.draw = root.current?.querySelector('.bd-act .go')?.getBoundingClientRect();
+    const go = root.current?.querySelector('.bd-act .go'); result.draw = go ? L(go) : undefined;
     return result;
   };
   const capture = (kind: 'move' | 'sort' = 'move') => {
@@ -40,7 +42,7 @@ export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: Dependen
     // A second action can interrupt a flight: continue from its visible position.
     flights.current.forEach((flight, id) => {
       const tile = snapshot.tiles.get(id);
-      if (tile && !root.current?.querySelector(`.ghost [data-tid="${id}"]`)) tile.rect = flight.node.getBoundingClientRect();
+      if (tile && !root.current?.querySelector(`.ghost [data-tid="${id}"]`)) tile.rect = L(flight.node);
     });
     pending.current = snapshot; mode.current = kind;
   };
@@ -58,9 +60,9 @@ export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: Dependen
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const from = pending.current ?? { ...baseline.current, tiles: new Map([...baseline.current.tiles].map(([id, tile]) => [id, { ...tile }])), melds: new Map(baseline.current.melds) };
     if (!pending.current) {
-      flights.current.forEach((flight, id) => { const tile = from.tiles.get(id); if (tile) tile.rect = flight.node.getBoundingClientRect(); });
+      flights.current.forEach((flight, id) => { const tile = from.tiles.get(id); if (tile) tile.rect = L(flight.node); });
       root.current.querySelectorAll<HTMLElement>('[data-m]').forEach(meld => {
-        if (meld.getAnimations().length) from.melds.set(meld.dataset.m!, meld.getBoundingClientRect());
+        if (meld.getAnimations().length) from.melds.set(meld.dataset.m!, L(meld));
       });
     }
     pending.current = null;
@@ -73,7 +75,7 @@ export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: Dependen
     if (!layer.current) {
       const el = document.createElement('div'); el.className = 'tile-flight-layer';
       el.setAttribute('aria-hidden', 'true'); el.inert = true;
-      document.body.append(el); layer.current = el;
+      root.current.append(el); layer.current = el;
     }
     const targets = new Map<number, HTMLElement>();
     root.current.querySelectorAll<HTMLElement>('[data-tid]').forEach(wrapper => {

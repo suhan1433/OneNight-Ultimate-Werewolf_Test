@@ -1,15 +1,16 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Meld, Tile } from '@rummikub/rules';
 import { orderMeld, validateMeld } from '@rummikub/rules';
 import type { PublicView } from '@rummikub/protocol';
 import { webPlatform } from '@rummikub/platform';
 import { emit } from './socket.js';
 import { sfx } from './sound.js';
-import { Ring, SortMode, SoundToggle, TileView, isNum, smartSort, sortByColor, sortByNumber, suggestedMelds } from './tiles.js';
+import { Ring, SortMode, TileView, isNum, smartSort, sortByColor, sortByNumber, suggestedMelds } from './tiles.js';
 import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker, jokerReplacement } from './editor.js';
 import { HAND, MELD, Pos, Slots, arrangeSlots, findSpot, fitHand, fitMobileHand, layoutTable, meldInsertIndex, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
 import { checkMeld } from './meldRules.js';
 import { useTileMotion } from './motion.js';
+import { toClientPoint, toLocalPoint, toLocalRect, useFrame } from './orient.js';
 
 export type GameApi = { online: boolean; notice: string; setNotice: (s: string) => void; next: () => number };
 type EditSnapshot = { draft: Draft; slots: Slots; tpos: Record<string, Pos>; sortMode: SortMode };
@@ -58,13 +59,14 @@ function useSize<T extends HTMLElement>() {
  */
 function OppChip({ p, active, remaining, pct }: { p: PublicView['players'][number]; active: boolean; remaining: number; pct: number }) {
   return (
-    <div className={`chip2 ${active ? 'active' : ''} ${p.handCount <= 3 ? 'low' : ''}`}>
+    <div className={`chip2 ${active ? 'active' : ''} ${p.handCount <= 3 ? 'low' : ''}`} aria-current={active ? 'true' : undefined}>
       <Ring active={active} pct={active ? pct : 0} danger={active && remaining <= 10} sec={remaining}><div className="avatar">{p.isBot ? '봇' : p.name.slice(0, 1)}</div></Ring>
-      <div className="who"><b>{p.name}</b><small>{active ? `${remaining}초` : p.hasInitialMeld ? '등록 완료' : '미등록'}</small></div>
+      <div className="who"><b>{p.name}</b><small>{active ? '차례' : p.hasInitialMeld ? '등록 완료' : '미등록'}</small></div>
       <em className="cnt" aria-label={`타일 ${p.handCount}개`}>{p.handCount}</em>
     </div>
   );
 }
+const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 export function Board({ view, game, onExit }: { view: PublicView; game: GameApi; onExit: () => void }) {
   const [draft, setDraft] = useState<Draft>({ hand: view.hand, table: view.table });
@@ -85,6 +87,11 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const [commitBusy, setCommitBusy] = useState(false);
   const [pulse, setPulse] = useState<Set<string>>(new Set());
   const [tip, setTip] = useState('');
+  const [menu, setMenu] = useState(false);
+  const [landed, setLanded] = useState<Set<number>>(new Set());
+  const [pop, setPop] = useState<Set<string>>(new Set());
+  const [dealing, setDealing] = useState(false);
+  const tiltT = useRef<ReturnType<typeof setTimeout>>();
   const [sortMode, setSortMode] = useState<SortMode>('smart');
   const committing = useRef(false);
   const home = useRef(new Map<number, number>());        // 손패를 떠난 타일의 원래 칸(되돌리면 거기로)
@@ -104,6 +111,13 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const [bdRef, bsz] = useSize<HTMLElement>();
   const [feltRef, fsz] = useSize<HTMLElement>();
   const [handRef, hsz] = useSize<HTMLDivElement>();
+  // 세로 화면이면 보드를 돌려 그린다. 계산은 모두 local(보드 기준) 좌표로 하고, 화면 좌표는 여기서만 오간다.
+  const { frame: fr, flip } = useFrame();
+  const stage = () => bdRef.current!.getBoundingClientRect();
+  const L = (x: number, y: number) => toLocalPoint(stage(), fr, x, y);
+  const C = (x: number, y: number) => toClientPoint(stage(), fr, x, y);
+  const RL = (el: Element) => toLocalRect(stage(), fr, el.getBoundingClientRect());
+  const muted = useSyncExternalStore(sfx.subscribe, sfx.isMuted);
 
   const me = view.playerId, myTurn = view.turn?.playerId === me;
   const self = view.players.find(p => p.id === me);
@@ -120,8 +134,8 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const origIds = useMemo(() => new Set(view.table.flatMap(m => m.tiles.map(e => e.tileId))), [view.table]);
   const ctx: Ctx = { tile: resolve, orig: origIds, fix: rebuild, newId: () => `draft-${crypto.randomUUID()}`, ok: m => check(m).ok };
 
-  // 지원하는 환경에서는 가로로 고정하고, 세로 화면에서는 전환 안내를 표시한다.
-  useEffect(() => { try { void (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {}); } catch { /* 미지원 */ } }, []);
+  // 게임 중에는 문서 스크롤/당겨서 새로고침을 막는다.
+  useEffect(() => { document.documentElement.classList.add('in-game'); return () => document.documentElement.classList.remove('in-game'); }, []);
   useEffect(() => () => stopTimers(gest.current), []);
   useEffect(() => { if (!tip) return; const t = setTimeout(() => setTip(''), 2600); return () => clearTimeout(t); }, [tip]);
 
@@ -182,7 +196,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   // ResizeObserver measures the actual felt after the rack, header and safe areas have taken space.
   const layout = useMemo(() => layoutTable(
     draft.table.map(m => ({ id: m.id, n: m.tiles.length, pos: tpos[m.id] })),
-    fsz.w, fsz.h, wide ? 54 : Math.max(26, Math.min(38, Math.floor(bsz.h * 0.09))), focus,
+    fsz.w, fsz.h, wide ? 54 : Math.max(26, Math.min(46, Math.floor(bsz.h * 0.12))), focus,
   ), [draft.table, tpos, focus, fsz.w, fsz.h, bsz.h, wide]);
   const mtw = layout.tw;
 
@@ -201,11 +215,12 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   useEffect(() => { if (!sameSlots(slots, slotsV)) setSlots(slotsV); }, [slotsV]);
   const handMap = useMemo(() => new Map(draft.hand.map(t => [t.id, t])), [draft.hand]);
   const handBySlots = useMemo(() => slotsV.map(id => (id == null ? undefined : handMap.get(id))).filter((t): t is Tile => !!t), [slotsV, handMap]);
-  const captureMotion = useTileMotion(bdRef, [slotsV, layout]);
+  const captureMotion = useTileMotion(bdRef, [slotsV, layout], r => (bdRef.current ? toLocalRect(stage(), fr, r) : r));
   const arrange = (hand: Tile[], breaks: ReadonlySet<number>): Slots | null => { const g = groupsOf(hand, breaks); return arrangeSlots(g, hf.cols, hf.cells, 1) ?? arrangeSlots(g, hf.cols, hf.cells, 0); };
   useEffect(() => { // 첫 입장: 추천 정리(묶음 사이는 빈 칸)로 시작
     if (arranged.current || !hsz.w || !draft.hand.length) return; arranged.current = true;
     const s = smartSort(draft.hand), a = arrange(s.hand, s.breaks); if (a) setSlots(a); sfx.deal(draft.hand.length);
+    if (!view.tableTiles.length) { setDealing(true); setTimeout(() => setDealing(false), 1400); }
   }, [hsz.w, draft.hand.length, hf.cols, hf.cells]);
 
   // 끄는 동안: 이 타일들을 끼워서 "유효해지는" 조합을 초록으로 알려준다
@@ -223,6 +238,15 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   // 효과음/진동
   const validCount = [...info.values()].filter(v => v.ok).length; const prevValid = useRef(validCount);
   useEffect(() => { if (myTurn && changed && validCount > prevValid.current) sfx.chime(); prevValid.current = validCount; }, [validCount]);
+  // 방금 완성된 조합은 잠깐 초록으로 반짝인다.
+  const validIds = useMemo(() => new Set([...info].filter(([, v]) => v.ok).map(([id]) => id)), [info]);
+  const prevIds = useRef(validIds);
+  useEffect(() => {
+    const fresh = myTurn && changed ? [...validIds].filter(id => !prevIds.current.has(id)) : [];
+    prevIds.current = validIds;
+    if (!fresh.length) return;
+    setPop(new Set(fresh)); const t = setTimeout(() => setPop(new Set()), 800); return () => clearTimeout(t);
+  }, [validIds]);
   useEffect(() => { if (myTurn && remaining > 0 && remaining <= 5) { sfx.tick(); if (remaining <= 3) webPlatform.haptics.tick(); } }, [remaining, myTurn]);
   const wasMine = useRef(myTurn);
   useEffect(() => { if (myTurn && !wasMine.current) { sfx.turn(); webPlatform.haptics.success(); setBanner('내 차례!'); setTimeout(() => setBanner(''), 1300); } wasMine.current = myTurn; }, [myTurn]);
@@ -241,7 +265,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   /** 조합(n장)을 손가락(aim) 위치 가운데에 두고 싶을 때 실제로 놓일 자리: 겹치면 가장 가까운 빈자리 */
   const spotFor = (count: number, a: { x: number; y: number }, exclude: string[] = []): Spot | null => {
     const c = canvasRef.current; if (!c) return null;
-    const cr = c.getBoundingClientRect(), { w, h } = meldSize(count, layout.tw), H = Math.max(layout.H, layout.height);
+    const cr = RL(c), { w, h } = meldSize(count, layout.tw), H = Math.max(layout.H, layout.height);
     const want = { x: a.x - cr.left - w / 2, y: a.y - cr.top - h / 2 };
     const others = [...layout.rects.entries()].filter(([id]) => !exclude.includes(id)).map(([, r]) => r);
     const s = findSpot(others, w, h, layout.W, H, want) ?? { x: Math.max(0, Math.min(layout.W - w, want.x)), y: Math.max(0, Math.min(H - h, want.y)) };
@@ -261,6 +285,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     leaving.forEach(([id, i]) => { if (i >= 0) home.current.set(id, i); });
     sfx.clack(); webPlatform.haptics.tick();
     if (!r.ok) return;
+    setLanded(new Set(ids)); setTimeout(() => setLanded(new Set()), 520);
     if (spot && r.meldId) { setTpos(p => ({ ...p, [r.meldId!]: toFrac(spot) })); setFocus(new Set([r.meldId])); }
     else if (r.meldId) setFocus(new Set([r.meldId]));
     if (r.splitId) {
@@ -330,22 +355,22 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const onDraw = () => { if (drawBusy || !myTurn) return; setDrawBusy(true); webPlatform.haptics.tick(); send('turn:draw').finally(() => setTimeout(() => setDrawBusy(false), 700)); };
 
   // 끌기: "놓을 곳"은 손가락이 아니라 손가락 위에 뜬 타일(aim) 아래의 요소로 판정한다
-  const aim = (e: { clientX: number; clientY: number; pointerType: string }) => {
-    if (e.pointerType === 'mouse') return { x: e.clientX, y: e.clientY };
+  const aim = (p: { x: number; y: number }, type: string) => {
+    if (type === 'mouse') return p;
     // 손가락 위쪽에 타일을 띄우되, 손패 영역에 가까워지면 오프셋을 0으로 줄여 손패에도 정확히 놓을 수 있게 한다
-    const top = handRef.current?.getBoundingClientRect().top ?? Infinity;
-    const k = Math.min(1, Math.max(0, 1 - (e.clientY - (top - 44)) / 64));
-    return { x: e.clientX, y: Math.max(8, e.clientY - 44 * k) };
+    const top = handRef.current ? RL(handRef.current).top : Infinity;
+    const k = Math.min(1, Math.max(0, 1 - (p.y - (top - 48)) / 68));
+    return { x: p.x, y: Math.max(8, p.y - 48 * k) };
   };
   const nearest = (root: Element, sel: string, x: number, y: number) => {
     let best: HTMLElement | undefined, bd = Infinity;
-    root.querySelectorAll<HTMLElement>(sel).forEach(t => { const r = t.getBoundingClientRect(); const d = Math.hypot(x - (r.left + r.width / 2), (y - (r.top + r.height / 2)) * 0.6); if (d < bd) { bd = d; best = t; } });
+    root.querySelectorAll<HTMLElement>(sel).forEach(t => { const r = RL(t); const d = Math.hypot(x - (r.left + r.width / 2), (y - (r.top + r.height / 2)) * 0.6); if (d < bd) { bd = d; best = t; } });
     return best;
   };
   const probe = (x: number, y: number): Drop => {
-    const el = document.elementFromPoint(x, y) as HTMLElement | null; if (!el) return { kind: 'none' };
+    const cp = C(x, y), el = document.elementFromPoint(cp.x, cp.y) as HTMLElement | null; if (!el) return { kind: 'none' };
     const rackEl = el.closest<HTMLElement>('[data-rack]');
-    const cr = canvasRef.current?.getBoundingClientRect();
+    const cr = canvasRef.current ? RL(canvasRef.current) : undefined;
     if (cr && el.closest('[data-felt]')) {
       const cx = x - cr.left, cy = y - cr.top;
       // Hit regions stay still while the visual preview opens a gap.
@@ -420,15 +445,16 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const onDown = (e: React.PointerEvent) => {
     if (e.button > 0 || gest.current || !e.isPrimary || commitBusy || drawBusy || coach) return;
     suppressClick.current = false;
-    const target = e.target as HTMLElement;
+    const target = e.target as HTMLElement, lp = L(e.clientX, e.clientY);
     const grip = target.closest<HTMLElement>('[data-mh]');
     if (grip) { // 조합 손잡이: 조합 전체를 끈다(위치만 바꾸는 건 첫 등록 전이나 상대 차례에도 가능)
       const m = draft.table.find(x => x.id === grip.dataset.mh); if (!m) return;
       stopTimers(gest.current);
       suppressClick.current = false;
       e.currentTarget.setPointerCapture(e.pointerId);
-      const first = grip.parentElement?.querySelector<HTMLElement>('.tile')?.getBoundingClientRect();
-      gest.current = { id: -1, meld: m.id, ids: m.tiles.map(x => x.tileId), sx: e.clientX, sy: e.clientY, pid: e.pointerId, tw: layout.tw, grabX: first ? e.clientX - first.left : 0, grabY: first ? e.clientY - first.top : 0, started: false, long: false, line: [], lo: 0, hi: 0, dir: 1 };
+      const first = grip.parentElement?.querySelector<HTMLElement>('.tile');
+      const fr0 = first ? RL(first) : undefined;
+      gest.current = { id: -1, meld: m.id, ids: m.tiles.map(x => x.tileId), sx: lp.x, sy: lp.y, pid: e.pointerId, tw: layout.tw, grabX: fr0 ? lp.x - fr0.left : 0, grabY: fr0 ? lp.y - fr0.top : 0, started: false, long: false, line: [], lo: 0, hi: 0, dir: 1 };
       return;
     }
     const t = target.closest<HTMLElement>('[data-t]'); if (!t) return;
@@ -437,36 +463,42 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     stopTimers(gest.current);
     suppressClick.current = false;
     e.currentTarget.setPointerCapture(e.pointerId);
-    const r = t.getBoundingClientRect();
-    const g: Gest = { id: Number(t.dataset.t), sx: e.clientX, sy: e.clientY, pid: e.pointerId, tw: r.width, grabX: e.clientX - r.left, grabY: e.clientY - r.top, started: false, long: false, line: [], lo: 0, hi: 0, dir: e.clientX >= r.left + r.width / 2 ? 1 : -1 };
+    const r = RL(t);
+    const g: Gest = { id: Number(t.dataset.t), sx: lp.x, sy: lp.y, pid: e.pointerId, tw: r.width, grabX: lp.x - r.left, grabY: lp.y - r.top, started: false, long: false, line: [], lo: 0, hi: 0, dir: lp.x >= r.left + r.width / 2 ? 1 : -1 };
     g.timer = setTimeout(() => beginLong(g), LONG_MS);
     gest.current = g; setPress(g.id);
   };
   const movePointer = (e: PointerEvent) => {
     const g = gest.current; if (!g || g.pid !== e.pointerId) return;
+    const p = L(e.clientX, e.clientY);
     if (!g.started) {
-      if (Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < (g.long ? 16 : e.pointerType === 'mouse' ? 5 : 9)) return;
+      if (Math.hypot(p.x - g.sx, p.y - g.sy) < (g.long ? 16 : e.pointerType === 'mouse' ? 5 : 9)) return;
       stopTimers(g); g.started = true; setPress(null); sfx.pick(); webPlatform.haptics.tick();
       const chosen = new Set(g.meld ? g.ids! : g.long ? g.line.slice(g.lo, g.hi + 1) : selSet.has(g.id) ? selected : [g.id]);
       // The floating stack must use exactly the same visual order as moveTiles.
       const ids = [...handBySlots.map(t => t.id), ...draft.table.flatMap(m => m.tiles.map(e => e.tileId))].filter(id => chosen.has(id));
       g.ids = ids; if (g.long) setSelected(ids);
       suppressClick.current = true;
-      const a = aim(e);
+      const a = aim(p, e.pointerType);
       const index = g.meld ? 0 : Math.max(0, ids.indexOf(g.id));
       const floating = { tw: g.tw, ox: -index * (g.tw + 2) - g.grabX, oy: -g.grabY };
       const next = { ids, ...floating, ...a, meld: g.meld, drop: probeFull(a, ids.length, g.meld, floating) };
       dragRef.current = next; setDrag(next); return;
     }
-    const a = aim(e);
+    const a = aim(p, e.pointerType);
     const cnt = g.ids?.length ?? 1;
     const previous = dragRef.current; if (!previous) return;
     const drop = probeFull(a, cnt, g.meld, previous);
     dragRef.current = { ...previous, ...a, drop };
     if (ghostRef.current) ghostRef.current.style.transform = `translate3d(${a.x + previous.ox}px, ${a.y + previous.oy}px, 0)`;
+    if (ghostRef.current) { // 움직이는 방향으로 살짝 기울어져 무게감이 느껴진다
+      const tilt = Math.max(-9, Math.min(9, (a.x - previous.x) * .7));
+      ghostRef.current.style.setProperty('--tilt', `${tilt}deg`);
+      clearTimeout(tiltT.current); tiltT.current = setTimeout(() => ghostRef.current?.style.setProperty('--tilt', '0deg'), 90);
+    }
     if (spotRef.current && drop.kind === 'new' && drop.spot) spotRef.current.style.transform = `translate3d(${drop.spot.x}px, ${drop.spot.y}px, 0)`;
     // React only needs to update when the destination changes, not for every pixel.
-    if (!sameDrop(previous.drop, drop)) setDrag(dragRef.current);
+    if (!sameDrop(previous.drop, drop)) { if (previous.drop.kind !== drop.kind || previous.drop.meldId !== drop.meldId) webPlatform.haptics.tick(); setDrag(dragRef.current); }
   };
   A.current.move = (e: PointerEvent) => {
     if (!gest.current || gest.current.pid !== e.pointerId) return;
@@ -488,7 +520,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     if (!g.started) { if (!g.meld && e.type !== 'pointercancel' && !g.long) toggle(g.id); return; } // 길게 눌렀다 떼면 선택이 그대로 남는다
     captureMotion(); // Also animate rejected drops and pointer cancellation back home.
     const d = dragRef.current; dragRef.current = null; setDrag(null);
-    if (d && e.type !== 'pointercancel') { const a = aim(e); dropTo(d.ids, d.drop, landingAim(a, d.ids.length, d), g.meld); }
+    if (d && e.type !== 'pointercancel') { const a = aim(L(e.clientX, e.clientY), e.pointerType); dropTo(d.ids, d.drop, landingAim(a, d.ids.length, d), g.meld); }
   };
   A.current.cancel = () => {
     const g = gest.current;
@@ -523,14 +555,15 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
   });
 
-  const hint = !myTurn ? (view.message || `${current?.name ?? ''}님 차례예요 · 손패와 테이블 자리는 미리 정리해 둘 수 있어요`)
+  const hint = !myTurn ? (view.message || '손패는 미리 정리해 둘 수 있어요')
     : tip ? tip
     : selected.length ? `${selected.length}장 선택 · 끌어서 옮기세요`
     : changed ? (canCommit ? '좋아요! ✓ 확정을 누르세요' : placed.length === 0 ? '손패 타일을 1장 이상 내야 해요' : !initialReady ? `첫 등록 ${placedPoints}/${view.config.initialMeldMin}점` : badIds.length ? (info.get(badIds[0]!)?.why ?? '고쳐야 할 조합이 있어요') : '확인이 필요해요')
     : needInitial ? `첫 등록 ${view.config.initialMeldMin}점 이상 · 타일을 끌어 놓으세요` : '끌어서 놓기 · 길게 누르면 이어진 타일이 늘어나요';
+  const urgent = myTurn && remaining <= 10;
   const insOf = (id: number) => (drag && drag.drop.tid === id && drag.drop.kind === 'meld' ? (drag.drop.after ? 'a' : 'b') : null);
   const sortLabel = { smart: '조합순', num: '숫자순', color: '색상순', custom: '내 배열' }[sortMode];
-  const tv = (t: Tile, extra: Partial<React.ComponentProps<typeof TileView>> = {}) => <TileView key={t.id} tile={t} selected={selSet.has(t.id)} ghosted={!!drag?.ids.includes(t.id)} pressing={press === t.id} ins={insOf(t.id)} {...extra} />;
+  const tv = (t: Tile, extra: Partial<React.ComponentProps<typeof TileView>> = {}) => <TileView key={t.id} tile={t} selected={selSet.has(t.id)} ghosted={!!drag?.ids.includes(t.id)} pressing={press === t.id} landed={landed.has(t.id)} ins={insOf(t.id)} {...extra} />;
   const rackPreview = useMemo(() => {
     if (drag?.drop.kind !== 'rack' || drag.drop.slot === undefined) return null;
     if (drag.ids.some(id => origIds.has(id))) return null;
@@ -563,18 +596,36 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const sp = drag?.drop.kind === 'new' ? drag.drop.spot : null;
 
   return (
-    <main ref={bdRef} className={`bd ${myTurn ? 'mine' : ''} ${drag ? 'dragging' : ''} ${myTurn && remaining <= 10 ? 'urgent' : ''}`} style={{ ['--mtw' as string]: `${mtw}px`, ['--rtw' as string]: `${hf.tw}px`, ['--rth' as string]: `${Math.round(hf.tw * 1.4)}px` }} onContextMenu={e => e.preventDefault()} onPointerDown={onDown} onLostPointerCapture={() => { if (gest.current) A.current.cancel(); }} onClickCapture={e => { if (suppressClick.current) { e.stopPropagation(); suppressClick.current = false; } }}>
-      <div className="rot" role="alert"><b aria-hidden="true">⟳</b>화면을 가로로 돌려 주세요</div>
+    <main ref={bdRef} data-turn={myTurn ? 'mine' : 'theirs'}
+      className={`bd ${myTurn ? 'mine' : 'theirs'} ${drag ? 'dragging' : ''} ${urgent ? 'urgent' : ''} ${fr.rot ? `rot ${fr.dir === 1 ? 'rot1' : 'rotn'}` : ''} ${dealing ? 'dealing' : ''}`}
+      style={{ ['--mtw' as string]: `${mtw}px`, ['--rtw' as string]: `${hf.tw}px`, ['--rth' as string]: `${Math.round(hf.tw * 1.4)}px`, ['--actw' as string]: wide ? '140px' : '96px',
+        ...(fr.rot ? { width: fr.vh, height: fr.vw, transform: fr.dir === 1 ? `translateX(${fr.vw}px) rotate(90deg)` : `translateY(${fr.vh}px) rotate(-90deg)` } : null) }}
+      onContextMenu={e => e.preventDefault()} onPointerDown={onDown} onLostPointerCapture={() => { if (gest.current) A.current.cancel(); }} onClickCapture={e => { if (suppressClick.current) { e.stopPropagation(); suppressClick.current = false; } }}>
+      <div className="edge" aria-hidden="true" />
+      <div className="tline" aria-hidden="true"><i style={{ transform: `scaleX(${(view.turn ? pct : 0) / 100})` }} /></div>
       {banner && <div className="banner" aria-hidden="true">{banner}</div>}
       <header className="bd-top">
         <div className="chips">{opps.map(p => <OppChip key={p.id} p={p} active={view.turn?.playerId === p.id} remaining={remaining} pct={pct} />)}</div>
-        <p className={`bd-say ${drag ? feedback.tone : canCommit ? 'good' : ''}`} aria-live="polite">{drag ? feedback.text : hint}</p>
+        <div className={`tp ${myTurn ? 'mine' : 'theirs'} ${urgent ? 'danger' : ''}`} role="status" aria-live="polite">
+          <span className="tp-main">
+            <b>{myTurn ? '내 차례' : `${current?.name ?? '상대'} 차례`}</b>
+            <i className="tp-time" aria-label={`${remaining}초 남음`}>{fmt(remaining)}</i>
+          </span>
+          <span className={`tp-hint ${drag ? feedback.tone : canCommit ? 'good' : ''}`}>{drag ? feedback.text : hint}</span>
+        </div>
         {!game.online && <span className="offline">연결 끊김</span>}
-        <div className={`mytimer ${myTurn ? 'on' : ''} ${myTurn && remaining <= 10 ? 'danger' : ''}`}>{myTurn ? `내 차례 ${remaining}` : `${current?.name ?? ''} ${remaining}`}</div>
-        <SoundToggle />
-        <button className="snd help" onClick={() => setCoach(true)} aria-label="조작 방법">?</button>
-        <button className="exit compact" onClick={onExit}>나가기</button>
+        <button className="menu-btn" onClick={() => setMenu(m => !m)} aria-expanded={menu} aria-label="메뉴"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg></button>
       </header>
+      {menu && <>
+        <div className="scrim" onClick={() => setMenu(false)} />
+        <div className="menu" role="menu">
+          <button role="menuitem" onClick={() => sfx.toggle()}>{muted ? '소리 켜기' : '소리 끄기'}</button>
+          <button role="menuitem" onClick={() => { setCoach(true); setMenu(false); }}>조작 방법</button>
+          {fr.rot && <button role="menuitem" onClick={flip}>화면 방향 뒤집기</button>}
+          {!!document.documentElement.requestFullscreen && <button role="menuitem" onClick={() => { setMenu(false); if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen().then(() => (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape')).catch(() => {}); }}>전체 화면</button>}
+          <button role="menuitem" className="exit" onClick={() => { setMenu(false); onExit(); }}>나가기</button>
+        </div>
+      </>}
 
       <div className="bd-fw">
         <section ref={feltRef} className={`bd-felt ${drag?.drop.kind === 'new' ? 'over' : ''}`} data-felt aria-label="테이블">
@@ -593,7 +644,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
               const shift = -Math.min(leftSpace, Math.max(gap / 2, gap - rightSpace));
               return (
                 <div key={m.id} data-m={m.id} style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
-                  className={`bm ${i?.ok ? 'ok' : 'bad'} ${drag?.drop.kind === 'meld' && drag.drop.meldId === m.id ? `over ${feedback.tone}` : ''} ${pulse.has(m.id) ? 'pulse' : ''} ${fits.has(m.id) ? 'fit' : ''} ${drag?.meld === m.id ? 'lifted' : ''}`}
+                  className={`bm ${i?.ok ? 'ok' : 'bad'} ${drag?.drop.kind === 'meld' && drag.drop.meldId === m.id ? `over ${feedback.tone}` : ''} ${pulse.has(m.id) ? 'pulse' : ''} ${pop.has(m.id) ? 'pop' : ''} ${fits.has(m.id) ? 'fit' : ''} ${drag?.meld === m.id ? 'lifted' : ''}`}
                   onClick={e => { if ((e.target as HTMLElement).closest('[data-t],[data-mh]')) return; if (i && !i.ok) setTip(i.why); }}>
                   <button type="button" tabIndex={-1} className="bm-grip" data-mh={m.id} aria-label="조합 옮기기"><span className="dots" aria-hidden="true">⠿</span></button>
                   <div className="bm-row">{m.tiles.map((e, index) => { const t = resolve(e.tileId); return t ? <span className="bm-tile" key={e.tileId} style={{ transform: `translateX(${insert >= 0 ? shift + (index >= insert ? gap : 0) : 0}px)` }}>{tv(t, { repC: !isNum(t) ? e.represents?.color : undefined, repV: !isNum(t) ? e.represents?.value : undefined, fresh: !origIds.has(t.id), flash: flash.has(t.id) })}</span> : null; })}
@@ -606,40 +657,43 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
           </div>
           {draft.table.length === 0 && <div className="bd-empty"><b>{myTurn ? '첫 조합을 놓아 보세요' : '테이블이 비어 있어요'}</b><span>{myTurn ? `같은 색 연속 숫자 · 같은 숫자 다른 색${needInitial ? ` · 합계 ${view.config.initialMeldMin}점 이상` : ''}` : '내 차례가 오기 전에 손패를 정리해 보세요'}</span></div>}
         </section>
+        {selected.length > 0 && <div className="bd-sel" role="toolbar" aria-label="선택한 타일">
+          <b>{selected.length}장</b>
+          {selectedLine.length > 1 && selectedLine.length !== selected.length && <button onClick={() => setSelected(selectedLine)}>묶음 선택</button>}
+          {myTurn && <button onClick={() => place(selected, { to: 'new' })}>새 조합</button>}
+          {myTurn && <button disabled={selected.every(id => handSet.has(id)) || selected.some(id => origIds.has(id))} onClick={() => placeHand(selected)}>손패로</button>}
+          <button onClick={() => setSelected([])} aria-label="선택 해제">해제</button>
+        </div>}
 
       </div>
 
       <section className={`bd-rack ${drag?.drop.kind === 'rack' ? 'over' : ''}`} data-rack aria-label="내 손패">
         <div ref={handRef} className="bd-hand" style={{ height: hf.h, gridTemplateColumns: `repeat(${hf.cols}, var(--rtw))` }}>
-          {slotsV.map((id, i) => { const t = id == null ? undefined : handMap.get(id); return <div key={i} data-slot={i} className={`cell ${t ? '' : 'vacant'} ${tgt.has(i) ? 'tgt' : ''}`}>{t && <span className="rack-tile" style={{ transform: rackDestinations.has(t.id) && !drag?.ids.includes(t.id) ? `translate(${(rackDestinations.get(t.id)! % hf.cols - i % hf.cols) * (hf.tw + HAND.gapX)}px, ${(Math.floor(rackDestinations.get(t.id)! / hf.cols) - Math.floor(i / hf.cols)) * (Math.round(hf.tw * 1.4) + HAND.rowExtra)}px)` : undefined }}>{tv(t, { isNew: newIds.has(t.id) })}</span>}</div>; })}
+          {slotsV.map((id, i) => { const t = id == null ? undefined : handMap.get(id); return <div key={i} data-slot={i} className={`cell ${t ? '' : 'vacant'} ${tgt.has(i) ? 'tgt' : ''}`}>{t && <span className="rack-tile" style={{ ['--k' as string]: i, transform: rackDestinations.has(t.id) && !drag?.ids.includes(t.id) ? `translate(${(rackDestinations.get(t.id)! % hf.cols - i % hf.cols) * (hf.tw + HAND.gapX)}px, ${(Math.floor(rackDestinations.get(t.id)! / hf.cols) - Math.floor(i / hf.cols)) * (Math.round(hf.tw * 1.4) + HAND.rowExtra)}px)` : undefined }}>{tv(t, { isNew: newIds.has(t.id) })}</span>}</div>; })}
         </div>
       </section>
 
       <aside className="bd-act">
         <fieldset className="bd-controls" disabled={commitBusy || drawBusy} aria-label="게임 조작">
         <div className="bd-info">
-          <span>손패 <b>{draft.hand.length}</b>{newIds.size > 0 && <em className="newbadge">NEW {newIds.size}</em>}</span>
+          <span className="hc"><b>{draft.hand.length}</b>장{newIds.size > 0 && <em className="newbadge">NEW {newIds.size}</em>}</span>
           {needInitial && <span className={`meter ${initialReady ? 'done' : ''}`}><i style={{ width: `${Math.min(100, (placedPoints / view.config.initialMeldMin) * 100)}%` }} />첫 등록 {placedPoints}/{view.config.initialMeldMin}</span>}
         </div>
-        {selected.length > 0 ? <div className="bd-selection" role="toolbar" aria-label="선택한 타일">
-          <b>{selected.length}장 선택</b>
-          {selectedLine.length > 1 && <button onClick={() => setSelected(selectedLine)}>묶음 선택</button>}
-          {myTurn && <button onClick={() => place(selected, { to: 'new' })}>새 조합</button>}
-          {myTurn && <button disabled={selected.every(id => handSet.has(id)) || selected.some(id => origIds.has(id))} onClick={() => placeHand(selected)}>손패로</button>}
-          <button onClick={() => setSelected([])} aria-label="선택 해제">선택 해제</button>
-        </div> : <div className="bd-tools">
-          {myTurn && !selected.length && suggestions[0] && <button className="bd-sug" onClick={() => placeSuggestion(suggestions[0]!)} aria-label="추천 조합 내기">💡 추천 {suggestions.length}</button>}
-          <button className="bd-tidy" onClick={tidyTable} aria-label="테이블 조합 자동 정돈" title="테이블 정돈">⊞<span> 정돈</span></button>
-          <button onClick={cycleSort} aria-label={`손패 정렬: 지금 ${sortLabel}`}>{sortLabel}</button>
-        </div>}
+        <div className="bd-tools">
+          <button className="bd-sort" onClick={cycleSort} aria-label={`손패 정렬: 지금 ${sortLabel}`}>{sortLabel}</button>
+          <button className="bd-tidy" onClick={tidyTable} aria-label="테이블 조합 자동 정돈" title="테이블 정돈">정돈</button>
+          {myTurn && suggestions[0] && <button className="bd-sug" onClick={() => placeSuggestion(suggestions[0]!)} aria-label="추천 조합 내기">추천 {suggestions.length}</button>}
+        </div>
         <div className="urow">
           <button disabled={!past.length || commitBusy || drawBusy} onClick={undo} aria-label="되돌리기">↶</button>
           <button disabled={!future.length || commitBusy || drawBusy} onClick={redo} aria-label="다시 실행">↷</button>
           <button disabled={!myTurn || !changed || commitBusy} onClick={reset} aria-label="처음 상태로">⟲</button>
         </div>
-        {changed
+        {!myTurn
+          ? <button className="primary go wait" disabled>대기 중<small>손패 정리 가능</small></button>
+          : changed
           ? <button className={`primary go ${canCommit ? 'ready' : ''}`} disabled={!canCommit || !game.online || commitBusy} onClick={commit}>{commitBusy ? '확정 중…' : canCommit ? '✓ 확정' : placed.length && !initialReady ? `${placedPoints}/${view.config.initialMeldMin}점` : '확인 필요'}</button>
-          : <button className="primary go" disabled={!myTurn || !game.online || drawBusy} onClick={onDraw}>{drawBusy ? '뽑는 중…' : '뽑기'}<small>남은 {view.poolCount}</small></button>}
+          : <button className="primary go" disabled={!game.online || drawBusy} onClick={onDraw}>{drawBusy ? '뽑는 중…' : '뽑기'}<small>남은 {view.poolCount}</small></button>}
         </fieldset>
       </aside>
 

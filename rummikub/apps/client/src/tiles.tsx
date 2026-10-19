@@ -14,19 +14,19 @@ export const JokerMark = () => (
   </svg>
 );
 
-type TileProps = { tile: Tile; repC?: Num['color']; repV?: number; selected?: boolean; ghosted?: boolean; fresh?: boolean; flash?: boolean; isNew?: boolean; pressing?: boolean; ins?: 'a' | 'b' | null; sheet?: boolean; passive?: boolean };
+type TileProps = { tile: Tile; repC?: Num['color']; repV?: number; selected?: boolean; ghosted?: boolean; fresh?: boolean; flash?: boolean; isNew?: boolean; landed?: boolean; pressing?: boolean; ins?: 'a' | 'b' | null; sheet?: boolean; passive?: boolean };
 /**
  * 타일 1장. 포인터/키 이벤트는 컨테이너에서 위임(data-t)하므로 props가 안정적이고 memo가 잘 먹는다.
  * 색 외에도 상태를 구분하도록: 이번 턴 타일=모서리 점(.fresh), 새로 뽑은 타일=NEW 띠(.isnew), 선택=테두리+상승.
  */
-export const TileView = memo(function TileView({ tile, repC, repV, selected, ghosted, fresh, flash, isNew, pressing, ins, sheet, passive }: TileProps) {
+export const TileView = memo(function TileView({ tile, repC, repV, selected, ghosted, fresh, flash, isNew, landed, pressing, ins, sheet, passive }: TileProps) {
   const j = !isNum(tile);
   const attr = sheet ? { 'data-s': tile.id } : passive ? {} : { 'data-t': tile.id };
   return (
     <span className={`ts ${ins ? `ins-${ins}` : ''}`} data-tid={tile.id}>
-      <button className={`tile ${j ? 'joker' : tile.color} ${selected ? 'selected' : ''} ${ghosted ? 'ghosted' : ''} ${fresh ? 'fresh' : ''} ${flash ? 'flash' : ''} ${isNew ? 'isnew' : ''} ${pressing ? 'pressing' : ''}`}
+      <button className={`tile ${j ? 'joker' : tile.color} ${selected ? 'selected' : ''} ${ghosted ? 'ghosted' : ''} ${fresh ? 'fresh' : ''} ${flash ? 'flash' : ''} ${isNew ? 'isnew' : ''} ${landed ? 'landed' : ''} ${pressing ? 'pressing' : ''}`}
         {...attr} tabIndex={passive ? -1 : 0} aria-pressed={!!selected} aria-label={j ? '조커' : `${tile.color} ${tile.value}`}>
-        <strong>{j ? <JokerMark /> : tile.value}</strong><span>{j ? '' : SUIT[tile.color]}</span>
+        <strong className={!j && (tile.value === 6 || tile.value === 9) ? 'u' : undefined}>{j ? <JokerMark /> : tile.value}</strong><span>{j ? '' : SUIT[tile.color]}</span>
         {j && repC && repV ? <em className={`rep ${repC}`}>{SUIT[repC]}{repV}</em> : null}
       </button>
     </span>

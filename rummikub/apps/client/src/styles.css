@@ -494,236 +494,203 @@ button:disabled{opacity:.38;cursor:not-allowed}
   .ctxbar button{min-height:38px}
 }
 
-/* ═════════ v4 보드: 가로 전용 · 손패 전부 보임 · 길게 눌러 늘리기 ═════════
-   타일 크기는 JS가 계산해 --mtw(테이블) / --rtw(손패)로 내려준다. 그 값 하나로 타일·글자·간격이 같이 줄어든다. */
-.bd{--tw:44px;--th:calc(var(--tw)*1.4);--mtw:40px;--rtw:36px;position:relative;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) 100px;grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"top top" "felt act" "rack act";gap:6px 8px;padding:calc(4px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;background:var(--grain),radial-gradient(ellipse at 50% 38%,#4a3220,var(--wood1) 50%,var(--wood0))}
-.bd.dragging{cursor:grabbing}
-.bd .tile{touch-action:none;margin-bottom:6px}
-.bd .tile.selected{transform:translateY(calc(var(--tw)*-.26))}
+/* ═════════ v7 보드 — 자동 가로 · 차례가 한눈에 · 읽기 쉬운 타일 ═════════
+   · 세로 화면에서는 .bd 전체가 90° 돌아간다(JS: orient.ts). 그래서 반응형은 viewport 미디어쿼리가 아니라
+     보드 자신의 크기(container query)로 한다.
+   · 색의 역할: 램프(황동빛 주황) = "내 차례/내 것", 슬레이트(차가운 청회색) = "상대 차례". 색 외에 글자·아이콘·테두리로도 구분한다.
+   · 타일 크기는 JS가 --mtw(테이블) / --rtw(손패)로 내려준다. */
+:root{--env-t:env(safe-area-inset-top,0px);--env-r:env(safe-area-inset-right,0px);--env-b:env(safe-area-inset-bottom,0px);--env-l:env(safe-area-inset-left,0px);--slate:#8fb0c4;--spring:cubic-bezier(.3,1.5,.5,1)}
+html.in-game,html.in-game body{overflow:hidden;overscroll-behavior:none;height:100%}
+html.in-game body{position:fixed;inset:0;width:100%}
+html{touch-action:manipulation}
 
-/* 위 줄: 상대 · 안내 · 타이머 · 소리 · 나가기 */
-.bd-top{grid-area:top;display:flex;align-items:center;gap:8px;min-width:0;min-height:38px}
-.bd-top .chips{flex:none;overflow:visible}
-.bd-top .snd{position:static;width:34px;height:34px;flex:none}
-.bd-top .mytimer{flex:none}
-.bd-say{flex:1;min-width:0;margin:0;padding:0 4px;font-size:.84rem;font-weight:700;color:#d6c8ae;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bd.mine .bd-say{color:var(--lamp)}.bd-say.good{color:#b9edc0}
+.bd{--tw:44px;--th:calc(var(--tw)*1.4);--mtw:40px;--rtw:36px;--accent:var(--lamp);--felt-a:#2f6050;--felt-b:#1d3b32;
+  --sa-t:var(--env-t);--sa-r:var(--env-r);--sa-b:var(--env-b);--sa-l:var(--env-l);--ease:cubic-bezier(.2,.8,.2,1);
+  container:bd/size;position:relative;width:100%;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) var(--actw,96px);grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:"top top" "felt act" "rack rack";gap:6px 8px;
+  padding:calc(8px + var(--sa-t)) calc(10px + var(--sa-r)) calc(6px + var(--sa-b)) calc(10px + var(--sa-l));
+  overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  background:var(--grain),radial-gradient(ellipse at 50% 30%,#4a3220,var(--wood1) 55%,var(--wood0))}
+.bd.theirs{--accent:var(--slate);--felt-a:#2c4d52;--felt-b:#1a3237}
+.bd.rot{position:fixed;left:0;top:0;transform-origin:0 0}
+/* 돌린 화면: 노치/홈 인디케이터 여백도 같이 돌아간다 */
+.bd.rot1{--sa-l:var(--env-t);--sa-r:var(--env-b);--sa-t:var(--env-r);--sa-b:var(--env-l)}
+.bd.rotn{--sa-l:var(--env-b);--sa-r:var(--env-t);--sa-t:var(--env-l);--sa-b:var(--env-r)}
+.bd.dragging,.bd.dragging *{cursor:grabbing}
 
-/* 테이블: 모든 조합이 한눈에 보이도록 타일이 자동으로 맞춰진다(넘칠 때만 스크롤) */
+/* ── 차례 신호 ① 화면 가장자리: 내 차례=램프빛이 숨 쉬듯 감싼다 / 상대 차례=어둡게 가라앉는다 ── */
+.edge{position:absolute;inset:0;z-index:25;pointer-events:none;transition:box-shadow .5s,opacity .5s}
+.bd.mine .edge{box-shadow:inset 0 0 0 3px #ffbf6bd9,inset 0 0 56px #ffbf6b4d;animation:breathe 3.2s ease-in-out infinite}
+.bd.theirs .edge{box-shadow:inset 0 0 90px #000000b3}
+.bd.urgent .edge{box-shadow:inset 0 0 0 3px #ee6a57e6,inset 0 0 60px #ee6a5788;animation:breathe .9s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.5}}
+/* ② 맨 위 시간 막대: 줄어드는 길이로 남은 시간을 본다 */
+.tline{position:absolute;left:0;right:0;top:0;height:4px;z-index:30;pointer-events:none;background:#ffffff12}
+.tline i{display:block;height:100%;transform-origin:0 50%;transition:transform 1s linear,background .3s;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.bd.urgent .tline i{background:var(--bad);box-shadow:0 0 10px var(--bad)}
+
+/* 위 줄: 상대 · 차례 알림판 · 메뉴 */
+.bd-top{grid-area:top;position:relative;z-index:31;display:flex;align-items:center;gap:8px;min-width:0;min-height:44px}
+.bd-top .chips{flex:none;display:flex;gap:6px}
+.chip2{display:flex;align-items:center;gap:6px;padding:2px 8px 2px 3px;border-radius:99px;background:#00000066;box-shadow:inset 0 0 0 1px #ffffff1f;min-width:0;transition:background .25s,box-shadow .25s,transform .25s var(--spring)}
+.chip2 .ring{--s:34px}.chip2 .who b{display:block;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.74rem}.chip2 .who small{font-size:.64rem;color:var(--mute)}
+.chip2.active{background:#8fb0c42e;box-shadow:inset 0 0 0 2px var(--slate),0 0 14px #8fb0c455}
+.chip2.active .who small{color:#c6dbe8;font-weight:800}
+.chip2 .ring .arc{stroke:var(--slate)}
+.chip2 .ring.danger .arc{stroke:var(--bad)}
+.chip2 .cnt{font:800 .9rem var(--f-num);min-width:26px;text-align:center;padding:2px 6px;border-radius:6px;background:var(--ivory);color:var(--ink);box-shadow:0 2px 0 var(--edge)}
+.chip2.low .cnt{background:var(--bad);color:#fff;animation:blink 1s infinite}
+.tp{flex:1;min-width:0;max-width:460px;margin-inline:auto;display:grid;gap:1px;align-content:center;height:42px;padding:2px 14px;border-radius:13px;text-align:center;transition:background .3s,color .3s,box-shadow .3s}
+.tp-main{display:flex;align-items:baseline;justify-content:center;gap:10px;white-space:nowrap}
+.tp-main b{font:800 1rem/1.15 var(--f-ui)}
+.tp-time{font:800 1.1rem/1.15 var(--f-num);font-style:normal;font-variant-numeric:tabular-nums}
+.tp-hint{font-size:.68rem;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp.mine{background:linear-gradient(180deg,#ffdca0,#ffb85a);color:#2a1a08;box-shadow:inset 0 1px 0 #fff8,0 0 22px #ffb05a88}
+.tp.mine .tp-hint{color:#5a3608}
+.tp.mine .tp-hint.good,.tp.mine .tp-hint.valid{color:#0f3a1b}
+.tp.mine .tp-hint.blocked{color:#7a1608}.tp.mine .tp-hint.repair{color:#5a3200}
+.tp.theirs{background:#0b0908c4;color:#e6e0d4;box-shadow:inset 0 0 0 1.5px #8fb0c4aa}
+.tp.theirs .tp-time{color:#bcd3e1}.tp.theirs .tp-hint{color:#a9b7bf}
+.tp.theirs .tp-hint.valid,.tp.theirs .tp-hint.good{color:#b9edc0}.tp.theirs .tp-hint.blocked{color:#ff9e8c}.tp.theirs .tp-hint.repair{color:#ffdcaa}
+.tp.danger{background:linear-gradient(180deg,#ff9a86,#ee6a57);color:#fff}
+.tp.danger .tp-hint{color:#fff}
+.tp.danger .tp-time{animation:tick .5s ease-in-out infinite alternate}
+@keyframes tick{to{transform:scale(1.18)}}
+.offline{flex:none;padding:4px 10px;border-radius:6px;background:var(--bad);color:#2a0803;font-size:.75rem;font-weight:800}
+.menu-btn{flex:none;display:grid;place-items:center;width:42px;height:42px;padding:0!important;border-radius:50%!important;background:#ffffff14;box-shadow:inset 0 0 0 1px #ffffff26}
+.menu-btn svg{width:20px;height:20px;fill:none;stroke:var(--text);stroke-width:2.2;stroke-linecap:round}
+.scrim{position:absolute;inset:0;z-index:50}
+.menu{position:absolute;z-index:51;top:calc(54px + var(--sa-t));right:calc(10px + var(--sa-r));display:grid;gap:4px;min-width:170px;padding:6px;border-radius:14px;background:#1c120bf5;box-shadow:inset 0 0 0 1px #ffffff26,0 14px 34px #000c;animation:menu-in .16s var(--ease)}
+.menu button{min-height:46px;text-align:left;padding:0 14px!important}
+@keyframes menu-in{from{opacity:0;transform:translateY(-6px) scale(.97)}}
+
+/* 테이블(펠트) */
 .bd-fw{grid-area:felt;position:relative;min-height:0;min-width:0;display:flex}
-.bd-felt{flex:1;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;padding:12px 12px 8px;border-radius:14px;background:var(--grain),radial-gradient(ellipse 70% 80% at 50% 45%,#5a3c25,#3a2516 60%,#2a190e);box-shadow:inset 0 0 0 1px #ffffff14,inset 0 10px 30px #0009;transition:box-shadow .15s}
-.bd-felt.over{box-shadow:inset 0 0 0 3px #ffffff88,inset 0 10px 30px #0009}
-.bd-melds{--tw:var(--mtw);--th:calc(var(--mtw)*1.4);display:flex;flex-wrap:wrap;gap:18px 14px;align-items:flex-start;align-content:flex-start;min-height:100%}
-.bm{position:relative;isolation:isolate;display:flex;gap:2px;padding:8px 6px 2px;border-radius:calc(var(--tw)*.26);background:#0000002e;box-shadow:inset 0 0 0 2px #8fc19766;transition:background .12s}
-/* 눈에 안 보이는 넓은 놓기 영역: 조합 사이 틈에 놓아도 가까운 조합으로 들어간다 */
-.bm::after{content:'';position:absolute;inset:-9px -7px;z-index:-1}
-.bm.bad{background:#ee6a5724;box-shadow:inset 0 0 0 2px var(--bad)}
-.bm.over{background:#ffffff33;box-shadow:inset 0 0 0 3px #fff,0 0 22px #ffffff44}
-.bd.dragging .bm:not(.over){box-shadow:inset 0 0 0 2px #ffffff55}
-.bm-badge{position:absolute;right:-4px;top:-10px;min-width:20px;padding:1px 6px;border-radius:99px;background:#1f3a26;color:#b9edc0;font:800 .66rem var(--f-num);text-align:center;font-style:normal;box-shadow:0 1px 3px #000a;pointer-events:none;z-index:3}
-.bm.bad .bm-badge{background:var(--bad);color:#fff}
-.bd-new{--tw:var(--mtw);align-self:stretch;display:grid;place-content:center;width:max(calc(var(--mtw)*1.3),46px);white-space:nowrap;min-height:calc(var(--mtw)*1.4 + 16px);padding:0;border-radius:calc(var(--mtw)*.26);background:#ffffff0d;box-shadow:inset 0 0 0 2px #ffffff55;font-size:1.3rem;line-height:1;text-align:center;color:#fff}
-.bd-new small{font-size:.66rem;font-weight:800;color:#e9dcc2}
-.bd-new.over,.bd-new:hover{background:#ffffff2e;box-shadow:inset 0 0 0 3px #fff}
-.bd-empty{position:absolute;inset:0;display:grid;place-items:center;margin:0;color:#ffffff59;font-weight:700;pointer-events:none}
-/* 선택 바: 테이블 아래 가운데에 떠서 엄지 가까이 */
-.bd-sel{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:8;display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:14px;background:#120b07ee;box-shadow:inset 0 0 0 2px var(--lamp),0 8px 20px #000a}
-.bd-sel b{font:800 .95rem var(--f-num);padding:0 4px}.bd-sel button{padding:7px 12px!important;min-height:36px;font-size:.8rem}
+.bd-felt{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden;touch-action:none;padding:8px;border-radius:14px;background:radial-gradient(ellipse at 50% 40%,var(--felt-a),var(--felt-b) 80%);box-shadow:inset 0 0 0 1px #ffffff18,inset 0 6px 22px #0005;transition:box-shadow .15s}
+.bd-felt.over{box-shadow:inset 0 0 0 3px #ffffff88,inset 0 6px 22px #0005}
+.bd-melds{--tw:var(--mtw);--th:calc(var(--mtw)*1.4);position:relative;display:block;height:100%}
+.bm{position:absolute;display:flex;flex-direction:column;box-sizing:border-box;padding:0 2px;border-radius:7px;background:#0000002b;box-shadow:inset 0 0 0 1px #ffffff12;transition:background .16s,box-shadow .16s}
+.bm::after{content:'';position:absolute;inset:-5px;z-index:-1}
+.bm.ok::before{content:'';position:absolute;left:8px;right:8px;bottom:1px;height:2px;border-radius:2px;background:#8fc19777;pointer-events:none}
+.bm.bad{background:#ee6a5724;box-shadow:inset 0 0 0 1.5px #ee6a57cc}
+.bm.lifted{opacity:.3}
+.bm-row{position:relative;display:flex;gap:2px;flex:none}
+.bm-tile{display:flex;flex:none;transition:transform 160ms var(--ease);will-change:transform}
+/* 조합 손잡이: 눈에 띄는 작은 막대 + 위쪽으로 넓은 터치 영역 */
+.bm-grip{all:unset;box-sizing:border-box;position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:4px;flex:none;cursor:grab;touch-action:none}
+.bm-grip::before{content:'';width:24px;height:3px;border-radius:2px;background:#ffffff66;transition:background .15s,width .15s}
+.bm-grip::after{content:'';position:absolute;left:-2px;right:-2px;top:-16px;height:22px}
+.bm-grip .dots{display:none}
+.bm:hover .bm-grip::before,.bd.dragging .bm-grip::before{background:#fff;width:30px}
+.bm-error{position:absolute;right:-4px;top:-5px;z-index:3;width:16px;height:16px;border-radius:50%;background:var(--bad);color:#fff;text-align:center;font:800 11px/16px var(--f-ui);pointer-events:none;box-shadow:0 1px 3px #000a}
+.bm-insert{position:absolute;top:0;height:calc(var(--mtw)*1.4);display:grid;place-items:center;border:1px dashed #d6f2d2b3;border-radius:4px;background:#c9efca24;color:#d6f2d2;font-size:14px;pointer-events:none}
+.bm.pulse{animation:splitpulse 1s ease-out}
+@keyframes splitpulse{0%{box-shadow:inset 0 0 0 3px var(--lamp),0 0 26px var(--lamp)}100%{box-shadow:inset 0 0 0 1px #ffffff12}}
+.bm.pop{animation:mpop .7s ease-out}
+@keyframes mpop{0%{box-shadow:0 0 0 3px #8fc197,0 0 24px #8fc197cc;transform:scale(1.035)}100%{box-shadow:inset 0 0 0 1px #ffffff12;transform:none}}
+/* 끄는 동안: 끼울 수 있는 조합 = 초록, 지금 놓을 곳 = 강조 */
+.bd.dragging .bm.fit{background:#8fc19724;box-shadow:0 0 0 2px #8fc197cc,0 0 14px #8fc19766}
+.bd.dragging .bm.over,.bd.dragging .bm.fit.over{background:#ffffff1f;box-shadow:0 0 0 2px #fff,0 0 20px #ffffff55}
+.bd.dragging .bm.over.repair{background:#ffbf6b18;box-shadow:0 0 0 2px #ffbf6bcc}
+.bd.dragging .bm.over.blocked{background:#ee6a5722;box-shadow:0 0 0 2px var(--bad)}
+.bd.dragging .bm.over.valid{background:#8fc19738;box-shadow:0 0 0 2px #b9edc0,0 0 22px #8fc197aa}
+.bd .spot{position:absolute;z-index:1;box-sizing:border-box;border-radius:8px;border:2px dashed #ffffffcc;background:#ffffff1f;pointer-events:none;animation:spot-in .14s ease-out}
+@keyframes spot-in{from{opacity:0;scale:.94}}
+.bd-empty{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;padding:20px;text-align:center;color:#ffffffb0;pointer-events:none}
+.bd-empty b{font-size:clamp(.95rem,1.8vw,1.25rem);font-weight:800}
+.bd-empty span{font-size:clamp(.72rem,1.2vw,.88rem);color:#ffffff80}
+/* 선택 바: 테이블 아래 가운데, 엄지 가까이 */
+.bd-sel{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:8;display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:16px;background:#120b07f2;box-shadow:inset 0 0 0 2px var(--lamp),0 8px 20px #000a;animation:sel-in .16s var(--ease)}
+.bd-sel b{font:800 .95rem var(--f-num);padding:0 6px;color:var(--lamp)}
+.bd-sel button{min-height:40px;padding:0 12px!important;font-size:.8rem;white-space:nowrap}
+@keyframes sel-in{from{opacity:0;translate:0 8px}}
 
-/* 손패: 한 화면에 전부. 높이는 JS가 정확히 계산해 넣는다(스크롤 없음) */
-.bd-rack{grid-area:rack;padding:5px 6px 7px;border-radius:12px 12px 6px 6px;background:var(--grain),linear-gradient(#5a3d28,var(--rail) 18%,#3b2617);box-shadow:inset 0 1px 0 #ffffff26,0 3px 0 #1b0f08;transition:box-shadow .15s}
+/* 손패: 내 앞의 랙. 내 차례에는 램프에 비친다. 높이는 JS가 정확히 계산(스크롤 없음). */
+.bd-rack{grid-area:rack;min-width:0;padding:4px 6px 6px;border-radius:14px 14px 5px 5px;background:var(--grain),linear-gradient(#5a3d28,var(--rail) 20%,#3b2617);box-shadow:inset 0 1px 0 #ffffff26,0 3px 0 #1b0f08;transition:box-shadow .4s,background .4s}
+.bd.theirs .bd-rack{background:var(--grain),linear-gradient(#3f2c1e,#33231a 20%,#271a11)}
+.bd.mine .bd-rack{box-shadow:inset 0 1px 0 #ffffff30,0 0 0 2px #ffbf6bcc,0 -6px 28px #ffb05a55,0 3px 0 #1b0f08}
 .bd-rack.over{box-shadow:inset 0 0 0 3px #ffffff88,0 3px 0 #1b0f08}
-.bd-hand{--tw:var(--rtw);--th:calc(var(--rtw)*1.4);display:flex;flex-wrap:wrap;align-content:flex-start;gap:4px 3px;padding:10px 8px 4px;overflow-y:auto;overscroll-behavior:contain;border-radius:8px;background:var(--groove);box-shadow:inset 0 6px 10px #000b}
-.hs{position:relative;display:flex}.brk{display:block;width:10px}
+.bd-hand{--tw:var(--rtw);--th:var(--rth);position:relative;display:grid;gap:4px 3px;align-content:start;justify-content:start;padding:10px 8px 4px;overflow:hidden;border-radius:9px;background:var(--groove);box-shadow:inset 0 6px 10px #000b}
+.cell{position:relative;width:var(--tw);height:calc(var(--th) + 6px);box-sizing:border-box;border-radius:6px;transition:background .1s,box-shadow .1s}
+.cell.vacant{box-shadow:inset 0 0 0 1px #ffffff10,inset 0 2px 4px #0006}
+.bd .cell.tgt{background:#ffbf6b38;box-shadow:inset 0 0 0 2px #ffd79f,0 0 12px #ffbf6b33}
+.bd-hand .cell.tgt::after{content:'+';position:absolute;inset:0;display:grid;place-items:center;color:var(--lamp);font-size:14px;pointer-events:none}
+.rack-tile{display:flex;transition:transform 160ms var(--ease)}
+.bd.dealing .rack-tile{animation:deal .5s var(--spring) both;animation-delay:calc(var(--k)*26ms)}
+@keyframes deal{from{opacity:0;transform:translateY(-80px) rotate(-9deg) scale(.8)}}
 
-/* 오른쪽 열: 손패 정보 · 정렬/추천 · 되돌리기 · 확정/뽑기 */
+/* ── 타일: 숫자는 크고 굵게, 색 모양은 더 크게, 6·9는 밑줄 ── */
+.bd .tile{position:relative;touch-action:none;cursor:grab;gap:1px;margin-bottom:6px;border-radius:calc(var(--tw)*.16);
+  background:linear-gradient(180deg,#fffaf0,#f6ecd5 60%,#e8d9b6);
+  box-shadow:inset 0 1px 0 #fff,inset 0 -3px 0 color-mix(in srgb,currentColor 24%,#dccdaa),0 3px 0 var(--edge),0 4px 0 var(--edge2),0 7px 8px -3px #000a;
+  transition:transform .18s var(--ease),box-shadow .18s}
+.bd .tile.red{color:#c52a18}.bd .tile.blue{color:#1b5fb8}.bd .tile.orange{color:#d65f00}.bd .tile.black{color:#1b1714}.bd .tile.joker{color:#6b3a9e}
+.bd .tile strong{font-size:calc(var(--tw)*.68);font-weight:800;letter-spacing:-.03em;font-variant-numeric:lining-nums;text-shadow:0 1px 0 #fff9}
+.bd .tile strong.u{text-decoration:underline;text-decoration-thickness:max(1.5px,.07em);text-underline-offset:.07em}
+.bd .tile>span{font-size:calc(var(--tw)*.3);line-height:1;opacity:1}
+.bd .tile .rep{font-size:calc(var(--tw)*.26)}
+.bd .tile.fresh{--edge:#d9a24f;--edge2:#a97a2e;animation:none}
+.bd .tile.fresh::before{content:'';position:absolute;top:calc(var(--tw)*.07);right:calc(var(--tw)*.07);width:max(4px,calc(var(--tw)*.15));aspect-ratio:1;border-radius:50%;background:#e8a21b;box-shadow:0 0 0 1px #fff8}
+.bd .tile.selected{transform:translateY(calc(var(--tw)*-.26));filter:drop-shadow(0 0 8px #ffbf6bcc)}
+.bd .tile.ghosted{opacity:.16;filter:none;transform:none}
+.bd .tile.flash{animation:trace 3.2s ease-out}
+.bd .tile.landed{animation:land .26s var(--spring) .18s both}
+@keyframes land{0%{transform:translateY(-5px) scale(1.07)}55%{transform:translateY(1px) scale(.98)}100%{transform:none}}
+.bd .tile.pressing{animation:pickup .16s var(--ease) forwards}
+@keyframes pickup{to{transform:translateY(-4px) scale(1.05);filter:drop-shadow(0 5px 6px #ffbf6b55)}}
+.bd .tile:focus-visible,.bd button:focus-visible{outline:2px solid var(--lamp);outline-offset:4px}
+.bd .ts.ins-b::before,.bd .ts.ins-a::after{display:none}
+
+/* 끄는 중인 타일: 손가락 위쪽에 떠서 놓을 자리를 가리지 않는다. 움직이는 쪽으로 기운다. */
+.bd .ghost{position:absolute;left:0;top:0;z-index:40;pointer-events:none;will-change:transform}
+.bd .ghost>.gstack{display:flex;gap:2px;transform:rotate(var(--tilt,0deg)) scale(1.1);transform-origin:50% 85%;transition:transform .14s ease-out;filter:drop-shadow(0 14px 10px #000a);animation:lift .14s ease-out}
+@keyframes lift{from{transform:scale(1)}}
+.bd .ghost .tile{margin-bottom:0;transform:none;transition:none;cursor:grabbing;animation:none}
+.bd .ghost>.gstack>.ts+.ts{margin-left:0}
+.bd .ghost em{position:absolute;right:-14px;top:-14px;min-width:24px;padding:2px 7px;border-radius:99px;background:var(--lamp);color:#2a1a08;font:800 .8rem var(--f-num);text-align:center;box-shadow:0 2px 0 var(--edge2);font-style:normal}
+.bd .drop-hint{display:none}
+/* 놓는 순간 날아가는 타일 레이어(보드 안: 돌려진 화면에서도 같이 돈다) */
+.tile-flight-layer{position:absolute;inset:0;z-index:35;pointer-events:none;user-select:none;overflow:hidden}
+.tile-flight{position:absolute;transform-origin:top left;pointer-events:none;will-change:transform}
+.tile-flight .tile{width:100%;height:100%;margin:0;opacity:1;transform:none;filter:none;animation:none;transition:none;pointer-events:none}
+
+/* 오른쪽 열: 손패 수 · 정렬/정돈/추천 · 되돌리기 · 확정/뽑기 (터치 영역 40px 이상) */
 .bd-act{grid-area:act;display:flex;flex-direction:column;gap:5px;min-height:0;justify-content:flex-end}
+.bd-controls{display:contents;margin:0;padding:0;border:0;min-width:0}
 .bd-info{display:grid;gap:3px;justify-items:center;font-size:.72rem;font-weight:700;color:#e9dcc2;text-align:center}
-.bd-info b{font:800 1rem var(--f-num)}
-.bd-info .meter{padding-bottom:5px;white-space:normal;font-size:.68rem}
-.bd-tools{display:grid;gap:5px}
-.bd-act button:not(.go){padding:7px 4px!important;min-height:34px;font-size:.76rem;border-radius:10px}
+.bd-info .hc b{font:800 1.25rem var(--f-num);margin-right:2px}
+.bd-info .meter{padding-bottom:5px;white-space:normal;font-size:.66rem}
+.bd-tools{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.bd-sort{grid-column:1/-1}
+.bd-act button:not(.go){min-height:40px;padding:0 4px!important;border-radius:11px;font-size:.78rem}
 .bd-act .bd-sug{background:#ffbf6b30;box-shadow:inset 0 0 0 1px var(--lamp);color:var(--lamp)}
 .bd-act .urow{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
-.bd-act .urow button{padding:0!important;min-height:38px;font-size:1.15rem}
-.bd-act .go{flex:1;max-height:130px;min-height:60px;display:grid;place-content:center;gap:2px;font-size:1.15rem;border-radius:14px}
-.bd-act .go small{font-size:.68rem;font-weight:700;opacity:.7}
+.bd-act .urow button{font-size:1.15rem}
+.bd-act .go{flex:1;min-height:64px;max-height:132px;display:grid;place-content:center;gap:2px;font-size:1.2rem;border-radius:16px}
+.bd-act .go small{font-size:.66rem;font-weight:700;opacity:.7}
 .bd .go.ready{background:linear-gradient(180deg,#e4f8e0,#9bd0a4 55%,#74b083);color:#0f2a14;box-shadow:inset 0 1px 0 #fff,0 4px 0 #4c8559,0 6px 0 #356042,0 10px 12px -4px #000c;animation:okglow 1.6s ease-in-out infinite}
-.bd .go:not(.ready){animation:none}
-.bd .go.arm{background:linear-gradient(180deg,#ffe7b8,var(--lamp));animation:armpulse .8s ease-in-out infinite}
 @keyframes okglow{50%{box-shadow:inset 0 1px 0 #fff,0 4px 0 #4c8559,0 6px 0 #356042,0 0 26px #8fc197cc}}
-.bd.urgent::after{content:'';position:fixed;inset:0;z-index:45;pointer-events:none;box-shadow:inset 0 0 0 3px var(--bad),inset 0 0 36px #ee6a5788;animation:blink 1s infinite}
+.bd .go.wait{font-size:1rem;white-space:nowrap}
+.bd .go.wait small{white-space:nowrap}
+.bd .go.wait,.bd .go.wait:disabled{background:#ffffff0d;color:#a9b7bf;box-shadow:inset 0 0 0 1.5px #8fb0c477;opacity:.9;text-align:center}
 
-/* 길게 누르는 중: 타일이 떠오르며 램프 빛이 차오른다 → 이어진 타일이 하나씩 선택된다 */
-.bd .tile.pressing{animation:pressup .38s ease-out forwards}
-@keyframes pressup{to{transform:translateY(calc(var(--tw)*-.14)) scale(1.08);filter:drop-shadow(0 0 9px var(--lamp))}}
-.bd .tile.selected{filter:drop-shadow(0 0 8px #ffbf6bb0)}
-
-/* 끄는 중인 타일: 손가락 위쪽에 떠서 놓을 자리를 가리지 않는다. 여러 장이면 가로로 이어서 보여준다 */
-.bd .ghost{position:fixed;z-index:40;pointer-events:none;transform:translate(-50%,-50%) scale(1.12) rotate(-2deg);filter:drop-shadow(0 18px 14px #000b)}
-.bd .ghost>.gstack{position:relative;left:auto;top:auto;display:flex}
-.bd .ghost>.gstack>.ts+.ts{margin-left:calc(var(--tw)*-.18)}
-.bd .ghost .tile{margin-bottom:0}
-.bd .ghost em{position:absolute;right:-14px;top:-14px;min-width:24px;padding:2px 7px;border-radius:99px;background:var(--lamp);color:#2a1a08;font:800 .8rem var(--f-num);text-align:center;box-shadow:0 2px 0 var(--edge2);font-style:normal}
-
-/* 세로로 들면 가로 전환 안내가 화면을 덮는다(터치 기기 한정) */
-.rot{display:none}
-@media(orientation:portrait) and (pointer:coarse){
-  .rot{position:fixed;inset:0;z-index:80;display:grid;place-content:center;gap:12px;text-align:center;background:#120b07f5;color:var(--text);font-weight:800;font-size:1.15rem}
-  .rot b{font-size:3.4rem;color:var(--lamp);animation:spin 2.4s ease-in-out infinite}
-}
-@keyframes spin{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(90deg)}}
-
-/* 큰 화면 / 낮은 가로 화면 */
-@media(min-width:900px) and (min-height:600px){.bd{grid-template-columns:minmax(0,1fr) 140px}.bd-act .go{max-height:150px}}
-@media(max-height:430px){.bd{grid-template-columns:minmax(0,1fr) 92px;gap:4px 6px}.bd-top{min-height:34px}.bd-act{gap:4px}.bd-act .go{min-height:52px}.chip2 .who{display:none}}
-
-/* 조합이 나뉘었을 때: 두 조합이 잠깐 빛난다 */
-.bm.pulse{animation:splitpulse 1s ease-out}
-@keyframes splitpulse{0%{box-shadow:inset 0 0 0 3px var(--lamp),0 0 26px var(--lamp)}100%{box-shadow:inset 0 0 0 2px #8fc19766,0 0 0 transparent}}
-
-/* ───── v5: 끼울 수 있는 조합 표시 · 새 조합 영역 · 안내 · 도움말 ───── */
-html{touch-action:manipulation}
-.bd.dragging .bm.fit{background:#8fc19738;box-shadow:inset 0 0 0 3px var(--ok),0 0 18px #8fc19799;animation:fitpulse 1s ease-in-out infinite}
-.bd.dragging .bm.fit::before{content:'+';position:absolute;left:-7px;top:-10px;z-index:3;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--ok);color:#0f2a14;font:800 .95rem/1 var(--f-num);box-shadow:0 1px 3px #000a}
-.bd.dragging .bm.fit.over{background:#8fc1975c;box-shadow:inset 0 0 0 3px #fff,0 0 22px #b9edc0}
-@keyframes fitpulse{50%{box-shadow:inset 0 0 0 3px var(--ok),0 0 6px #8fc19755}}
-.bd.dragging .bd-new{background:#ffffff1c;box-shadow:inset 0 0 0 2px #fff9;border-style:dashed}
-.bd-top .snd.help{font:800 1rem var(--f-num)}
-.coach{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:12px;background:#0b0604d9}
+.bd .banner{position:absolute;left:50%;top:42%;z-index:60;padding:12px 34px;border-radius:16px;background:#120b07ee;box-shadow:0 0 0 2px var(--lamp),0 0 44px #ffbf6b99;color:var(--lamp);font:800 1.7rem var(--f-ui);pointer-events:none;animation:banner 1.3s var(--ease) both}
+@keyframes banner{0%{opacity:0;transform:translate(-50%,-30%) scale(.88)}16%{opacity:1;transform:translate(-50%,-50%) scale(1)}80%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-70%)}}
+.bd .toast{position:absolute;top:calc(56px + var(--sa-t));z-index:70;pointer-events:none}
+.coach{position:absolute;inset:0;z-index:70;display:grid;place-items:center;padding:12px;background:#0b0604e6}
 .coach-card{width:min(100%,560px);max-height:100%;overflow:auto;padding:16px 20px;border-radius:16px;background:linear-gradient(#2c1b10,#1e120a);box-shadow:inset 0 0 0 1px #ffffff26,0 20px 50px #000c;display:grid;gap:10px}
 .coach-card h2{margin:0;font:800 1.1rem var(--f-ui);color:var(--lamp)}
 .coach-card ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
 .coach-card li{display:grid;grid-template-columns:84px 1fr;gap:10px;align-items:baseline;font-size:.85rem;line-height:1.4;color:#d6c8ae}
 .coach-card li b{color:var(--text);font-size:.9rem}
-.coach-card .primary{justify-self:end;padding:10px 22px}
+.coach-card .primary{justify-self:end;padding:12px 24px}
 
-/* ───── v6: 자유 배치 — 칸 손패 · 조합 손잡이 · 캔버스 테이블 ───── */
-.bd-melds{position:relative;display:block;min-height:100%}
-.bm{position:absolute;display:flex;flex-direction:column;gap:0;padding:0 6px 2px;box-sizing:border-box;transition:left .18s ease,top .18s ease,width .18s ease,background .12s,box-shadow .12s}
-.bm::after{inset:-5px -5px}
-.bm-grip{all:unset;box-sizing:border-box;position:relative;display:flex;align-items:center;justify-content:space-between;width:100%;height:16px;flex:none;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
-/* 손잡이는 <button>: 터치는 가까운 버튼으로 보정되므로 타일 버튼에 지지 않게 같은 종류로 만든다 */
-.bm-grip::after{content:'';position:absolute;left:-6px;right:-6px;top:-6px;height:24px}
-.bm-grip .dots{font-size:.8rem;line-height:1;letter-spacing:-1px;color:#ffffff8c;pointer-events:none}
-.bm-grip .bm-badge{position:static;top:auto;right:auto;margin:0;padding:0 6px;line-height:14px;font-size:.62rem}
-.bm-row{display:flex;gap:2px;flex:none}
-.bm.lifted{opacity:.4}
-.bd.dragging .bm-grip .dots{color:#fff}
-.spot{position:absolute;z-index:1;box-sizing:border-box;border-radius:10px;border:2px dashed #ffffffcc;background:#ffffff1f;pointer-events:none;transition:left .06s,top .06s}
-.bd-tidy{position:absolute;right:8px;bottom:8px;z-index:6;min-height:26px;padding:3px 10px!important;border-radius:99px;font-size:.68rem;opacity:.75}
-.bd-tidy:hover{opacity:1}
-
-/* 손패: 칸(slot) 랙 */
-.bd-hand{display:grid;gap:4px 3px;align-content:start;justify-content:start}
-.cell{width:var(--tw);height:calc(var(--th) + 6px);border-radius:6px;box-sizing:border-box;transition:background .1s,box-shadow .1s}
-.cell.vacant{box-shadow:inset 0 0 0 1px #ffffff12}
-.cell.tgt{background:#ffbf6b2e;box-shadow:inset 0 0 0 2px var(--lamp)}
-
-/* 토스트는 안내용: 아래 타일/손잡이를 가리거나 터치를 막지 않는다 */
-.toast{pointer-events:none}
-
-/* Direct manipulation: keep pointer tracking on the compositor, animate edits once. */
-.bd{--motion-ease:cubic-bezier(.2,.8,.2,1)}
-.bd [data-tid]{transform-origin:top left}
-.bd .tile{cursor:grab;transition:transform .18s var(--motion-ease),box-shadow .18s ease}
-.bd .tile:focus-visible,.bd button:focus-visible{outline:2px solid var(--lamp);outline-offset:4px}
-.bd.dragging .tile,.bd.dragging .bm-grip{cursor:grabbing}
-.bd .tile.ghosted{opacity:.16;filter:none;transform:none}
-.bd .tile.fresh{animation:none}
-.bd .tile.flash{animation:trace 3.2s ease-out}
-.bd .bm{transition:background .16s ease,box-shadow .16s ease}
-.bd .bm.lifted{opacity:.3}
-.bd.dragging .bm.fit{animation:none;box-shadow:inset 0 0 0 2px var(--ok),0 0 12px #8fc19744}
-.bd .ghost{left:0;top:0;will-change:transform;filter:none}
-.bd .ghost>.gstack{transform:none;gap:2px;filter:drop-shadow(0 12px 10px #0008)}
-.bd .ghost>.gstack>.ts+.ts{margin-left:0}
-.bd .ghost .tile{transform:none;transition:none;cursor:grabbing}
-.bd .drop-hint{position:absolute;left:50%;top:calc(100% + 14px);transform:translateX(-50%);padding:6px 11px;border:1px solid #ffbf6b66;border-radius:20px;background:#20160bf2;color:#f5e6c9;box-shadow:0 4px 12px #0004;white-space:nowrap;font-size:.72rem;font-weight:700}
-.bd .drop-hint.valid{background:#193923f2;color:#cef0d1;border-color:#8fc197}
-.bd .spot{border:2px solid #ffcf87aa;background:#ffbf6b14;box-shadow:inset 0 0 18px #ffbf6b10;transition:none}
-.bd .cell.tgt{background:#ffbf6b38;box-shadow:inset 0 0 0 2px #ffd79f,0 0 12px #ffbf6b22}
-.bd .ts.ins-b::before,.bd .ts.ins-a::after{width:5px;background:#d1f4ce;box-shadow:0 0 10px #8fc19799}
-.bd .bd-empty{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;text-align:center;padding:20px;color:#ead8b39c}
-.bd-empty b{font-size:clamp(.9rem,1.8vw,1.2rem);font-weight:700}
-.bd-empty span{font-size:clamp(.68rem,1.2vw,.84rem);font-weight:400;color:#d8c5a877}
-.bd-sel{animation:selection-in .16s var(--motion-ease)}
-@keyframes selection-in{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}
-@media(prefers-reduced-motion:reduce){.bd .ghost>.gstack{transform:none}.bd .ghost{will-change:auto}}
-
-/* Independent flight layer keeps tiles visible across the rack's scroll boundary. */
-.tile-flight-layer{position:fixed;inset:0;z-index:60;pointer-events:none;user-select:none;overflow:visible}
-.tile-flight{position:absolute;transform-origin:top left;pointer-events:none;will-change:transform}
-.tile-flight .tile{width:100%;height:100%;margin:0;opacity:1;transform:none;filter:none;animation:none;transition:none;pointer-events:none}
-.tile-flight .tile strong{font-size:calc(var(--tw)*.62)}
-.tile-flight .tile span{font-size:calc(var(--tw)*.3)}
-.bd .tile.pressing{animation:tile-pickup .16s var(--motion-ease) forwards}
-@keyframes tile-pickup{to{transform:translateY(-3px);filter:drop-shadow(0 4px 5px #ffbf6b44)}}
-
-/* Mobile playing surface: tiles first, no scrolling or score trays. */
-.bd-felt{overflow:hidden;touch-action:none;padding:8px;border-radius:12px;background:radial-gradient(ellipse at 50% 40%,#32594d,#203e35 75%);box-shadow:inset 0 0 0 1px #ffffff15,inset 0 4px 16px #0003}
-.bd-melds{min-height:0}
-.bd .bm{padding:0 2px;background:transparent;box-shadow:none;border-radius:5px}
-.bd .bm.bad{background:#ee6a5714;box-shadow:0 0 0 1px #ee6a5770}
-.bd .bm-grip{height:4px;position:relative;z-index:2;justify-content:center}
-.bd .bm-grip::after{inset:-5px 0 auto;height:11px}
-.bd .bm-grip .dots{font-size:10px;line-height:4px;opacity:.3;letter-spacing:3px}
-.bd .bm:hover .dots,.bd .bm.over .dots{opacity:1}
-.bd .bm-row{position:relative;gap:2px}
-.bd .bm-tile{display:flex;flex:none;transition:transform 160ms var(--motion-ease);will-change:transform}
-.bd .bm .tile{border-radius:calc(var(--tw)*.14);box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 #d9cba6,0 2px 0 #b9a57e,0 3px 4px #0004}
-.bd .bm .tile strong{font-size:calc(var(--tw)*.7)}
-.bd .bm .tile>span{font-size:calc(var(--tw)*.19);line-height:1}
-.bd .bm-insert{position:absolute;top:0;height:calc(var(--mtw)*1.4);display:grid;place-items:center;border:1px dashed #d6f2d2b3;border-radius:4px;background:#c9efca20;color:#d6f2d2;font-size:14px;pointer-events:none}
-.bd .bm-error{position:absolute;right:-3px;top:-2px;z-index:3;width:13px;height:13px;border-radius:50%;background:var(--bad);color:white;text-align:center;font:800 10px/13px var(--f-ui);pointer-events:none}
-.bd.dragging .bm:not(.over){box-shadow:none}
-.bd.dragging .bm.fit{background:#8fc19710;box-shadow:0 0 0 1px #b9edc04d}
-.bd.dragging .bm.fit::before{display:none}
-.bd.dragging .bm.over,.bd.dragging .bm.fit.over{background:#c9efca12;box-shadow:0 0 0 1px #c9efca88}
-.bd .ts.ins-b::before,.bd .ts.ins-a::after{display:none}
-.bd-hand{overflow:hidden;padding:10px 8px 4px}
-.bd-rack{min-width:0;padding:3px 4px 4px}
-.bd-tidy{top:5px;bottom:auto;right:5px;min-height:24px;background:#142c2580;box-shadow:none;opacity:.65}
-@media(max-width:899px),(max-height:599px){
-  .bd{grid-template-columns:minmax(0,1fr) 80px;gap:5px 6px}
-  .bd-top{gap:5px;min-height:30px}
-  .bd-top .chips{gap:4px}
-  .bd-top .chip2{padding:2px 5px;gap:4px}
-  .bd-top .chip2 .ring{--s:24px}
-  .bd-top .chip2 .avatar{font-size:.6rem}
-  .bd-top .chip2 .who{display:none}
-  .bd-top .chip2 .cnt{font-size:.7rem;min-width:20px}
-  .bd-top .snd{width:28px;height:28px}
-  .bd-say{font-size:.7rem}
-  .bd-top .mytimer{font-size:.72rem;padding:5px 7px}
-  .bd-top .exit.compact{font-size:.65rem;padding:5px 7px}
-  .bd-act{gap:5px}
-  .bd-act .go{max-height:90px;min-height:52px;font-size:1rem}
-  .bd-act button:not(.go){min-height:32px;font-size:.69rem}
-  .bd-act .urow{gap:3px}
-  .bd-act .urow button{min-height:32px;font-size:1rem}
+/* 보드 크기별 보정(container query: 돌려진 화면에서도 보드 기준) */
+@container bd (max-width:760px){.chip2 .who{display:none}.chip2 .ring{--s:30px}.tp-hint{font-size:.64rem}}
+@container bd (max-width:600px){.bd-top .chips{gap:4px}.tp{padding-inline:8px}.tp-main b{font-size:.9rem}}
+@container bd (max-height:400px){
+  .bd-act{gap:4px}.bd-act button:not(.go){min-height:36px;font-size:.72rem}.bd-act .go{min-height:52px;font-size:1.05rem}
+  .bd-info .hc b{font-size:1.05rem}.bd-info .meter{font-size:.6rem;padding-bottom:4px}
 }
-@media(prefers-reduced-motion:reduce){.bd .bm-tile{transition:none}}
-/* Table controls live with the other controls, clear of every tile. */
-.bd-act .bd-tidy{position:static;opacity:1;border-radius:10px;background:#ffffff0f}
-
-/* Show the exact rack result without moving the fixed drop hit regions. */
-.bd-hand{--th:var(--rth);position:relative}
-.rack-tile{display:flex;transition:transform 160ms var(--motion-ease)}
-.bd-hand .cell.tgt::after{content:'+';position:absolute;inset:0;display:grid;place-items:center;color:var(--lamp);font-size:14px;pointer-events:none}
-.bd-hand .cell{position:relative}
-.bd-selection{display:grid;gap:4px;min-width:0}
-.bd-selection b{text-align:center;color:var(--lamp);font-size:.7rem}
-.bd-selection button{white-space:nowrap}
-.bd.dragging .bm.over.repair{background:#ffbf6b12;box-shadow:0 0 0 1px #ffbf6b99}
-.bd.dragging .bm.over.blocked{background:#ee6a5714;box-shadow:0 0 0 1px var(--bad)}
-.bd .drop-hint.repair{border-color:#ffbf6b99;color:#ffdcaa}
-.bd .drop-hint.blocked{border-color:var(--bad);background:#48261ff5;color:#ffd0c8}
-/* Feedback stays in the header so it cannot cover the tile or a neighboring meld. */
-.bd.dragging .bd-say{color:var(--lamp)}
-.bd .drop-hint{display:none}
-.bd .bm-grip::after{height:9px}
-@media(prefers-reduced-motion:reduce){.rack-tile{transition:none}}
-.bd.dragging .bd-say.valid{color:#b9edc0}
-.bd.dragging .bd-say.blocked{color:#ff9e8c}
-.bd-controls{display:contents;margin:0;padding:0;border:0;min-width:0}
+@container bd (max-height:340px){.bd-tools{grid-template-columns:1fr}.bd-tidy{display:none}.bd-act button:not(.go){min-height:32px}.bd-top{min-height:38px}.tp{height:38px}.menu-btn{width:36px;height:36px}}
+@media(prefers-reduced-motion:reduce){.bd .ghost>.gstack,.bm-tile,.rack-tile{transition:none}.edge{animation:none!important}}
