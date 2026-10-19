@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { Card, CardDeclaration, CardOptions, GameConfig, PendingDecision, PlayedCard, Suit } from '@skullking/shared';
 import { cardArt } from './card-art';
 import { clearSession, emit, saveSession } from './socket';
-import { playCardSound, unlockCardSounds } from './sound';
+import { playCardSound, stopCardSounds, unlockCardSounds } from './sound';
 import { useGame } from './store';
 import { fx } from './fx';
 import { Avatar, Icon } from './icons';
@@ -12,10 +12,10 @@ import './styles.css';
 
 const SFX_PREF='skullking.effects';
 const soundEnabled=()=>{try{return localStorage.getItem(SFX_PREF)!=='off';}catch{return true;}};
-const setSoundEnabled=(enabled:boolean)=>{try{localStorage.setItem(SFX_PREF,enabled?'on':'off');}catch{/* 저장소를 사용할 수 없어도 현재 화면에서는 계속 작동 */}fx.setEnabled(enabled);};
+const setSoundEnabled=(enabled:boolean)=>{try{localStorage.setItem(SFX_PREF,enabled?'on':'off');}catch{/* 저장소를 사용할 수 없어도 현재 화면에서는 계속 작동 */}if(!enabled)stopCardSounds();fx.setEnabled(enabled);};
 fx.setEnabled(soundEnabled());
 /** 사용자 제스처 안에서: 카드 효과음 + 앰비언트 오디오 잠금 해제 */
-const unlock=()=>{unlockCardSounds();fx.unlock();};
+const unlock=()=>{if(!soundEnabled())return;unlockCardSounds();fx.unlock();};
 type Pl=NonNullable<ReturnType<typeof useGame.getState>['game']>['players'][number];
 
 const suits:Record<Suit,{icon:string;name:string}>={parrot:{icon:'parrot',name:'앵무새'},map:{icon:'map',name:'지도'},treasure:{icon:'treasure',name:'보물'},jolly:{icon:'jolly',name:'졸리 로저'}};

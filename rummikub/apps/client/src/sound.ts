@@ -5,9 +5,26 @@ let muted = false;
 try { muted = localStorage.getItem('rk-mute') === '1'; } catch { /* 저장소를 쓸 수 없는 환경 */ }
 const listeners = new Set<() => void>();
 
+/** 지원 브라우저에서는 효과음이 다른 앱의 음악과 함께 재생되도록 요청한다. */
+function preferAmbientAudio() {
+  try {
+    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (audioSession) audioSession.type = 'ambient';
+  } catch { /* 지원하지 않는 브라우저에서는 기본 동작을 쓴다 */ }
+}
+
+/** 음소거 시 컨텍스트까지 닫아 모바일의 오디오 포커스를 확실히 반납한다. */
+function releaseAudioSession() {
+  const active = ctx;
+  ctx = null;
+  noiseBuf = null;
+  if (active && active.state !== 'closed') void active.close().catch(() => undefined);
+}
+
 function ac(): AudioContext | null {
   if (muted) return null;
   try {
+    preferAmbientAudio();
     const C = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!C) return null;
     ctx ??= new C();
@@ -72,6 +89,7 @@ export const sfx = {
   toggle: () => {
     muted = !muted;
     try { localStorage.setItem('rk-mute', muted ? '1' : '0'); } catch { /* 무시 */ }
+    if (muted) releaseAudioSession();
     listeners.forEach(l => l());
     if (!muted) sfx.pick();
     return muted;

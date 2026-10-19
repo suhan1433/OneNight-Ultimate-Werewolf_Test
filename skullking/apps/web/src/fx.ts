@@ -14,12 +14,19 @@ let enabled = true;
 let wantAmbience = false;
 
 const AC = () => (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+function preferAmbientAudio() {
+  try {
+    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (audioSession) audioSession.type = 'ambient';
+  } catch { /* 지원하지 않는 브라우저에서는 기본 동작을 쓴다 */ }
+}
 
 function ensure(): AudioContext | null {
   if (ctx) return ctx;
   const C = AC();
   if (!C) return null;
   try {
+    preferAmbientAudio();
     ctx = new C();
     master = ctx.createGain();
     master.gain.value = 0.9;
@@ -98,6 +105,15 @@ function startAmbience() {
 
 function stopAmbience() { amb?.stop(); amb = null; }
 
+/** 무음 상태에서는 Web Audio 자체를 종료해 다른 음악 앱의 포커스를 붙잡지 않는다. */
+function releaseAudioSession() {
+  stopAmbience();
+  const active = ctx;
+  ctx = null;
+  master = null;
+  if (active && active.state !== 'closed') void active.close().catch(() => undefined);
+}
+
 function tone(freq: number, to: number, dur: number, gain: number, type: OscillatorType = 'sine', delay = 0) {
   const c = ensure(); if (!c || !master || !enabled) return;
   const t = c.currentTime + delay;
@@ -139,7 +155,7 @@ export const fx = {
   },
   setEnabled(on: boolean) {
     enabled = on;
-    if (!on) stopAmbience();
+    if (!on) releaseAudioSession();
     else if (wantAmbience) startAmbience();
   },
   ambience(on: boolean) {

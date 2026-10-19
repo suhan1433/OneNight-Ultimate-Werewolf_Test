@@ -36,6 +36,12 @@ const expiredActionRecoveries = new Map<string, number>();
 // announcements appeared to have no sound.
 const narrationAudio = new Map<string, HTMLAudioElement>();
 const seenNarrations = new Set<string>();
+function preferAmbientAudio() {
+  try {
+    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (audioSession) audioSession.type = 'ambient';
+  } catch { /* 지원하지 않는 브라우저에서는 기본 동작을 쓴다 */ }
+}
 const getNarrationAudio = (audioKey: string) => {
   let audio = narrationAudio.get(audioKey);
   if (!audio) {
@@ -43,6 +49,7 @@ const getNarrationAudio = (audioKey: string) => {
     // case (for example shield_bearer -> shield-bearer.mp3).
     // Keep this relative to Vite's configured base path. In Render, this app
     // is served at /werewolf/, rather than at the site root.
+    preferAmbientAudio();
     audio = new Audio(`${import.meta.env.BASE_URL}${audioKey.replaceAll('_', '-')}.mp3`);
     audio.preload = 'auto';
     // Narration is an announcement, never background music. Be explicit so a
@@ -174,6 +181,8 @@ export function setNarrationEnabled(enabled: boolean) {
   narrationUnlocked = narrationUnlocked || enabled;
   if (!enabled) {
     clearNarration();
+    narrationAudio.forEach(audio => { audio.onended = null; audio.onerror = null; audio.removeAttribute('src'); audio.load(); });
+    narrationAudio.clear();
     seenNarrations.clear();
     return;
   }

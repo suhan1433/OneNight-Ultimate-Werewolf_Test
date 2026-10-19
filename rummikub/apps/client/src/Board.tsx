@@ -158,17 +158,23 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const opps = Array.from({ length: Math.max(0, n - 1) }, (_, i) => view.players[(mineIdx + i + 1) % n]!);
 
   // 손패(칸 랙)와 테이블(자유 캔버스)은 한 화면을 나눠 쓴다.
-  // 손패 높이 예산을 몇 단계로 시험해 보고, 두 타일 크기 중 작은 쪽이 가장 커지는 조합을 고른다.
+  // 손패가 많을수록 랙 몫을 늘려 타일이 지나치게 작아지지 않게 한다.
+  // 테이블은 남은 공간에서 줄이거나 스크롤할 수 있지만, 손패는 항상 조작해야 하므로 조금 더 우선한다.
   const wide = bsz.w >= 900;
   const { hf, layout } = useMemo(() => {
-    const N = Math.max(draft.hand.length, view.hand.length), maxH = wide ? 54 : 44, maxT = wide ? 60 : 52;
+    const N = Math.max(draft.hand.length, view.hand.length);
+    const maxH = wide ? 64 : 54, maxT = wide ? 60 : 52;
+    const handRatios = N >= 36 ? [0.48, 0.44, 0.40, 0.36]
+      : N >= 24 ? [0.44, 0.40, 0.36, 0.32]
+        : [0.38, 0.34, 0.30, 0.26];
     const items: TableItem[] = draft.table.map(m => ({ id: m.id, n: m.tiles.length, pos: tpos[m.id] }));
     let best: { hf: ReturnType<typeof fitHand>; layout: ReturnType<typeof layoutTable>; score: number } | null = null;
-    for (const f of [0.34, 0.30, 0.27, 0.24]) {
+    for (const f of handRatios) {
       const h = fitHand(N, hsz.w, Math.floor(bsz.h * f), maxH);
       const feltH = bsz.h - 44 - 12 - (h.h + 12) - 20 - 8; // 위줄 + 간격 + 손패 받침 + 테이블 안쪽 여백 + 여유
       const L = layoutTable(items, fsz.w, Math.max(0, feltH), maxT, focus);
-      const score = Math.min(L.tw, h.tw + 6);
+      // 테이블 타일이 손패보다 최대 14px 작아지는 것은 허용해, 타일이 많은 손패를 읽기 쉽게 유지한다.
+      const score = Math.min(h.tw, L.tw + 14);
       if (!best || score > best.score) best = { hf: h, layout: L, score };
     }
     return best!;

@@ -124,14 +124,17 @@ const fxKey = 'planet-nine-fx';
 let prefs: FxPrefs = { sound: false, haptic: false };
 try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(fxKey) ?? '{}') }; } catch { /* 기본값 유지 */ }
 export const getFx = () => prefs;
-export const setFx = (next: Partial<FxPrefs>) => { prefs = { ...prefs, ...next }; try { localStorage.setItem(fxKey, JSON.stringify(prefs)); } catch { /* 무시 */ } };
 const buzz: Record<FxKind, number | number[]> = { tap: 8, play: 14, comm: [10, 40, 10], win: [20, 60, 20, 60, 40], fail: [60, 40, 60] };
 const tone: Record<FxKind, [number, number]> = { tap: [520, 0.05], play: [330, 0.08], comm: [880, 0.18], win: [660, 0.4], fail: [160, 0.3] };
 let audio: AudioContext | undefined;
+const preferAmbientAudio = () => { try { const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession; if (session) session.type = 'ambient'; } catch { /* 지원하지 않는 브라우저 */ } };
+const releaseAudioSession = () => { const active = audio; audio = undefined; if (active && active.state !== 'closed') void active.close().catch(() => undefined); };
+export const setFx = (next: Partial<FxPrefs>) => { prefs = { ...prefs, ...next }; try { localStorage.setItem(fxKey, JSON.stringify(prefs)); } catch { /* 무시 */ } if (!prefs.sound) releaseAudioSession(); };
 export function cue(kind: FxKind) {
   if (prefs.haptic) navigator.vibrate?.(buzz[kind]);
   if (!prefs.sound) return;
   try {
+    preferAmbientAudio();
     audio ??= new AudioContext();
     const osc = audio.createOscillator(); const gain = audio.createGain();
     osc.frequency.value = tone[kind][0]; gain.gain.value = 0.04;

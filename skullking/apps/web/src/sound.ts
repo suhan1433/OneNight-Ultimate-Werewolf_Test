@@ -9,18 +9,25 @@ const soundFile=(card:Card,declaration?:PlayedCard['declaration'])=>{
 
 const url=(file:string)=>`${import.meta.env.BASE_URL}audio/${file}.mp3`;
 let soundsUnlocked=false;let unlocking=false;
+let unlockAttempt=0;
+const activeSounds=new Set<HTMLAudioElement>();
+const preferAmbientAudio=()=>{try{const session=(navigator as Navigator & {audioSession?:{type:string}}).audioSession;if(session)session.type='ambient';}catch{/* 지원하지 않는 브라우저 */}};
+const dispose=(audio:HTMLAudioElement)=>{activeSounds.delete(audio);audio.pause();audio.removeAttribute('src');audio.load();};
+
+/** 음소거 직후에도 남아 있는 짧은 효과음을 중지해 오디오 포커스를 반납한다. */
+export function stopCardSounds(){unlockAttempt++;unlocking=false;soundsUnlocked=false;[...activeSounds].forEach(dispose);}
 
 /** Plays a disposable instance so simultaneous special-card effects never cut each other off. */
 export function playCardSound({card,declaration}:PlayedCard){
   const file=soundFile(card,declaration);if(!file||typeof Audio==='undefined')return;
-  const audio=new Audio(url(file));audio.preload='auto';audio.volume=.7;
-  audio.addEventListener('ended',()=>{audio.removeAttribute('src');audio.load();},{once:true});
-  void audio.play().catch(()=>{/* A browser may block audio until the player's first interaction. */});
+  preferAmbientAudio();const audio=new Audio(url(file));audio.preload='auto';audio.volume=.7;activeSounds.add(audio);
+  audio.addEventListener('ended',()=>dispose(audio),{once:true});
+  void audio.play().catch(()=>dispose(audio));
 }
 
 /** Unlocks media playback inside a user gesture so later socket updates can play their effects. */
 export function unlockCardSounds(){
-  if(soundsUnlocked||unlocking||typeof Audio==='undefined')return;unlocking=true;
-  const audio=new Audio(url('escape'));audio.muted=true;audio.volume=0;
-  void audio.play().then(()=>{audio.pause();audio.removeAttribute('src');audio.load();soundsUnlocked=true;unlocking=false;}).catch(()=>{unlocking=false;/* The next user gesture will retry. */});
+  if(soundsUnlocked||unlocking||typeof Audio==='undefined')return;unlocking=true;const attempt=++unlockAttempt;
+  preferAmbientAudio();const audio=new Audio(url('escape'));audio.muted=true;audio.volume=0;activeSounds.add(audio);
+  void audio.play().then(()=>{dispose(audio);if(attempt!==unlockAttempt)return;soundsUnlocked=true;unlocking=false;}).catch(()=>{dispose(audio);if(attempt===unlockAttempt)unlocking=false;/* 다음 사용자 입력에서 재시도 */});
 }
