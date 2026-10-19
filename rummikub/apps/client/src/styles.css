@@ -660,10 +660,15 @@ html{touch-action:manipulation}
 .bd-info{display:grid;gap:3px;justify-items:center;font-size:.72rem;font-weight:700;color:#e9dcc2;text-align:center}
 .bd-info .hc b{font:800 1.25rem var(--f-num);margin-right:2px}
 .bd-info .meter{padding-bottom:5px;white-space:normal;font-size:.66rem}
-.bd-tools{display:grid;grid-template-columns:1fr 1fr;gap:5px}
-.bd-sort{grid-column:1/-1}
+.bd-tools{display:grid;grid-template-columns:1fr;gap:5px}
+.bd-sorts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.bd-act .bd-sorts button{font-weight:800;transition:background .15s,box-shadow .15s,color .15s}
+.bd-act .bd-sorts button{min-height:50px;font-size:.84rem}
+.bd-act .bd-tidy{min-height:46px}
+.bd-act .urow button{min-height:46px}
+.bd-act .go{max-height:160px}
+.bd-act .bd-sorts button[aria-pressed=true]{background:#ffbf6b2e;box-shadow:inset 0 0 0 1.5px var(--lamp);color:var(--lamp)}
 .bd-act button:not(.go){min-height:40px;padding:0 4px!important;border-radius:11px;font-size:.78rem}
-.bd-act .bd-sug{background:#ffbf6b30;box-shadow:inset 0 0 0 1px var(--lamp);color:var(--lamp)}
 .bd-act .urow{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
 .bd-act .urow button{font-size:1.15rem}
 .bd-act .go{flex:1;min-height:64px;max-height:132px;display:grid;place-content:center;gap:2px;font-size:1.2rem;border-radius:16px}
@@ -692,5 +697,16 @@ html{touch-action:manipulation}
   .bd-act{gap:4px}.bd-act button:not(.go){min-height:36px;font-size:.72rem}.bd-act .go{min-height:52px;font-size:1.05rem}
   .bd-info .hc b{font-size:1.05rem}.bd-info .meter{font-size:.6rem;padding-bottom:4px}
 }
-@container bd (max-height:340px){.bd-tools{grid-template-columns:1fr}.bd-tidy{display:none}.bd-act button:not(.go){min-height:32px}.bd-top{min-height:38px}.tp{height:38px}.menu-btn{width:36px;height:36px}}
+@container bd (max-height:340px){.bd-act button:not(.go){min-height:32px}.bd-top{min-height:38px}.tp{height:38px}.menu-btn{width:36px;height:36px}}
 @media(prefers-reduced-motion:reduce){.bd .ghost>.gstack,.bm-tile,.rack-tile{transition:none}.edge{animation:none!important}}
+
+/* ── v7.1 손패: 완성된 덩어리 표시 · 램프 · 질감 · 알림 ── */
+.cell.rd::before{content:'';position:absolute;left:-2px;right:-2px;bottom:-2px;height:4px;background:linear-gradient(90deg,#ffe2ad,#ffb05a);box-shadow:0 0 10px #ffbf6bff;transform-origin:0 50%;animation:rd-in .45s var(--ease) both}
+.cell.rd-s::before{left:2px;border-radius:2px 0 0 2px}.cell.rd-e::before{right:2px;border-radius:0 2px 2px 0}
+@keyframes rd-in{from{transform:scaleX(0);opacity:0}}
+.bd-felt::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(ellipse 65% 75% at 50% 0%,#ffe6b024,transparent 72%)}
+.bd.theirs .bd-felt::before{background:radial-gradient(ellipse 65% 75% at 50% 0%,#bcd3e11c,transparent 72%)}
+.bd .tile{background:radial-gradient(#0000000f .6px,transparent .8px) 0 0/3px 3px,linear-gradient(180deg,#fffaf0,#f6ecd5 60%,#e8d9b6)}
+.bd .banner.slate{color:#cfe2ee;box-shadow:0 0 0 2px var(--slate),0 0 40px #8fb0c466;font-size:1.35rem}
+.bd-info .hc b{display:inline-block;animation:bump .3s var(--spring)}
+@keyframes bump{from{transform:scale(1.5)}}

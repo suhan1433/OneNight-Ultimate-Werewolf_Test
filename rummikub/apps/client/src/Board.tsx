@@ -5,7 +5,7 @@ import type { PublicView } from '@rummikub/protocol';
 import { webPlatform } from '@rummikub/platform';
 import { emit } from './socket.js';
 import { sfx } from './sound.js';
-import { Ring, SortMode, TileView, isNum, smartSort, sortByColor, sortByNumber, suggestedMelds } from './tiles.js';
+import { Ring, SortMode, TileView, isNum, sortByColor, sortByNumber } from './tiles.js';
 import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker, jokerReplacement } from './editor.js';
 import { HAND, MELD, Pos, Slots, arrangeSlots, findSpot, fitHand, fitMobileHand, layoutTable, meldInsertIndex, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
 import { checkMeld } from './meldRules.js';
@@ -82,6 +82,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const [flash, setFlash] = useState<Set<number>>(new Set());
   const [newIds, setNewIds] = useState<Set<number>>(new Set());
   const [banner, setBanner] = useState('');
+  const [slate, setSlate] = useState(false);
   const [coach, setCoach] = useState(() => { try { return localStorage.getItem('rk-coach2') !== '1'; } catch { return false; } });
   const [drawBusy, setDrawBusy] = useState(false);
   const [commitBusy, setCommitBusy] = useState(false);
@@ -92,7 +93,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const [pop, setPop] = useState<Set<string>>(new Set());
   const [dealing, setDealing] = useState(false);
   const tiltT = useRef<ReturnType<typeof setTimeout>>();
-  const [sortMode, setSortMode] = useState<SortMode>('smart');
+  const [sortMode, setSortMode] = useState<SortMode>('num');
   const committing = useRef(false);
   const home = useRef(new Map<number, number>());        // 손패를 떠난 타일의 원래 칸(되돌리면 거기로)
   const arranged = useRef(false);
@@ -179,7 +180,6 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const needInitial = !!self && !self.hasInitialMeld;
   const initialReady = !needInitial || placedPoints >= view.config.initialMeldMin;
   const canCommit = myTurn && changed && placed.length > 0 && badIds.length === 0 && initialReady;
-  const suggestions = useMemo(() => (myTurn ? suggestedMelds(draft.hand, allow) : []), [draft.hand, allow, myTurn]);
   const remaining = Math.max(0, Math.ceil(((view.turn?.deadline ?? now) - now) / 1000));
   const pct = Math.min(100, (remaining / view.config.turnSeconds) * 100);
   const current = view.players.find(p => p.id === view.turn?.playerId);
@@ -214,12 +214,22 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const slotsV = useMemo(() => normalizeSlots(slots, draft.hand.map(t => t.id), hf.cells, home.current), [slots, draft.hand, hf.cells]);
   useEffect(() => { if (!sameSlots(slots, slotsV)) setSlots(slotsV); }, [slotsV]);
   const handMap = useMemo(() => new Map(draft.hand.map(t => [t.id, t])), [draft.hand]);
+  // 손패에서 한 줄로 이어 붙어 이미 "완성된" 덩어리: 아래에 램프빛 줄을 그어 준다.
+  const readyCells = useMemo(() => {
+    const out = new Map<number, 's' | 'm' | 'e'>(); let seg: number[] = [];
+    const flush = () => {
+      if (seg.length >= 3 && check({ id: 'rack', type: 'run', tiles: seg.map(i => ({ tileId: slotsV[i]! })) }).ok) seg.forEach((ci, k) => out.set(ci, k === 0 ? 's' : k === seg.length - 1 ? 'e' : 'm'));
+      seg = [];
+    };
+    slotsV.forEach((id, i) => { if (i % hf.cols === 0) flush(); if (id != null && pool.has(id)) seg.push(i); else flush(); });
+    flush(); return out;
+  }, [slotsV, hf.cols, pool, allow]);
   const handBySlots = useMemo(() => slotsV.map(id => (id == null ? undefined : handMap.get(id))).filter((t): t is Tile => !!t), [slotsV, handMap]);
   const captureMotion = useTileMotion(bdRef, [slotsV, layout], r => (bdRef.current ? toLocalRect(stage(), fr, r) : r));
   const arrange = (hand: Tile[], breaks: ReadonlySet<number>): Slots | null => { const g = groupsOf(hand, breaks); return arrangeSlots(g, hf.cols, hf.cells, 1) ?? arrangeSlots(g, hf.cols, hf.cells, 0); };
   useEffect(() => { // 첫 입장: 추천 정리(묶음 사이는 빈 칸)로 시작
     if (arranged.current || !hsz.w || !draft.hand.length) return; arranged.current = true;
-    const s = smartSort(draft.hand), a = arrange(s.hand, s.breaks); if (a) setSlots(a); sfx.deal(draft.hand.length);
+    const s = sortByNumber(draft.hand), a = arrange(s.hand, s.breaks); if (a) setSlots(a); sfx.deal(draft.hand.length);
     if (!view.tableTiles.length) { setDealing(true); setTimeout(() => setDealing(false), 1400); }
   }, [hsz.w, draft.hand.length, hf.cols, hf.cells]);
 
@@ -248,8 +258,14 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     setPop(new Set(fresh)); const t = setTimeout(() => setPop(new Set()), 800); return () => clearTimeout(t);
   }, [validIds]);
   useEffect(() => { if (myTurn && remaining > 0 && remaining <= 5) { sfx.tick(); if (remaining <= 3) webPlatform.haptics.tick(); } }, [remaining, myTurn]);
+  const prevTurn = useRef(view.turn?.playerId);
+  useEffect(() => { // 차례가 상대에게 넘어갈 때도 조용히 알려 준다
+    const id = view.turn?.playerId;
+    if (id && prevTurn.current && id !== prevTurn.current && id !== me) { setSlate(true); setBanner(`${view.players.find(p => p.id === id)?.name ?? '상대'} 차례`); setTimeout(() => setBanner(''), 1100); }
+    prevTurn.current = id;
+  }, [view.turn?.playerId]);
   const wasMine = useRef(myTurn);
-  useEffect(() => { if (myTurn && !wasMine.current) { sfx.turn(); webPlatform.haptics.success(); setBanner('내 차례!'); setTimeout(() => setBanner(''), 1300); } wasMine.current = myTurn; }, [myTurn]);
+  useEffect(() => { if (myTurn && !wasMine.current) { sfx.turn(); webPlatform.haptics.success(); setSlate(false); setBanner('내 차례!'); setTimeout(() => setBanner(''), 1300); } wasMine.current = myTurn; }, [myTurn]);
 
   // Game edits and local organization share one chronological undo history.
   const snapshot = (): EditSnapshot => ({ draft, slots: slotsV, tpos, sortMode });
@@ -323,14 +339,6 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     captureMotion(); remember();
     setTpos(p => ({ ...p, [id]: toFrac(s) })); setFocus(new Set([id])); sfx.clack(); webPlatform.haptics.tick();
   };
-  const placeSuggestion = (sm: Meld) => {
-    const ordered = asServer(sm), ids = ordered.tiles.map(e => e.tileId);
-    const r = moveTiles({ ...draft, hand: handBySlots }, ids, { to: 'new' }, ctx);
-    if (!r.ok) { game.setNotice(r.reason); return; }
-    const leaving = ids.map(id => [id, slotsV.indexOf(id)] as const);
-    const table = r.draft.table.map(m => (m.id === r.meldId ? rebuild({ ...m, tiles: ids.map(tileId => ({ tileId })) }) : m));
-    if (apply({ ...r, draft: { ...r.draft, table } })) { leaving.forEach(([id, i]) => { if (i >= 0) home.current.set(id, i); }); sfx.clack(); webPlatform.haptics.tick(); }
-  };
   const step = (from: EditSnapshot[], setFrom: (f: EditSnapshot[]) => void, to: EditSnapshot[], setTo: (t: EditSnapshot[]) => void) => {
     const s = from[from.length - 1]; if (!s || commitBusy || drawBusy) return;
     captureMotion();
@@ -341,13 +349,12 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const undo = () => step(past, setPast, future, setFuture);
   const redo = () => step(future, setFuture, past, setPast);
   const reset = () => { if (!changed) return; captureMotion(); remember(); setDraft({ hand: mergeHandOrder(draft.hand, view.hand), table: view.table.map(asServer) }); setSelected([]); };
-  const cycleSort = () => {
+  /** 숫자순/색상순 모두 "완성된 조합은 한 칸씩 띄워서" 배치한다. 같은 버튼을 다시 누르면 다시 정리한다. */
+  const sortBy = (mode: 'num' | 'color') => {
     captureMotion('sort');
-    const next: SortMode = sortMode === 'smart' ? 'num' : sortMode === 'num' ? 'color' : 'smart';
-    const cur = handBySlots;
-    const r = next === 'smart' ? smartSort(cur) : next === 'color' ? sortByColor(cur) : { hand: sortByNumber(cur), breaks: new Set<number>() };
+    const r = mode === 'color' ? sortByColor(handBySlots) : sortByNumber(handBySlots);
     const a = arrange(r.hand, r.breaks); if (a && !sameSlots(a, slotsV)) { remember(); setSlots(a); }
-    setSortMode(next); setNewIds(new Set());
+    setSortMode(mode); setNewIds(new Set()); sfx.pick(); webPlatform.haptics.tick();
   };
   const tidyTable = () => { if (!draft.table.length) return; captureMotion('sort'); remember(); setTpos({}); setFocus(new Set()); sfx.pick(); };
   const send = (event: string) => emit(event, { roomId: view.roomId, clientSeq: game.next() }).catch((e: Error) => game.setNotice(e.message));
@@ -562,7 +569,6 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     : needInitial ? `첫 등록 ${view.config.initialMeldMin}점 이상 · 타일을 끌어 놓으세요` : '끌어서 놓기 · 길게 누르면 이어진 타일이 늘어나요';
   const urgent = myTurn && remaining <= 10;
   const insOf = (id: number) => (drag && drag.drop.tid === id && drag.drop.kind === 'meld' ? (drag.drop.after ? 'a' : 'b') : null);
-  const sortLabel = { smart: '조합순', num: '숫자순', color: '색상순', custom: '내 배열' }[sortMode];
   const tv = (t: Tile, extra: Partial<React.ComponentProps<typeof TileView>> = {}) => <TileView key={t.id} tile={t} selected={selSet.has(t.id)} ghosted={!!drag?.ids.includes(t.id)} pressing={press === t.id} landed={landed.has(t.id)} ins={insOf(t.id)} {...extra} />;
   const rackPreview = useMemo(() => {
     if (drag?.drop.kind !== 'rack' || drag.drop.slot === undefined) return null;
@@ -603,7 +609,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       onContextMenu={e => e.preventDefault()} onPointerDown={onDown} onLostPointerCapture={() => { if (gest.current) A.current.cancel(); }} onClickCapture={e => { if (suppressClick.current) { e.stopPropagation(); suppressClick.current = false; } }}>
       <div className="edge" aria-hidden="true" />
       <div className="tline" aria-hidden="true"><i style={{ transform: `scaleX(${(view.turn ? pct : 0) / 100})` }} /></div>
-      {banner && <div className="banner" aria-hidden="true">{banner}</div>}
+      {banner && <div className={`banner ${slate ? 'slate' : ''}`} aria-hidden="true">{banner}</div>}
       <header className="bd-top">
         <div className="chips">{opps.map(p => <OppChip key={p.id} p={p} active={view.turn?.playerId === p.id} remaining={remaining} pct={pct} />)}</div>
         <div className={`tp ${myTurn ? 'mine' : 'theirs'} ${urgent ? 'danger' : ''}`} role="status" aria-live="polite">
@@ -669,20 +675,22 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
 
       <section className={`bd-rack ${drag?.drop.kind === 'rack' ? 'over' : ''}`} data-rack aria-label="내 손패">
         <div ref={handRef} className="bd-hand" style={{ height: hf.h, gridTemplateColumns: `repeat(${hf.cols}, var(--rtw))` }}>
-          {slotsV.map((id, i) => { const t = id == null ? undefined : handMap.get(id); return <div key={i} data-slot={i} className={`cell ${t ? '' : 'vacant'} ${tgt.has(i) ? 'tgt' : ''}`}>{t && <span className="rack-tile" style={{ ['--k' as string]: i, transform: rackDestinations.has(t.id) && !drag?.ids.includes(t.id) ? `translate(${(rackDestinations.get(t.id)! % hf.cols - i % hf.cols) * (hf.tw + HAND.gapX)}px, ${(Math.floor(rackDestinations.get(t.id)! / hf.cols) - Math.floor(i / hf.cols)) * (Math.round(hf.tw * 1.4) + HAND.rowExtra)}px)` : undefined }}>{tv(t, { isNew: newIds.has(t.id) })}</span>}</div>; })}
+          {slotsV.map((id, i) => { const t = id == null ? undefined : handMap.get(id); return <div key={i} data-slot={i} className={`cell ${t ? '' : 'vacant'} ${tgt.has(i) ? 'tgt' : ''} ${readyCells.has(i) ? `rd rd-${readyCells.get(i)}` : ''}`}>{t && <span className="rack-tile" style={{ ['--k' as string]: i, transform: rackDestinations.has(t.id) && !drag?.ids.includes(t.id) ? `translate(${(rackDestinations.get(t.id)! % hf.cols - i % hf.cols) * (hf.tw + HAND.gapX)}px, ${(Math.floor(rackDestinations.get(t.id)! / hf.cols) - Math.floor(i / hf.cols)) * (Math.round(hf.tw * 1.4) + HAND.rowExtra)}px)` : undefined }}>{tv(t, { isNew: newIds.has(t.id) })}</span>}</div>; })}
         </div>
       </section>
 
       <aside className="bd-act">
         <fieldset className="bd-controls" disabled={commitBusy || drawBusy} aria-label="게임 조작">
         <div className="bd-info">
-          <span className="hc"><b>{draft.hand.length}</b>장{newIds.size > 0 && <em className="newbadge">NEW {newIds.size}</em>}</span>
+          <span className="hc"><b key={draft.hand.length}>{draft.hand.length}</b>장{newIds.size > 0 && <em className="newbadge">NEW {newIds.size}</em>}</span>
           {needInitial && <span className={`meter ${initialReady ? 'done' : ''}`}><i style={{ width: `${Math.min(100, (placedPoints / view.config.initialMeldMin) * 100)}%` }} />첫 등록 {placedPoints}/{view.config.initialMeldMin}</span>}
         </div>
+        <div className="bd-sorts" role="group" aria-label="손패 정렬">
+          <button aria-pressed={sortMode === 'num'} onClick={() => sortBy('num')}>숫자순</button>
+          <button aria-pressed={sortMode === 'color'} onClick={() => sortBy('color')}>색상순</button>
+        </div>
         <div className="bd-tools">
-          <button className="bd-sort" onClick={cycleSort} aria-label={`손패 정렬: 지금 ${sortLabel}`}>{sortLabel}</button>
-          <button className="bd-tidy" onClick={tidyTable} aria-label="테이블 조합 자동 정돈" title="테이블 정돈">정돈</button>
-          {myTurn && suggestions[0] && <button className="bd-sug" onClick={() => placeSuggestion(suggestions[0]!)} aria-label="추천 조합 내기">추천 {suggestions.length}</button>}
+          <button className="bd-tidy" onClick={tidyTable} aria-label="테이블 조합 자동 정돈" title="테이블 정돈">테이블 정돈</button>
         </div>
         <div className="urow">
           <button disabled={!past.length || commitBusy || drawBusy} onClick={undo} aria-label="되돌리기">↶</button>
