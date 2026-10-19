@@ -21,18 +21,25 @@ export function buildNightActionQueue(selectedRoles, players) {
     return NIGHT_ROLES.filter((r) => selected.has(r.id)).map((r) => ({
         id: randomUUID(), role: r.id, playerIds: players.filter((p) => p.originalRole === r.id).map((p) => p.id), actedPlayerIds: [],
         order: r.nightOrder, startedAt: 0, expiresAt: 0, status: 'pending'
-    }));
+    })).filter((action) => action.playerIds.length > 0);
+}
+/**
+ * Socket snapshots are discarded by the client when their revision is not
+ * newer. Date.now() alone can repeat within one submit/resolve turn, which
+ * used to let the private-result snapshot be discarded after the submit
+ * snapshot. Keep revisions strictly increasing within a room.
+ */
+export function nextRoomVersion(room, now = Date.now()) {
+    return Math.max(now, room.updatedAt + 1);
 }
 export function startCurrentAction(room, now = Date.now()) {
-    const queue = [...room.nightActionQueue];
-    const current = queue[room.currentNightActionIndex];
-    if (!current)
+    if (!room.nightActionQueue.length)
         return startDay(room, now);
-    // 선택된 역할은 실제 소유자가 없어도 사회자 안내와 추리의 타이밍이
-    // 동일해야 한다. 배정 여부를 노출하지 않도록 항상 설정된 제한 시간을 쓴다.
+    // Every owner chooses at the same time. Commands are deliberately applied
+    // later, in queue order, so concurrent input cannot change rule ordering.
     const duration = room.actionTimeLimitSeconds * 1000;
-    queue[room.currentNightActionIndex] = { ...current, status: 'active', startedAt: now, expiresAt: now + duration };
-    return { ...room, nightActionQueue: queue, updatedAt: now };
+    const queue = room.nightActionQueue.map((action) => ({ ...action, status: 'active', startedAt: now, expiresAt: now + duration }));
+    return { ...room, nightActionQueue: queue, currentNightActionIndex: 0, pendingNightCommands: {}, nightResolutionExpiresAt: null, updatedAt: nextRoomVersion(room, now) };
 }
 // The opening narration is 3.984 seconds. Keep a small transport/rendering
 // buffer so every client sees the night intro before the first role appears.
@@ -43,7 +50,7 @@ export function startNightIntro(room, now = Date.now()) {
     if (!current)
         return startDay(room, now);
     queue[room.currentNightActionIndex] = { ...current, status: 'pending', startedAt: now, expiresAt: now + NIGHT_INTRO_DURATION_MS };
-    return { ...room, nightActionQueue: queue, updatedAt: now };
+    return { ...room, nightActionQueue: queue, updatedAt: nextRoomVersion(room, now) };
 }
 export function advanceNight(room, status, now = Date.now()) {
     const queue = [...room.nightActionQueue];
@@ -51,13 +58,75 @@ export function advanceNight(room, status, now = Date.now()) {
     if (action)
         queue[room.currentNightActionIndex] = { ...action, status };
     const nextIndex = room.currentNightActionIndex + 1;
-    const next = { ...room, nightActionQueue: queue, currentNightActionIndex: nextIndex, nightLog: action ? [...room.nightLog, { actionId: action.id, role: action.role, status, at: now }] : room.nightLog, updatedAt: now };
+    const next = { ...room, nightActionQueue: queue, currentNightActionIndex: nextIndex, nightLog: action ? [...room.nightLog, { actionId: action.id, role: action.role, status, at: now }] : room.nightLog, updatedAt: nextRoomVersion(room, now) };
     return nextIndex >= queue.length ? startDay(next, now) : startCurrentAction(next, now);
+}
+export function allNightActionsSubmitted(room) {
+    const submitted = room.pendingNightCommands ?? {};
+    // Completed actions must not keep a copied Doppelganger action from
+    // waiting for their old commands a second time.
+    return room.nightActionQueue
+        .filter((action) => action.status === 'active')
+        .every((action) => action.playerIds.every((id) => !!submitted[id]));
+}
+/** Applies choices after everyone has chosen, then reserves time to show private results before day. */
+export const NIGHT_RESULT_DURATION_MS = 6_000;
+export function resolveParallelNight(room, now = Date.now()) {
+    const commands = room.pendingNightCommands ?? {};
+    let resolved = { ...room, nightActionQueue: room.nightActionQueue.map((action) => ({ ...action })) };
+    const copiedActions = [];
+    for (let index = 0; index < resolved.nightActionQueue.length; index += 1) {
+        const action = resolved.nightActionQueue[index];
+        if (action.status !== 'active')
+            continue;
+        resolved.currentNightActionIndex = index;
+        for (const playerId of action.playerIds) {
+            const command = commands[playerId];
+            if (!command)
+                continue;
+            const applied = applyNightAction(resolved, playerId, command);
+            resolved = applied.room;
+            resolved.privateResults[playerId] = applied.result;
+            // A Doppelganger uses the copied card's night ability as a distinct
+            // follow-up choice.  It cannot share the first command slot: the copy
+            // target and, for example, a Seer's inspection are two separate inputs.
+            if (action.role === 'doppelganger' && typeof applied.result.role === 'string') {
+                const copiedRole = applied.result.role;
+                const definition = ROLE_DEFINITIONS[copiedRole];
+                if (definition.nightOrder !== null && copiedRole !== 'doppelganger') {
+                    copiedActions.push({
+                        id: randomUUID(), role: copiedRole, playerIds: [playerId], actedPlayerIds: [],
+                        // This happens immediately after copying, before dawn.  Its order
+                        // only affects presentation because all ordinary choices were
+                        // already collected in the current resolution pass.
+                        order: action.order + 0.1, startedAt: now, expiresAt: now + room.actionTimeLimitSeconds * 1000,
+                        status: 'active', copied: true
+                    });
+                }
+            }
+        }
+        const queue = [...resolved.nightActionQueue];
+        queue[index] = { ...queue[index], status: action.playerIds.every((id) => !!commands[id]) ? 'completed' : 'timeout' };
+        resolved.nightActionQueue = queue;
+        resolved.nightLog = [...resolved.nightLog, { actionId: action.id, role: action.role, status: queue[index].status, at: now }];
+    }
+    if (copiedActions.length) {
+        const queue = [...resolved.nightActionQueue, ...copiedActions];
+        return {
+            ...resolved,
+            nightActionQueue: queue,
+            currentNightActionIndex: queue.length - copiedActions.length,
+            pendingNightCommands: {},
+            nightResolutionExpiresAt: null,
+            updatedAt: nextRoomVersion(room, now)
+        };
+    }
+    return { ...resolved, currentNightActionIndex: 0, pendingNightCommands: {}, nightResolutionExpiresAt: now + NIGHT_RESULT_DURATION_MS, updatedAt: nextRoomVersion(room, now) };
 }
 export function validateNightAction(room, playerId, actionId, command) {
     if (room.phase !== 'night')
         return '현재 밤 페이즈가 아닙니다.';
-    const action = room.nightActionQueue[room.currentNightActionIndex];
+    const action = room.nightActionQueue.find((candidate) => candidate.id === actionId);
     if (!action || action.id !== actionId || action.status !== 'active')
         return '이미 끝났거나 현재 행동이 아닙니다.';
     if (!action.playerIds.includes(playerId) || action.actedPlayerIds.includes(playerId))
@@ -82,17 +151,8 @@ export function validateNightAction(room, playerId, actionId, command) {
         return '센터 카드 1장을 선택하세요.';
     if (role === 'drunk' && command.centerIndexes?.length !== 1)
         return '센터 카드 1장을 선택하세요.';
-    if (role === 'witch') {
-        const inspectingOnly = command.type === 'inspect_center' && targets.length === 0 && command.centerIndexes?.length === 1;
-        const swappingAfterInspection = command.type === 'swap_center' && targets.length === 1 && command.centerIndexes?.length === 1;
-        if (!inspectingOnly && !swappingAfterInspection)
-            return '먼저 센터 카드 1장을 확인한 뒤 교환할 플레이어를 선택하세요.';
-        if (swappingAfterInspection) {
-            const seen = room.privateResults[playerId];
-            if (seen?.kind !== 'witch_seen' || Number(seen.centerIndex) !== command.centerIndexes[0])
-                return '확인한 센터 카드만 플레이어 카드와 교환할 수 있습니다.';
-        }
-    }
+    if (role === 'witch' && !(command.type === 'swap_center' && targets.length === 1 && command.centerIndexes?.length === 1))
+        return '교환할 플레이어와 센터 카드 1장을 선택하세요.';
     if (role === 'werewolf') {
         const wolves = room.players.filter((p) => p.id !== self.id && p.currentRole && WOLF_ROLES.includes(p.currentRole));
         if (!wolves.length && command.type !== 'inspect_center')
@@ -118,11 +178,6 @@ export function applyNightAction(room, playerId, command) {
                 break;
             self.currentRole = target.currentRole;
             result = { kind: 'copied', targetNickname: target.nickname, role: target.currentRole };
-            const copied = target.currentRole && ROLE_DEFINITIONS[target.currentRole];
-            if (copied?.canActAtNight && copied.id !== 'doppelganger') {
-                const follow = { id: randomUUID(), role: copied.id, playerIds: [self.id], actedPlayerIds: [], order: action.order + 0.1, startedAt: 0, expiresAt: 0, status: 'pending', copied: true };
-                room = { ...room, nightActionQueue: [...room.nightActionQueue.slice(0, room.currentNightActionIndex + 1), follow, ...room.nightActionQueue.slice(room.currentNightActionIndex + 1)] };
-            }
             break;
         }
         case 'shield_bearer':
@@ -206,10 +261,7 @@ export function applyNightAction(room, playerId, command) {
             break;
         default: result = { kind: 'confirmed' };
     }
-    // 마법사의 첫 단계(센터 카드 확인)는 행동을 종료하지 않는다. 결과는 해당
-    // 플레이어에게만 저장되고 같은 action 안에서 두 번째 교환 선택으로 이어진다.
-    const isWitchInspection = action.role === 'witch' && command.type === 'inspect_center' && !target;
-    const queue = room.nightActionQueue.map((a, i) => i === room.currentNightActionIndex && !isWitchInspection ? { ...a, actedPlayerIds: [...a.actedPlayerIds, playerId] } : a);
+    const queue = room.nightActionQueue.map((a, i) => i === room.currentNightActionIndex ? { ...a, actedPlayerIds: [...a.actedPlayerIds, playerId] } : a);
     // Keep an immutable, private snapshot at the moment the player acted. This
     // must not be reconstructed from current cards later: other roles can alter
     // those cards after this action has already happened.
@@ -223,7 +275,7 @@ export function applyNightAction(room, playerId, command) {
 // 잘못된 UI 경로를 통해 불필요한 정보가 노출될 수 있으므로 닉네임만 전송한다.
 const privateRole = (p) => ({ nickname: p.nickname });
 export function startDay(room, now = Date.now()) {
-    return { ...room, phase: 'day', dayExpiresAt: now + room.dayTimeLimitSeconds * 1000, updatedAt: now };
+    return { ...room, phase: 'day', dayExpiresAt: now + room.dayTimeLimitSeconds * 1000, nightResolutionExpiresAt: null, updatedAt: nextRoomVersion(room, now) };
 }
 export function calculateVotes(room) {
     const counts = Object.fromEntries(room.players.map((p) => [p.id, 0]));
@@ -276,7 +328,7 @@ export function calculateResult(room) {
     // With no wolves in play, the minion wins only by surviving an execution.
     // If every minion is executed (even alongside villagers), that condition
     // fails and the village wins.
-    if ((wolves.length > 0 && wolfDied) || (wolves.length === 0 && (executed.size === 0 || minions.every((p) => executed.has(p.id)))))
+    if ((wolves.length > 0 && wolfDied) || (wolves.length === 0 && (executed.size === 0 || (minions.length > 0 && minions.every((p) => executed.has(p.id))))))
         winners.push('village');
     // The minion shares a werewolf victory even when they were executed.  A
     // minion only needs to survive for its separate "no werewolves in play"
@@ -287,10 +339,13 @@ export function calculateResult(room) {
         winners.push('minion');
     return { winners: [...new Set(winners)], executedIds, voteCounts, receivedVoteCounts, votes: room.votes, players: players.map((p) => ({ id: p.id, nickname: p.nickname, originalRole: p.originalRole, currentRole: p.currentRole })) };
 }
-export function buildPlayerGameState(room, playerId, actionResults = {}) {
+export function buildPlayerGameState(room, playerId, actionResults = room.privateResults) {
     const self = room.players.find((p) => p.id === playerId);
-    const action = room.nightActionQueue[room.currentNightActionIndex] ?? null;
-    const isActor = !!action?.playerIds.includes(playerId) && action.status === 'active' && !action.actedPlayerIds.includes(playerId);
+    const ownActions = room.nightActionQueue.filter((candidate) => candidate.playerIds.includes(playerId));
+    const action = ownActions.find((candidate) => candidate.status === 'active')
+        ?? (room.nightActionQueue.some((candidate) => candidate.status === 'pending') ? ownActions[0] ?? null : null)
+        ?? (room.nightResolutionExpiresAt ? ownActions.at(-1) ?? null : null);
+    const isActor = !!action?.playerIds.includes(playerId) && action.status === 'active' && !(room.pendingNightCommands ?? {})[playerId];
     let actionContext;
     if (isActor && action) {
         if (['werewolf', 'alpha_wolf', 'minion'].includes(action.role))
@@ -307,8 +362,9 @@ export function buildPlayerGameState(room, playerId, actionResults = {}) {
         botMode: !!room.botMode,
         players: room.players.map((p) => ({ id: p.id, nickname: p.nickname, avatar: p.avatar, isReady: p.isReady, hasConfirmedCard: p.hasConfirmedCard, connected: p.connected, isHost: p.id === room.hostId, hasVoted: !!room.votes[p.id], isBot: !!p.isBot })),
         selectedRoles: room.selectedRoles, currentNightAction: action ? { id: action.id, role: action.role, order: action.order, startedAt: action.startedAt, expiresAt: action.expiresAt, status: action.status, copied: action.copied } : null,
-        isNightActor: isActor, actionContext, actionResult: actionResults[playerId], nightActions: room.privateNightActions?.[playerId] ?? [], votesCompleted: Object.keys(room.votes).length, dayVoteRequests: (room.voteStartRequests ?? []).length, hasRequestedDayVote: (room.voteStartRequests ?? []).includes(playerId), totalPlayers: room.players.length,
+        isNightActor: isActor, actionContext, actionResult: room.nightResolutionExpiresAt ? actionResults[playerId] : undefined, nightActions: room.privateNightActions?.[playerId] ?? [], votesCompleted: Object.keys(room.votes).length, dayVoteRequests: (room.voteStartRequests ?? []).length, hasRequestedDayVote: (room.voteStartRequests ?? []).includes(playerId), totalPlayers: room.players.length,
         dayExpiresAt: room.dayExpiresAt, serverNow: Date.now(), chat: room.chat.slice(-100), lobbyChat: [], publicReveals: room.publicReveals,
-        settings: { actionTimeLimitSeconds: room.actionTimeLimitSeconds, dayTimeLimitSeconds: room.dayTimeLimitSeconds }, result: room.result
+        settings: { actionTimeLimitSeconds: room.actionTimeLimitSeconds, dayTimeLimitSeconds: room.dayTimeLimitSeconds }, result: room.result, nightEndsAt: room.nightResolutionExpiresAt ?? room.nightActionQueue.find((candidate) => candidate.status === 'pending' || candidate.status === 'active')?.expiresAt ?? null,
+        nightResolutionEndsAt: room.nightResolutionExpiresAt ?? null
     };
 }

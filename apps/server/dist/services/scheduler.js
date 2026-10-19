@@ -1,14 +1,16 @@
 import { NARRATOR_LINES } from '@werewolf/shared';
-import { advanceNight, applyNightAction, buildNightActionQueue, calculateResult, startCurrentAction, startNightIntro } from '../game/engine.js';
-import { emitActionStart, emitDayStart, emitRoomState } from '../socket/handlers.js';
+import { allNightActionsSubmitted, buildNightActionQueue, calculateResult, nextRoomVersion, resolveParallelNight, startCurrentAction, startDay, startNightIntro } from '../game/engine.js';
+import { emitDayStart, emitRoomState } from '../socket/handlers.js';
 import { getRoom, getRoomCodes, getVotes, recordVote, saveRoom, withRoomLock } from './redis.js';
 const DISCONNECT_GRACE_MS = 45_000;
 function hasDueWork(room, now) {
     if (!room)
         return false;
     if (room.phase === 'night') {
+        if (room.nightResolutionExpiresAt)
+            return room.nightResolutionExpiresAt <= now;
         const action = room.nightActionQueue[room.currentNightActionIndex];
-        return !!action && (action.expiresAt <= now || (action.status === 'active' && action.playerIds.some((id) => room.players.some((player) => player.id === id && player.isBot) && !action.actedPlayerIds.includes(id))));
+        return !!action && (action.expiresAt <= now || (action.status === 'active' && (allNightActionsSubmitted(room) || room.nightActionQueue.some((nightAction) => nightAction.playerIds.some((id) => room.players.some((player) => player.id === id && player.isBot) && !(room.pendingNightCommands ?? {})[id])))));
     }
     if (room.phase === 'day')
         return !!room.dayExpiresAt && room.dayExpiresAt <= now;
@@ -18,10 +20,7 @@ function hasDueWork(room, now) {
         return room.players.some((p) => !p.connected && !!p.disconnectedAt && p.disconnectedAt + DISCONNECT_GRACE_MS <= now);
     return false;
 }
-function botCommand(room, playerId) {
-    const action = room.nightActionQueue[room.currentNightActionIndex];
-    if (!action)
-        return null;
+function botCommand(room, playerId, action) {
     const targets = room.players.filter((player) => player.id !== playerId && player.connected && player.id !== room.protectedPlayerId).map((player) => player.id);
     const target = targets[0];
     switch (action.role) {
@@ -29,10 +28,7 @@ function botCommand(room, playerId) {
             const hasPackmate = room.players.some((player) => player.id !== playerId && ['werewolf', 'alpha_wolf', 'mystic_wolf', 'dream_wolf'].includes(player.currentRole ?? ''));
             return hasPackmate ? { type: 'confirm' } : { type: 'inspect_center', centerIndexes: [0] };
         }
-        case 'witch':
-            return room.privateResults[playerId]?.kind === 'witch_seen'
-                ? (target ? { type: 'swap_center', targetPlayerIds: [target], centerIndexes: [Number(room.privateResults[playerId].centerIndex)] } : null)
-                : { type: 'inspect_center', centerIndexes: [0] };
+        case 'witch': return target ? { type: 'swap_center', targetPlayerIds: [target], centerIndexes: [0] } : null;
         case 'troublemaker': return targets.length >= 2 ? { type: 'swap_players', targetPlayerIds: targets.slice(0, 2) } : null;
         case 'seer': return target ? { type: 'inspect_player', targetPlayerIds: [target] } : { type: 'inspect_centers', centerIndexes: [0, 1] };
         case 'apprentice_seer': return { type: 'inspect_center', centerIndexes: [0] };
@@ -48,27 +44,19 @@ function botCommand(room, playerId) {
     }
 }
 function runBotNightActions(room) {
-    const action = room.nightActionQueue[room.currentNightActionIndex];
-    if (!action?.status || action.status !== 'active')
+    if (!room.nightActionQueue.some((action) => action.status === 'active'))
         return room;
-    for (const playerId of action.playerIds) {
-        const player = room.players.find((candidate) => candidate.id === playerId);
-        if (!player?.isBot || action.actedPlayerIds.includes(playerId))
-            continue;
-        // A witch has two consecutive choices within one action, so allow its
-        // inspection result to feed directly into its exchange choice.
-        for (let step = 0; step < 2; step += 1) {
-            const command = botCommand(room, playerId);
-            if (!command)
-                break;
-            const applied = applyNightAction(room, playerId, command);
-            room = applied.room;
-            room.privateResults[playerId] = applied.result;
-            if (room.nightActionQueue[room.currentNightActionIndex]?.actedPlayerIds.includes(playerId))
-                break;
+    const pendingNightCommands = { ...(room.pendingNightCommands ?? {}) };
+    for (const action of room.nightActionQueue)
+        for (const playerId of action.playerIds) {
+            const player = room.players.find((candidate) => candidate.id === playerId);
+            if (!player?.isBot || pendingNightCommands[playerId])
+                continue;
+            const command = botCommand(room, playerId, action);
+            if (command)
+                pendingNightCommands[playerId] = command;
         }
-    }
-    return room;
+    return { ...room, pendingNightCommands };
 }
 export function startScheduler(io) {
     const timer = setInterval(async () => {
@@ -98,23 +86,24 @@ export async function processExpiredRoom(io, code) {
         const room = await withRoomLock(code, async (room) => {
             const now = Date.now();
             if (room.phase === 'night') {
-                const current = room.nightActionQueue[room.currentNightActionIndex];
-                if (current?.status === 'pending' && current.expiresAt <= now) {
-                    room = startCurrentAction(room, now);
+                if (room.nightResolutionExpiresAt && room.nightResolutionExpiresAt <= now) {
+                    room = startDay(room, now);
                     transitioned = true;
+                    dayTransition = true;
                     await saveRoom(room);
                 }
-                else if (current?.status === 'active' && current.expiresAt <= now) {
-                    const wasLast = room.currentNightActionIndex === room.nightActionQueue.length - 1;
-                    room = advanceNight(room, current.playerIds.length ? 'timeout' : 'skipped', now);
-                    transitioned = true;
-                    dayTransition = wasLast;
-                    await saveRoom(room);
-                }
-                else if (current?.status === 'active') {
-                    const updated = runBotNightActions(room);
-                    if (updated !== room) {
+                else {
+                    const current = room.nightActionQueue[room.currentNightActionIndex];
+                    if (current?.status === 'pending' && current.expiresAt <= now) {
+                        room = startCurrentAction(room, now);
+                        transitioned = true;
+                        await saveRoom(room);
+                    }
+                    else if (current?.status === 'active') {
+                        const updated = runBotNightActions(room);
                         room = updated;
+                        if (current.expiresAt <= now || allNightActionsSubmitted(room))
+                            room = resolveParallelNight(room, now);
                         transitioned = true;
                         await saveRoom(room);
                     }
@@ -123,7 +112,7 @@ export async function processExpiredRoom(io, code) {
             else if (room.phase === 'day' && room.dayExpiresAt && room.dayExpiresAt <= now) {
                 room.phase = 'voting';
                 room.dayExpiresAt = null;
-                room.updatedAt = now;
+                room.updatedAt = nextRoomVersion(room, now);
                 transitioned = true;
                 await saveRoom(room);
             }
@@ -158,16 +147,21 @@ export async function processExpiredRoom(io, code) {
                 }
                 room.votes = await getVotes(room.roomCode);
                 const eligible = room.players.filter((player) => player.connected || !player.disconnectedAt || player.disconnectedAt + DISCONNECT_GRACE_MS > now);
-                if (eligible.every((player) => !!room.votes[player.id])) {
+                // Bots may cast their deterministic ballot as soon as voting opens,
+                // but they must never turn the voting screen into an automatic result.
+                // A connected human must explicitly confirm a ballot first.
+                const humanHasVoted = room.players.some((player) => !player.isBot && !!room.votes[player.id]);
+                if (humanHasVoted && eligible.every((player) => !!room.votes[player.id])) {
                     room.result = calculateResult(room);
                     room.players = room.players.map((p) => ({ ...p, currentRole: room.result.players.find((x) => x.id === p.id).currentRole }));
                     room.phase = 'result';
                     room.resultExpiresAt = now + 30 * 60 * 1000;
+                    room.updatedAt = nextRoomVersion(room, now);
                     transitioned = true;
                     await saveRoom(room);
                 }
                 else if (botsVoted) {
-                    room.updatedAt = now;
+                    room.updatedAt = nextRoomVersion(room, now);
                     transitioned = true;
                     await saveRoom(room);
                 }
@@ -177,13 +171,8 @@ export async function processExpiredRoom(io, code) {
         if (transitioned) {
             // Queue the narration before the state that reveals its controls. Socket
             // ordering makes the audio instruction arrive before its timer begins.
-            if (room.phase === 'night') {
-                const action = room.nightActionQueue[room.currentNightActionIndex];
-                if (action?.status === 'active')
-                    emitActionStart(io, room);
-                else
-                    io.to(`game:${code}`).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', stateVersion: room.updatedAt, timestamp: Date.now() });
-            }
+            if (room.phase === 'night' && room.nightActionQueue[0]?.status === 'pending')
+                io.to(`game:${code}`).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', stateVersion: room.updatedAt, timestamp: Date.now() });
             await emitRoomState(io, room);
             if (room.phase === 'day' && dayTransition)
                 emitDayStart(io, room);
