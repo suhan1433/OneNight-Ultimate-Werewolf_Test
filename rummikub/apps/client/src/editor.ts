@@ -125,12 +125,12 @@ export function swapJoker(d: Draft, meldId: string, jokerId: number, tileId: num
 }
 
 /** 서버에 보낼 게임 상태의 정규화 문자열.
- * 손패의 "표시 순서"는 포함하지 않는다. 조합은 타일 ID 집합 + 조커 표현값으로만 비교하므로
- * 조합/타일의 나열 순서만 바뀐 경우는 변경으로 보지 않는다. */
+ * 손패의 "표시 순서"는 포함하지 않는다. 조합의 위치/나열 순서는 포함하지 않는다.
+ * 런 내부의 타일 순서는 유효성을 바꾸므로 비교에 포함한다. */
 export function signature(d: Draft): string {
   const hand = d.hand.map(t => t.id).sort((a, b) => a - b).join(',');
   const table = d.table
-    .map(m => m.tiles.map(e => `${e.tileId}${e.represents ? `@${e.represents.color}${e.represents.value}` : ''}`).sort().join(','))
+    .map(m => { const entries = m.tiles.map(e => `${e.tileId}${e.represents ? `@${e.represents.color}${e.represents.value}` : ''}`); return (m.type === 'group' ? entries.sort() : entries).join(','); })
     .sort().join('|');
   return `${hand}#${table}`;
 }

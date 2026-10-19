@@ -1,7 +1,7 @@
 /**
  * 레이아웃/제스처용 순수 함수 — React/DOM 의존 없음.
  *  · 손패  : 칸(slot) 단위 랙. 빈 칸이 곧 사용자가 만든 묶음 구분선이다.
- *  · 테이블: 조합을 자유 위치(캔버스)에 놓고, 겹치면 밀어내고, 안 들어가면 타일을 줄인다.
+ *  · 테이블: 조합을 자유 위치(캔버스)에 놓고, 겹치면 밀어내고, 안 들어가면 빈 공간을 정돈하고 타일을 줄인다.
  */
 import type { Tile } from '@rummikub/rules';
 
@@ -12,6 +12,8 @@ export type HandFit = { tw: number; rows: number; cols: number; cells: number; h
 
 /** 타일 수 n에 더해 자유롭게 옮길 여유 칸 */
 export const handSpare = (n: number) => Math.max(6, Math.ceil(n * 0.25));
+/** 모바일에서는 빈 칸보다 읽고 잡을 수 있는 타일 크기를 우선한다. */
+export const mobileHandSpare = (n: number) => Math.max(4, Math.ceil(n * 0.1));
 
 /** 칸 수가 (n + 여유) 이상이면서 높이 예산 안에 들어가는 가장 큰 타일 */
 export function fitHand(n: number, W: number, budgetH: number, max: number): HandFit {
@@ -27,12 +29,16 @@ export function fitHand(n: number, W: number, budgetH: number, max: number): Han
 
 /** 모바일은 랙 높이를 일정하게 유지하고, 장수와 화면 면적으로 타일 크기를 정한다. */
 export function fitMobileHand(n: number, W: number, H: number): HandFit {
-  const budget = Math.floor(H * 0.32);
-  const screenMax = Math.max(28, Math.min(40, Math.floor(H * 0.09)));
-  const densityMax = Math.floor(Math.sqrt(Math.max(0, W * (budget - HAND.padY)) / ((n + handSpare(n)) * 1.4)) - 7);
-  const fit = fitHand(n, W, budget, Math.max(HAND.min, Math.min(screenMax, densityMax)));
-  // 최소 크기에서도 넘치면 모든 칸을 유지하고 랙 안에서 스크롤한다.
-  return { ...fit, h: Math.min(fit.h, budget) };
+  // A long, shallow rack leaves the table most of the screen. Never hide tiles in a scroll area.
+  const budget = Math.max(42, Math.floor(H * (H > W ? 0.25 : 0.28)));
+  const max = Math.min(38, Math.max(26, Math.floor(H * 0.085)));
+  for (let tw = max; tw >= 1; tw--) {
+    const cols = Math.max(1, Math.floor((W + HAND.gapX) / (tw + HAND.gapX)));
+    const rows = Math.ceil((n + mobileHandSpare(n)) / cols);
+    const h = rows * (Math.round(tw * 1.4) + HAND.rowExtra) + HAND.padY;
+    if (h <= budget) return { tw, cols, rows, cells: rows * cols, h };
+  }
+  return fitHand(n, W, budget, HAND.min);
 }
 
 /** 이전 배치를 최대한 유지하면서 칸 수/타일 구성에 맞춘다. 새 타일은 원래 자리(home) → 마지막 타일 뒤 → 앞쪽 빈 칸 순. */
@@ -55,23 +61,24 @@ export function normalizeSlots(prev: Slots, ids: number[], cells: number, home?:
 export function placeInSlots(slots: Slots, ids: number[], at: number, cols: number): Slots {
   const out: Slots = slots.map(s => (s !== null && ids.includes(s) ? null : s));
   const n = out.length;
+  if (!n || !ids.length || ids.length > n) return slots;
   let idx = Math.max(0, Math.min(n - 1, at));
   if (ids.length <= cols) idx = Math.max(Math.floor(idx / cols) * cols, Math.min(idx, Math.floor(idx / cols) * cols + cols - ids.length)); // 한 줄에 들어가면 줄바꿈 없이
   idx = Math.min(idx, n - ids.length);
-  const rowOf = (i: number) => Math.floor(i / cols);
-  for (const id of ids) {
-    if (out[idx] === null) { out[idx] = id; idx++; continue; }
-    const find = (from: number, dir: 1 | -1, sameRow: boolean) => { let j = from; while (j >= 0 && j < n && out[j] !== null && (!sameRow || rowOf(j) === rowOf(from))) j += dir; return j >= 0 && j < n && out[j] === null && (!sameRow || rowOf(j) === rowOf(from)) ? j : -1; };
-    let j = find(idx, 1, true), dir: 1 | -1 = 1;
-    if (j < 0) { j = find(idx, -1, true); dir = -1; }
-    if (j < 0) { j = find(idx, 1, false); dir = 1; }
-    if (j < 0) { j = find(idx, -1, false); dir = -1; }
-    if (j < 0) return slots;
-    if (dir === 1) for (let k = j; k > idx; k--) out[k] = out[k - 1]!;
-    else for (let k = j; k < idx; k++) out[k] = out[k + 1]!;
-    out[idx] = id; idx++;
-  }
-  return out;
+  // Reserve the entire block at once. Inserting one tile at a time can push
+  // an earlier tile out of the group when a full row needs space on its left.
+  const rowStart = Math.floor(idx / cols) * cols;
+  const rowEnd = Math.min(n, Math.ceil((idx + ids.length) / cols) * cols);
+  const candidates: number[] = [];
+  for (let i = idx; i < idx + ids.length; i++) candidates.push(i);
+  for (let i = idx + ids.length; i < rowEnd; i++) candidates.push(i);
+  for (let i = idx - 1; i >= rowStart; i--) candidates.push(i);
+  for (let i = rowEnd; i < n; i++) candidates.push(i);
+  for (let i = rowStart - 1; i >= 0; i--) candidates.push(i);
+  const remove = new Set(candidates.filter(i => out[i] === null).slice(0, ids.length));
+  if (remove.size < ids.length) return slots;
+  const base = out.filter((_, i) => !remove.has(i));
+  return [...base.slice(0, idx), ...ids, ...base.slice(idx)];
 }
 
 /** 묶음(groups)을 순서대로 놓되 묶음 사이에 gap칸을 비운다. 한 줄에 들어가는 묶음은 줄을 넘지 않게 다음 줄로 보낸다. 칸이 모자라면 null. */
@@ -108,7 +115,7 @@ export type Rect = { x: number; y: number; w: number; h: number };
 export type Pos = { fx: number; fy: number };           // 캔버스 크기에 대한 비율(타일 크기가 바뀌어도 자리가 유지된다)
 export type TableItem = { id: string; n: number; pos?: Pos };
 export type TableLayout = { tw: number; rects: Map<string, Rect>; W: number; H: number; height: number; fits: boolean };
-export const MELD = { padX: 12, gapT: 2, rowExtra: 24, gap: 8, min: 22 };
+export const MELD = { padX: 4, gapT: 2, rowExtra: 10, gap: 10, min: 14 };
 
 export const meldSize = (n: number, tw: number) => ({ w: n * tw + (n - 1) * MELD.gapT + MELD.padX, h: Math.round(tw * 1.4) + MELD.rowExtra });
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -136,18 +143,19 @@ export function findSpot(placed: Rect[], w: number, h: number, W: number, H: num
  * 모든 조합을 W×H 캔버스에 놓는다.
  *  · 저장된 위치(pos)는 최대한 지키고, focus(방금 바뀐 조합)가 우선권을 갖는다 — 겹치면 다른 조합이 밀려난다.
  *  · 위치 없는 조합은 빈자리를 위·왼쪽부터 채운다.
- *  · 다 못 놓으면 타일을 줄이고(이분 탐색), 최소 크기로도 안 되면 아래로 늘려서(스크롤) 놓는다.
+ *  · 빈 공간을 정돈하고 모든 조합이 화면 안에 들어올 때까지 크기를 맞춘다(스크롤 없음).
  */
 export function layoutTable(items: TableItem[], W: number, H: number, maxTw: number, focus: ReadonlySet<string> = new Set()): TableLayout {
   const empty = (tw: number): TableLayout => ({ tw, rects: new Map(), W, H, height: 0, fits: true });
   if (W <= 0 || H <= 0 || !items.length) return empty(Math.min(maxTw, 40));
   const order = [...items].sort((a, b) => Number(focus.has(b.id)) - Number(focus.has(a.id)) || Number(!!b.pos) - Number(!!a.pos));
-  const place = (tw: number, tall: boolean) => {
-    const Hb = tall ? 1e6 : H, placed: Rect[] = [], rects = new Map<string, Rect>();
-    for (const it of order) {
-      const { w, h } = meldSize(it.n, tw); if (w > W) return null;
+  const place = (tw: number, compact = false) => {
+    const Hb = H, placed: Rect[] = [], rects = new Map<string, Rect>();
+    const sequence = compact ? [...items].sort((a, b) => b.n - a.n) : order;
+    for (const it of sequence) {
+      const { w, h } = meldSize(it.n, tw); if (w > W || h > Hb) return null;
       let spot: { x: number; y: number } | null;
-      if (it.pos) {
+      if (it.pos && !compact) {
         const x = clamp(it.pos.fx * W, 0, W - w), y = clamp(it.pos.fy * H, 0, Hb - h), r = { x, y, w, h };
         spot = placed.some(p => overlaps(r, p)) ? findSpot(placed, w, h, W, Hb, { x, y }) : { x, y };
       } else spot = findSpot(placed, w, h, W, Hb);
@@ -157,9 +165,16 @@ export function layoutTable(items: TableItem[], W: number, H: number, maxTw: num
     return rects;
   };
   const done = (tw: number, rects: Map<string, Rect>, fits: boolean): TableLayout => ({ tw, rects, W, H, fits, height: Math.max(H, ...[...rects.values()].map(r => r.y + r.h)) });
-  const top = place(maxTw, false); if (top) return done(maxTw, top, true);
-  let lo = MELD.min, hi = maxTw - 1, found: { tw: number; rects: Map<string, Rect> } | null = null;
-  while (lo <= hi) { const mid = (lo + hi) >> 1, r = place(mid, false); if (r) { found = { tw: mid, rects: r }; lo = mid + 1; } else hi = mid - 1; }
-  if (found) return done(found.tw, found.rects, true);
-  return done(MELD.min, place(MELD.min, true) ?? new Map(), false);
+  // Preserve the player's arrangement first. Compact only when it would force smaller tiles.
+  // Search every size: packing with saved positions is not monotonic, so binary search can miss a fit.
+  for (let tw = maxTw; tw >= 1; tw--) {
+    const rects = place(tw) ?? place(tw, true);
+    if (rects) return done(tw, rects, true);
+  }
+  return empty(1); // Only possible while the viewport has no usable area.
+}
+
+/** Stable insertion boundary based on layout coordinates, never animated tile positions. */
+export function meldInsertIndex(x: number, n: number, tw: number): number {
+  return clamp(Math.floor((x - MELD.padX / 2 + tw / 2) / (tw + MELD.gapT)), 0, n);
 }

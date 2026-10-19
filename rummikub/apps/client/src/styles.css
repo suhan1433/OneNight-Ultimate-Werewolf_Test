@@ -659,3 +659,71 @@ html{touch-action:manipulation}
 .tile-flight .tile span{font-size:calc(var(--tw)*.3)}
 .bd .tile.pressing{animation:tile-pickup .16s var(--motion-ease) forwards}
 @keyframes tile-pickup{to{transform:translateY(-3px);filter:drop-shadow(0 4px 5px #ffbf6b44)}}
+
+/* Mobile playing surface: tiles first, no scrolling or score trays. */
+.bd-felt{overflow:hidden;touch-action:none;padding:8px;border-radius:12px;background:radial-gradient(ellipse at 50% 40%,#32594d,#203e35 75%);box-shadow:inset 0 0 0 1px #ffffff15,inset 0 4px 16px #0003}
+.bd-melds{min-height:0}
+.bd .bm{padding:0 2px;background:transparent;box-shadow:none;border-radius:5px}
+.bd .bm.bad{background:#ee6a5714;box-shadow:0 0 0 1px #ee6a5770}
+.bd .bm-grip{height:4px;position:relative;z-index:2;justify-content:center}
+.bd .bm-grip::after{inset:-5px 0 auto;height:11px}
+.bd .bm-grip .dots{font-size:10px;line-height:4px;opacity:.3;letter-spacing:3px}
+.bd .bm:hover .dots,.bd .bm.over .dots{opacity:1}
+.bd .bm-row{position:relative;gap:2px}
+.bd .bm-tile{display:flex;flex:none;transition:transform 160ms var(--motion-ease);will-change:transform}
+.bd .bm .tile{border-radius:calc(var(--tw)*.14);box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 #d9cba6,0 2px 0 #b9a57e,0 3px 4px #0004}
+.bd .bm .tile strong{font-size:calc(var(--tw)*.7)}
+.bd .bm .tile>span{font-size:calc(var(--tw)*.19);line-height:1}
+.bd .bm-insert{position:absolute;top:0;height:calc(var(--mtw)*1.4);display:grid;place-items:center;border:1px dashed #d6f2d2b3;border-radius:4px;background:#c9efca20;color:#d6f2d2;font-size:14px;pointer-events:none}
+.bd .bm-error{position:absolute;right:-3px;top:-2px;z-index:3;width:13px;height:13px;border-radius:50%;background:var(--bad);color:white;text-align:center;font:800 10px/13px var(--f-ui);pointer-events:none}
+.bd.dragging .bm:not(.over){box-shadow:none}
+.bd.dragging .bm.fit{background:#8fc19710;box-shadow:0 0 0 1px #b9edc04d}
+.bd.dragging .bm.fit::before{display:none}
+.bd.dragging .bm.over,.bd.dragging .bm.fit.over{background:#c9efca12;box-shadow:0 0 0 1px #c9efca88}
+.bd .ts.ins-b::before,.bd .ts.ins-a::after{display:none}
+.bd-hand{overflow:hidden;padding:10px 8px 4px}
+.bd-rack{min-width:0;padding:3px 4px 4px}
+.bd-tidy{top:5px;bottom:auto;right:5px;min-height:24px;background:#142c2580;box-shadow:none;opacity:.65}
+@media(max-width:899px),(max-height:599px){
+  .bd{grid-template-columns:minmax(0,1fr) 80px;gap:5px 6px}
+  .bd-top{gap:5px;min-height:30px}
+  .bd-top .chips{gap:4px}
+  .bd-top .chip2{padding:2px 5px;gap:4px}
+  .bd-top .chip2 .ring{--s:24px}
+  .bd-top .chip2 .avatar{font-size:.6rem}
+  .bd-top .chip2 .who{display:none}
+  .bd-top .chip2 .cnt{font-size:.7rem;min-width:20px}
+  .bd-top .snd{width:28px;height:28px}
+  .bd-say{font-size:.7rem}
+  .bd-top .mytimer{font-size:.72rem;padding:5px 7px}
+  .bd-top .exit.compact{font-size:.65rem;padding:5px 7px}
+  .bd-act{gap:5px}
+  .bd-act .go{max-height:90px;min-height:52px;font-size:1rem}
+  .bd-act button:not(.go){min-height:32px;font-size:.69rem}
+  .bd-act .urow{gap:3px}
+  .bd-act .urow button{min-height:32px;font-size:1rem}
+}
+@media(prefers-reduced-motion:reduce){.bd .bm-tile{transition:none}}
+/* Table controls live with the other controls, clear of every tile. */
+.bd-act .bd-tidy{position:static;opacity:1;border-radius:10px;background:#ffffff0f}
+
+/* Show the exact rack result without moving the fixed drop hit regions. */
+.bd-hand{--th:var(--rth);position:relative}
+.rack-tile{display:flex;transition:transform 160ms var(--motion-ease)}
+.bd-hand .cell.tgt::after{content:'+';position:absolute;inset:0;display:grid;place-items:center;color:var(--lamp);font-size:14px;pointer-events:none}
+.bd-hand .cell{position:relative}
+.bd-selection{display:grid;gap:4px;min-width:0}
+.bd-selection b{text-align:center;color:var(--lamp);font-size:.7rem}
+.bd-selection button{white-space:nowrap}
+.bd.dragging .bm.over.repair{background:#ffbf6b12;box-shadow:0 0 0 1px #ffbf6b99}
+.bd.dragging .bm.over.blocked{background:#ee6a5714;box-shadow:0 0 0 1px var(--bad)}
+.bd .drop-hint.repair{border-color:#ffbf6b99;color:#ffdcaa}
+.bd .drop-hint.blocked{border-color:var(--bad);background:#48261ff5;color:#ffd0c8}
+/* Feedback stays in the header so it cannot cover the tile or a neighboring meld. */
+.bd.dragging .bd-say{color:var(--lamp)}
+.bd .drop-hint{display:none}
+.bd .bm-grip::after{height:9px}
+@media(prefers-reduced-motion:reduce){.rack-tile{transition:none}}
+.bd.dragging .bd-say.valid{color:#b9edc0}
+.bd.dragging .bd-say.blocked{color:#ff9e8c}
+.bd-controls{display:contents;margin:0;padding:0;border:0;min-width:0}

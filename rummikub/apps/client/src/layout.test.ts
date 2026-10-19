@@ -1,4 +1,4 @@
-import { fitHand, fitMobileHand, handSpare, normalizeSlots, placeInSlots, arrangeSlots, slotLine, linked, layoutTable, findSpot, meldSize, MELD, type Rect, type Slots } from './layout';
+import { fitHand, fitMobileHand, handSpare, mobileHandSpare, normalizeSlots, placeInSlots, arrangeSlots, slotLine, linked, layoutTable, findSpot, meldSize, meldInsertIndex, MELD, type Rect, type Slots } from './layout';
 import type { Tile } from '@rummikub/rules';
 let fails = 0; const ok = (c: boolean, m: string) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const T = (id: number, color: any, value: number): Tile => ({ id, kind: 'number', color, value } as Tile);
@@ -18,7 +18,7 @@ const ids = (s: Slots) => s.filter((v): v is number => v !== null).sort((a, b) =
 for (const [W, H] of [[530, 320], [640, 390], [780, 430]]) {
   const counts = [14, 24, 36, 44];
   const fits = counts.map(n => fitMobileHand(n, W!, H!));
-  ok(fits.every((f, i) => f.cells >= counts[i]! + handSpare(counts[i]!) && f.h <= H! * 0.32), `모바일 ${W}×${H}: 손패가 늘어도 랙 높이 예산 준수`);
+  ok(fits.every((f, i) => f.cells >= counts[i]! + mobileHandSpare(counts[i]!) && f.h <= H! * 0.32), `모바일 ${W}×${H}: 손패가 늘어도 랙 높이 예산 준수`);
   ok(fits.every((f, i) => i === 0 || f.tw <= fits[i - 1]!.tw) && fits[0]!.tw > fits[3]!.tw, `모바일 ${W}×${H}: 장수가 많아지면 자동 축소 (${fits.map(f => f.tw).join('/')})`);
   const few = layoutTable([{ id: 'a', n: 3 }], W!, 140, 33);
   const many = layoutTable(Array.from({ length: 16 }, (_, i) => ({ id: `${i}`, n: 4 })), W!, 140, 33);
@@ -78,4 +78,47 @@ const inside = (rs: Rect[], W: number, H: number) => rs.every(r => r.x >= 0 && r
   const s = findSpot(placed, 120, 80, 640, 200, { x: 150, y: 10 })!; const r = { x: s.x, y: s.y, w: 120, h: 80 };
   ok(noOverlap([r, ...placed]) && Math.hypot(s.x - 150, s.y - 10) < 100, 'findSpot: 겹치면 가장 가까운 빈 자리로 비켜선다 (' + s.x + ',' + s.y + ')');
   ok(findSpot([{ x: 0, y: 0, w: 640, h: 200 }], 50, 50, 640, 200) === null, 'findSpot: 자리가 없으면 null'); }
+// Dense late-game tables and long runs must stay inside the visible felt, even below the preferred minimum.
+for (const [W, H] of [[460, 150], [720, 180], [330, 330]]) {
+  for (const counts of [Array(26).fill(4), [13, 13, 13, 13, 13, 13, 13, 13], Array(35).fill(3)]) {
+    const items = counts.map((n, i) => ({ id: `dense-${i}`, n, pos: { fx: (i % 5) * .18, fy: (i % 4) * .22 } }));
+    const L = layoutTable(items, W!, H!, 38), rs = [...L.rects.values()];
+    ok(L.fits && rs.length === items.length && noOverlap(rs) && inside(rs, W!, H!) && L.height === H, `모든 타일 표시: ${W}×${H}, ${counts.reduce((a, b) => a + b, 0)}장`);
+  }
+}
+for (const [W, H] of [[460, 320], [720, 390], [280, 568], [350, 844]]) {
+  for (const n of [14, 24, 44, 80]) {
+    const f = fitMobileHand(n, W!, H!);
+    const contentH = f.rows * (Math.round(f.tw * 1.4) + 10) + 14;
+    ok(contentH <= f.h && f.cells >= n + mobileHandSpare(n), `손패 숨김 없음: ${W}×${H}, ${n}장`);
+  }
+}
+{
+  const tw = 30, n = 4, pad = MELD.padX / 2;
+  ok(meldInsertIndex(-20, n, tw) === 0 && meldInsertIndex(999, n, tw) === n, '삽입: 양 끝에서 앞/뒤로 제한');
+  for (let i = 0; i < n; i++) {
+    const left = pad + i * (tw + MELD.gapT);
+    ok(meldInsertIndex(left + tw * .2, n, tw) === i && meldInsertIndex(left + tw * .8, n, tw) === i + 1, `삽입: ${i}번 타일 왼쪽/오른쪽 반쪽 구분`);
+  }
+}
+{
+  const slots: Slots = [1, 2, 3, 4, 5, null, null, null, null, null];
+  const preview = placeInSlots(slots, [1, 2, 3], 4, 5);
+  ok(preview[2] === 1 && preview[3] === 2 && preview[4] === 3 && ids(preview) === '1,2,3,4,5', '여러 장 줄 끝 삽입: 미리보기용 결과가 한 줄에 들어가고 타일 보존');
+  ok(placeInSlots(slots, Array.from({ length: 11 }, (_, i) => i + 20), 9, 5) === slots, '손패 공간보다 큰 선택은 미리보기 배열을 손상하지 않는다');
+}
+{
+  const base: Slots = [...Array.from({ length: 24 }, (_, i) => i + 1), ...Array(6).fill(null)];
+  let preserves = true;
+  for (const selected of [[2], [2, 11], [2, 11, 19], [2, 11, 19, 24]]) {
+    for (let at = 0; at < base.length; at++) {
+      const result = placeInSlots(base, selected, at, 10), first = result.indexOf(selected[0]!);
+      const others = result.filter(id => id !== null && !selected.includes(id));
+      preserves &&= ids(result) === ids(base) && new Set(result.filter(id => id !== null)).size === 24;
+      preserves &&= result.slice(first, first + selected.length).join() === selected.join() && Math.floor(first / 10) === Math.floor((first + selected.length - 1) / 10);
+      preserves &&= others.join() === base.filter(id => id !== null && !selected.includes(id)).join();
+    }
+  }
+  ok(preserves, '꽉 찬 랙 120개 삽입 위치: 묶음 연속성, 나머지 순서, 타일 수 모두 보존');
+}
 console.log(fails ? `${fails} FAILED` : 'ALL PASSED'); process.exit(fails ? 1 : 0);

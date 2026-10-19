@@ -58,6 +58,11 @@ const run = (r: any) => { if (!r.ok) throw new Error(r.reason); return r.draft a
 { const d2 = { ...base, hand: [...base.hand].reverse() }; ok(signature(d2) === signature(base), '손패 정렬만으로는 변경 아님'); }
 // 테이블만 재배치 → 변경 감지
 { const d = run(moveTiles(base, [1], { to: 'new' }, ctx)); ok(signature(d) !== signature(base) && d.hand.length === base.hand.length, '테이블만 재배치해도 변경 감지'); }
+// Run order changes validity and must keep reset/commit controls in edit mode.
+{ const d = { ...base, table: base.table.map(m => m.id === 'A' ? { ...m, tiles: [...m.tiles].reverse() } : m) };
+  ok(signature(d) !== signature(base), '런 순서 변경도 편집으로 감지'); }
+{ const d = { ...base, table: [...base.table].reverse().map(m => m.type === 'group' ? { ...m, tiles: [...m.tiles].reverse() } : m) };
+  ok(signature(d) === signature(base), '조합 위치/그룹 내부 순서는 게임 변경 아님'); }
 // 같은 상태로 되돌리면 변경 아님
 { let d = run(moveTiles(base, [6], { to: 'new' }, ctx)); d = run(moveTiles(d, [6], { to: 'meld', meldId: 'A' }, ctx)); ok(signature(d) === signature(base), '이동 후 원복 → 변경 아님'); }
 
