@@ -622,3 +622,40 @@ html{touch-action:manipulation}
 
 /* 토스트는 안내용: 아래 타일/손잡이를 가리거나 터치를 막지 않는다 */
 .toast{pointer-events:none}
+
+/* Direct manipulation: keep pointer tracking on the compositor, animate edits once. */
+.bd{--motion-ease:cubic-bezier(.2,.8,.2,1)}
+.bd [data-tid]{transform-origin:top left}
+.bd .tile{cursor:grab;transition:transform .18s var(--motion-ease),box-shadow .18s ease}
+.bd .tile:focus-visible,.bd button:focus-visible{outline:2px solid var(--lamp);outline-offset:4px}
+.bd.dragging .tile,.bd.dragging .bm-grip{cursor:grabbing}
+.bd .tile.ghosted{opacity:.16;filter:none;transform:none}
+.bd .tile.fresh{animation:none}
+.bd .tile.flash{animation:trace 3.2s ease-out}
+.bd .bm{transition:background .16s ease,box-shadow .16s ease}
+.bd .bm.lifted{opacity:.3}
+.bd.dragging .bm.fit{animation:none;box-shadow:inset 0 0 0 2px var(--ok),0 0 12px #8fc19744}
+.bd .ghost{left:0;top:0;will-change:transform;filter:none}
+.bd .ghost>.gstack{transform:none;gap:2px;filter:drop-shadow(0 12px 10px #0008)}
+.bd .ghost>.gstack>.ts+.ts{margin-left:0}
+.bd .ghost .tile{transform:none;transition:none;cursor:grabbing}
+.bd .drop-hint{position:absolute;left:50%;top:calc(100% + 14px);transform:translateX(-50%);padding:6px 11px;border:1px solid #ffbf6b66;border-radius:20px;background:#20160bf2;color:#f5e6c9;box-shadow:0 4px 12px #0004;white-space:nowrap;font-size:.72rem;font-weight:700}
+.bd .drop-hint.valid{background:#193923f2;color:#cef0d1;border-color:#8fc197}
+.bd .spot{border:2px solid #ffcf87aa;background:#ffbf6b14;box-shadow:inset 0 0 18px #ffbf6b10;transition:none}
+.bd .cell.tgt{background:#ffbf6b38;box-shadow:inset 0 0 0 2px #ffd79f,0 0 12px #ffbf6b22}
+.bd .ts.ins-b::before,.bd .ts.ins-a::after{width:5px;background:#d1f4ce;box-shadow:0 0 10px #8fc19799}
+.bd .bd-empty{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;text-align:center;padding:20px;color:#ead8b39c}
+.bd-empty b{font-size:clamp(.9rem,1.8vw,1.2rem);font-weight:700}
+.bd-empty span{font-size:clamp(.68rem,1.2vw,.84rem);font-weight:400;color:#d8c5a877}
+.bd-sel{animation:selection-in .16s var(--motion-ease)}
+@keyframes selection-in{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}
+@media(prefers-reduced-motion:reduce){.bd .ghost>.gstack{transform:none}.bd .ghost{will-change:auto}}
+
+/* Independent flight layer keeps tiles visible across the rack's scroll boundary. */
+.tile-flight-layer{position:fixed;inset:0;z-index:60;pointer-events:none;user-select:none;overflow:visible}
+.tile-flight{position:absolute;transform-origin:top left;pointer-events:none;will-change:transform}
+.tile-flight .tile{width:100%;height:100%;margin:0;opacity:1;transform:none;filter:none;animation:none;transition:none;pointer-events:none}
+.tile-flight .tile strong{font-size:calc(var(--tw)*.62)}
+.tile-flight .tile span{font-size:calc(var(--tw)*.3)}
+.bd .tile.pressing{animation:tile-pickup .16s var(--motion-ease) forwards}
+@keyframes tile-pickup{to{transform:translateY(-3px);filter:drop-shadow(0 4px 5px #ffbf6b44)}}

@@ -110,7 +110,21 @@ export function validateTurn({ before, after, config, tiles }: TurnValidationArg
   for (const meld of after.table) { const checked = validateStoredMeld(meld, lookup, config); if (!checked.ok) return checked; }
   const moved = before.hand.filter(id => afterTable.includes(id)); if (!moved.length) return { ok: false, reason: '손패에서 적어도 한 타일을 내야 합니다.' };
   const beforeJokers = new Map(before.table.flatMap(meld => meld.tiles.filter(entry => lookup.get(entry.tileId)?.kind === 'joker').map(entry => [entry.tileId, entry.represents] as const)));
-  for (const meld of after.table) for (const entry of meld.tiles) if (beforeJokers.has(entry.tileId)) { const old = beforeJokers.get(entry.tileId); if (old?.color !== entry.represents?.color || old?.value !== entry.represents?.value) return { ok: false, reason: '기존 조커의 지정 값은 교체 없이 바꿀 수 없습니다.' }; }
+  // 조커를 빼도 원래 조합이 유효하면(예: 서로 다른 색의 10 세 장 + 조커),
+  // 그 조커는 다른 조합에 옮겨 새 값을 나타낼 수 있다. 나머지 경우에는 조커의
+  // 표현값을 고정해, 실제 타일로 교체하지 않고 조커의 역할만 바꾸는 것을 막는다.
+  const releasedJokers = new Set(before.table.flatMap(previous => previous.tiles
+    .filter(entry => lookup.get(entry.tileId)?.kind === 'joker')
+    .filter(entry => {
+      const current = after.table.find(meld => meld.id === previous.id);
+      const remainder = { ...previous, tiles: previous.tiles.filter(tile => tile.tileId !== entry.tileId) };
+      return config.allowJokerMeldManipulation
+        && !!current
+        && !current.tiles.some(tile => tile.tileId === entry.tileId)
+        && validateStoredMeld(remainder, lookup, config).ok;
+    })
+    .map(entry => entry.tileId)));
+  for (const meld of after.table) for (const entry of meld.tiles) if (beforeJokers.has(entry.tileId) && !releasedJokers.has(entry.tileId)) { const old = beforeJokers.get(entry.tileId); if (old?.color !== entry.represents?.color || old?.value !== entry.represents?.value) return { ok: false, reason: '기존 조커의 지정 값은 교체 없이 바꿀 수 없습니다.' }; }
   if (!before.hasInitialMeld) {
     // 새 첫 등록 조합은 추가할 수 있지만, 턴 시작 시 테이블에 있던 조합 자체는 그대로여야 한다.
     // 테이블 전체를 비교하면 정상적인 새 조합 추가도 "기존 테이블 변경"으로 오인한다.
