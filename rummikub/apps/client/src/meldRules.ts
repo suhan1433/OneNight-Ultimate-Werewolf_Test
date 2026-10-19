@@ -38,6 +38,12 @@ export function checkMeld(m: Meld, tile: (id: number) => Tile | undefined, allow
   const base = validate(tiles, allowTwoJokers, m.id);
   if (!base.ok || !base.meld) return { ok: false, reason: whyInvalid(tiles) };
   if (base.meld.type === 'group') {
+    // 서버에서 받은 유효한 대체 색상은 보존한다(빈 색은 둘 중 어느 쪽도 가능).
+    if (m.tiles.every(e => tile(e.tileId)?.kind !== 'joker' || e.represents)) {
+      const represented = tiles.map((t, i): Tile => t.kind === 'number' ? t : { id: t.id, kind: 'number', ...m.tiles[i]!.represents! });
+      const preserved = validate(represented, allowTwoJokers, m.id);
+      if (preserved.ok && preserved.meld?.type === 'group') return { ok: true, meld: { ...m, type: 'group' } };
+    }
     const rep = new Map(base.meld.tiles.map(e => [e.tileId, e.represents] as const));
     return { ok: true, meld: { ...base.meld, tiles: m.tiles.map(e => entry(e.tileId, rep.get(e.tileId))) } };
   }

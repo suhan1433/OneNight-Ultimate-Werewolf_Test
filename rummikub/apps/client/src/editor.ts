@@ -4,7 +4,7 @@
  * 서버가 최종 권위자이므로 여기서는 "구조 불변식"(타일 1장 = 1곳, 원래 테이블 타일은 손패로 못 감)만 지키고,
  * 조합의 유효성/조커 표현값은 호출자가 주는 fix()(= validateMeld 기반)에 맡긴다.
  */
-import type { Meld, Tile } from '@rummikub/rules';
+import { orderMeld, validateMeld, type Meld, type Tile } from '@rummikub/rules';
 
 export type Draft = { hand: Tile[]; table: Meld[] };
 export type Dest = { to: 'hand'; at?: number } | { to: 'new' } | { to: 'meld'; meldId: string; index?: number };
@@ -109,18 +109,33 @@ export function mergeMelds(d: Draft, meldIds: string[], ctx: Ctx): Result {
   return { ok: true, draft: { hand: d.hand, table: d.table.filter(m => !set.has(m.id) || m.id === head.id).map(m => (m.id === head.id ? merged : m)) }, meldId: head.id };
 }
 
-/** 손패의 타일로 조커 자리를 대신하고, 꺼낸 조커는 새 조합(1장)에 둔다. 조커는 같은 턴에 다른 조합에 써야 한다(서버 검증). */
+/** 조커 대신 타일을 놓았을 때 남는 조합. 원래 대체 값과 달라도 유효하면 허용한다. */
+export function jokerReplacement(m: Meld, jokerId: number, tileId: number, ctx: Ctx): Meld | undefined {
+  if (ctx.tile(jokerId)?.kind !== 'joker' || ctx.tile(tileId)?.kind !== 'number'
+    || !m.tiles.some(e => e.tileId === jokerId) || m.tiles.some(e => e.tileId === tileId)) return undefined;
+  const entries = m.tiles.map(e => e.tileId === jokerId ? { tileId } : e);
+  const tiles = entries.map(e => ctx.tile(e.tileId));
+  if (tiles.some(t => !t)) return undefined;
+  const checked = validateMeld(tiles as Tile[], true, m.id);
+  if (!checked.ok) return undefined;
+  const replacement = orderMeld(checked.meld, new Map((tiles as Tile[]).map(t => [t.id, t])));
+  return ctx.ok && !ctx.ok(replacement) ? undefined : replacement;
+}
+
+/** 손패/테이블의 타일로 교체하고, 꺼낸 조커는 이번 턴에 다시 쓰도록 임시 조합에 둔다. */
 export function swapJoker(d: Draft, meldId: string, jokerId: number, tileId: number, ctx: Ctx): Result {
   const m = d.table.find(x => x.id === meldId);
-  const k = m?.tiles.findIndex(e => e.tileId === jokerId) ?? -1;
-  if (!m || k < 0) return fail('조커를 찾을 수 없어요.');
-  if (!d.hand.some(t => t.id === tileId)) return fail('손패의 타일로만 조커를 바꿀 수 있어요.');
+  if (!m) return fail('조커를 찾을 수 없어요.');
+  if (!d.hand.some(t => t.id === tileId) && !d.table.some(x => x.tiles.some(e => e.tileId === tileId))) return fail('교체할 타일을 찾을 수 없어요.');
+  const swapped = jokerReplacement(m, jokerId, tileId, ctx);
+  if (!swapped) return fail('교체 후에도 원래 조합이 유효해야 해요.');
   const id = ctx.newId();
-  const swapped = ctx.fix({ ...m, tiles: m.tiles.map((e, i) => (i === k ? { tileId } : e)) });
-  const joker = ctx.tile(jokerId); if (!joker) return fail('조커 정보를 찾을 수 없어요.');
+  const table = d.table.map(x => x.id === meldId ? swapped
+    : x.tiles.some(e => e.tileId === tileId) ? ctx.fix({ ...x, tiles: x.tiles.filter(e => e.tileId !== tileId) }) : x)
+    .filter(x => x.tiles.length);
   return {
     ok: true, jokerId, meldId: id,
-    draft: { hand: d.hand.filter(t => t.id !== tileId), table: [...d.table.map(x => (x.id === meldId ? swapped : x)), { id, type: 'run', tiles: [{ tileId: jokerId }] } as Meld] },
+    draft: { hand: d.hand.filter(t => t.id !== tileId), table: [...table, { id, type: 'run', tiles: [{ tileId: jokerId }] }] },
   };
 }
 

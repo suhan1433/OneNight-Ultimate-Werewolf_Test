@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Meld, Tile } from '@rummikub/rules';
-import { validateMeld } from '@rummikub/rules';
+import { orderMeld, validateMeld } from '@rummikub/rules';
 import type { PublicView } from '@rummikub/protocol';
 import { webPlatform } from '@rummikub/platform';
 import { emit } from './socket.js';
 import { sfx } from './sound.js';
 import { Ring, SortMode, SoundToggle, TileView, isNum, smartSort, sortByColor, sortByNumber, suggestedMelds } from './tiles.js';
-import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker } from './editor.js';
+import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker, jokerReplacement } from './editor.js';
 import { HAND, MELD, Pos, Slots, arrangeSlots, findSpot, fitHand, fitMobileHand, layoutTable, meldInsertIndex, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
 import { checkMeld } from './meldRules.js';
 import { useTileMotion } from './motion.js';
@@ -116,13 +116,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const check = (m: Meld) => checkMeld(m, resolve, allow, validateMeld);
   const rebuild = (m: Meld): Meld => { const c = check(m); return c.ok ? c.meld : m; };
   /** 서버가 준 조합(이미 유효)은 런을 숫자순으로 가지런히 해서 시작한다. 이후 순서는 사용자가 정한다. */
-  const asServer = (m: Meld): Meld => {
-    const r = validateMeld(tilesOf(m), allow, m.id);
-    if (!r.ok || r.meld.type !== 'run') return m;
-    const v = (e: Meld['tiles'][number]) => { const t = resolve(e.tileId); return t && isNum(t) ? t.value : r.meld.tiles.find(x => x.tileId === e.tileId)?.represents?.value ?? e.represents?.value ?? 0; };
-    const c = check({ ...m, tiles: [...m.tiles].sort((a, b) => v(a) - v(b)) });
-    return c.ok ? c.meld : m;
-  };
+  const asServer = (m: Meld): Meld => orderMeld(m, pool);
   const origIds = useMemo(() => new Set(view.table.flatMap(m => m.tiles.map(e => e.tileId))), [view.table]);
   const ctx: Ctx = { tile: resolve, orig: origIds, fix: rebuild, newId: () => `draft-${crypto.randomUUID()}`, ok: m => check(m).ok };
 
@@ -391,9 +385,9 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     if (d.kind === 'new') return place(ids, { to: 'new' }, a);
     if (d.kind !== 'meld') return;
     const m = draft.table.find(x => x.id === d.meldId); if (!m) return;
-    const target = d.tid !== undefined ? resolve(d.tid) : undefined, e = m.tiles.find(x => x.tileId === d.tid);
+    const target = d.tid !== undefined ? resolve(d.tid) : undefined;
     const one = ids.length === 1 ? resolve(ids[0]!) : undefined;
-    if (target && !isNum(target) && one && isNum(one) && handSet.has(one.id) && e?.represents && e.represents.color === one.color && e.represents.value === one.value && !needInitial) {
+    if (target && !isNum(target) && one && isNum(one) && !needInitial && jokerReplacement(m, target.id, one.id, ctx)) {
       if (apply(swapJoker({ ...draft, hand: handBySlots }, m.id, target.id, one.id, ctx))) { game.setNotice('조커를 꺼냈어요. 확정 전에 다른 조합에 꼭 써야 해요.'); sfx.clack(); }
       return;
     }
@@ -557,7 +551,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     const m = d.kind === 'meld' ? draft.table.find(m => m.id === d.meldId) : undefined;
     if (needInitial && (drag.ids.some(id => origIds.has(id)) || m?.tiles.some(e => origIds.has(e.tileId)))) return blocked('첫 등록 전에는 새 조합으로 놓으세요');
     const e = m?.tiles.find(e => e.tileId === d.tid), tile = e && resolve(e.tileId), one = drag.ids.length === 1 ? resolve(drag.ids[0]!) : undefined;
-    if (!needInitial && tile?.kind === 'joker' && one && isNum(one) && handSet.has(one.id) && e?.represents?.color === one.color && e.represents.value === one.value) return { tone: 'valid', text: '조커 교체 · 꺼낸 조커는 다시 사용하세요' };
+    if (!needInitial && tile?.kind === 'joker' && one && isNum(one) && m && jokerReplacement(m, tile.id, one.id, ctx)) return { tone: 'valid', text: '조커 교체 · 꺼낸 조커는 다시 사용하세요' };
     const index = m && d.tid !== undefined ? m.tiles.findIndex(e => e.tileId === d.tid) + (d.after ? 1 : 0) : undefined;
     let previewId = 0;
     const result = moveTiles({ ...draft, hand: handBySlots }, drag.ids, m ? { to: 'meld', meldId: m.id, index } : { to: 'new' }, { ...ctx, newId: () => `preview-${++previewId}` });
@@ -663,7 +657,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
               <li><b>끌어서 놓기</b><span>조합 위에 놓으면 끼워지고, 빈 곳에 놓으면 그 자리에 새 조합이 생겨요. 타일 사이가 벌어지는 위치에 놓으세요. 초록으로 빛나는 조합에는 끼울 수 있어요.</span></li>
               <li><b>길게 누르기</b><span>계속 누르면 이어진 타일이 하나씩 늘어나요. 그대로 끌면 한꺼번에 옮겨요. 한 장을 선택한 뒤 ‘묶음 선택’으로 바로 고를 수도 있어요.</span></li>
               <li><b>순서대로</b><span>같은 색 숫자 조합은 왼쪽에서 오른쪽으로 작은 수부터 놓아야 ✓가 돼요. 중간에 끼워 규칙이 깨지면 그 자리에서 나눠 줘요.</span></li>
-              <li><b>조커 옮기기</b><span>조커를 빼도 원래 조합이 3장 이상으로 유효하면, 조커를 직접 다른 조합으로 끌어 옮길 수 있어요. 교체라면 조커가 나타내던 정확한 타일이 필요해요.</span></li>
+              <li><b>조커 옮기기</b><span>조커를 빼도 원래 조합이 3장 이상으로 유효하면, 조커를 직접 다른 조합으로 끌어 옮길 수 있어요. 손패나 테이블의 타일로 남은 조합이 유효해지면 교체할 수 있어요.</span></li>
               <li><b>자유 배치</b><span>손패는 빈 칸 아무 데나 놓아 묶음을 만들고, 테이블 조합은 한 장을 고르고 ‘묶음 선택’을 누른 뒤 끌어 옮겨요. 위쪽 ⠿ 손잡이로도 옮길 수 있어요.</span></li>
               <li><b>확정</b><span>모든 조합이 완성되면 오른쪽 확정! 낼 게 없으면 뽑기.</span></li>
             </ul>

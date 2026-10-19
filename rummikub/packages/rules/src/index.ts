@@ -94,8 +94,13 @@ export function validateStoredMeld(meld: Meld, lookup: Map<TileId, Tile>, config
   if (!inferred.ok) return inferred;
   const jokerEntries = meld.tiles.filter(entry => lookup.get(entry.tileId)?.kind === 'joker');
   if (jokerEntries.some(entry => !entry.represents)) return { ok: false, reason: '조커가 대신하는 색과 숫자를 정해야 합니다.' };
-  const candidate = inferJokerRepresents(tiles, config.allowTwoJokersInMeld).find(item => item.type === meld.type && item.represents.every((rep, i) => rep.color === jokerEntries[i]?.represents?.color && rep.value === jokerEntries[i]?.represents?.value));
-  return candidate ? { ok: true, meld } : { ok: false, reason: '조커의 지정 값이 이 조합과 맞지 않습니다.' };
+  // 대체된 일반 타일로 직접 검사한다. 그룹의 모든 빈 색상과 조커 두 장의
+  // 어느 배치든 허용하되, 중복 색/숫자와 1~13 범위를 검사한다.
+  const represented = tiles.map((tile, i): NumberTile => tile.kind === 'number'
+    ? tile : { id: tile.id, kind: 'number', ...meld.tiles[i]!.represents! });
+  if (represented.some(tile => !colors.includes(tile.color) || !Number.isInteger(tile.value) || tile.value < 1 || tile.value > 13)) return { ok: false, reason: '조커의 지정 값이 이 조합과 맞지 않습니다.' };
+  const valid = inferJokerRepresents(represented).some(candidate => candidate.type === meld.type);
+  return valid ? { ok: true, meld } : { ok: false, reason: '조커의 지정 값이 이 조합과 맞지 않습니다.' };
 }
 export interface TurnSnapshot { table: Meld[]; hand: TileId[]; hasInitialMeld: boolean }
 export interface TurnValidationArgs { before: TurnSnapshot; after: Pick<TurnSnapshot, 'table' | 'hand'>; config: RuleConfig; tiles: Tile[] }
@@ -121,7 +126,15 @@ export function validateTurn({ before, after, config, tiles }: TurnValidationArg
         && remainder.every(tile => withoutJoker.some(meld => meld.tiles.some(candidate => candidate.tileId === tile.tileId)));
     })
     .map(entry => entry.tileId)));
-  for (const meld of after.table) for (const entry of meld.tiles) if (beforeJokers.has(entry.tileId) && !releasedJokers.has(entry.tileId)) { const old = beforeJokers.get(entry.tileId); if (old?.color !== entry.represents?.color || old?.value !== entry.represents?.value) return { ok: false, reason: '기존 조커의 지정 값은 교체 없이 바꿀 수 없습니다.' }; }
+  for (const meld of after.table) for (const entry of meld.tiles) {
+    if (!beforeJokers.has(entry.tileId) || releasedJokers.has(entry.tileId)) continue;
+    const old = beforeJokers.get(entry.tileId);
+    // 그룹의 조커는 어느 빈 색상이든 대신할 수 있다. 숫자와 런의 대체 값은 유지한다.
+    const wasGroup = before.table.some(previous => previous.type === 'group' && previous.tiles.some(tile => tile.tileId === entry.tileId));
+    if (old?.value !== entry.represents?.value || (old?.color !== entry.represents?.color && !(wasGroup && meld.type === 'group'))) {
+      return { ok: false, reason: '기존 조커의 지정 값은 교체 없이 바꿀 수 없습니다.' };
+    }
+  }
   if (!before.hasInitialMeld) {
     // 새 첫 등록 조합은 추가할 수 있지만, 턴 시작 시 테이블에 있던 조합 자체는 그대로여야 한다.
     // 테이블 전체를 비교하면 정상적인 새 조합 추가도 "기존 테이블 변경"으로 오인한다.

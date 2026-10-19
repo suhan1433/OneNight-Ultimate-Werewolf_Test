@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDeck, defaultRuleConfig, scoreStalemate, tileMap, validateMeld, validateTurn, type Meld, type NumberTile, type Tile } from './index.js';
+import { createDeck, defaultRuleConfig, scoreStalemate, tileMap, validateMeld, validateStoredMeld, validateTurn, type Meld, type NumberTile, type Tile } from './index.js';
 const tile = (id: number, color: NumberTile['color'], value: number): NumberTile => ({ id, kind: 'number', color, value });
 const joker = (id: number): Tile => ({ id, kind: 'joker' });
 describe('Sabra rules', () => {
@@ -84,6 +84,30 @@ describe('Sabra rules', () => {
       after: { table: [...remaining, { id: 'reused', type: 'run', tiles: [{ tileId: 21 }, { tileId: 22 }, { tileId: 20, represents: { color: 'blue', value: 12 } }] }], hand: [] },
       config: defaultRuleConfig, tiles,
     })).toEqual({ ok: true });
+  });
+  it('accepts either missing group color and either order of two jokers', () => {
+    const tiles = [tile(1, 'red', 7), tile(2, 'blue', 7), joker(3), joker(4)];
+    const lookup = tileMap(tiles);
+    for (const color of ['black', 'orange'] as const) {
+      expect(validateStoredMeld({ id: 'group', type: 'group', tiles: [{ tileId: 1 }, { tileId: 2 }, { tileId: 3, represents: { color, value: 7 } }] }, lookup).ok).toBe(true);
+    }
+    const group: Meld = { id: 'group', type: 'group', tiles: [{ tileId: 1 }, { tileId: 2 }, { tileId: 3, represents: { color: 'orange', value: 7 } }, { tileId: 4, represents: { color: 'black', value: 7 } }] };
+    expect(validateStoredMeld(group, lookup).ok).toBe(true);
+    group.tiles[3]!.represents!.color = 'orange';
+    expect(validateStoredMeld(group, lookup).ok).toBe(false);
+    const runTiles = [tile(1, 'red', 7), joker(2), joker(3)];
+    const run: Meld = { id: 'run', type: 'run', tiles: [{ tileId: 3, represents: { color: 'red', value: 8 } }, { tileId: 1 }, { tileId: 2, represents: { color: 'red', value: 6 } }] };
+    expect(validateStoredMeld(run, tileMap(runTiles)).ok).toBe(true);
+    run.tiles[0]!.represents!.value = 14;
+    expect(validateStoredMeld(run, tileMap(runTiles)).ok).toBe(false);
+  });
+  it('allows adding the other missing color to a group containing a joker', () => {
+    const tiles = [tile(1, 'red', 7), tile(2, 'blue', 7), joker(3), tile(4, 'black', 7)];
+    expect(validateTurn({
+      before: { hand: [4], hasInitialMeld: true, table: [{ id: 'group', type: 'group', tiles: [{ tileId: 1 }, { tileId: 2 }, { tileId: 3, represents: { color: 'black', value: 7 } }] }] },
+      after: { hand: [], table: [{ id: 'group', type: 'group', tiles: [{ tileId: 1 }, { tileId: 2 }, { tileId: 4 }, { tileId: 3, represents: { color: 'orange', value: 7 } }] }] },
+      config: defaultRuleConfig, tiles,
+    }).ok).toBe(true);
   });
   it('scores a stalemate to zero sum', () => { const scores = scoreStalemate({ a: [1], b: [2] }, [tile(1, 'red', 3), tile(2, 'blue', 8)]); expect(Object.values(scores.deltas).reduce((a, b) => a + b, 0)).toBe(0); });
   it('keeps a lookup stable', () => expect(tileMap(createDeck()).size).toBe(106));

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -n server,client -c magenta,cyan \"npm run dev -w @rummikub/server\" \"npm run dev -w @rummikub/client\"",
     "build": "npm run build -w @rummikub/rules && npm run build -w @rummikub/protocol && npm run build -w @rummikub/platform && npm run build -w @rummikub/server && npm run build -w @rummikub/client",
-    "test": "npm run test -w @rummikub/rules && npm run test -w @rummikub/server",
+    "test": "npm run build -w @rummikub/rules && npm run test -w @rummikub/rules && npm run test -w @rummikub/server && npm run test -w @rummikub/client",
     "typecheck": "npm run typecheck -w @rummikub/rules && npm run typecheck -w @rummikub/protocol && npm run typecheck -w @rummikub/platform && npm run typecheck -w @rummikub/server && npm run typecheck -w @rummikub/client",
     "cap:ios": "npm run build -w @rummikub/client && npx cap sync ios --prefix apps/client && npx cap open ios --prefix apps/client",
     "cap:android": "npm run build -w @rummikub/client && npx cap sync android --prefix apps/client && npx cap open android --prefix apps/client"
