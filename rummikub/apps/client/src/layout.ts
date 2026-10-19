@@ -1,46 +1,79 @@
 /**
  * 레이아웃/제스처용 순수 함수 — React/DOM 의존 없음.
- * · fitHand : 손패 전체가 스크롤 없이 보이는 가장 큰 타일 크기
- * · fitTable: 테이블의 모든 조합이 스크롤 없이 보이는 가장 큰 타일 크기
- * · handLine: 손패에서 길게 눌렀을 때 "이어진" 타일 줄
+ *  · 손패  : 칸(slot) 단위 랙. 빈 칸이 곧 사용자가 만든 묶음 구분선이다.
+ *  · 테이블: 조합을 자유 위치(캔버스)에 놓고, 겹치면 밀어내고, 안 들어가면 타일을 줄인다.
  */
 import type { Tile } from '@rummikub/rules';
 
-export const HAND = { min: 20, gapX: 3, brk: 10, rowExtra: 10, padY: 14 };
-export const TABLE = { min: 22, gapT: 2, padX: 12, gapX: 14, gapY: 18, rowExtra: 18, newW: 1.3 };
+/* ───────────── 손패: 칸(slot) 랙 ───────────── */
+export type Slots = (number | null)[];
+export const HAND = { min: 20, gapX: 3, rowExtra: 10, padY: 14 };
+export type HandFit = { tw: number; rows: number; cols: number; cells: number; h: number };
 
-/** 손패가 차지하는 줄 수의 "넘지 않는" 상한. 그리디 줄바꿈은 마지막 줄을 뺀 모든 줄이 (W - 타일 - 구분선)보다 꽉 차므로 성립한다. */
-export function handRows(n: number, breaks: number, tw: number, W: number): number {
-  const per = tw + HAND.gapX;
-  const total = n * per + breaks * HAND.brk;
-  if (total <= W) return 1;
-  const usable = W - per - HAND.brk;
-  return usable <= 0 ? n : Math.ceil(total / usable);
+/** 타일 수 n에 더해 자유롭게 옮길 여유 칸 */
+export const handSpare = (n: number) => Math.max(6, Math.ceil(n * 0.25));
+
+/** 칸 수가 (n + 여유) 이상이면서 높이 예산 안에 들어가는 가장 큰 타일 */
+export function fitHand(n: number, W: number, budgetH: number, max: number): HandFit {
+  const need = n + handSpare(n);
+  const at = (tw: number): HandFit => {
+    const cols = W > 0 ? Math.max(1, Math.floor((W + HAND.gapX) / (tw + HAND.gapX))) : 14;
+    const rows = Math.ceil(need / cols);
+    return { tw, rows, cols, cells: rows * cols, h: rows * (Math.round(tw * 1.4) + HAND.rowExtra) + HAND.padY };
+  };
+  for (let tw = max; tw >= HAND.min; tw--) { const f = at(tw); if (f.h <= budgetH) return f; }
+  return at(HAND.min);
 }
 
-export function fitHand(n: number, breaks: number, W: number, budgetH: number, max: number): { tw: number; rows: number; h: number } {
-  const h = (tw: number, rows: number) => rows * (Math.round(tw * 1.4) + HAND.rowExtra) + HAND.padY;
-  if (W <= 0) return { tw: Math.min(max, 32), rows: 1, h: h(Math.min(max, 32), 1) };
-  for (let tw = max; tw >= HAND.min; tw--) {
-    const rows = handRows(n, breaks, tw, W);
-    if (h(tw, rows) <= budgetH) return { tw, rows, h: h(tw, rows) };
+/** 이전 배치를 최대한 유지하면서 칸 수/타일 구성에 맞춘다. 새 타일은 원래 자리(home) → 마지막 타일 뒤 → 앞쪽 빈 칸 순. */
+export function normalizeSlots(prev: Slots, ids: number[], cells: number, home?: ReadonlyMap<number, number>): Slots {
+  const want = new Set(ids), out: Slots = Array(cells).fill(null), done = new Set<number>();
+  prev.forEach((id, i) => { if (id !== null && want.has(id) && i < cells && !done.has(id)) { out[i] = id; done.add(id); } });
+  let last = -1; out.forEach((v, i) => { if (v !== null) last = i; });
+  for (const id of ids) {
+    if (done.has(id)) continue;
+    const h = home?.get(id);
+    let k = h !== undefined && h < cells && out[h] === null ? h : -1;
+    if (k < 0) { k = last + 1; while (k < cells && out[k] !== null) k++; }
+    if (k >= cells) { k = 0; while (k < cells && out[k] !== null) k++; }
+    if (k < cells) { out[k] = id; done.add(id); if (k > last) last = k; }
   }
-  const rows = handRows(n, breaks, HAND.min, W);
-  return { tw: HAND.min, rows, h: h(HAND.min, rows) };
+  return out;
 }
 
-/** 조합들을 왼쪽부터 채워 가며 줄바꿈했을 때 W×H 안에 들어가는 가장 큰 타일 너비. 안 들어가면 min(그때는 스크롤). */
-export function fitTable(counts: number[], extra: boolean, W: number, H: number, max: number): number {
-  if (W <= 0 || H <= 0) return Math.min(max, 36);
-  for (let tw = max; tw >= TABLE.min; tw--) {
-    const widths = counts.map(n => n * tw + (n - 1) * TABLE.gapT + TABLE.padX);
-    if (extra) widths.push(tw * TABLE.newW + 4);
-    if (widths.some(w => w > W)) continue;
-    let rows = 1, x = 0;
-    for (const w of widths) { if (x > 0 && x + TABLE.gapX + w > W) { rows++; x = w; } else x += (x ? TABLE.gapX : 0) + w; }
-    if (rows * (Math.round(tw * 1.4) + TABLE.rowExtra) + (rows - 1) * TABLE.gapY <= H) return tw;
+/** ids를 at 칸부터 연속으로 놓는다. 이미 차 있으면 같은 줄의 빈 칸까지 한 칸씩 밀어서 끼워 넣는다(없으면 줄 밖으로). */
+export function placeInSlots(slots: Slots, ids: number[], at: number, cols: number): Slots {
+  const out: Slots = slots.map(s => (s !== null && ids.includes(s) ? null : s));
+  const n = out.length;
+  let idx = Math.max(0, Math.min(n - 1, at));
+  if (ids.length <= cols) idx = Math.max(Math.floor(idx / cols) * cols, Math.min(idx, Math.floor(idx / cols) * cols + cols - ids.length)); // 한 줄에 들어가면 줄바꿈 없이
+  idx = Math.min(idx, n - ids.length);
+  const rowOf = (i: number) => Math.floor(i / cols);
+  for (const id of ids) {
+    if (out[idx] === null) { out[idx] = id; idx++; continue; }
+    const find = (from: number, dir: 1 | -1, sameRow: boolean) => { let j = from; while (j >= 0 && j < n && out[j] !== null && (!sameRow || rowOf(j) === rowOf(from))) j += dir; return j >= 0 && j < n && out[j] === null && (!sameRow || rowOf(j) === rowOf(from)) ? j : -1; };
+    let j = find(idx, 1, true), dir: 1 | -1 = 1;
+    if (j < 0) { j = find(idx, -1, true); dir = -1; }
+    if (j < 0) { j = find(idx, 1, false); dir = 1; }
+    if (j < 0) { j = find(idx, -1, false); dir = -1; }
+    if (j < 0) return slots;
+    if (dir === 1) for (let k = j; k > idx; k--) out[k] = out[k - 1]!;
+    else for (let k = j; k < idx; k++) out[k] = out[k + 1]!;
+    out[idx] = id; idx++;
   }
-  return TABLE.min;
+  return out;
+}
+
+/** 묶음(groups)을 순서대로 놓되 묶음 사이에 gap칸을 비운다. 한 줄에 들어가는 묶음은 줄을 넘지 않게 다음 줄로 보낸다. 칸이 모자라면 null. */
+export function arrangeSlots(groups: number[][], cols: number, cells: number, gap = 1): Slots | null {
+  const out: Slots = Array(cells).fill(null); let k = 0;
+  for (const g of groups) {
+    if (!g.length) continue;
+    if (g.length <= cols && k % cols !== 0 && g.length > cols - (k % cols)) k += cols - (k % cols);
+    if (k + g.length > cells) return null;
+    g.forEach((id, i) => { out[k + i] = id; }); k += g.length + gap;
+  }
+  return out;
 }
 
 /** 손패에서 바로 옆 타일과 "이어지는" 관계인가: 같은 색 연속 숫자 / 같은 숫자 다른 색 / 조커 */
@@ -50,12 +83,73 @@ export function linked(a: Tile, b: Tile): boolean {
   return a.value === b.value;
 }
 
-/** 손패 id가 속한 "이어진 줄": 묶음 구분선(breaks)을 넘지 않고, 이웃끼리 linked인 구간 */
-export function handLine(hand: Tile[], breaks: ReadonlySet<number>, id: number): number[] {
-  const i = hand.findIndex(t => t.id === id);
-  if (i < 0) return [id];
+/** id가 놓인 "이어진 줄": 같은 줄에서 빈 칸 없이 붙어 있고 이웃끼리 linked인 구간 */
+export function slotLine(slots: Slots, cols: number, tile: (id: number) => Tile | undefined, id: number): number[] {
+  const i = slots.indexOf(id); if (i < 0) return [id];
+  const rs = Math.floor(i / cols) * cols, re = rs + cols - 1, at = (k: number) => { const v = slots[k]; return v == null ? undefined : tile(v); };
   let lo = i, hi = i;
-  while (lo > 0 && !breaks.has(hand[lo]!.id) && linked(hand[lo - 1]!, hand[lo]!)) lo--;
-  while (hi < hand.length - 1 && !breaks.has(hand[hi + 1]!.id) && linked(hand[hi]!, hand[hi + 1]!)) hi++;
-  return hand.slice(lo, hi + 1).map(t => t.id);
+  while (lo > rs && at(lo - 1) && at(lo) && linked(at(lo - 1)!, at(lo)!)) lo--;
+  while (hi < re && at(hi + 1) && at(hi) && linked(at(hi)!, at(hi + 1)!)) hi++;
+  return slots.slice(lo, hi + 1) as number[];
+}
+
+/* ───────────── 테이블: 자유 배치 캔버스 ───────────── */
+export type Rect = { x: number; y: number; w: number; h: number };
+export type Pos = { fx: number; fy: number };           // 캔버스 크기에 대한 비율(타일 크기가 바뀌어도 자리가 유지된다)
+export type TableItem = { id: string; n: number; pos?: Pos };
+export type TableLayout = { tw: number; rects: Map<string, Rect>; W: number; H: number; height: number; fits: boolean };
+export const MELD = { padX: 12, gapT: 2, rowExtra: 24, gap: 8, min: 22 };
+
+export const meldSize = (n: number, tw: number) => ({ w: n * tw + (n - 1) * MELD.gapT + MELD.padX, h: Math.round(tw * 1.4) + MELD.rowExtra });
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w + MELD.gap && b.x < a.x + a.w + MELD.gap && a.y < b.y + b.h + MELD.gap && b.y < a.y + a.h + MELD.gap;
+
+/** 겹치지 않는 자리를 찾는다. want가 있으면 가장 가까운 자리, 없으면 위·왼쪽부터 채운다(first-fit). 없으면 null. */
+export function findSpot(placed: Rect[], w: number, h: number, W: number, H: number, want?: { x: number; y: number }): { x: number; y: number } | null {
+  const g = MELD.gap, xs = new Set<number>([0, Math.max(0, W - w)]), ys = new Set<number>([0, Math.max(0, H - h)]);
+  if (want) { xs.add(clamp(want.x, 0, Math.max(0, W - w))); ys.add(clamp(want.y, 0, Math.max(0, H - h))); }
+  for (const r of placed) { xs.add(r.x + r.w + g); xs.add(r.x - w - g); xs.add(r.x); ys.add(r.y + r.h + g); ys.add(r.y - h - g); ys.add(r.y); }
+  let best: { x: number; y: number } | null = null, bestScore = Infinity;
+  for (const y of ys) {
+    if (y < 0 || y + h > H) continue;
+    for (const x of xs) {
+      if (x < 0 || x + w > W) continue;
+      const rect = { x, y, w, h }; if (placed.some(p => overlaps(rect, p))) continue;
+      const score = want ? Math.hypot(x - want.x, y - want.y) : y * 100000 + x;
+      if (score < bestScore) { bestScore = score; best = { x, y }; }
+    }
+  }
+  return best;
+}
+
+/**
+ * 모든 조합을 W×H 캔버스에 놓는다.
+ *  · 저장된 위치(pos)는 최대한 지키고, focus(방금 바뀐 조합)가 우선권을 갖는다 — 겹치면 다른 조합이 밀려난다.
+ *  · 위치 없는 조합은 빈자리를 위·왼쪽부터 채운다.
+ *  · 다 못 놓으면 타일을 줄이고(이분 탐색), 최소 크기로도 안 되면 아래로 늘려서(스크롤) 놓는다.
+ */
+export function layoutTable(items: TableItem[], W: number, H: number, maxTw: number, focus: ReadonlySet<string> = new Set()): TableLayout {
+  const empty = (tw: number): TableLayout => ({ tw, rects: new Map(), W, H, height: 0, fits: true });
+  if (W <= 0 || H <= 0 || !items.length) return empty(Math.min(maxTw, 40));
+  const order = [...items].sort((a, b) => Number(focus.has(b.id)) - Number(focus.has(a.id)) || Number(!!b.pos) - Number(!!a.pos));
+  const place = (tw: number, tall: boolean) => {
+    const Hb = tall ? 1e6 : H, placed: Rect[] = [], rects = new Map<string, Rect>();
+    for (const it of order) {
+      const { w, h } = meldSize(it.n, tw); if (w > W) return null;
+      let spot: { x: number; y: number } | null;
+      if (it.pos) {
+        const x = clamp(it.pos.fx * W, 0, W - w), y = clamp(it.pos.fy * H, 0, Hb - h), r = { x, y, w, h };
+        spot = placed.some(p => overlaps(r, p)) ? findSpot(placed, w, h, W, Hb, { x, y }) : { x, y };
+      } else spot = findSpot(placed, w, h, W, Hb);
+      if (!spot) return null;
+      const rect = { ...spot, w, h }; placed.push(rect); rects.set(it.id, rect);
+    }
+    return rects;
+  };
+  const done = (tw: number, rects: Map<string, Rect>, fits: boolean): TableLayout => ({ tw, rects, W, H, fits, height: Math.max(H, ...[...rects.values()].map(r => r.y + r.h)) });
+  const top = place(maxTw, false); if (top) return done(maxTw, top, true);
+  let lo = MELD.min, hi = maxTw - 1, found: { tw: number; rects: Map<string, Rect> } | null = null;
+  while (lo <= hi) { const mid = (lo + hi) >> 1, r = place(mid, false); if (r) { found = { tw: mid, rects: r }; lo = mid + 1; } else hi = mid - 1; }
+  if (found) return done(found.tw, found.rects, true);
+  return done(MELD.min, place(MELD.min, true) ?? new Map(), false);
 }

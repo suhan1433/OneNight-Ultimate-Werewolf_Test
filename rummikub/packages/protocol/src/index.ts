@@ -8,5 +8,7 @@ const configSchema = z.object({ initialMeldMin: z.number().int().min(1).max(104)
 export const roomCreateSchema = z.object({ name: z.string().trim().min(1).max(16), maxPlayers: z.number().int().min(2).max(4), config: configSchema.optional(), clientSeq: z.number().int().nonnegative() });
 export const roomJoinSchema = z.object({ roomId: z.string().trim().length(6).transform(value => value.toUpperCase()), name: z.string().trim().min(1).max(16), playerId: z.string().optional(), sessionToken: z.string().optional(), clientSeq: z.number().int().nonnegative() });
 export const roomActionSchema = z.object({ roomId: z.string().length(6), clientSeq: z.number().int().nonnegative() });
+export const roomTimerSchema = roomActionSchema.extend({ turnSeconds: z.number().int().min(20).max(600) });
+export const roomKickSchema = roomActionSchema.extend({ playerId: z.string().uuid() });
 export const commitSchema = roomActionSchema.extend({ version: z.number().int().nonnegative(), table: z.array(z.object({ id: z.string().min(1).max(80), type: z.enum(['group', 'run']), tiles: z.array(z.object({ tileId: z.number().int().min(0).max(105), represents: z.object({ color: z.enum(['black', 'red', 'blue', 'orange']), value: z.number().int().min(1).max(13) }).optional() })).min(3) })), hand: z.array(z.number().int().min(0).max(105)) });
 export type RoomCreate = z.infer<typeof roomCreateSchema>; export type RoomJoin = z.infer<typeof roomJoinSchema>; export type TurnCommit = z.infer<typeof commitSchema>;

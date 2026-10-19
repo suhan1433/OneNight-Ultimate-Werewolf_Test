@@ -19,6 +19,30 @@ export const defaultRuleConfig: RuleConfig = {
 };
 export const colors: Color[] = ['black', 'red', 'blue', 'orange'];
 
+/**
+ * 조합의 표시 순서를 규칙에 맞게 고정한다.
+ *
+ * 네트워크를 통해 들어오는 조합은 타일을 어떤 순서로 담고 있든 유효할 수 있으므로,
+ * 서버가 저장하기 전에 항상 이 순서로 정규화한다. 런은 숫자(조커의 대체 숫자 포함),
+ * 그룹은 색 순서로 놓인다.
+ */
+export function orderMeld(meld: Meld, lookup: ReadonlyMap<TileId, Tile>): Meld {
+  const represented = (entry: MeldTile) => {
+    const tile = lookup.get(entry.tileId);
+    return tile?.kind === 'number'
+      ? { color: tile.color, value: tile.value }
+      : entry.represents;
+  };
+  const tiles = [...meld.tiles].sort((a, b) => {
+    const left = represented(a), right = represented(b);
+    if (!left || !right) return 0;
+    return meld.type === 'run'
+      ? left.value - right.value
+      : colors.indexOf(left.color) - colors.indexOf(right.color);
+  });
+  return { ...meld, tiles };
+}
+
 export function createDeck(): Tile[] {
   const deck: Tile[] = []; let id = 0;
   for (const color of colors) for (let value = 1; value <= 13; value += 1) for (let copy = 0; copy < 2; copy += 1) deck.push({ id: id++, kind: 'number', color, value });

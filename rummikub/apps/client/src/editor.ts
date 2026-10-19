@@ -22,25 +22,6 @@ export type Result = { ok: true; draft: Draft; meldId?: string; jokerId?: number
 const fail = (reason: string): Result => ({ ok: false, reason });
 const insertAt = <T,>(arr: T[], at: number, items: T[]) => [...arr.slice(0, at), ...items, ...arr.slice(at)];
 
-const COLOR_ORDER = ['red', 'blue', 'orange', 'black'];
-/**
- * 유효하지 않은 조합도 보기 좋게 정리한다(검증은 하지 않는다).
- * 같은 색이면 숫자 오름차순, 같은 숫자면 색 순서. 조커는 뒤로. 그 외(섞인 조합)는 그대로 둔다.
- * → 2장만 놓았을 때 6,5처럼 거꾸로 보이던 문제를 막는다.
- */
-export function tidyMeld(m: Meld, tile: (id: number) => Tile | undefined): Meld {
-  type N = Extract<Tile, { kind: 'number' }>;
-  const items = m.tiles.map(e => ({ e, t: tile(e.tileId) }));
-  const nums = items.filter((x): x is { e: typeof x.e; t: N } => !!x.t && x.t.kind !== 'joker');
-  const rest = items.filter(x => !x.t || x.t.kind === 'joker');
-  if (!nums.length) return m;
-  const c0 = nums[0]!.t.color, v0 = nums[0]!.t.value;
-  const sameColor = nums.every(x => x.t.color === c0), sameValue = nums.every(x => x.t.value === v0);
-  if (sameColor === sameValue) return m;
-  const sorted = [...nums].sort((a, b) => (sameColor ? a.t.value - b.t.value : COLOR_ORDER.indexOf(a.t.color) - COLOR_ORDER.indexOf(b.t.color)));
-  return { ...m, tiles: [...sorted, ...rest].map(x => x.e) };
-}
-
 /** 타일을 손패 / 기존 조합(원하는 위치) / 새 조합으로 옮긴다.
  *  기존 조합 "중간"에 끼워 넣어 그 조합이 무효가 되면(ctx.ok 필요), 끼운 자리에서 둘로 나눠 더 많은 타일이 유효해지는 쪽을 택한다.
  *  예) 5·6·7·8·9·10 의 8과 9 사이에 9를 놓으면 → 5·6·7·8·9 / 9·10 */

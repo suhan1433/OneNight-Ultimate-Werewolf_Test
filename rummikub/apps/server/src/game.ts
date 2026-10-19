@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { createDeck, defaultRuleConfig, seededShuffle, scoreRound, scoreStalemate, tileMap, validateMeld, validateTurn, type Meld, type RuleConfig, type Tile, type TileId, type TurnSnapshot } from '@rummikub/rules';
+import { createDeck, defaultRuleConfig, orderMeld, seededShuffle, scoreRound, scoreStalemate, tileMap, validateMeld, validateTurn, type Meld, type RuleConfig, type Tile, type TileId, type TurnSnapshot } from '@rummikub/rules';
 import type { Phase, PlayerView, PublicView } from '@rummikub/protocol';
 
 export interface Player { id: string; name: string; seat: number; connected: boolean; isBot: boolean; ready: boolean; hasInitialMeld: boolean; score: number; token: string; socketId: string | null; lastSeq: number }
@@ -26,6 +26,25 @@ export function joinRoom(room: GameRoom, name: string, previous?: { playerId?: s
 }
 export function fillBots(room: GameRoom, ownerId: string) { if (room.hostId !== ownerId || room.phase !== 'lobby') throw Error('방장만 봇을 추가할 수 있습니다.'); while (room.players.length < room.maxPlayers) { const number = room.players.filter(player => player.isBot).length + 1; const bot: Player = { id: randomUUID(), name: `Neon Bot ${number}`, seat: room.players.length, connected: true, isBot: true, ready: true, hasInitialMeld: false, score: 0, token: '', socketId: null, lastSeq: -1 }; room.players.push(bot); room.hands[bot.id] = []; } room.version += 1; room.message = 'Empty chairs were filled with Neon Bots.'; }
 export function toggleReady(room: GameRoom, playerId: string) { const player = getPlayer(room, playerId); if (room.phase !== 'lobby') throw Error('대기실에서만 준비할 수 있습니다.'); if (!player.isBot) player.ready = !player.ready; room.version += 1; }
+export function setTurnSeconds(room: GameRoom, ownerId: string, turnSeconds: number) {
+  if (room.hostId !== ownerId || room.phase !== 'lobby') throw Error('방장만 대기실에서 타이머를 설정할 수 있습니다.');
+  if (!Number.isInteger(turnSeconds) || turnSeconds < 20 || turnSeconds > 600) throw Error('턴 시간은 20초에서 600초 사이여야 합니다.');
+  room.config.turnSeconds = turnSeconds;
+  room.version += 1;
+  room.message = `Turn timer set to ${turnSeconds} seconds.`;
+}
+export function kickPlayer(room: GameRoom, ownerId: string, targetId: string): Pick<Player, 'id' | 'name' | 'socketId'> {
+  if (room.hostId !== ownerId || room.phase !== 'lobby') throw Error('방장만 대기실에서 플레이어를 강퇴할 수 있습니다.');
+  if (targetId === ownerId) throw Error('방장은 자신을 강퇴할 수 없습니다.');
+  const index = room.players.findIndex(player => player.id === targetId);
+  if (index < 0) throw Error('플레이어를 찾을 수 없습니다.');
+  const [player] = room.players.splice(index, 1);
+  delete room.hands[targetId];
+  room.players.forEach((item, seat) => { item.seat = seat; });
+  room.version += 1;
+  room.message = `${player!.name} was removed from the lounge.`;
+  return { id: player!.id, name: player!.name, socketId: player!.socketId };
+}
 export function startGame(room: GameRoom, ownerId: string) {
   if (room.hostId !== ownerId || room.phase !== 'lobby') throw Error('방장만 게임을 시작할 수 있습니다.');
   if (room.players.length < 2) throw Error('2명 이상이어야 합니다.'); if (!room.players.every(player => player.ready)) throw Error('모든 플레이어가 준비해야 합니다.');
@@ -40,7 +59,9 @@ function rotate(room: GameRoom, completedBy: Player, message: string) { const ne
 export function commitTurn(room: GameRoom, playerId: string, version: number, table: Meld[], hand: TileId[]) {
   const player = getPlayer(room, playerId); if (room.phase !== 'playing' || room.turn?.playerId !== playerId) throw Error('지금은 당신의 차례가 아닙니다.'); if (version !== room.version) throw Error('게임 상태가 바뀌었습니다. 다시 동기화했습니다.');
   const result = validateTurn({ before: room.turn.snapshot, after: { table, hand }, config: room.config, tiles: room.deck }); if (!result.ok) throw Error(result.reason);
-  room.table = structuredClone(table); room.hands[playerId] = [...hand]; if (!player.hasInitialMeld) player.hasInitialMeld = true; room.passCount = 0;
+  // 클라이언트가 보낸 배열 순서에 의존하지 않는다. 예: 6·5·7로 들어와도 테이블에는 5·6·7로 저장된다.
+  const lookup = tileLookup(room);
+  room.table = table.map(meld => orderMeld(meld, lookup)); room.hands[playerId] = [...hand]; if (!player.hasInitialMeld) player.hasInitialMeld = true; room.passCount = 0;
   if (hand.length === 0) { endRound(room, player.id, `${player.name}: RUMMIKUB!`); return; } rotate(room, player, `${player.name} completed a meld.`);
 }
 export function drawTurn(room: GameRoom, playerId: string) {

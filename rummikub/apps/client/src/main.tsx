@@ -22,10 +22,11 @@ function useGame() {
   useEffect(() => {
     const onState = (s: PublicView) => { setView(s); setNotice(''); };
     const onReject = ({ reason }: { reason: string }) => setNotice(reason);
+    const onKicked = ({ reason }: { reason?: string }) => { clearSession(); location.hash = ''; setView(null); setNotice(reason ?? '방장에서 강퇴되었습니다.'); };
     const onConnect = () => { setOnline(true); const saved = session(); if (saved) emit('room:join', { ...saved, clientSeq: next() }).catch(() => { clearSession(); setView(null); }); };
     const onDown = () => setOnline(false);
-    socket.on('state:sync', onState); socket.on('turn:rejected', onReject); socket.on('connect', onConnect); socket.on('disconnect', onDown);
-    return () => { socket.off('state:sync', onState); socket.off('turn:rejected', onReject); socket.off('connect', onConnect); socket.off('disconnect', onDown); };
+    socket.on('state:sync', onState); socket.on('turn:rejected', onReject); socket.on('room:kicked', onKicked); socket.on('connect', onConnect); socket.on('disconnect', onDown);
+    return () => { socket.off('state:sync', onState); socket.off('turn:rejected', onReject); socket.off('room:kicked', onKicked); socket.off('connect', onConnect); socket.off('disconnect', onDown); };
   }, [next]);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 4000); return () => clearTimeout(t); }, [notice]);
   return { view, setView, online, notice, setNotice, next };
@@ -75,6 +76,11 @@ function Lobby({ view, game, onExit }: { view: PublicView; game: Game; onExit: (
   const host = view.hostId === view.playerId;
   const allReady = view.players.length >= 2 && view.players.every(p => p.ready);
   const action = (event: string) => emit(event, { roomId: view.roomId, clientSeq: game.next() }).catch(e => game.setNotice(e.message));
+  const setTimer = (turnSeconds: number) => emit('room:setTurnSeconds', { roomId: view.roomId, turnSeconds, clientSeq: game.next() }).catch(e => game.setNotice(e.message));
+  const kick = (player: PublicView['players'][number]) => {
+    if (!window.confirm(`${player.name}님을 강퇴할까요?`)) return;
+    emit('room:kick', { roomId: view.roomId, playerId: player.id, clientSeq: game.next() }).catch(e => game.setNotice(e.message));
+  };
   const invite = () => webPlatform.share.inviteRoom(view.roomId, `${location.origin}${location.pathname}#/join/${view.roomId}`);
   const seats = Math.min(4, Math.max(view.players.length, 2));
   const mineIdx = Math.max(0, view.players.findIndex(p => p.id === view.playerId));
@@ -92,8 +98,10 @@ function Lobby({ view, game, onExit }: { view: PublicView; game: Game; onExit: (
           <article key={i} className={`chair ${where[i] ?? ''} ${p?.ready ? 'ready' : ''} ${p ? '' : 'empty'}`}>
             <div className="avatar">{p ? (p.isBot ? '봇' : p.name.slice(0, 1)) : '+'}</div>
             <b>{p?.name ?? '빈 자리'}</b><small>{p ? (p.isBot ? '컴퓨터' : p.ready ? '준비 완료' : '대기 중') : '기다리는 중'}</small>
+            {host && p && p.id !== view.playerId && <button className="kick" onClick={() => kick(p)}>{p.isBot ? '내보내기' : '강퇴'}</button>}
           </article>))}
       </section>
+      {host && <section className="timer-settings" aria-label="턴 타이머 설정"><span>턴 타이머</span><div>{[30, 60, 90, 120, 180].map(seconds => <button key={seconds} className="chip" aria-pressed={view.config.turnSeconds === seconds} onClick={() => setTimer(seconds)}>{seconds}초</button>)}</div></section>}
       <div className="btns">
         <button onClick={() => action('room:ready')} className={self.ready ? 'on' : ''}>{self.ready ? '준비 취소' : '준비 완료'}</button>
         {host && <button onClick={() => action('room:fillBots')}>빈 자리 봇으로 채우기</button>}

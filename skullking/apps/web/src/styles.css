@@ -134,7 +134,7 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .dock-foot{position:relative;z-index:1;display:grid;gap:.6rem;margin-top:.2rem}.cta{width:100%}
 
 /* ═════════ 로비 ═════════ */
-.harbor{max-width:1000px;margin:auto;min-height:100dvh;padding:1rem clamp(1rem,4vw,2rem) 2rem;display:grid;grid-template-rows:auto auto 1fr auto;gap:1.4rem}
+.harbor{max-width:1000px;margin:auto;min-height:100dvh;padding:1rem clamp(1rem,4vw,2rem) 2rem;display:grid;grid-template-rows:auto auto auto 1fr auto;gap:1.4rem}
 .topbar{display:flex;justify-content:space-between;align-items:center}
 .leave{background:none;border:0;box-shadow:none;color:var(--bone-2);font-size:.82rem;padding:.4rem .5rem 0}
 .harbor-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem}
@@ -283,7 +283,18 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .seat[data-side=r] .bubble{left:auto;right:-4px;translate:0 0}.seat[data-side=r] .bubble::after{left:auto;right:20px;translate:0 -1px}
 .seat:has(.bubble){z-index:25}
 .bwrap{position:relative;display:block;width:42px;height:42px}.bwrap .avatar-cameo{width:100%;height:100%}.pod .bwrap{width:52px;height:52px}
-.berth .avatar{position:relative}
+.berth .avatar{position:relative}.berth:has(.bubble){z-index:25}
+.harbor-chat{display:flex;justify-content:center}
+/* ─ 비딩: 선 · 카드 내는 순서 ─ */
+.order-strip{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.3rem .9rem;font:700 .78rem var(--sans);letter-spacing:.02em}
+.order-strip i{display:inline-grid;place-items:center;min-width:22px;height:22px;margin-right:.4rem;padding:0 .35rem;border-radius:99px;background:var(--gold);color:#2a1c10;font:900 .7rem var(--serif);font-style:normal;box-shadow:0 0 0 2px rgba(13,8,5,.25)}
+.order-strip .os-me b{font:900 1.15rem/1 var(--serif);color:var(--blood)}.order-strip .os-me small{font-weight:600;opacity:.75}
+.bid .order-strip{padding:.4rem .8rem;border:1px dashed rgba(42,28,16,.42);border-radius:3px;color:var(--ink)}
+.turntext.bid-order{display:grid;gap:.15rem;justify-items:center;opacity:1}.turntext.bid-order .order-strip{color:var(--bone)}.turntext .order-strip .os-me b{color:var(--gold-hi)}
+.os-note{font-size:.68rem;color:var(--bone-3);letter-spacing:.04em}
+.ord-tag{position:absolute;right:-7px;top:-5px;min-width:19px;height:19px;padding:0 4px;display:grid;place-items:center;border-radius:99px;background:rgba(13,8,5,.88);color:var(--bone);border:1px solid rgba(233,220,196,.55);font:900 .62rem var(--serif);font-style:normal;box-shadow:var(--sh-1)}
+.game.is-bidding .lead-tag{width:auto;min-width:24px;height:22px;padding:0 6px;border-radius:99px;right:-9px;background:var(--gold);color:#2a1c10;font-size:.72rem;box-shadow:0 0 0 2px rgba(13,8,5,.7),var(--sh-1)}
+.game.is-bidding .seat.leader .portrait{box-shadow:0 0 0 2px var(--gold),0 0 16px 2px rgba(216,164,61,.4),var(--sh-2)}
 @keyframes bubbleIn{from{opacity:0;transform:scale(.6) translateY(6px)}}
 @keyframes bubbleOut{to{opacity:0;transform:translateY(-4px)}}
 
@@ -457,8 +468,24 @@ button:disabled{opacity:.38;cursor:not-allowed}
   .hcard{bottom:36px}
   /* 키보드가 열린 동안에는 손패 대신 탁자와 좌석을 우선한다. JS가
      visual viewport 높이를 넣어 iOS의 자동 화면 이동도 같은 기준으로 맞춘다. */
-  .game.is-play.chat-focus{height:var(--chat-viewport-height,100dvh)}
-  .game.is-play.chat-focus .hand-box{height:0!important;overflow:hidden}
+  .game.chat-focus:not(.score){height:var(--chat-viewport-height,100dvh)}
+  .game.chat-focus:not(.score) .hand-box{height:0!important;overflow:hidden}
+  .game.is-bidding.chat-focus .center-ui{visibility:hidden}
+  /* 정산 화면: 점수표(말풍선이 뜨는 곳)와 입력창만 남기고 고정 */
+  .game.score.chat-focus{height:var(--chat-viewport-height,100dvh);min-height:0;overflow:hidden;display:flex;flex-direction:column;padding-bottom:.5rem}
+  .game.score.chat-focus :is(.roundhead,.score-note,.score-actions,.score-tabs){display:none}
+  .game.score.chat-focus .finale{padding:.4rem 0}.game.score.chat-focus .finale>:not(.podium){display:none}
+  .game.score.chat-focus :is(.ledger,.board){flex:1 1 auto;min-height:0;overflow-y:auto;width:100%;max-width:760px;margin:.6rem auto}
+  .game.score.chat-focus .ledger{padding-top:3.6rem}
+  .game.score.chat-focus .chat-inline{flex:none;padding:.4rem 1rem}
+  /* 대기실: 헤더·설정·버튼을 접고 입력창 + 프로필(말풍선)만 보이게 고정 */
+  .harbor.chat-focus{height:var(--chat-viewport-height,100dvh);min-height:0;overflow:hidden;gap:.5rem;padding-bottom:.5rem;grid-template-rows:auto auto minmax(0,1fr)}
+  .harbor.chat-focus :is(.harbor-head,.harbor-actions,.voyage){display:none}
+  .harbor.chat-focus .harbor-body{grid-template-columns:1fr;min-height:0;overflow-y:auto;align-items:start}
+  .harbor.chat-focus .roster{grid-template-columns:repeat(3,1fr);gap:.6rem;padding:3.8rem .2rem .6rem;align-content:start}
+  .harbor.chat-focus .berth{padding:.7rem .3rem .6rem}.harbor.chat-focus .berth .avatar{width:48px;height:48px}.harbor.chat-focus .berth.vacant{min-height:96px}
+  .harbor.chat-focus .berth:nth-child(3n+1) .bubble{left:-4px;translate:0 0}.harbor.chat-focus .berth:nth-child(3n+1) .bubble::after{left:20px;translate:0 -1px}
+  .harbor.chat-focus .berth:nth-child(3n) .bubble{left:auto;right:-4px;translate:0 0}.harbor.chat-focus .berth:nth-child(3n) .bubble::after{left:auto;right:20px;translate:0 -1px}
   .help-foot{padding:.7rem 1rem .9rem;gap:.5rem}.help-foot .prev{padding:.6rem}.help-foot .prev span{display:none}.help-foot .next{padding:.6rem .9rem;font-size:.86rem}
   .board th,.board td{padding:.5rem .45rem}.board .who{min-width:92px}.wh{gap:.4rem}.wh .avatar-cameo{display:none}.wh .medal{width:22px;height:22px}
   .tiles,.hcols{grid-template-columns:1fr}.help-body{padding:1.2rem 1.1rem 1rem}.help-foot{padding:.7rem 1.1rem 1rem}.help-tabs{padding-left:1rem}

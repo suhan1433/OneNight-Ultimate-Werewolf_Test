@@ -1,7 +1,7 @@
 import http from 'node:http';
 import cors from 'cors'; import express from 'express'; import { Server } from 'socket.io';
-import { commitSchema, roomActionSchema, roomCreateSchema, roomJoinSchema } from '@rummikub/protocol';
-import { MemoryGameStore, botAction, commitTurn, createRoom, drawTurn, fillBots, getPlayer, joinRoom, publicView, resetTurn, returnLobby, roomCode, startGame, timeoutTurn, toggleReady } from './game.js';
+import { commitSchema, roomActionSchema, roomCreateSchema, roomJoinSchema, roomKickSchema, roomTimerSchema } from '@rummikub/protocol';
+import { MemoryGameStore, botAction, commitTurn, createRoom, drawTurn, fillBots, getPlayer, joinRoom, kickPlayer, publicView, resetTurn, returnLobby, roomCode, setTurnSeconds, startGame, timeoutTurn, toggleReady } from './game.js';
 const app = express(); app.use(cors({ origin: true, credentials: true })); app.get('/health', (_req, res) => res.json({ ok: true, game: 'rummikub-neon-parlor' }));
 const server = http.createServer(app); const io = new Server(server, { cors: { origin: true, credentials: true }, transports: ['websocket', 'polling'] }); const store = new MemoryGameStore();
 const channel = (playerId: string) => `rummikub:${playerId}`;
@@ -13,7 +13,15 @@ io.on('connection', socket => {
   ack(socket, 'room:create', data => { const input = roomCreateSchema.parse(data); let id = roomCode(); while (store.get(id)) id = roomCode(); const { room, player } = createRoom(id, input.name, input.maxPlayers, input.config); player.socketId = socket.id; store.set(room); bind(socket, id, player.id); send(id); return { roomId: id, playerId: player.id, sessionToken: player.token }; });
   ack(socket, 'room:join', data => { const input = roomJoinSchema.parse(data); const room = store.get(input.roomId); if (!room) throw Error('방 코드를 찾을 수 없습니다.'); const player = joinRoom(room, input.name, input); player.socketId = socket.id; bind(socket, room.roomId, player.id); send(room.roomId); return { roomId: room.roomId, playerId: player.id, sessionToken: player.token }; });
   const action = (event: string, mutate: (roomId: string, playerId: string, data: unknown) => void) => ack(socket, event, data => { const parsed = roomActionSchema.parse(data); const { room, playerId } = requirePlayer(socket, parsed.roomId); const player = getPlayer(room, playerId); if (parsed.clientSeq <= player.lastSeq) return {}; player.lastSeq = parsed.clientSeq; mutate(room.roomId, playerId, data); send(room.roomId); return {}; });
-  action('room:ready', (roomId, playerId) => toggleReady(store.get(roomId)!, playerId)); action('room:fillBots', (roomId, playerId) => fillBots(store.get(roomId)!, playerId)); action('game:start', (roomId, playerId) => startGame(store.get(roomId)!, playerId)); action('turn:draw', (roomId, playerId) => drawTurn(store.get(roomId)!, playerId)); action('turn:reset', (roomId, playerId) => resetTurn(store.get(roomId)!, playerId)); action('game:lobby', (roomId, playerId) => returnLobby(store.get(roomId)!, playerId));
+  action('room:ready', (roomId, playerId) => toggleReady(store.get(roomId)!, playerId)); action('room:fillBots', (roomId, playerId) => fillBots(store.get(roomId)!, playerId));
+  action('room:setTurnSeconds', (roomId, playerId, data) => setTurnSeconds(store.get(roomId)!, playerId, roomTimerSchema.parse(data).turnSeconds));
+  action('room:kick', (roomId, playerId, data) => {
+    const removed = kickPlayer(store.get(roomId)!, playerId, roomKickSchema.parse(data).playerId);
+    const target = removed.socketId ? io.sockets.sockets.get(removed.socketId) : undefined;
+    target?.leave(channel(removed.id));
+    target?.emit('room:kicked', { reason: '방장에 의해 강퇴되었습니다.' });
+  });
+  action('game:start', (roomId, playerId) => startGame(store.get(roomId)!, playerId)); action('turn:draw', (roomId, playerId) => drawTurn(store.get(roomId)!, playerId)); action('turn:reset', (roomId, playerId) => resetTurn(store.get(roomId)!, playerId)); action('game:lobby', (roomId, playerId) => returnLobby(store.get(roomId)!, playerId));
   ack(socket, 'turn:commit', data => { const input = commitSchema.parse(data); const { room, playerId } = requirePlayer(socket, input.roomId); const player = getPlayer(room, playerId); if (input.clientSeq <= player.lastSeq) return {}; player.lastSeq = input.clientSeq; commitTurn(room, playerId, input.version, input.table, input.hand); send(room.roomId); return {}; });
   socket.on('disconnect', () => { const room = store.get(socket.data.roomId); if (!room || !socket.data.playerId) return; const player = room.players.find(item => item.id === socket.data.playerId); if (player?.socketId === socket.id) { player.connected = false; player.socketId = null; room.version += 1; send(room.roomId); } });
 });

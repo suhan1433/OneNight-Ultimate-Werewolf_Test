@@ -65,16 +65,22 @@ export function Bubble({ playerId }: { playerId: string }) {
 function useMobileChatView(focused: boolean) {
   useEffect(() => {
     if (!focused || !window.matchMedia('(max-width: 640px)').matches) return;
-    const game = document.querySelector<HTMLElement>('.game.is-play');
-    if (!game) return;
+    /* 비딩(.is-bidding) · 플레이(.is-play) · 정산(.score) · 대기실(.harbor) 어디서든 같은 방식으로 고정한다.
+       예전에는 '.game.is-play' 만 찾아서 비딩 중/대기실/정산 화면에서는 고정이 되지 않았다. */
+    const ROOT = '.game, .harbor';
     const viewport = window.visualViewport;
     let frame = 0;
+    const apply = () => {
+      const root = document.querySelector<HTMLElement>(ROOT);
+      if (!root) return;
+      root.style.setProperty('--chat-viewport-height', `${Math.round(viewport?.height ?? window.innerHeight)}px`);
+      if (!root.classList.contains('chat-focus')) root.classList.add('chat-focus');
+    };
     const sync = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        game.style.setProperty('--chat-viewport-height', `${Math.round(viewport?.height ?? window.innerHeight)}px`);
-        game.classList.add('chat-focus');
-        // 브라우저가 입력창을 보이게 하려고 밀어 둔 페이지를 게임판의 위쪽으로 되돌린다.
+        apply();
+        // 브라우저가 입력창을 보이게 하려고 밀어 둔 페이지를 화면 위쪽으로 되돌린다.
         window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       });
     };
@@ -82,13 +88,22 @@ function useMobileChatView(focused: boolean) {
     viewport?.addEventListener('resize', sync);
     viewport?.addEventListener('scroll', sync);
     window.addEventListener('resize', sync);
+    /* 비딩→플레이처럼 React가 className을 다시 써서 chat-focus가 지워져도 즉시 복구 */
+    const mo = new MutationObserver(() => {
+      const root = document.querySelector<HTMLElement>(ROOT);
+      if (root && !root.classList.contains('chat-focus')) root.classList.add('chat-focus');
+    });
+    mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
     return () => {
+      mo.disconnect();
       window.cancelAnimationFrame(frame);
       viewport?.removeEventListener('resize', sync);
       viewport?.removeEventListener('scroll', sync);
       window.removeEventListener('resize', sync);
-      game.classList.remove('chat-focus');
-      game.style.removeProperty('--chat-viewport-height');
+      document.querySelectorAll<HTMLElement>(ROOT).forEach(r => {
+        r.classList.remove('chat-focus');
+        r.style.removeProperty('--chat-viewport-height');
+      });
     };
   }, [focused]);
 }
@@ -112,6 +127,6 @@ export function ChatInput({ roomCode, meId, wide }: { roomCode: string; meId: st
   return <form className={'chat' + (wide ? ' wide' : '')} onSubmit={submit}>
     <Icon name="chat" />
     <input value={text} onChange={e => setText(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} maxLength={60} placeholder="한마디…" aria-label="채팅 입력" autoComplete="off" autoCorrect="off" enterKeyHint="send" />
-    <button type="submit" disabled={!text.trim()} aria-label="보내기"><Icon name="send" /></button>
+    <button type="submit" disabled={!text.trim()} aria-label="보내기" onMouseDown={e => e.preventDefault()}><Icon name="send" /></button>
   </form>;
 }

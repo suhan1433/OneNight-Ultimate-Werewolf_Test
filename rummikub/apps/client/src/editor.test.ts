@@ -1,4 +1,4 @@
-import { moveTiles, splitMeld, mergeMelds, swapJoker, signature, mergeHandOrder, whyInvalid, tidyMeld, type Draft, type Ctx } from './editor';
+import { moveTiles, splitMeld, mergeMelds, swapJoker, signature, mergeHandOrder, whyInvalid, type Draft, type Ctx } from './editor';
 import type { Meld, Tile } from '@rummikub/rules';
 let fails = 0; const ok = (c: boolean, m: string) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok  ', m); };
 const T = (id: number, color: any, value: number): Tile => ({ id, kind: 'number', color, value } as Tile);
@@ -79,10 +79,12 @@ const tilesOfMeld = (d: Draft, i: number) => d.table[i]!.tiles.map(e => e.tileId
 { const d = run(moveTiles(Rd(ids6), [41], { to: 'meld', meldId: 'R', index: 4 }, ctx)); ok(d.table.length === 1, 'I ctx.ok 없으면 분할 없음(하위 호환)'); }
 // J: 맨 끝/맨 앞에 놓는 건 분할하지 않는다
 { const d = run(moveTiles(Rd(ids6), [41], { to: 'meld', meldId: 'R', index: 0 }, ctx2)); ok(d.table.length === 1, 'J 가장자리 삽입은 분할 없음'); }
-// K: 무효 조합도 숫자/색 순서로 정리
-{ const g = (m: Meld) => m.tiles.map(e => e.tileId).join();
-  ok(g(tidyMeld(mk('X', 'run', [6, 5]), id => pool.get(id))) === '5,6', 'K 같은 색 2장은 오름차순');
-  ok(g(tidyMeld(mk('X', 'group', [23, 22, 21]), id => pool.get(id))) === '21,22,23', 'K 같은 숫자는 색 순서');
-  ok(g(tidyMeld(mk('X', 'run', [6, 40, 5]), id => pool.get(id))) === '5,6,40', 'K 조커는 뒤로'); }
+// L: 순서까지 보는 검사(ctx.ok)에서도 끼운 자리에서 분할된다 / 순서가 틀어진 삽입은 분할 없이 무효로 남는다
+{ const mini = (tiles: Tile[], _a: boolean, id: string) => ({ ok: validTiles({ id, type: 'run', tiles: tiles.map(t => ({ tileId: t.id })) } as Meld) });
+  const strictOk = (m: Meld) => { const ts = m.tiles.map(e => pool.get(e.tileId)!); if (!mini(ts, false, m.id).ok) return false; const ns = ts as Extract<Tile, { kind: 'number' }>[]; return ns.every(t => t.color !== ns[0]!.color) || ns.every((t, i) => i === 0 || t.value === ns[i - 1]!.value + 1); };
+  const ctx3: Ctx = { ...ctx, fix: m => m, ok: strictOk };
+  let d = run(moveTiles(Rd(ids6), [41], { to: 'meld', meldId: 'R', index: 4 }, ctx3)); ok(d.table.length === 2 && tilesOfMeld(d, 0) === '3,4,5,6,41' && tilesOfMeld(d, 1) === '37,38', 'L 순서 검사에서도 8·9 사이 삽입은 5~9 / 9·10');
+  d = run(moveTiles(Rd([3, 4, 5, 6]), [41], { to: 'meld', meldId: 'R', index: 2 }, ctx3)); ok(d.table.length === 1 && tilesOfMeld(d, 0) === '3,4,41,5,6', 'L 순서가 틀어진 삽입은 그대로(무효 표시는 UI 몫)');
+  d = run(moveTiles(Rd([3, 4, 5, 6]), [41], { to: 'meld', meldId: 'R', index: 4 }, ctx3)); ok(d.table.length === 1 && strictOk(d.table[0]!), 'L 순서대로 끝에 놓으면 유효'); }
 ok(whyInvalid([pool.get(1)!, pool.get(2)!]).includes('3장'), 'whyInvalid 3장 미만');
 console.log(fails ? `${fails} FAILED` : 'ALL PASSED'); process.exit(fails ? 1 : 0);
