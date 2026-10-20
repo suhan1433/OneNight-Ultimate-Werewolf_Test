@@ -22,9 +22,9 @@ async function setGame(page: Page, state: ClientGameState | null) {
 }
 
 async function tracks(page: Page) {
-  return page.evaluate(() => (window as any).__recordings.map(({ audio, src }: { audio: HTMLAudioElement; src: string }) => ({
-    src: decodeURI(src), paused: audio.paused, time: audio.currentTime, duration: audio.duration, loop: audio.loop, error: audio.error?.code,
-  })) as Array<{ src: string; paused: boolean; time: number; duration: number; loop: boolean; error?: number }>);
+  return page.evaluate(() => (window as any).__recordings.map(({ audio, src, pauses }: { audio: HTMLAudioElement; src: string; pauses: number }) => ({
+    src: decodeURI(src), paused: audio.paused, time: audio.currentTime, duration: audio.duration, loop: audio.loop, error: audio.error?.code, pauses,
+  })) as Array<{ src: string; paused: boolean; time: number; duration: number; loop: boolean; error?: number; pauses: number }>);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -33,7 +33,9 @@ test.beforeEach(async ({ page }) => {
     const Native = window.Audio;
     (window as any).Audio = function (src: string) {
       const audio = new Native(src);
-      (window as any).__recordings.push({ audio, src });
+      const record = { audio, src, pauses: 0 };
+      audio.addEventListener('pause', () => record.pauses++);
+      (window as any).__recordings.push(record);
       return audio;
     };
   });
@@ -79,6 +81,8 @@ test('start bell, role reveal and vote landing use the provided effects without 
   await page.getByRole('button', { name: '음향 설정 닫기' }).click();
   await setGame(page, game('role_reveal'));
   await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('게임시작_종소리') && t.time > 0)).toBe(true);
+  expect((await tracks(page)).find(t => t.src.includes('대기실_벽난로'))?.paused).toBe(false);
+  expect((await tracks(page)).find(t => t.src.includes('대기실_벽난로'))?.pauses).toBe(0);
   await page.getByRole('button', { name: '길게 누르기 어렵다면 — 탭으로 바로 확인' }).click();
   await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('역할확인_카드넘어갈때') && t.duration > .5)).toBe(true);
   await setGame(page, game('team_vote'));
@@ -97,6 +101,68 @@ test('ending MP3 waits for the title and plays once when the ending is skipped',
   expect((await tracks(page)).filter(t => t.src.includes('엔딩'))).toHaveLength(0);
   await page.getByRole('button', { name: '엔딩 바로 보기' }).click();
   await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('엔딩') && t.time > 0 && t.duration > 7)).toBe(true);
+  expect((await tracks(page)).find(t => t.src.includes('토론'))?.paused).toBe(false);
+  expect((await tracks(page)).find(t => t.src.includes('토론'))?.pauses).toBe(0);
   await setGame(page, { ...game('result'), winner: 'good', winReason: '원정 성공', stateVersion: 2 });
   expect((await tracks(page)).filter(t => t.src.includes('엔딩'))).toHaveLength(1);
+});
+
+test('background never pauses or restarts during vote, quest and assassination reveal effects', async ({ page }) => {
+  await setGame(page, game('team_build'));
+  await page.getByRole('button', { name: '음향 설정', exact: true }).click();
+  await page.getByRole('button', { name: '음향 설정 닫기' }).click();
+  await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('토론') && t.time > 0)).toBe(true);
+  const initialTime = (await tracks(page)).find(t => t.src.includes('토론'))!.time;
+  await setGame(page, game('team_vote'));
+  await setGame(page, { ...game('vote_result'), voteResult: { approve: 3, reject: 2, passed: true } });
+  // Observe the actual cinematic silence window, rather than emulating it.
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-vt-still'));
+  expect((await tracks(page)).find(t => t.src.includes('토론'))?.paused).toBe(false);
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-vt-still'));
+  await setGame(page, game('quest'));
+  await setGame(page, { ...game('quest_result'), questResult: { fails: 0, success: true } });
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-cs-still'));
+  expect((await tracks(page)).find(t => t.src.includes('토론'))?.paused).toBe(false);
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-cs-still'));
+  await setGame(page, { ...game('team_build'), round: 1 });
+  const discussion = (await tracks(page)).filter(t => t.src.includes('토론'));
+  expect(discussion).toHaveLength(1);
+  expect(discussion[0]!.pauses).toBe(0);
+  expect(discussion[0]!.time).toBeGreaterThan(initialTime + 4);
+  await setGame(page, game('assassination'));
+  await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('암살') && t.time > 0)).toBe(true);
+  const beforeLock = (await tracks(page)).find(t => t.src.includes('암살'))!.time;
+  await page.evaluate(async () => {
+    const path = '/avalon/src/socket.ts';
+    const { socket } = await import(path);
+    // Dispatch the same public event the server sends when the target is locked.
+    socket.emitEvent(['ASSASSIN_AIM', { roomCode: 'SOUND', targetId: 'p1', actorId: 'p2', locked: true }]);
+  });
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-cs-still'));
+  await expect.poll(async () => (await tracks(page)).find(t => t.src.includes('암살'))!.time).toBeGreaterThan(beforeLock + .3);
+  expect((await tracks(page)).find(t => t.src.includes('암살'))?.pauses).toBe(0);
+});
+
+test('an outgoing background keeps playing while the next recording loads', async ({ page }) => {
+  await setGame(page, game('lobby'));
+  await page.getByRole('button', { name: '음향 설정', exact: true }).click();
+  await page.getByRole('button', { name: '음향 설정 닫기' }).click();
+  await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('대기실_벽난로') && t.time > 0)).toBe(true);
+  let release!: () => void;
+  let requested = false;
+  const waiting = new Promise<void>(resolve => { release = resolve; });
+  await page.route(url => decodeURI(url.pathname).includes('토론') && url.pathname.endsWith('.mp3'), async route => {
+    requested = true;
+    await waiting;
+    await route.continue();
+  });
+  try {
+    await setGame(page, game('team_build'));
+    await expect.poll(() => requested).toBe(true);
+    const before = (await tracks(page)).find(t => t.src.includes('대기실_벽난로'))!.time;
+    await expect.poll(async () => (await tracks(page)).find(t => t.src.includes('대기실_벽난로'))!.time).toBeGreaterThan(before + .3);
+    expect((await tracks(page)).find(t => t.src.includes('대기실_벽난로'))?.paused).toBe(false);
+  } finally { release(); }
+  await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('토론') && t.time > 0)).toBe(true);
+  expect((await tracks(page)).find(t => t.src.includes('대기실_벽난로'))?.paused).toBe(true);
 });

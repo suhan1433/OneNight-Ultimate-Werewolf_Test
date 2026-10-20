@@ -13,9 +13,9 @@ const effects = { start, role, coin, ending };
 type Background = keyof typeof backgrounds;
 type Effect = keyof typeof effects;
 const scenes: Record<Phase, Background | null> = {
-  lobby: 'fireplace', role_reveal: null, team_build: 'discussion', team_vote: 'discussion',
+  lobby: 'fireplace', role_reveal: 'fireplace', team_build: 'discussion', team_vote: 'discussion',
   vote_result: 'discussion', quest: 'discussion', quest_result: 'discussion',
-  assassination: 'assassination', result: null,
+  assassination: 'assassination', result: 'discussion',
 };
 
 /** Recordings are imported as Vite assets, including in both Docker layouts.
@@ -25,6 +25,7 @@ class RecordedAudio {
   private phase?: Phase;
   private desired: Background | null = null;
   private current?: HTMLAudioElement;
+  private pending?: HTMLAudioElement;
   private tracks = new Map<Background, HTMLAudioElement>();
   private activeEffects = new Set<HTMLAudioElement>();
   private unlocked = false;
@@ -36,15 +37,13 @@ class RecordedAudio {
       this.sync();
     };
     const visibility = () => {
-      if (document.hidden) { this.current?.pause(); this.stopEffects(); }
+      if (document.hidden) { this.current?.pause(); this.pending?.pause(); this.stopEffects(); }
       else this.sync();
     };
     const unsubscribe = gameAudio.subscribe(() => {
       if (gameAudio.volume('effects') === 0) this.stopEffects();
       this.sync();
     });
-    const observer = new MutationObserver(() => this.sync());
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-rv-still', 'data-vt-still', 'data-cs-still'] });
     window.addEventListener('pointerdown', unlock, { capture: true, passive: true });
     window.addEventListener('keydown', unlock, true);
     document.addEventListener('visibilitychange', visibility);
@@ -54,9 +53,9 @@ class RecordedAudio {
       window.removeEventListener('keydown', unlock, true);
       document.removeEventListener('visibilitychange', visibility);
       window.removeEventListener('pageshow', visibility);
-      observer.disconnect(); unsubscribe(); this.stopEffects();
+      unsubscribe(); this.stopEffects();
       this.tracks.forEach(audio => this.release(audio)); this.tracks.clear();
-      this.current = undefined; this.desired = null; this.unlocked = false;
+      this.current = undefined; this.pending = undefined; this.desired = null; this.unlocked = false;
       this.room = undefined; this.phase = undefined;
     };
   }
@@ -67,6 +66,10 @@ class RecordedAudio {
     if (newRoom || phase !== this.phase) this.stopEffects();
     const desired = phase ? scenes[phase] : null;
     if (newRoom || desired !== this.desired) {
+      if (this.pending && this.pending !== this.current) this.pending.pause();
+      this.pending = undefined;
+    }
+    if (newRoom || !desired) {
       if (this.current) { this.current.pause(); this.current.currentTime = 0; }
       this.current = undefined;
     }
@@ -76,8 +79,8 @@ class RecordedAudio {
   }
 
   private sync() {
-    if (!this.desired || !this.unlocked || this.quiet() || gameAudio.volume('background') === 0) {
-      this.current?.pause(); return;
+    if (!this.desired || !this.unlocked || document.hidden || gameAudio.volume('background') === 0) {
+      this.current?.pause(); this.pending?.pause(); return;
     }
     let audio = this.tracks.get(this.desired);
     if (!audio) {
@@ -86,17 +89,24 @@ class RecordedAudio {
       gameAudio.trackMedia(audio, 'background', this.desired === 'discussion' ? .22 : .32);
       this.tracks.set(this.desired, audio);
     }
-    this.current = audio;
-    if (!audio.paused) return;
+    if (this.current === audio && !audio.paused) return;
+    if (this.pending === audio && !audio.paused) return;
     gameAudio.unlock();
     const playing = audio;
+    this.pending = playing;
     void playing.play().then(() => {
-      if (this.current !== playing || this.quiet() || gameAudio.volume('background') === 0) playing.pause();
-    }).catch(() => { /* Retry background playback on the next gesture. */ });
-  }
-
-  private quiet() {
-    return document.hidden || ['data-rv-still', 'data-vt-still', 'data-cs-still'].some(name => document.documentElement.hasAttribute(name));
+      if (!this.desired || this.tracks.get(this.desired) !== playing || document.hidden || gameAudio.volume('background') === 0) {
+        // A rapid phase change may have returned to the outgoing track.
+        if (this.current !== playing || document.hidden || gameAudio.volume('background') === 0) playing.pause();
+        return;
+      }
+      // Keep the previous background playing until the replacement is audible.
+      const outgoing = this.current;
+      this.current = playing;
+      if (outgoing && outgoing !== playing) { outgoing.pause(); outgoing.currentTime = 0; }
+    }).catch(() => { /* Keep the outgoing music; retry on the next gesture. */ }).finally(() => {
+      if (this.pending === playing) this.pending = undefined;
+    });
   }
 
   play(effect: Effect) {
