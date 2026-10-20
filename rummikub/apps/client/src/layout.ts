@@ -12,8 +12,8 @@ export type HandFit = { tw: number; rows: number; cols: number; cells: number; h
 
 /** 타일 수 n에 더해 자유롭게 옮길 여유 칸 */
 export const handSpare = (n: number) => Math.max(6, Math.ceil(n * 0.25));
-/** 모바일에서는 빈 칸보다 읽고 잡을 수 있는 타일 크기를 우선한다. */
-export const mobileHandSpare = (n: number) => Math.max(4, Math.ceil(n * 0.1));
+/** 모바일에서도 20장 이상 쌓였을 때 묶음을 가를 빈 칸이 모자라지 않게 최소 6칸 + 20%를 비워 둔다(그래도 타일 크기가 먼저 줄어든다). */
+export const mobileHandSpare = (n: number) => Math.max(6, Math.ceil(n * 0.2));
 
 /** 칸 수가 (n + 여유) 이상이면서 높이 예산 안에 들어가는 가장 큰 타일 */
 export function fitHand(n: number, W: number, budgetH: number, max: number): HandFit {

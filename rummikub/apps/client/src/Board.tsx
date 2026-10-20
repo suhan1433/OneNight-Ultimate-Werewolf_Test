@@ -5,7 +5,7 @@ import type { PublicView } from '@rummikub/protocol';
 import { webPlatform } from '@rummikub/platform';
 import { emit } from './socket.js';
 import { sfx } from './sound.js';
-import { Ring, SortMode, TileView, isNum, sortByColor, sortByNumber } from './tiles.js';
+import { Ring, SortMode, TileView, isNum, sortAll, sortByGroup, sortByRun } from './tiles.js';
 import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker, jokerReplacement } from './editor.js';
 import { HAND, MELD, Pos, Slots, arrangeSlots, findSpot, fitHand, fitMobileHand, layoutTable, meldInsertIndex, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
 import { checkMeld } from './meldRules.js';
@@ -13,7 +13,8 @@ import { useTileMotion } from './motion.js';
 import { toClientPoint, toLocalPoint, toLocalRect, useFrame } from './orient.js';
 
 export type GameApi = { online: boolean; notice: string; setNotice: (s: string) => void; next: () => number };
-type EditSnapshot = { draft: Draft; slots: Slots; tpos: Record<string, Pos>; sortMode: SortMode };
+/** 되돌리기 기록은 테이블에서 일어난 일(타일 놓기/옮기기, 조합 이동·정돈)만 담는다. 손패 정렬·재배치는 기록하지 않는다. */
+type EditSnapshot = { draft: Draft; tpos: Record<string, Pos> };
 type Spot = { x: number; y: number; w: number; h: number };
 type Drop = { kind: 'none' | 'new' | 'rack' | 'meld'; meldId?: string; tid?: number; after?: boolean; slot?: number; spot?: Spot | null };
 type Drag = { ids: number[]; tw: number; x: number; y: number; ox: number; oy: number; drop: Drop; meld?: string };
@@ -93,8 +94,13 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const [pop, setPop] = useState<Set<string>>(new Set());
   const [dealing, setDealing] = useState(false);
   const tiltT = useRef<ReturnType<typeof setTimeout>>();
-  const [sortMode, setSortMode] = useState<SortMode>('num');
+  const [sortMode, setSortMode] = useState<SortMode>('custom');
   const committing = useRef(false);
+  /** 저장점: 이번 턴에 "전체가 규칙에 맞는" 배치가 될 때마다 자동으로 갱신된다. 되돌리기 기록(undo)과는 별개다. */
+  type Checkpoint = { draft: Draft; tpos: Record<string, Pos>; added: number };
+  const [ckpt, setCkpt] = useState<Checkpoint | null>(null);
+  const [autoSend, setAutoSend] = useState(() => { try { return localStorage.getItem('rk-auto') !== '0'; } catch { return true; } });
+  const lastBase = useRef(''); const lastDeadline = useRef<number | undefined>(undefined);
   const home = useRef(new Map<number, number>());        // 손패를 떠난 타일의 원래 칸(되돌리면 거기로)
   const arranged = useRef(false);
   const prevHand = useRef<Set<number> | null>(null);
@@ -142,6 +148,12 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
 
   // 서버 확정 상태가 오면 편집 중이던 임시 상태를 버리고 서버 기준으로 복구한다(손패 칸 배치는 그대로 유지)
   useLayoutEffect(() => {
+    // 같은 턴에서 내 손패/테이블 기준이 그대로인 상태 갱신(재연결, 입퇴장, 확정 거절 등)은 편집 중인 작업을 지우지 않는다.
+    const base = signature({ hand: view.hand, table: view.table.map(asServer) });
+    const same = myTurn && lastBase.current === base && lastDeadline.current === view.turn?.deadline;
+    lastBase.current = base; lastDeadline.current = view.turn?.deadline;
+    if (same) return;
+    setCkpt(null);
     const g = gest.current;
     const ids = g?.ids ?? (g ? [g.id] : []);
     // Opponents' draws must not interrupt the rack organization allowed on their turn.
@@ -229,7 +241,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const arrange = (hand: Tile[], breaks: ReadonlySet<number>): Slots | null => { const g = groupsOf(hand, breaks); return arrangeSlots(g, hf.cols, hf.cells, 1) ?? arrangeSlots(g, hf.cols, hf.cells, 0); };
   useEffect(() => { // 첫 입장: 추천 정리(묶음 사이는 빈 칸)로 시작
     if (arranged.current || !hsz.w || !draft.hand.length) return; arranged.current = true;
-    const s = sortByNumber(draft.hand), a = arrange(s.hand, s.breaks); if (a) setSlots(a); sfx.deal(draft.hand.length);
+    const s = sortAll(draft.hand), a = arrange(s.hand, s.breaks); if (a) setSlots(a); sfx.deal(draft.hand.length);
     if (!view.tableTiles.length) { setDealing(true); setTimeout(() => setDealing(false), 1400); }
   }, [hsz.w, draft.hand.length, hf.cols, hf.cells]);
 
@@ -257,6 +269,8 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     if (!fresh.length) return;
     setPop(new Set(fresh)); const t = setTimeout(() => setPop(new Set()), 800); return () => clearTimeout(t);
   }, [validIds]);
+  // 전체가 유효해지면 그 배치를 저장점으로 삼는다(확정이 아니라 "여기까지는 안전"이라는 표시).
+  useEffect(() => { if (canCommit) setCkpt({ draft, tpos, added: placed.length }); }, [canCommit, draft]);
   useEffect(() => { if (myTurn && remaining > 0 && remaining <= 5) { sfx.tick(); if (remaining <= 3) webPlatform.haptics.tick(); } }, [remaining, myTurn]);
   const prevTurn = useRef(view.turn?.playerId);
   useEffect(() => { // 차례가 상대에게 넘어갈 때도 조용히 알려 준다
@@ -267,8 +281,8 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const wasMine = useRef(myTurn);
   useEffect(() => { if (myTurn && !wasMine.current) { sfx.turn(); webPlatform.haptics.success(); setSlate(false); setBanner('내 차례!'); setTimeout(() => setBanner(''), 1300); } wasMine.current = myTurn; }, [myTurn]);
 
-  // Game edits and local organization share one chronological undo history.
-  const snapshot = (): EditSnapshot => ({ draft, slots: slotsV, tpos, sortMode });
+  // Undo history covers table edits only; the rack layout (slots) is never restored by undo/redo.
+  const snapshot = (): EditSnapshot => ({ draft, tpos });
   const remember = () => { setPast(p => [...p.slice(-99), snapshot()]); setFuture([]); };
   // 편집 명령
   const apply = (r: Result, history = true) => {
@@ -322,7 +336,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     if (ids.every(id => handSet.has(id))) {
       const next = placeInSlots(slotsV, slotsV.filter((v): v is number => v !== null && ids.includes(v)), at, hf.cols);
       if (sameSlots(next, slotsV)) { setSelected([]); return; }
-      captureMotion(); remember();
+      captureMotion();
       setSlots(next);
       setSortMode('custom'); setSelected([]); sfx.pick(); webPlatform.haptics.tick(); return;
     }
@@ -343,23 +357,48 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     const s = from[from.length - 1]; if (!s || commitBusy || drawBusy) return;
     captureMotion();
     setFrom(from.slice(0, -1)); setTo([...to.slice(-99), snapshot()]);
-    setDraft(s.draft); setSlots(s.slots); setTpos(s.tpos); setSortMode(s.sortMode);
+    setDraft(s.draft); setTpos(s.tpos); // 손패 칸 배치는 그대로 두고, 돌아온 타일만 원래 칸(home)으로 들어간다
     setSelected([]); webPlatform.haptics.tick();
   };
   const undo = () => step(past, setPast, future, setFuture);
   const redo = () => step(future, setFuture, past, setPast);
-  const reset = () => { if (!changed) return; captureMotion(); remember(); setDraft({ hand: mergeHandOrder(draft.hand, view.hand), table: view.table.map(asServer) }); setSelected([]); };
-  /** 숫자순/색상순 모두 "완성된 조합은 한 칸씩 띄워서" 배치한다. 같은 버튼을 다시 누르면 다시 정리한다. */
-  const sortBy = (mode: 'num' | 'color') => {
+  /** 처음 누르면 저장점으로, 저장점과 같거나 저장점이 없으면 턴 처음으로 돌아간다. */
+  const atCkpt = !!ckpt && signature(ckpt.draft) === signature(draft);
+  const reset = () => {
+    if (!changed) return;
+    captureMotion(); remember();
+    if (ckpt && !atCkpt) {
+      setDraft({ hand: mergeHandOrder(draft.hand, ckpt.draft.hand), table: ckpt.draft.table }); setTpos(ckpt.tpos);
+      game.setNotice('저장점으로 돌아갔어요 · 한 번 더 누르면 턴 처음으로');
+    } else { setDraft({ hand: mergeHandOrder(draft.hand, view.hand), table: view.table.map(asServer) }); setCkpt(null); }
+    setSelected([]);
+  };
+  /** 런(1·2·3) / 그룹(7·7·7) 정렬. 완성된 덩어리는 한 칸씩 띄운다. 손패 배치만 바꾸므로 되돌리기 기록에 넣지 않는다. */
+  const sortBy = (mode: 'run' | 'group') => {
     captureMotion('sort');
-    const r = mode === 'color' ? sortByColor(handBySlots) : sortByNumber(handBySlots);
-    const a = arrange(r.hand, r.breaks); if (a && !sameSlots(a, slotsV)) { remember(); setSlots(a); }
+    const r = mode === 'run' ? sortByRun(handBySlots) : sortByGroup(handBySlots);
+    // 칸이 모자라 덩어리를 띄울 수 없으면 띄우기를 포기하고 한 줄로라도 정렬한다.
+    const a = arrange(r.hand, r.breaks) ?? arrangeSlots([r.hand.map(t => t.id)], hf.cols, hf.cells, 0);
+    if (a && !sameSlots(a, slotsV)) setSlots(a);
     setSortMode(mode); setNewIds(new Set()); sfx.pick(); webPlatform.haptics.tick();
   };
   const tidyTable = () => { if (!draft.table.length) return; captureMotion('sort'); remember(); setTpos({}); setFocus(new Set()); sfx.pick(); };
   const send = (event: string) => emit(event, { roomId: view.roomId, clientSeq: game.next() }).catch((e: Error) => game.setNotice(e.message));
-  const commit = () => { if (committing.current) return; committing.current = true; setCommitBusy(true); justCommitted.current = true; return emit('turn:commit', { roomId: view.roomId, version: view.version, table: draft.table, hand: draft.hand.map(t => t.id), clientSeq: game.next() }).then(() => { webPlatform.haptics.success(); sfx.chime(); setBanner('✓ 확정!'); setTimeout(() => setBanner(''), 1100); }).catch((e: Error) => { justCommitted.current = false; game.setNotice(e.message); }).finally(() => { committing.current = false; setCommitBusy(false); }); };
+  const commit = (d: Draft = draft) => { if (committing.current) return; committing.current = true; setCommitBusy(true); justCommitted.current = true; return emit('turn:commit', { roomId: view.roomId, version: view.version, table: d.table, hand: d.hand.map(t => t.id), clientSeq: game.next() }).then(() => { webPlatform.haptics.success(); sfx.chime(); setBanner('✓ 확정!'); setTimeout(() => setBanner(''), 1100); }).catch((e: Error) => { justCommitted.current = false; game.setNotice(e.message); }).finally(() => { committing.current = false; setCommitBusy(false); }); };
   const onDraw = () => { if (drawBusy || !myTurn) return; setDrawBusy(true); webPlatform.haptics.tick(); send('turn:draw').finally(() => setTimeout(() => setDrawBusy(false), 700)); };
+  // 제한 시간 직전: 지금 배치가 유효하면 그대로, 아니면 저장점을 자동 확정한다. 둘 다 없으면 서버 규칙대로 처리된다.
+  const latest = useRef({ canCommit, ckpt, autoSend, busy: false, draft, commit });
+  latest.current = { canCommit, ckpt, autoSend, busy: commitBusy || drawBusy, draft, commit };
+  useEffect(() => {
+    const dl = view.turn?.deadline; if (!myTurn || !dl) return;
+    const ms = dl - Date.now() - 1800; if (ms < -1500) return;
+    const t = setTimeout(() => {
+      const s = latest.current; if (!s.autoSend || s.busy) return;
+      if (s.canCommit) { game.setNotice('시간이 거의 끝나 지금 배치를 확정해요'); s.commit(s.draft); }
+      else if (s.ckpt) { game.setNotice('시간이 거의 끝나 저장점 배치를 확정해요'); setDraft(s.ckpt.draft); setTpos(s.ckpt.tpos); s.commit(s.ckpt.draft); }
+    }, Math.max(0, ms));
+    return () => clearTimeout(t);
+  }, [view.turn?.deadline, myTurn, view.version]);
 
   // 끌기: "놓을 곳"은 손가락이 아니라 손가락 위에 뜬 타일(aim) 아래의 요소로 판정한다
   const aim = (p: { x: number; y: number }, type: string) => {
@@ -565,6 +604,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const hint = !myTurn ? (view.message || '손패는 미리 정리해 둘 수 있어요')
     : tip ? tip
     : selected.length ? `${selected.length}장 선택 · 끌어서 옮기세요`
+    : remaining <= 15 && changed ? (autoSend && (canCommit || ckpt) ? `시간이 끝나면 ${canCommit ? '지금' : '저장된'} 배치가 자동 확정돼요` : '시간이 끝나면 지금 배치는 사라져요')
     : changed ? (canCommit ? '좋아요! ✓ 확정을 누르세요' : placed.length === 0 ? '손패 타일을 1장 이상 내야 해요' : !initialReady ? `첫 등록 ${placedPoints}/${view.config.initialMeldMin}점` : badIds.length ? (info.get(badIds[0]!)?.why ?? '고쳐야 할 조합이 있어요') : '확인이 필요해요')
     : needInitial ? `첫 등록 ${view.config.initialMeldMin}점 이상 · 타일을 끌어 놓으세요` : '끌어서 놓기 · 길게 누르면 이어진 타일이 늘어나요';
   const urgent = myTurn && remaining <= 10;
@@ -626,6 +666,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
         <div className="scrim" onClick={() => setMenu(false)} />
         <div className="menu" role="menu">
           <button role="menuitem" onClick={() => sfx.toggle()}>{muted ? '소리 켜기' : '소리 끄기'}</button>
+          <button role="menuitemcheckbox" aria-checked={autoSend} onClick={() => setAutoSend(v => { const n = !v; try { localStorage.setItem('rk-auto', n ? '1' : '0'); } catch { /* 무시 */ } return n; })}>시간 종료 시 자동 확정 · {autoSend ? '켜짐' : '꺼짐'}</button>
           <button role="menuitem" onClick={() => { setCoach(true); setMenu(false); }}>조작 방법</button>
           {fr.rot && <button role="menuitem" onClick={flip}>화면 방향 뒤집기</button>}
           {!!document.documentElement.requestFullscreen && <button role="menuitem" onClick={() => { setMenu(false); if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen().then(() => (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape')).catch(() => {}); }}>전체 화면</button>}
@@ -683,11 +724,16 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
         <fieldset className="bd-controls" disabled={commitBusy || drawBusy} aria-label="게임 조작">
         <div className="bd-info">
           <span className="hc"><b key={draft.hand.length}>{draft.hand.length}</b>장{newIds.size > 0 && <em className="newbadge">NEW {newIds.size}</em>}</span>
+          {myTurn && ckpt && changed && <span className={`ckpt ${atCkpt ? 'at' : ''}`}>{atCkpt ? '✓ 저장됨' : '↺ 저장점'} +{ckpt.added}장</span>}
           {needInitial && <span className={`meter ${initialReady ? 'done' : ''}`}><i style={{ width: `${Math.min(100, (placedPoints / view.config.initialMeldMin) * 100)}%` }} />첫 등록 {placedPoints}/{view.config.initialMeldMin}</span>}
         </div>
         <div className="bd-sorts" role="group" aria-label="손패 정렬">
-          <button aria-pressed={sortMode === 'num'} onClick={() => sortBy('num')}>숫자순</button>
-          <button aria-pressed={sortMode === 'color'} onClick={() => sortBy('color')}>색상순</button>
+          <button aria-pressed={sortMode === 'run'} onClick={() => sortBy('run')} aria-label="같은 색 연속 숫자로 정렬 (예: 빨강 1, 2, 3)">
+            <span className="mini" aria-hidden="true"><i className="red">1</i><i className="red">2</i><i className="red">3</i></span><small>같은 색</small>
+          </button>
+          <button aria-pressed={sortMode === 'group'} onClick={() => sortBy('group')} aria-label="같은 숫자 다른 색으로 정렬 (예: 빨강 7, 검정 7, 파랑 7)">
+            <span className="mini" aria-hidden="true"><i className="red">7</i><i className="black">7</i><i className="blue">7</i></span><small>다른 색</small>
+          </button>
         </div>
         <div className="bd-tools">
           <button className="bd-tidy" onClick={tidyTable} aria-label="테이블 조합 자동 정돈" title="테이블 정돈">테이블 정돈</button>
@@ -695,12 +741,12 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
         <div className="urow">
           <button disabled={!past.length || commitBusy || drawBusy} onClick={undo} aria-label="되돌리기">↶</button>
           <button disabled={!future.length || commitBusy || drawBusy} onClick={redo} aria-label="다시 실행">↷</button>
-          <button disabled={!myTurn || !changed || commitBusy} onClick={reset} aria-label="처음 상태로">⟲</button>
+          <button disabled={!myTurn || !changed || commitBusy} onClick={reset} aria-label={ckpt && !atCkpt ? '저장점으로 되돌리기' : '턴 처음 상태로'} title={ckpt && !atCkpt ? '저장점으로' : '턴 처음으로'}>⟲</button>
         </div>
         {!myTurn
           ? <button className="primary go wait" disabled>대기 중<small>손패 정리 가능</small></button>
           : changed
-          ? <button className={`primary go ${canCommit ? 'ready' : ''}`} disabled={!canCommit || !game.online || commitBusy} onClick={commit}>{commitBusy ? '확정 중…' : canCommit ? '✓ 확정' : placed.length && !initialReady ? `${placedPoints}/${view.config.initialMeldMin}점` : '확인 필요'}</button>
+          ? <button className={`primary go ${canCommit ? 'ready' : ''}`} disabled={!canCommit || !game.online || commitBusy} onClick={() => commit()}>{commitBusy ? '확정 중…' : canCommit ? '✓ 확정' : placed.length && !initialReady ? `${placedPoints}/${view.config.initialMeldMin}점` : '확인 필요'}</button>
           : <button className="primary go" disabled={!game.online || drawBusy} onClick={onDraw}>{drawBusy ? '뽑는 중…' : '뽑기'}<small>남은 {view.poolCount}</small></button>}
         </fieldset>
       </aside>

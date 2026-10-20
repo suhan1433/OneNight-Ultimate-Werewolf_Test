@@ -59,19 +59,19 @@ export function Ring({ active, pct, danger, sec, children }: { active: boolean; 
   );
 }
 
-export type SortMode = 'num' | 'color' | 'custom';
+export type SortMode = 'run' | 'group' | 'custom';
 const colorIdx = (t: Tile) => (isNum(t) ? COLORS.indexOf(t.color) : 9);
 const startOf = (c: Tile[]) => Math.min(...c.filter(isNum).map(t => t.value));
 const isRun = (c: Tile[]) => c.filter(isNum).every(t => t.color === (c[0] as Num).color);
+const numsOf = (hand: Tile[]) => hand.filter(isNum).sort((a, b) => a.color.localeCompare(b.color) || a.value - b.value);
+const jokersOf = (hand: Tile[]) => hand.filter(t => !isNum(t));
 
-/** 손패 안에서 이미 완성된 조합(같은 색 연속 3장+ / 같은 숫자 다른 색 3장+)을 겹치지 않게 뽑는다. 나머지와 조커는 따로 돌려준다. */
-function findMelds(hand: Tile[]) {
-  const rest = hand.filter(isNum).sort((a, b) => a.color.localeCompare(b.color) || a.value - b.value);
-  const melds: Tile[][] = [];
-  const take = (g: Tile[]) => { melds.push(g); g.forEach(t => rest.splice(rest.indexOf(t as Num), 1)); };
+/** 같은 색 연속 3장 이상(런)을 겹치지 않게 뽑는다. 뽑힌 타일은 rest에서 빠진다. */
+function takeRuns(rest: Num[]) {
+  const runs: Tile[][] = [];
   for (const c of COLORS) {
     let run: Num[] = [];
-    const flush = () => { if (run.length >= 3) take(run); run = []; };
+    const flush = () => { if (run.length >= 3) { runs.push(run); run.forEach(t => rest.splice(rest.indexOf(t), 1)); } run = []; };
     for (const t of rest.filter(t => t.color === c)) {
       const last = run[run.length - 1];
       if (last && t.value === last.value) continue;
@@ -79,25 +79,39 @@ function findMelds(hand: Tile[]) {
     }
     flush();
   }
-  for (let v = 1; v <= 13; v++) { const g = [...new Map(rest.filter(t => t.value === v).map(t => [t.color, t])).values()]; if (g.length >= 3) take(g); }
-  return { melds, rest, jokers: hand.filter(t => !isNum(t)) };
+  return runs;
+}
+/** 같은 숫자 서로 다른 색 3장 이상(그룹)을 뽑는다. */
+function takeGroups(rest: Num[]) {
+  const groups: Tile[][] = [];
+  for (let v = 1; v <= 13; v++) {
+    const g = [...new Map(rest.filter(t => t.value === v).map(t => [t.color, t])).values()];
+    if (g.length >= 3) { groups.push(g); g.forEach(t => rest.splice(rest.indexOf(t), 1)); }
+  }
+  return groups;
 }
 const finish = (clusters: Tile[][]) => { const cs = clusters.filter(c => c.length); return { hand: cs.flat(), breaks: new Set(cs.slice(1).map(c => c[0]!.id)) as ReadonlySet<number> }; };
 
-/** 숫자순: 완성된 조합은 숫자 순서대로 한 덩어리씩 띄워 놓고, 남은 타일은 숫자순(같은 숫자는 색 순)으로 이어 붙인다. 조커는 맨 끝. */
-export function sortByNumber(hand: Tile[]) {
-  const { melds, rest, jokers } = findMelds(hand);
-  melds.sort((a, b) => startOf(a) - startOf(b) || colorIdx(a[0]!) - colorIdx(b[0]!));
-  rest.sort((a, b) => a.value - b.value || colorIdx(a) - colorIdx(b));
-  return finish([...melds, rest, jokers]);
+/** 같은 색 연속 숫자(1·2·3): 완성된 런을 색 순서대로 한 덩어리씩 띄우고, 남은 타일은 색마다 묶어 숫자순으로 둔다. 조커는 맨 끝. */
+export function sortByRun(hand: Tile[]) {
+  const rest = numsOf(hand), runs = takeRuns(rest);
+  runs.sort((a, b) => colorIdx(a[0]!) - colorIdx(b[0]!) || startOf(a) - startOf(b));
+  return finish([...runs, ...COLORS.map(c => rest.filter(t => t.color === c)), jokersOf(hand)]);
 }
-/** 색상순: 완성된 런은 색 순서대로, 그룹은 그 뒤에 띄워 놓고, 남은 타일은 색마다 한 덩어리(색 → 숫자)로 묶는다. 조커는 맨 끝. */
-export function sortByColor(hand: Tile[]) {
-  const { melds, rest, jokers } = findMelds(hand);
-  const runs = melds.filter(isRun).sort((a, b) => colorIdx(a[0]!) - colorIdx(b[0]!) || startOf(a) - startOf(b));
-  const groups = melds.filter(m => !isRun(m)).sort((a, b) => startOf(a) - startOf(b));
-  const byColor = COLORS.map(c => rest.filter(t => t.color === c).sort((a, b) => a.value - b.value));
-  return finish([...runs, ...groups, ...byColor, jokers]);
+/** 같은 숫자 다른 색(7빨·7검·7파): 완성된 그룹을 숫자 순서대로 띄우고, 남은 타일은 숫자순(같은 숫자는 색 순)으로 이어 둔다. 조커는 맨 끝. */
+export function sortByGroup(hand: Tile[]) {
+  const rest = numsOf(hand), groups = takeGroups(rest);
+  groups.sort((a, b) => startOf(a) - startOf(b));
+  rest.sort((a, b) => a.value - b.value || colorIdx(a) - colorIdx(b));
+  return finish([...groups, rest, jokersOf(hand)]);
+}
+/** 처음 받았을 때의 정리: 런 → 그룹 → 나머지(숫자순) → 조커 */
+export function sortAll(hand: Tile[]) {
+  const rest = numsOf(hand), runs = takeRuns(rest), groups = takeGroups(rest);
+  runs.sort((a, b) => colorIdx(a[0]!) - colorIdx(b[0]!) || startOf(a) - startOf(b));
+  groups.sort((a, b) => startOf(a) - startOf(b));
+  rest.sort((a, b) => a.value - b.value || colorIdx(a) - colorIdx(b));
+  return finish([...runs, ...groups, rest, jokersOf(hand)]);
 }
 
 /** 손패에서 바로 낼 수 있는 3장 조합을 겹치지 않게 골라 준다. 완전한 솔버가 아니라 초보자를 위한 보조 기능. */

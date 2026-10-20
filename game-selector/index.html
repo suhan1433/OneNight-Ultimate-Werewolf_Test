@@ -1,116 +1,126 @@
 <!doctype html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0c0f1d" />
-    <title>온라인 보드게임</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@700;900&display=swap" />
-    <link rel="stylesheet" href="/launcher.css" />
-  </head>
-  <body>
-    <main class="launcher">
-      <h1>오늘 어떤 게임을<br />플레이할까요?</h1>
-      <p class="intro">친구들과 같은 방 코드로 모여, 각자의 기기에서 플레이하세요.</p>
-      <nav class="games" aria-label="게임 선택">
-        <a class="game-card skullking" href="/skullking/">
-          <svg class="art" viewBox="0 0 320 200" aria-hidden="true">
-            <circle class="table" cx="160" cy="100" r="62" />
-            <path class="hill" d="M66 170c18-54 47-98 94-98s77 44 94 98" />
-            <path class="pines" d="M122 140l38-80 38 80M96 148h128" />
-            <g class="seats"><circle cx="246" cy="100" r="9"/><circle cx="202" cy="169" r="9"/><circle class="lit" cx="116" cy="169" r="9"/><circle cx="74" cy="100" r="9"/><circle cx="115" cy="33" r="9"/><circle cx="205" cy="33" r="9"/></g>
-          </svg>
-          <span class="game-copy"><strong>스컬 킹</strong><small>예측과 배짱으로 트릭을 쟁취하는 해적 카드 게임</small></span>
-          <span class="enter">입장하기 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg></span>
-        </a>
-        <a class="game-card avalon" href="/avalon/">
-          <svg class="art" viewBox="0 0 320 200" aria-hidden="true">
-            <circle class="table" cx="160" cy="100" r="62" />
-            <circle class="table-inner" cx="160" cy="100" r="42" />
-            <circle class="core" cx="160" cy="100" r="7" />
-            <g class="seats">
-              <circle cx="246" cy="100" r="9" /><circle cx="220.8" cy="160.8" r="9" />
-              <circle cx="160" cy="186" r="9" /><circle cx="99.2" cy="160.8" r="9" />
-              <circle cx="74" cy="100" r="9" /><circle cx="99.2" cy="39.2" r="9" />
-              <circle class="lit" cx="160" cy="14" r="9" /><circle cx="220.8" cy="39.2" r="9" />
-            </g>
-          </svg>
-          <span class="game-copy"><strong>아발론</strong><small>원탁의 기사들이 펼치는 팀 추리 게임</small></span>
-          <span class="enter">입장하기
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-          </span>
-        </a>
-        <a class="game-card spacecrew" href="/spacecrew/">
-          <svg class="art" viewBox="0 0 320 200" aria-hidden="true">
-            <defs>
-              <radialGradient id="planetGlow" cx="50%" cy="50%" r="50%">
-                <stop offset="0" stop-color="#659cff" stop-opacity=".42" />
-                <stop offset="1" stop-color="#659cff" stop-opacity="0" />
-              </radialGradient>
-              <linearGradient id="planetSurface" x1="0" y1="0" x2="1" y2="1">
-                <stop stop-color="#4674d5" /><stop offset="1" stop-color="#172c75" />
-              </linearGradient>
-            </defs>
-            <g class="space-stars"><circle cx="38" cy="42" r="1.4" /><circle cx="94" cy="28" r="1" /><circle cx="274" cy="32" r="1.4" /><circle cx="292" cy="108" r="1" /><circle cx="48" cy="122" r="1" /><circle cx="238" cy="70" r=".9" /></g>
-            <circle class="planet-glow" cx="218" cy="102" r="82" fill="url(#planetGlow)" />
-            <circle class="planet" cx="218" cy="102" r="48" fill="url(#planetSurface)" />
-            <path class="planet-ring" d="M150 116c27 25 88 33 133 4" />
-            <path class="rocket" d="M89 133c-14-15-14-39 2-59 21 2 40 16 47 35-7 18-27 28-49 24Z" />
-            <path class="rocket-window" d="M102 91a8 8 0 1 1-1 16 8 8 0 0 1 1-16Z" />
-            <path class="rocket-flame" d="M82 128 64 144l20-5Z" />
-          </svg>
-          <span class="game-copy"><strong>더 크루: 행성 9 탐사</strong><small>침묵 속 협력으로 미지의 행성을 향하는 트릭테이킹 게임</small></span>
-          <span class="enter">입장하기
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-          </span>
-        </a>
-        <a class="game-card rummikub" href="/rummikub/">
-          <svg class="art" viewBox="0 0 320 200" aria-hidden="true">
-            <defs>
-              <linearGradient id="rummikubTable" x1="0" y1="0" x2="1" y2="1">
-                <stop stop-color="#15776c" /><stop offset="1" stop-color="#063d45" />
-              </linearGradient>
-            </defs>
-            <rect class="rummikub-table" x="22" y="24" width="276" height="152" rx="38" fill="url(#rummikubTable)" />
-            <path class="rummikub-line" d="M43 134c58-24 176-24 234 0" />
-            <g class="rummikub-tiles">
-              <rect x="67" y="76" width="36" height="52" rx="5" /><text x="85" y="110">3</text>
-              <rect x="108" y="67" width="36" height="52" rx="5" /><text x="126" y="101">4</text>
-              <rect x="149" y="59" width="36" height="52" rx="5" /><text x="167" y="93">5</text>
-              <rect x="190" y="67" width="36" height="52" rx="5" /><text x="208" y="101">6</text>
-              <rect x="231" y="76" width="36" height="52" rx="5" /><text x="249" y="110">7</text>
-            </g>
-          </svg>
-          <span class="game-copy"><strong>루미큐브</strong><small>타일을 조합해 가장 먼저 손패를 비우는 전략 게임</small></span>
-          <span class="enter">입장하기
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-          </span>
-        </a>
-        <a class="game-card werewolf" href="/werewolf/">
-          <svg class="art" viewBox="0 0 320 200" aria-hidden="true">
-            <defs>
-              <radialGradient id="moonGlow"><stop offset="0" stop-color="#cfd4ff" stop-opacity=".55" /><stop offset="1" stop-color="#cfd4ff" stop-opacity="0" /></radialGradient>
-              <mask id="crescent"><rect width="320" height="200" fill="#fff" /><circle cx="226" cy="64" r="40" fill="#000" /></mask>
-            </defs>
-            <circle class="moon-glow" cx="200" cy="78" r="86" fill="url(#moonGlow)" />
-            <circle class="moon" cx="200" cy="78" r="46" mask="url(#crescent)" />
-            <g class="stars">
-              <circle cx="46" cy="34" r="1.5" /><circle cx="92" cy="70" r="1" /><circle cx="128" cy="26" r="1.3" />
-              <circle cx="278" cy="40" r="1.2" /><circle cx="292" cy="96" r="1" /><circle cx="60" cy="108" r="1.1" />
-            </g>
-            <path class="hill" d="M0 200V152Q42 126 86 150T172 146T252 152T320 138V200Z" />
-            <g class="pines">
-              <path d="M40 158l9-26 9 26zM108 156l8-22 8 22zM248 158l10-28 10 28zM286 150l7-19 7 19z" />
-            </g>
-          </svg>
-          <span class="game-copy"><strong>한밤의 늑대인간</strong><small>단 한 번의 밤, 뒤바뀐 역할을 추리하세요</small></span>
-          <span class="enter">입장하기
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-          </span>
-        </a>
-      </nav>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1115" />
+  <meta name="description" content="친구들과 함께하는 작은 보드게임 아지트. 한밤의 늑대인간, 아발론, 스컬 킹, 더 크루, 루미큐브. 오늘 밤의 게임을 골라보세요." />
+  <title>AFTER HOURS — 오늘 밤의 보드게임</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="/launcher.css" />
+</head>
+<body>
+  <a class="skip-link" href="#collection">게임 선택으로 건너뛰기</a>
+  <div class="night-sky" aria-hidden="true"><div class="sky-orbit"></div><div class="sky-moon"></div></div>
+  <div class="shell">
+    <header class="header">
+      <a class="brand" href="/" aria-label="애프터 아워스 홈"><svg viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M29 8A15 15 0 1 0 32 29 14 14 0 0 1 29 8Z" fill="currentColor"/><path d="m31 4 1.4 4.6L37 10l-4.6 1.4L31 16l-1.4-4.6L25 10l4.6-1.4Z" fill="currentColor"/></svg><span>AFTER HOURS<small>THE BOARD GAME CLUB</small></span></a>
+      <div class="header-right"><span class="night-label"><i></i> 오늘 밤, 함께 플레이</span><a class="guide-link" href="#how-to">처음 오셨나요? <span aria-hidden="true">↗</span></a></div>
+    </header>
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="eyebrow"><span></span> GOOD COMPANY. GREAT GAMES.</div>
+        <h1 id="hero-title">일상은 잠시 내려놓고,<br /><em>한 판의 세계</em>로.</h1>
+        <p class="intro">누군가는 정체를 숨기고, 누군가는 우주로 떠나는 밤.<br />친구들과 함께할 오늘의 이야기를 골라보세요.</p>
+        <div class="hero-note"><span aria-hidden="true">✧</span> 각자의 화면에서, 하나의 테이블로.</div>
+        <div class="moon-caption" aria-hidden="true"><span>THE NIGHT IS STILL YOUNG</span><i></i>LET’S PLAY A LITTLE LONGER.</div>
+      </section>
+      <section class="collection" id="collection" aria-labelledby="collection-title">
+        <div class="collection-heading"><h2 id="collection-title">오늘의 게임 <span>05</span></h2><span class="collection-hint">마음이 끌리는 세계를 선택하세요 <span aria-hidden="true">↙</span></span></div>
+        <nav class="games" aria-label="게임 선택">
+          <a class="game-card werewolf wide" href="/werewolf/">
+            <div class="scene">
+              <svg class="art" viewBox="0 0 640 310" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                <defs>
+                  <linearGradient id="wolfSky" x2="0" y2="1"><stop stop-color="#192831"/><stop offset="1" stop-color="#52626b"/></linearGradient>
+                  <radialGradient id="wolfGlow"><stop stop-color="#d6e6d8" stop-opacity=".35"/><stop offset="1" stop-color="#c1dcda" stop-opacity="0"/></radialGradient>
+                  <linearGradient id="wolfMist"><stop stop-color="#a2bfb8" stop-opacity="0"/><stop offset=".5" stop-color="#a2bfb8" stop-opacity=".23"/><stop offset="1" stop-color="#a2bfb8" stop-opacity="0"/></linearGradient>
+                  <symbol id="pine" viewBox="0 0 50 140"><path d="M23 140h4V96H48L34 72h10L31 48h8L25 4 11 48h8L6 72h10L2 96h21Z" fill="currentColor"/></symbol>
+                </defs>
+                <path fill="url(#wolfSky)" d="M0 0h640v310H0z"/><circle cx="385" cy="94" r="146" fill="url(#wolfGlow)"/>
+                <g fill="#d9e8df" opacity=".6"><circle cx="86" cy="39" r="1"/><circle cx="212" cy="27" r="1.4"/><circle cx="288" cy="64" r=".8"/><circle cx="487" cy="31" r="1"/><circle cx="564" cy="75" r="1.3"/><circle cx="156" cy="89" r=".8"/></g>
+                <circle cx="385" cy="94" r="43" fill="#e4e7cd"/><circle cx="371" cy="80" r="11" fill="#bdcbbc" opacity=".3"/><circle cx="399" cy="105" r="15" fill="#bccabd" opacity=".25"/><circle cx="370" cy="112" r="5" fill="#b5c8bc" opacity=".3"/>
+                <path d="m0 176 67-36 70 23 75-57 68 52 80-27 86 37 74-54 120 55v141H0Z" fill="#243d43"/>
+                <g color="#21383c" opacity=".8"><use href="#pine" x="24" y="80" width="51" height="148"/><use href="#pine" x="78" y="111" width="40" height="118"/><use href="#pine" x="463" y="82" width="55" height="157"/><use href="#pine" x="531" y="107" width="43" height="130"/></g>
+                <path d="M0 241q110-76 242-24t398-20v113H0Z" fill="#142a30"/>
+                <path class="mist" d="M-60 204q160-52 356-11t410-20v52q-215 33-402 9t-364 9Z" fill="url(#wolfMist)"/>
+                <g color="#0c2026"><use href="#pine" x="-25" y="1" width="100" height="290"/><use href="#pine" x="49" y="112" width="62" height="181"/><use href="#pine" x="571" y="18" width="86" height="262"/><use href="#pine" x="533" y="131" width="58" height="168"/></g>
+                <path d="m329 249 7-21 18-10 4-17 13-6 7-22 7 10 9 2-4 12-12 9-4 22 14 22h-13l-13-17-6 16h-10l6-22-12 7-2 17Z" fill="#081a20"/><path d="M0 286q180-31 317-15t323-1v40H0Z" fill="#0b191e"/>
+              </svg>
+              <span class="scene-label">TRUST NO ONE</span><span class="genre">심리 · 추리</span><span class="scene-title">단 한 번의 밤.<br />당신은 누구를 믿나요?</span>
+            </div>
+            <div class="card-body"><div class="game-meta">ONE NIGHT ULTIMATE WEREWOLF</div><h3>한밤의 늑대인간</h3><p>눈을 뜨면, 모든 것이 달라져 있을지도.</p><div class="card-bottom"><span class="game-tag">정체를 숨기는 짜릿함</span><span class="enter">플레이하기 <span class="arrow" aria-hidden="true">↗</span></span></div></div>
+          </a>
+          <a class="game-card avalon wide" href="/avalon/">
+            <div class="scene">
+              <svg class="art" viewBox="0 0 640 310" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                <defs><linearGradient id="avalonSky" x2="0" y2="1"><stop stop-color="#142c2d"/><stop offset="1" stop-color="#34534a"/></linearGradient><radialGradient id="swordGlow"><stop stop-color="#d7d4a4" stop-opacity=".38"/><stop offset="1" stop-color="#b9d3a5" stop-opacity="0"/></radialGradient><linearGradient id="blade"><stop stop-color="#e0e9da"/><stop offset=".5" stop-color="#d3ddc9"/><stop offset=".51" stop-color="#8fada2"/><stop offset="1" stop-color="#b4c6b2"/></linearGradient></defs>
+                <path fill="url(#avalonSky)" d="M0 0h640v310H0z"/><ellipse cx="396" cy="144" rx="164" ry="155" fill="url(#swordGlow)"/>
+                <g stroke="#c7cfac" fill="none" opacity=".19"><circle cx="400" cy="139" r="103"/><circle cx="400" cy="139" r="88" stroke-dasharray="1 10"/><path d="M400 18v25m0 191v24M278 139h25m194 0h25M314 53l17 17m138 138 17 17M314 225l17-17M469 70l17-17"/></g>
+                <path d="m451 196 13-76 12-12 12 12 2 21 17-9 3-37 13-18 14 18 3 49 20 9 6-40 13-11 13 15 14 95Z" fill="#132f2e" opacity=".65"/>
+                <path d="M0 239q122-42 262-9t378-20v100H0Z" fill="#16352f"/>
+                <g fill="#0e2726"><path d="m0 0 45 0 20 147 27 86-28-15-16-71L27 99 7 121l22-45Z"/><path d="m640 0-39 0-17 107-42 41-26 4 17 10 26-5 25-25-16 110 30-10 24-129Z"/><path d="m20 0 39 32 20 4 24 24-7-21-32-26L53 0Zm586 0-39 34-38 13-17 30 26-21 37-9 40-29Z"/></g>
+                <ellipse cx="395" cy="274" rx="102" ry="13" fill="#719078" opacity=".13"/><path d="m335 277 10-41 34-22 40 2 31 22 13 39Z" fill="#213d35"/><path d="m345 236 34-22 40 2-21 24-26-8-18 23Z" fill="#3f5b49"/><path d="m398 240 21-24 31 22-15 21-16-14-12 24Z" fill="#2c493d"/>
+                <g class="sword"><path d="M393 93h14v128l-7 16-7-16Z" fill="url(#blade)"/><path d="M400 99v125" stroke="#f6f2cb" opacity=".55"/><path d="m371 93 5-8 18 4h12l18-4 5 8-22 4h-14Z" fill="#c3a76a"/><path d="M396 58h8v30h-8Z" fill="#77664a"/><path d="m396 64 8 4m-8 3 8 4m-8 3 8 4" stroke="#baa371"/><path d="m400 45 8 8-8 9-8-9Z" fill="#cfbb7c"/><path d="m400 49 4 4-4 5-4-5Z" fill="#cfe1bc"/></g>
+                <g fill="#d0c48c"><circle cx="314" cy="154" r="1.7"/><circle cx="452" cy="81" r="1.4"/><circle cx="469" cy="196" r="1.8"/><circle cx="341" cy="75" r="1"/><circle cx="363" cy="192" r="1.2"/><circle cx="506" cy="161" r="1"/></g><path d="M0 292q169-28 332-9t308-7v34H0Z" fill="#0e211f"/>
+              </svg>
+              <span class="scene-label">FOR THE KINGDOM</span><span class="genre">팀 전략 · 추리</span><span class="scene-title">충성의 맹세 뒤에,<br />배신이 숨어 있다.</span>
+            </div>
+            <div class="card-body"><div class="game-meta">THE RESISTANCE: AVALON</div><h3>아발론</h3><p>원탁에 모인 기사들, 그 안에 숨어든 어둠.</p><div class="card-bottom"><span class="game-tag">설득과 의심의 원탁</span><span class="enter">플레이하기 <span class="arrow" aria-hidden="true">↗</span></span></div></div>
+          </a>
+          <a class="game-card skullking" href="/skullking/">
+            <div class="scene">
+              <svg class="art" viewBox="0 0 420 280" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                <defs><linearGradient id="pirateSky" x2="0" y2="1"><stop stop-color="#412b28"/><stop offset="1" stop-color="#b4794c"/></linearGradient><linearGradient id="pirateSea" x2="0" y2="1"><stop stop-color="#493d38"/><stop offset="1" stop-color="#1b2529"/></linearGradient></defs>
+                <path fill="url(#pirateSky)" d="M0 0h420v280H0z"/><circle cx="281" cy="95" r="45" fill="#dcb77c" opacity=".75"/><path d="M0 107q70-23 139-7t151-9 130-3v14q-58-9-135 3t-151 9T0 119Z" fill="#b68a63" opacity=".4"/><path d="M0 185q64-12 132 0t141-3 147 2v96H0Z" fill="url(#pirateSea)"/>
+                <g class="ship"><path d="m222 195 19 27h73l26-35-36 9Z" fill="#1e2322"/><path d="M279 66v134m-34-89v87m65-66v65" stroke="#242823" stroke-width="3"/><path d="m284 85 35 5-11 29-24-4Z" fill="#222925"/><path d="m273 102-35 53 35-4Zm10 19 39 38-39-5Zm-12 38-37 28 37-4Zm12 1 43 24-43 4ZM241 129l-24 39 24-3Z" fill="#c8b08a"/><path d="m301 95-5-1-3 4 2 4 5 1 3-4Z" fill="#d7c6a2"/><path d="m292 106 11 6m-11-1 11-5" stroke="#d7c6a2" stroke-width="1.5"/><path d="m215 191 129-5" stroke="#252922" stroke-width="2"/></g>
+                <g fill="none" stroke="#ba9d77" opacity=".25"><path d="M215 234h94m-126 10h65m59-27h47M32 204h82m-57 13h92m182 33h58"/></g><path d="m32 67 6-3 7 3m12 8 5-3 6 3" stroke="#352f29" fill="none"/><path d="M0 267q109-28 211-2t209-5v20H0Z" fill="#162124"/>
+              </svg>
+              <span class="scene-label">FORTUNE FAVORS THE BOLD</span><span class="genre">트릭테이킹</span>
+            </div>
+            <div class="card-body"><div class="game-meta">SKULL KING</div><h3>스컬 킹</h3><p>승리를 예언하고, 거친 바다를 지배하세요.</p><div class="card-bottom"><span class="game-tag">예측과 배짱의 한 판</span><span class="enter">플레이하기 <span class="arrow" aria-hidden="true">↗</span></span></div></div>
+          </a>
+          <a class="game-card spacecrew" href="/spacecrew/">
+            <div class="scene">
+              <svg class="art" viewBox="0 0 420 280" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                <defs><linearGradient id="spaceSky" x2="1" y2="1"><stop stop-color="#111d35"/><stop offset="1" stop-color="#3f4162"/></linearGradient><radialGradient id="spaceGlow"><stop stop-color="#9596d3" stop-opacity=".35"/><stop offset="1" stop-color="#7b77bb" stop-opacity="0"/></radialGradient><linearGradient id="planet" x2="1" y2="1"><stop stop-color="#b7b9d1"/><stop offset=".4" stop-color="#777fa9"/><stop offset="1" stop-color="#303954"/></linearGradient></defs>
+                <path fill="url(#spaceSky)" d="M0 0h420v280H0z"/><circle cx="283" cy="118" r="137" fill="url(#spaceGlow)"/>
+                <g fill="#e0e4f0"><circle cx="37" cy="62" r="1"/><circle cx="93" cy="40" r="1.5"/><circle cx="177" cy="83" r="1"/><circle cx="226" cy="26" r="1"/><circle cx="356" cy="49" r="1.2"/><circle cx="382" cy="141" r="1"/><circle cx="143" cy="204" r="1.4"/><circle cx="328" cy="225" r="1"/><circle cx="59" cy="172" r="1"/><circle cx="202" cy="244" r="1"/></g>
+                <ellipse cx="282" cy="128" rx="104" ry="24" transform="rotate(-28 282 128)" stroke="#b1adc4" fill="none" stroke-width="9" opacity=".25"/><circle cx="282" cy="118" r="59" fill="url(#planet)"/><path d="M228 95q62-17 108 24m-111-7q73-11 110 26m-103-8q46 0 94 25" stroke="#adb0cb" stroke-width="5" opacity=".2" fill="none"/><path d="M189 168c26 21 132-23 184-79" stroke="#a4a1bc" fill="none" stroke-width="6" opacity=".65"/>
+                <path d="M39 260Q166 164 359 41" stroke="#aab7da" stroke-dasharray="3 7" fill="none" opacity=".3"/>
+                <g class="rocket"><path d="m132 188 9-39 28-23 2 36-25 28Z" fill="#d9dfe0"/><path d="m141 155-15 5-6 22 15-4m28-20 5 13-13 18-3-15" fill="#919ebc"/><circle cx="153" cy="150" r="6" fill="#344a6a" stroke="#aab8ce" stroke-width="2"/><path d="m134 185-12 19 20-13Z" fill="#d4bc95"/><path d="m136 187-9 12 12-9Z" fill="#f3e2bb"/></g><path d="M0 277q150-37 259-16t161-2v21H0Z" fill="#121d30"/>
+              </svg>
+              <span class="scene-label">TOGETHER, INTO THE UNKNOWN</span><span class="genre">협력 · 미션</span>
+            </div>
+            <div class="card-body"><div class="game-meta">THE CREW: THE QUEST FOR PLANET NINE</div><h3>더 크루 <span class="subtitle">행성 9 탐사</span></h3><p>말하지 않아도 통하는, 우리만의 우주 탐사.</p><div class="card-bottom"><span class="game-tag">함께라서 가능한 미션</span><span class="enter">플레이하기 <span class="arrow" aria-hidden="true">↗</span></span></div></div>
+          </a>
+          <a class="game-card rummikub" href="/rummikub/">
+            <div class="scene">
+              <svg class="art" viewBox="0 0 420 280" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                <defs><radialGradient id="felt"><stop stop-color="#416b61"/><stop offset="1" stop-color="#193d36"/></radialGradient><linearGradient id="tile" x2="1" y2="1"><stop stop-color="#f7efda"/><stop offset="1" stop-color="#c8c0a7"/></linearGradient><filter id="tileShadow" x="-60%" y="-60%" width="220%" height="240%"><feDropShadow dx="0" dy="9" stdDeviation="6" flood-color="#091d16" flood-opacity=".5"/></filter><pattern id="feltGrain" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M0 0h1v1H0zM3 3h1v1H3z" fill="#d9dfc3" opacity=".045"/></pattern></defs>
+                <path fill="url(#felt)" d="M0 0h420v280H0z"/><path fill="url(#feltGrain)" d="M0 0h420v280H0z"/><ellipse cx="244" cy="144" rx="159" ry="100" fill="none" stroke="#c7c7a0" opacity=".13"/><ellipse cx="244" cy="144" rx="147" ry="89" fill="none" stroke="#c7c7a0" opacity=".08"/>
+                <g filter="url(#tileShadow)"><g transform="rotate(-14 250 140)"><g class="tiles">
+                  <g transform="translate(153 87)"><rect y="4" width="47" height="68" rx="6" fill="#99957d"/><rect width="47" height="67" rx="6" fill="url(#tile)"/><text x="23.5" y="43" fill="#ac4f3e">7</text><circle cx="23.5" cy="54" r="2" fill="#ac4f3e"/></g>
+                  <g transform="translate(208 78)"><rect y="4" width="47" height="68" rx="6" fill="#99957d"/><rect width="47" height="67" rx="6" fill="url(#tile)"/><text x="23.5" y="43" fill="#ac4f3e">8</text><circle cx="23.5" cy="54" r="2" fill="#ac4f3e"/></g>
+                  <g transform="translate(263 69)"><rect y="4" width="47" height="68" rx="6" fill="#99957d"/><rect width="47" height="67" rx="6" fill="url(#tile)"/><text x="23.5" y="43" fill="#ac4f3e">9</text><circle cx="23.5" cy="54" r="2" fill="#ac4f3e"/></g>
+                  <g transform="translate(204 166) rotate(8)"><rect y="4" width="47" height="68" rx="6" fill="#99957d"/><rect width="47" height="67" rx="6" fill="url(#tile)"/><text x="23.5" y="43" fill="#324c65">3</text><circle cx="23.5" cy="54" r="2" fill="#324c65"/></g>
+                  <g transform="translate(262 162) rotate(8)"><rect y="4" width="47" height="68" rx="6" fill="#99957d"/><rect width="47" height="67" rx="6" fill="url(#tile)"/><text x="23.5" y="43" fill="#b78b34">3</text><circle cx="23.5" cy="54" r="2" fill="#b78b34"/></g>
+                </g></g></g><path d="m347 52 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" fill="#d5c995" opacity=".6"/>
+              </svg>
+              <span class="scene-label">EVERY PIECE HAS A POSSIBILITY</span><span class="genre">숫자 · 전략</span>
+            </div>
+            <div class="card-body"><div class="game-meta">RUMMIKUB</div><h3>루미큐브</h3><p>흩어진 숫자 속, 나만의 한 수를 발견하세요.</p><div class="card-bottom"><span class="game-tag">조합이 완성되는 즐거움</span><span class="enter">플레이하기 <span class="arrow" aria-hidden="true">↗</span></span></div></div>
+          </a>
+        </nav>
+      </section>
+      <section class="how-to" id="how-to" aria-labelledby="how-title">
+        <div class="how-intro"><span class="eyebrow">A SEAT FOR EVERYONE</span><h2 id="how-title">모이는 방법은, 간단해요.</h2></div>
+        <ol><li><span class="step">01</span><div><strong>게임을 고르고</strong><p>마음에 드는 게임에 입장하세요.</p></div></li><li><span class="step">02</span><div><strong>방 코드를 나누면</strong><p>한 명이 방을 만들고 코드를 공유해요.</p></div></li><li><span class="step">03</span><div><strong>우리의 테이블 완성</strong><p>각자의 기기로 같은 방에 모여요.</p></div></li></ol>
+      </section>
     </main>
-  </body>
+    <footer><span class="footer-brand">AFTER HOURS <span>좋은 사람들과, 한 판 더.</span></span><span>Made for nights worth sharing. <span aria-hidden="true">☾</span></span></footer>
+  </div>
+</body>
 </html>

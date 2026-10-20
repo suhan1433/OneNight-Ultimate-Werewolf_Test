@@ -710,3 +710,18 @@ html{touch-action:manipulation}
 .bd .banner.slate{color:#cfe2ee;box-shadow:0 0 0 2px var(--slate),0 0 40px #8fb0c466;font-size:1.35rem}
 .bd-info .hc b{display:inline-block;animation:bump .3s var(--spring)}
 @keyframes bump{from{transform:scale(1.5)}}
+
+/* ── v7.2 정렬 버튼: 1·2·3(같은 색 연속) / 7·7·7(같은 숫자 다른 색) ── */
+.bd-act .bd-sorts button{display:grid;place-content:center;justify-items:center;gap:3px;padding:4px 2px!important}
+.mini{display:flex;gap:2px}
+.mini i{width:12px;height:16px;border-radius:2px;background:var(--ivory);font:800 10px/16px var(--f-num);font-style:normal;text-align:center;box-shadow:0 1px 0 var(--edge)}
+.mini i.red{color:#c52a18}.mini i.blue{color:#1b5fb8}.mini i.black{color:#1b1714}
+.bd-sorts small{font-size:.6rem;font-weight:700;line-height:1;opacity:.85}
+@container bd (max-height:340px){.bd-sorts small{display:none}}
+
+/* ── v7.3 저장점 ── */
+.bd-info .ckpt{font-size:.62rem;font-weight:800;color:#a9b7bf}
+.bd-info .ckpt.at{color:#b9edc0}
+.menu button[aria-checked=true]{color:var(--lamp)}
+
+.bd-act .go{word-break:keep-all;padding:0 4px;line-height:1.2}
