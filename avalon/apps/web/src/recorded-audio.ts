@@ -1,0 +1,129 @@
+import type { Phase } from '@werewolf/shared';
+import { gameAudio } from './audio-settings';
+import fireplace from '../../../avalon_mp3/대기실_벽난로.mp3?url';
+import discussion from '../../../avalon_mp3/토론.mp3?url';
+import assassination from '../../../avalon_mp3/암살.mp3?url';
+import start from '../../../avalon_mp3/게임시작_종소리.mp3?url';
+import role from '../../../avalon_mp3/역할확인_카드넘어갈때.mp3?url';
+import coin from '../../../avalon_mp3/투표_코인착지음.mp3?url';
+import ending from '../../../avalon_mp3/엔딩.mp3?url';
+
+const backgrounds = { fireplace, discussion, assassination };
+const effects = { start, role, coin, ending };
+type Background = keyof typeof backgrounds;
+type Effect = keyof typeof effects;
+const scenes: Record<Phase, Background | null> = {
+  lobby: 'fireplace', role_reveal: null, team_build: 'discussion', team_vote: 'discussion',
+  vote_result: 'discussion', quest: 'discussion', quest_result: 'discussion',
+  assassination: 'assassination', result: null,
+};
+
+/** Recordings are imported as Vite assets, including in both Docker layouts.
+ * All volume control passes through the shared Web Audio gains for iOS too. */
+class RecordedAudio {
+  private room?: string;
+  private phase?: Phase;
+  private desired: Background | null = null;
+  private current?: HTMLAudioElement;
+  private tracks = new Map<Background, HTMLAudioElement>();
+  private activeEffects = new Set<HTMLAudioElement>();
+  private unlocked = false;
+
+  attach() {
+    const unlock = () => {
+      this.unlocked = true;
+      gameAudio.unlockMedia();
+      this.sync();
+    };
+    const visibility = () => {
+      if (document.hidden) { this.current?.pause(); this.stopEffects(); }
+      else this.sync();
+    };
+    const unsubscribe = gameAudio.subscribe(() => {
+      if (gameAudio.volume('effects') === 0) this.stopEffects();
+      this.sync();
+    });
+    const observer = new MutationObserver(() => this.sync());
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-rv-still', 'data-vt-still', 'data-cs-still'] });
+    window.addEventListener('pointerdown', unlock, { capture: true, passive: true });
+    window.addEventListener('keydown', unlock, true);
+    document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('pageshow', visibility);
+    return () => {
+      window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('keydown', unlock, true);
+      document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pageshow', visibility);
+      observer.disconnect(); unsubscribe(); this.stopEffects();
+      this.tracks.forEach(audio => this.release(audio)); this.tracks.clear();
+      this.current = undefined; this.desired = null; this.unlocked = false;
+      this.room = undefined; this.phase = undefined;
+    };
+  }
+
+  setScene(room?: string, phase?: Phase) {
+    const newRoom = room !== this.room;
+    const started = !newRoom && this.phase === 'lobby' && phase === 'role_reveal';
+    if (newRoom || phase !== this.phase) this.stopEffects();
+    const desired = phase ? scenes[phase] : null;
+    if (newRoom || desired !== this.desired) {
+      if (this.current) { this.current.pause(); this.current.currentTime = 0; }
+      this.current = undefined;
+    }
+    this.room = room; this.phase = phase; this.desired = desired;
+    this.sync();
+    if (started) this.play('start');
+  }
+
+  private sync() {
+    if (!this.desired || !this.unlocked || this.quiet() || gameAudio.volume('background') === 0) {
+      this.current?.pause(); return;
+    }
+    let audio = this.tracks.get(this.desired);
+    if (!audio) {
+      audio = new Audio(backgrounds[this.desired]);
+      audio.loop = true; audio.preload = 'none';
+      gameAudio.trackMedia(audio, 'background', this.desired === 'discussion' ? .22 : .32);
+      this.tracks.set(this.desired, audio);
+    }
+    this.current = audio;
+    if (!audio.paused) return;
+    gameAudio.unlock();
+    const playing = audio;
+    void playing.play().then(() => {
+      if (this.current !== playing || this.quiet() || gameAudio.volume('background') === 0) playing.pause();
+    }).catch(() => { /* Retry background playback on the next gesture. */ });
+  }
+
+  private quiet() {
+    return document.hidden || ['data-rv-still', 'data-vt-still', 'data-cs-still'].some(name => document.documentElement.hasAttribute(name));
+  }
+
+  play(effect: Effect) {
+    // Do not queue missed effects when autoplay is blocked or a tab is hidden.
+    if (!this.phase || !this.unlocked || document.hidden || gameAudio.volume('effects') === 0) return;
+    // Bound simultaneous recordings when several votes arrive together.
+    if (this.activeEffects.size >= 4) return;
+    const audio = new Audio(effects[effect]);
+    audio.preload = 'auto';
+    gameAudio.trackMedia(audio, 'effects', effect === 'coin' ? .45 : .65);
+    this.activeEffects.add(audio);
+    const cleanup = () => { if (this.activeEffects.delete(audio)) this.release(audio); };
+    audio.addEventListener('ended', cleanup, { once: true });
+    audio.addEventListener('error', cleanup, { once: true });
+    gameAudio.unlock();
+    void audio.play().catch(cleanup);
+  }
+
+  private release(audio: HTMLAudioElement) {
+    audio.pause(); gameAudio.untrackMedia(audio);
+    audio.removeAttribute('src'); audio.load();
+  }
+
+  private stopEffects() {
+    this.activeEffects.forEach(audio => this.release(audio));
+    this.activeEffects.clear();
+  }
+}
+
+export const recordedAudio = new RecordedAudio();

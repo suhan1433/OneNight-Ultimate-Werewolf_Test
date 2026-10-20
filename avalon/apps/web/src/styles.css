@@ -318,6 +318,9 @@ main.board.tense>*{position:relative;z-index:1}
   .chat-toggle{right:10px;bottom:10px}.chat-panel{right:10px;bottom:10px;height:min(230px,calc(100dvh - 30px))}
 }
 
+.utility-actions .audio-settings-button{width:40px;height:40px;flex:0 0 40px}
+.audio-settings-button svg{display:block;width:21px;height:21px;flex:none}
+
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
 }

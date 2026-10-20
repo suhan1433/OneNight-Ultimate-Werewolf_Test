@@ -4,8 +4,9 @@ import {emit,socket,getAssassinAim,getTeamSelection,type AssassinAimState,type T
 import {useGame} from './store';
 import {PlayerAvatar,useCharacterResolver} from './profile';
 import {roleArtFor} from './role-art';
+import {useEndingAudio} from './use-recorded-audio';
 
-/* 스토리보드 4(팀 구성) · 6(퀘스트 결과) · 7(암살) · 8(엔딩). 소리·햅틱 없음 — 시각 언어만.
+/* 스토리보드 4(팀 구성) · 6(퀘스트 결과) · 7(암살) · 8(엔딩). 엔딩 음원은 타이틀 공개 시점에 재생한다.
    3·5번 장면과 같은 문법: 놋쇠 인레이 원탁 · 스포트라이트 암전 · 정적 → 타격 → 여운 · 캔버스 입자.
    원탁은 '촛불이 놓인 원탁 + 그 둘레에 앉은 기사들' 구조다: 좌석은 바깥 링(SEAT_R), 촛불은 원탁 위(CANDLE_R).
    모든 시간(초)은 cinematic.css 의 숫자와 같은 기준이다. */
@@ -264,6 +265,7 @@ export function AssassinScene({game}:{game:ClientGameState}){
 export function EndingScene({game}:{game:ClientGameState}){
   const good=game.winner==='good';const impact=!!game.assassinTarget;const offset=impact?3.2:0;const end=6+offset;
   const clock=useClock(true,end);const merlin=game.revealedRoles?.find(item=>item.role==='merlin');
+  useEndingAudio(clock.time,offset+3,clock.final);
   const target=game.players.find(player=>player.id===game.assassinTarget);const name=(id:string)=>game.players.find(player=>player.id===id)?.nickname??'기사';
   const n=game.players.length;
   const teamOf=(id:string)=>{const info=game.revealedRoles?.find(item=>item.id===id);return info?ROLE_DEFINITIONS[info.role]?.team:undefined;};

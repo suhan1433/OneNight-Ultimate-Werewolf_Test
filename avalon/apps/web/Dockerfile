@@ -7,6 +7,7 @@ COPY avalon/apps/server/package.json apps/server/package.json
 RUN npm install
 COPY avalon/packages/shared packages/shared
 COPY avalon/apps/web apps/web
+COPY avalon/avalon_mp3 avalon_mp3
 COPY game-audio /game-audio
 ARG VITE_SOCKET_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
