@@ -4,6 +4,7 @@ WORKDIR /app
 # Each game is currently an independent npm workspace.  Install all of them
 # before the integrated build writes their static files into apps/web/dist.
 COPY . .
+COPY game-audio game-audio
 RUN npm ci \
   && npm --prefix avalon ci \
   && npm --prefix skullking ci \
