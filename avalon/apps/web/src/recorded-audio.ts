@@ -1,4 +1,4 @@
-import type { Phase } from '@werewolf/shared';
+import type { Phase, RoleType } from '@werewolf/shared';
 import { gameAudio } from './audio-settings';
 import fireplace from '../../../avalon_mp3/대기실_벽난로.mp3?url';
 import discussion from '../../../avalon_mp3/토론.mp3?url';
@@ -7,9 +7,16 @@ import start from '../../../avalon_mp3/게임시작_종소리.mp3?url';
 import role from '../../../avalon_mp3/역할확인_카드넘어갈때.mp3?url';
 import coin from '../../../avalon_mp3/투표_코인착지음.mp3?url';
 import ending from '../../../avalon_mp3/엔딩.mp3?url';
+import merlin from '../../../avalon_role_mp3/멀린.mp3?url';
+import percival from '../../../avalon_role_mp3/퍼시벌.mp3?url';
+import assassin from '../../../avalon_role_mp3/암살자.mp3?url';
+import morgana from '../../../avalon_role_mp3/모르가나.mp3?url';
+import mordred from '../../../avalon_role_mp3/모드레드.mp3?url';
+import oberon from '../../../avalon_role_mp3/오베론.mp3?url';
 
 const backgrounds = { fireplace, discussion, assassination };
 const effects = { start, role, coin, ending };
+const roleVoices: Partial<Record<RoleType, string>> = { merlin, percival, assassin, morgana, mordred, oberon };
 type Background = keyof typeof backgrounds;
 type Effect = keyof typeof effects;
 const scenes: Record<Phase, Background | null> = {
@@ -28,6 +35,7 @@ class RecordedAudio {
   private pending?: HTMLAudioElement;
   private tracks = new Map<Background, HTMLAudioElement>();
   private activeEffects = new Set<HTMLAudioElement>();
+  private roleVoice?: HTMLAudioElement;
   private unlocked = false;
 
   attach() {
@@ -110,19 +118,38 @@ class RecordedAudio {
   }
 
   play(effect: Effect) {
+    return this.playRecording(effects[effect], effect === 'coin' ? .45 : .65);
+  }
+
+  playRole(role: RoleType) {
+    if (this.roleVoice) {
+      this.activeEffects.delete(this.roleVoice);
+      this.release(this.roleVoice);
+      this.roleVoice = undefined;
+    }
+    this.play('role');
+    const src = roleVoices[role];
+    if (src) this.roleVoice = this.playRecording(src, .65);
+  }
+
+  private playRecording(src: string, volume: number) {
     // Do not queue missed effects when autoplay is blocked or a tab is hidden.
     if (!this.phase || !this.unlocked || document.hidden || gameAudio.volume('effects') === 0) return;
     // Bound simultaneous recordings when several votes arrive together.
     if (this.activeEffects.size >= 4) return;
-    const audio = new Audio(effects[effect]);
+    const audio = new Audio(src);
     audio.preload = 'auto';
-    gameAudio.trackMedia(audio, 'effects', effect === 'coin' ? .45 : .65);
+    gameAudio.trackMedia(audio, 'effects', volume);
     this.activeEffects.add(audio);
-    const cleanup = () => { if (this.activeEffects.delete(audio)) this.release(audio); };
+    const cleanup = () => {
+      if (this.roleVoice === audio) this.roleVoice = undefined;
+      if (this.activeEffects.delete(audio)) this.release(audio);
+    };
     audio.addEventListener('ended', cleanup, { once: true });
     audio.addEventListener('error', cleanup, { once: true });
     gameAudio.unlock();
     void audio.play().catch(cleanup);
+    return audio;
   }
 
   private release(audio: HTMLAudioElement) {
@@ -133,6 +160,7 @@ class RecordedAudio {
   private stopEffects() {
     this.activeEffects.forEach(audio => this.release(audio));
     this.activeEffects.clear();
+    this.roleVoice = undefined;
   }
 }
 

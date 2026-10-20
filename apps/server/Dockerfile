@@ -39,6 +39,8 @@ COPY apps/server apps/server
 COPY apps/web apps/web
 COPY mp3 mp3
 COPY avalon avalon
+# Role reveal recordings are imported by Avalon's Vite build into dist/avalon/assets.
+COPY avalon/avalon_role_mp3 avalon/avalon_role_mp3
 COPY skullking skullking
 COPY spacecrew spacecrew
 COPY rummikub rummikub

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { ClientGameState, Phase } from '../../../packages/shared/src/types';
+import type { ClientGameState, Phase, RoleType } from '../../../packages/shared/src/types';
 
 // Run against a freshly started Vite server with E2E_BASE_URL=http://127.0.0.1:5174.
 function game(phase: Phase): ClientGameState {
@@ -92,6 +92,21 @@ test('start bell, role reveal and vote landing use the provided effects without 
   await setGame(page, { ...voted, stateVersion: 2 });
   expect((await tracks(page)).filter(t => t.src.includes('투표_코인착지음'))).toHaveLength(1);
 });
+
+for (const [role, name] of Object.entries({ merlin: '멀린', percival: '퍼시벌', assassin: '암살자', morgana: '모르가나', mordred: '모드레드', oberon: '오베론' })) {
+  test(`${name} recording plays only when the role card is revealed`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const state = { ...game('role_reveal'), selfRole: role as RoleType };
+    await setGame(page, state);
+    expect((await tracks(page)).filter(t => t.src.includes('avalon_role_mp3'))).toHaveLength(0);
+    await page.getByRole('button', { name: '길게 누르기 어렵다면 — 탭으로 바로 확인' }).click();
+    await expect.poll(async () => (await tracks(page)).some(t => t.src.includes(`avalon_role_mp3/${name}.mp3`) && t.time > 0 && t.duration > 0)).toBe(true);
+    await setGame(page, { ...state, stateVersion: 2 });
+    expect((await tracks(page)).filter(t => t.src.includes('avalon_role_mp3'))).toHaveLength(1);
+    await setGame(page, game('team_build'));
+    await expect.poll(async () => (await tracks(page)).filter(t => t.src.includes('avalon_role_mp3')).every(t => t.paused)).toBe(true);
+  });
+}
 
 test('ending MP3 waits for the title and plays once when the ending is skipped', async ({ page }) => {
   await setGame(page, game('quest'));

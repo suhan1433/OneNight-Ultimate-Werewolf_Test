@@ -248,7 +248,7 @@ function Role({game}:{game:ClientGameState}){
   useEffect(()=>{const r=document.documentElement;r.toggleAttribute('data-rv-dark',!lit);return()=>r.removeAttribute('data-rv-dark');},[lit]);
 
   const reveal=()=>{
-    recordedAudio.play('role');
+    recordedAudio.playRole(role);
     setEverShown(true);setShown(true);setLit(true);setStrike(k=>k+1);
     navigator.vibrate?.(90);                                            // 2.6s 타격: 햅틱 강 1회
     setMsg(`당신의 역할은 ${def.name}입니다. ${label}.`);
