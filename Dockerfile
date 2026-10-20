@@ -6,7 +6,6 @@ WORKDIR /app
 COPY . .
 RUN npm ci \
   && npm --prefix avalon ci \
-  && npm --prefix bloodbound ci \
   && npm --prefix skullking ci \
   && npm --prefix spacecrew ci \
   && npm --prefix rummikub ci \
