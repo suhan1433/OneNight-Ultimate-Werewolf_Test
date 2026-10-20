@@ -1,12 +1,13 @@
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package*.json tsconfig.base.json ./
-COPY packages/shared/package.json packages/shared/package.json
-COPY apps/web/package.json apps/web/package.json
-COPY apps/server/package.json apps/server/package.json
+COPY avalon/package*.json avalon/tsconfig.base.json ./
+COPY avalon/packages/shared/package.json packages/shared/package.json
+COPY avalon/apps/web/package.json apps/web/package.json
+COPY avalon/apps/server/package.json apps/server/package.json
 RUN npm install
-COPY packages/shared packages/shared
-COPY apps/web apps/web
+COPY avalon/packages/shared packages/shared
+COPY avalon/apps/web apps/web
+COPY game-audio /game-audio
 ARG VITE_SOCKET_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
 ENV DOCKER_BUILD=true

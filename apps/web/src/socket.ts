@@ -1,3 +1,5 @@
+import { gameAudio } from './audio-settings';
+import { preferAmbientAudio } from '../../../game-audio/audio';
 import { io } from 'socket.io-client';
 import type { Ack, ClientGameState } from '@werewolf/shared';
 import { useGame } from './store';
@@ -36,12 +38,6 @@ const expiredActionRecoveries = new Map<string, number>();
 // announcements appeared to have no sound.
 const narrationAudio = new Map<string, HTMLAudioElement>();
 const seenNarrations = new Set<string>();
-function preferAmbientAudio() {
-  try {
-    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-    if (audioSession) audioSession.type = 'ambient';
-  } catch { /* 지원하지 않는 브라우저에서는 기본 동작을 쓴다 */ }
-}
 const getNarrationAudio = (audioKey: string) => {
   let audio = narrationAudio.get(audioKey);
   if (!audio) {
@@ -55,7 +51,7 @@ const getNarrationAudio = (audioKey: string) => {
     // Narration is an announcement, never background music. Be explicit so a
     // recording can only play through once even if its source has loop hints.
     audio.loop = false;
-    audio.volume = .9;
+    gameAudio.trackMedia(audio, 'effects', .9);
     narrationAudio.set(audioKey, audio);
   }
   return audio;
@@ -151,6 +147,7 @@ function playNextNarration() {
   };
   audio.onended = discardCurrent;
   audio.onerror = discardCurrent;
+  gameAudio.unlock();
   void audio.play().catch(() => {
     // Browsers (especially Safari and mobile WebViews) can reject a play()
     // started by a Socket event until the next real user gesture. Keep this
@@ -161,11 +158,13 @@ function playNextNarration() {
 }
 
 const unlockNarration = () => {
+  gameAudio.unlockMedia();
   narrationUnlocked = true;
   // Resume an interrupted announcement at its existing position. Do not call
   // playNextNarration in this case: that function intentionally starts a new
   // queued line from 0 seconds.
   if (currentNarration?.paused) {
+    gameAudio.unlock();
     void currentNarration.play().catch(() => {});
     return;
   }
@@ -181,7 +180,7 @@ export function setNarrationEnabled(enabled: boolean) {
   narrationUnlocked = narrationUnlocked || enabled;
   if (!enabled) {
     clearNarration();
-    narrationAudio.forEach(audio => { audio.onended = null; audio.onerror = null; audio.removeAttribute('src'); audio.load(); });
+    narrationAudio.forEach(audio => { gameAudio.untrackMedia(audio); audio.onended = null; audio.onerror = null; audio.removeAttribute('src'); audio.load(); });
     narrationAudio.clear();
     seenNarrations.clear();
     return;
@@ -189,6 +188,8 @@ export function setNarrationEnabled(enabled: boolean) {
   playNextNarration();
 }
 
+// Mixer preferences own muting; keep narration scheduling active at zero volume.
+useGame.setState({ tts: true });
 socket.on('NARRATOR_SPEECH', ({ audioKey, actionId, stateVersion }: { audioKey?: string; actionId?: string; stateVersion?: number }) => {
   if (!useGame.getState().tts || !audioKey || !actionId || stateVersion === undefined) return;
   // A reconnect or a racing scheduler can deliver this exact announcement

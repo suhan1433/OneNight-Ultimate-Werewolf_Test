@@ -1,3 +1,4 @@
+import { gameAudio } from './audio-settings';
 /**
  * 더 크루: 행성 9를 찾아서 — 장면 중심 UI 재설계
  *
@@ -78,6 +79,7 @@ function App() {
 
   return <>
     <Starfield />
+    <button className="game-audio-button" aria-label="음향 설정" title="음향 설정" onClick={gameAudio.openSettings}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4ZM17 8a6 6 0 0 1 0 8M20 5a10 10 0 0 1 0 14"/></svg></button>
     {!game ? <Title request={request} onSession={reply => saveSession(reply as Session)} onHelp={() => openDrawer('help')} />
       : game.phase === 'lobby' ? <Lobby game={game} send={send} onLeave={leave} onHelp={() => openDrawer('help')} />
       : view && <Table game={game} view={view} send={send} recordPlay={recordPlay} dismissBriefing={dismissBriefing} openDrawer={openDrawer} onLeave={leave} />}

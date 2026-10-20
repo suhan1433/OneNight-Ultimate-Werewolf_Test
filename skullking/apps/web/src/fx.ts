@@ -1,3 +1,5 @@
+import { gameAudio } from './audio-settings';
+import { preferAmbientAudio } from '../../../../game-audio/audio';
 /**
  * 분위기 사운드 + 햅틱 (외부 음원 없이 WebAudio로 합성)
  *  - ambience : 파도(필터 노이즈 + 느린 LFO) · 가끔 들리는 선체 삐걱임
@@ -9,18 +11,13 @@
  */
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+let background: GainNode | null = null;
+let unbind: (() => void)[] = [];
 let amb: { stop: () => void } | null = null;
 let enabled = true;
 let wantAmbience = false;
 
 const AC = () => (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
-function preferAmbientAudio() {
-  try {
-    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-    if (audioSession) audioSession.type = 'ambient';
-  } catch { /* 지원하지 않는 브라우저에서는 기본 동작을 쓴다 */ }
-}
-
 function ensure(): AudioContext | null {
   if (ctx) return ctx;
   const C = AC();
@@ -29,7 +26,10 @@ function ensure(): AudioContext | null {
     preferAmbientAudio();
     ctx = new C();
     master = ctx.createGain();
-    master.gain.value = 0.9;
+    unbind = [gameAudio.bindGain(master, 'effects', .9)];
+    background = ctx.createGain();
+    unbind.push(gameAudio.bindGain(background, 'background', .9));
+    background.connect(ctx.destination);
     master.connect(ctx.destination);
   } catch { ctx = null; }
   return ctx;
@@ -52,7 +52,7 @@ function startAmbience() {
   if (!c || !master || amb || !enabled) return;
   const out = c.createGain();
   out.gain.value = 0;
-  out.connect(master);
+  out.connect(background!);
   out.gain.linearRampToValueAtTime(0.5, c.currentTime + 2.5);
 
   // 파도: 갈색 노이즈 → 로우패스 → 느린 LFO로 밀려왔다 빠지는 느낌
@@ -111,6 +111,8 @@ function releaseAudioSession() {
   const active = ctx;
   ctx = null;
   master = null;
+  background = null;
+  unbind.forEach(stop => stop()); unbind = [];
   if (active && active.state !== 'closed') void active.close().catch(() => undefined);
 }
 
@@ -148,9 +150,10 @@ export const haptic = (pattern: number | number[]) => {
 export const fx = {
   /** 사용자 제스처 안에서 호출: 오디오 컨텍스트를 깨우고 앰비언트를 시작 */
   unlock() {
+    if (!enabled) return;
     const c = ensure();
     if (!c) return;
-    if (c.state === 'suspended') void c.resume();
+    if (c.state !== 'running' && c.state !== 'closed') void c.resume().catch(() => undefined);
     if (wantAmbience && enabled) startAmbience();
   },
   setEnabled(on: boolean) {

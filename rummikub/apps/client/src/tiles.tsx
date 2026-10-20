@@ -1,3 +1,4 @@
+import { gameAudio } from './audio-settings';
 import { memo, useSyncExternalStore } from 'react';
 import type { Meld, Tile } from '@rummikub/rules';
 import { validateMeld } from '@rummikub/rules';
@@ -40,7 +41,7 @@ export const Letters = ({ text, tilt = true }: { text: string; tilt?: boolean })
 export function SoundToggle() {
   const muted = useSyncExternalStore(sfx.subscribe, sfx.isMuted);
   return (
-    <button className="snd" onClick={() => sfx.toggle()} aria-pressed={!muted} aria-label={muted ? '소리 켜기' : '소리 끄기'} title={muted ? '소리 켜기' : '소리 끄기'}>
+    <button className="snd" onClick={gameAudio.openSettings} aria-label="음향 설정" title="음향 설정">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M4 9v6h4l5 4V5L8 9H4Z" />{muted ? <path d="m17 9 5 6m0-6-5 6" /> : <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />}
       </svg>

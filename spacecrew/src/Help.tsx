@@ -1,3 +1,4 @@
+import { gameAudio } from './audio-settings';
 import { useState } from 'react';
 import type { Card } from './types';
 import { getFx, markTutorialSeen, setFx } from './lib';
@@ -10,7 +11,7 @@ const Demo = ({ card, note, spot }: { card: Card; note: string; spot?: Spot }) =
 /** 도움말 본문(서랍 · 튜토리얼 공용 문구) */
 export function HelpBody() {
   const [fx, setLocal] = useState(getFx());
-  const toggle = (k: 'sound' | 'haptic') => { setFx({ [k]: !fx[k] }); setLocal(getFx()); };
+  const toggle = (k: 'haptic') => { setFx({ [k]: !fx[k] }); setLocal(getFx()); };
   return <div className="help">
     <details open><summary>한 판의 흐름</summary>
       <p>더 크루는 모두가 한 팀인 협력 카드 게임이에요. 미션에 적힌 ‘과제 카드’를 정해진 사람이 따내면 모두 함께 성공해요.</p>
@@ -33,7 +34,7 @@ export function HelpBody() {
       <p><b>연결이 끊기거나 새로고침했어요.</b> 같은 기기·브라우저로 다시 열면 자동으로 이어서 들어가요.</p>
       <p><b>나가기를 누르면요?</b> 방에서 나가 첫 화면으로 돌아가요. 진행 중이면 한 번 더 확인해요.</p></details>
     <details><summary>설정</summary>
-      <label className="check"><input type="checkbox" checked={fx.sound} onChange={() => toggle('sound')} /> 효과음 켜기 (기본 꺼짐)</label>
+      <button type="button" onClick={gameAudio.openSettings}>음향 설정 · 전체 음량 / 배경음 / 효과음</button>
       <label className="check"><input type="checkbox" checked={fx.haptic} onChange={() => toggle('haptic')} /> 진동 켜기 (기본 꺼짐, 지원 기기만)</label></details>
   </div>;
 }

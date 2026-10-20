@@ -1,3 +1,4 @@
+import { gameAudio } from './audio-settings';
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Card, CardDeclaration, CardOptions, GameConfig, PendingDecision, PlayedCard, Suit } from '@skullking/shared';
@@ -10,10 +11,10 @@ import { Avatar, Icon } from './icons';
 import { Bubble, ChatInput, useChatSync } from './chat';
 import './styles.css';
 
-const SFX_PREF='skullking.effects';
-const soundEnabled=()=>{try{return localStorage.getItem(SFX_PREF)!=='off';}catch{return true;}};
-const setSoundEnabled=(enabled:boolean)=>{try{localStorage.setItem(SFX_PREF,enabled?'on':'off');}catch{/* 저장소를 사용할 수 없어도 현재 화면에서는 계속 작동 */}if(!enabled)stopCardSounds();fx.setEnabled(enabled);};
-fx.setEnabled(soundEnabled());
+const soundEnabled=()=>!gameAudio.getSettings().muted && gameAudio.getSettings().master > 0;
+const syncSound=()=>{const enabled=soundEnabled();if(!enabled)stopCardSounds();fx.setEnabled(enabled);};
+syncSound();
+gameAudio.subscribe(syncSound);
 /** 사용자 제스처 안에서: 카드 효과음 + 앰비언트 오디오 잠금 해제 */
 const unlock=()=>{if(!soundEnabled())return;unlockCardSounds();fx.unlock();};
 type Pl=NonNullable<ReturnType<typeof useGame.getState>['game']>['players'][number];
@@ -287,7 +288,7 @@ function Landing() {
     {help&&<Help close={()=>setHelp(false)}/>}
   </main>;
 }
-function GameHeader({round,cards,onHelp,title}:{round?:number;cards?:number;onHelp:()=>void;title?:string}){const game=useGame(s=>s.game)!;const [soundOn,setSoundOn]=useState(soundEnabled);return <header className="game-head"><button className="leave" onClick={()=>leaveRoom(game.roomCode)} aria-label="방 나가기"><Icon name="back"/><span>나가기</span></button><span className="voyage-mark">{title??<><small>ROUND</small><b>{round}</b><span className="of">{cards}장</span></>}</span><div className="game-tools"><button className="tool sound-toggle" type="button" aria-pressed={soundOn} aria-label={'소리 '+(soundOn?'켜짐':'꺼짐')} title={'소리 '+(soundOn?'끄기':'켜기')} onClick={()=>{const next=!soundOn;setSoundOn(next);setSoundEnabled(next);if(next)unlock();}}><Icon name={soundOn?'sound':'mute'}/></button><button className="tool help-orb" onClick={onHelp} aria-label="도움말 열기"><Icon name="help"/></button></div></header>;}
+function GameHeader({round,cards,onHelp,title}:{round?:number;cards?:number;onHelp:()=>void;title?:string}){const game=useGame(s=>s.game)!;return <header className="game-head"><button className="leave" onClick={()=>leaveRoom(game.roomCode)} aria-label="방 나가기"><Icon name="back"/><span>나가기</span></button><span className="voyage-mark">{title??<><small>ROUND</small><b>{round}</b><span className="of">{cards}장</span></>}</span><div className="game-tools"><button className="tool sound-toggle" type="button" aria-label="음향 설정" title="음향 설정" onClick={event=>{unlock();gameAudio.openSettings(event);}}><Icon name="sound"/></button><button className="tool help-orb" onClick={onHelp} aria-label="도움말 열기"><Icon name="help"/></button></div></header>;}
 /* 비딩 중 '선(첫 카드를 내는 사람)'과 내가 몇 번째로 카드를 내는지 한눈에 보여 준다. */
 function playOrder(game:NonNullable<ReturnType<typeof useGame.getState>['game']>){const n=game.players.length;const s=Math.max(0,game.players.findIndex(p=>p.id===game.leaderId));const ids=Array.from({length:n},(_,j)=>game.players[(s+j)%n]?.id);return {n,mine:Math.max(0,ids.indexOf(game.playerId))+1,leader:game.players[s]?.nickname??'—'};}
 function OrderStrip(){const game=useGame(s=>s.game)!;const o=playOrder(game);const meLead=game.leaderId===game.playerId;return <div className="order-strip" role="status"><span className="os-lead"><i>선</i>{meLead?'나':o.leader}</span><span className="os-me">내 순서 <b>{o.mine}</b>/{o.n}{meLead&&<small> · 첫 카드</small>}</span></div>;}
@@ -478,7 +479,7 @@ function Lobby(){
   const kick=(playerId:string,nickname:string)=>{if(window.confirm(`${nickname}님을 대기실에서 내보낼까요?`))emit('PLAYER_KICK',{roomCode:game.roomCode,playerId}).catch(showError);};
   const hint=host?(canStart?'모두 준비됐어요. 출항하세요!':game.players.length<2?'최소 2명이 필요해요. 봇으로 채울 수도 있어요.':'모든 선원이 준비하면 출항할 수 있어요 ('+readyN+'/'+game.players.length+')'):'선장이 출항하기를 기다리는 중이에요.';
   return <main className="harbor">
-    <header className="topbar"><button className="leave" onClick={()=>leaveRoom(game.roomCode)}><Icon name="back"/><span>나가기</span></button><button className="help-orb" onClick={()=>setHelp(true)} aria-label="도움말 열기"><Icon name="help"/></button></header>
+    <header className="topbar"><button className="leave" onClick={()=>leaveRoom(game.roomCode)}><Icon name="back"/><span>나가기</span></button><button className="tool sound-toggle" aria-label="음향 설정" title="음향 설정" onClick={gameAudio.openSettings}><Icon name="sound"/></button><button className="help-orb" onClick={()=>setHelp(true)} aria-label="도움말 열기"><Icon name="help"/></button></header>
     <div className="harbor-head"><div><h1>선원 모집</h1><p>친구에게 방 코드를 알려 주세요.</p></div>
       <div className="harbor-invite"><button type="button" className="roomcode" onClick={copy} aria-label={'방 코드 '+game.roomCode+' 복사'}><small>방 코드</small><strong>{game.roomCode}</strong><span>{copied?'복사했어요':'눌러서 복사'}</span></button><button type="button" className={'invite-link'+(linkCopied?' done':'')} onClick={share}>{linkCopied?'✓ 링크 복사됨':'🔗 초대 링크 보내기'}</button></div></div>
     <div className="harbor-chat"><ChatInput roomCode={game.roomCode} meId={game.playerId} wide/></div>

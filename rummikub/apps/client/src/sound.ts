@@ -1,34 +1,28 @@
+import { gameAudio } from './audio-settings';
+import { preferAmbientAudio } from '../../../../game-audio/audio';
 // 합성 효과음: 오디오 파일 없이 WebAudio로 "딱" 소리를 만든다.
 // 브라우저 정책상 첫 터치/클릭 이후에만 소리가 난다. 음소거 상태는 localStorage에 저장된다.
 let ctx: AudioContext | null = null;
-let muted = false;
-try { muted = localStorage.getItem('rk-mute') === '1'; } catch { /* 저장소를 쓸 수 없는 환경 */ }
-const listeners = new Set<() => void>();
-
-/** 지원 브라우저에서는 효과음이 다른 앱의 음악과 함께 재생되도록 요청한다. */
-function preferAmbientAudio() {
-  try {
-    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-    if (audioSession) audioSession.type = 'ambient';
-  } catch { /* 지원하지 않는 브라우저에서는 기본 동작을 쓴다 */ }
-}
-
+let master: GainNode | null = null;
+let unbind: (() => void) | undefined;
+const isMuted = () => gameAudio.volume('effects') === 0;
 /** 음소거 시 컨텍스트까지 닫아 모바일의 오디오 포커스를 확실히 반납한다. */
 function releaseAudioSession() {
   const active = ctx;
   ctx = null;
   noiseBuf = null;
+  master = null; unbind?.(); unbind = undefined;
   if (active && active.state !== 'closed') void active.close().catch(() => undefined);
 }
 
 function ac(): AudioContext | null {
-  if (muted) return null;
+  if (isMuted()) return null;
   try {
     preferAmbientAudio();
     const C = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!C) return null;
-    ctx ??= new C();
-    if (ctx.state === 'suspended') void ctx.resume();
+    if (!ctx) { ctx = new C(); master = ctx.createGain(); unbind = gameAudio.bindGain(master, 'effects'); master.connect(ctx.destination); }
+    if (ctx.state !== 'running' && ctx.state !== 'closed') void ctx.resume().catch(() => undefined);
     return ctx;
   } catch { return null; }
 }
@@ -52,12 +46,12 @@ function knock(vol: number, freq: number, when = 0, body = 150) {
   const n = noise(c), f = c.createBiquadFilter(), g = c.createGain();
   f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 1.2;
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-  n.connect(f); f.connect(g); g.connect(c.destination);
+  n.connect(f); f.connect(g); g.connect(master!);
   n.start(t); n.stop(t + 0.08);
   const o = c.createOscillator(), og = c.createGain();
   o.frequency.setValueAtTime(body, t); o.frequency.exponentialRampToValueAtTime(body * 0.5, t + 0.06);
   og.gain.setValueAtTime(vol * 0.9, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-  o.connect(og); og.connect(c.destination);
+  o.connect(og); og.connect(master!);
   o.start(t); o.stop(t + 0.09);
 }
 
@@ -68,7 +62,7 @@ function tone(freq: number, when: number, dur: number, vol: number) {
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g); g.connect(c.destination);
+  o.connect(g); g.connect(master!);
   o.start(t); o.stop(t + dur + 0.02);
 }
 
@@ -85,14 +79,8 @@ export const sfx = {
   turn: () => { tone(523, 0, 0.3, 0.07); tone(784, 0.12, 0.45, 0.07); },
   /** 남은 시간 5초 이하 */
   tick: () => tone(1050, 0, 0.06, 0.05),
-  isMuted: () => muted,
-  toggle: () => {
-    muted = !muted;
-    try { localStorage.setItem('rk-mute', muted ? '1' : '0'); } catch { /* 무시 */ }
-    if (muted) releaseAudioSession();
-    listeners.forEach(l => l());
-    if (!muted) sfx.pick();
-    return muted;
-  },
-  subscribe: (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; },
+  isMuted,
+  toggle: () => { gameAudio.update({ muted: !gameAudio.getSettings().muted }); if (!isMuted()) sfx.pick(); return isMuted(); },
+  subscribe: gameAudio.subscribe,
 };
+gameAudio.subscribe(() => { if (isMuted()) releaseAudioSession(); });

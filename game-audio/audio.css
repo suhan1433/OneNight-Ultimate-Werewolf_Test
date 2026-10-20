@@ -1,0 +1,15 @@
+.game-audio-dialog{box-sizing:border-box;width:min(360px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;margin:auto;padding:24px;border:1px solid #768397;border-radius:18px;background:#172233;color:#f3f5fa;box-shadow:0 24px 80px #0009;font:15px/1.5 system-ui,sans-serif;text-align:left;letter-spacing:normal}
+.game-audio-dialog::backdrop{background:#0009}
+.game-audio-dialog form{display:grid;gap:22px;margin:0}
+.game-audio-dialog .ga-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.game-audio-dialog h2{margin:0;color:inherit;font:700 21px/1.4 system-ui,sans-serif}
+.game-audio-dialog .ga-close{display:grid;place-items:center;width:36px;height:36px;min-width:0;min-height:0;margin:0;padding:0;border:1px solid #ffffff30;border-radius:50%;background:#ffffff12;color:inherit;font:24px/1 system-ui;box-shadow:none;transform:none;cursor:pointer}
+.game-audio-dialog label{display:grid;gap:10px;margin:0;color:inherit;font:500 14px/1.5 system-ui,sans-serif;letter-spacing:normal}
+.game-audio-dialog .ga-mute{display:flex;align-items:center;gap:10px}
+.game-audio-dialog .ga-mute input{appearance:auto;position:static;width:20px;height:20px;margin:0;accent-color:#84d8cf}
+.game-audio-dialog .ga-slider span{display:flex;justify-content:space-between;gap:12px}
+.game-audio-dialog output{color:#a9e7df;font-variant-numeric:tabular-nums}
+.game-audio-dialog input[type=range]{appearance:auto;position:static;box-sizing:border-box;width:100%;height:30px;min-height:30px;margin:0;padding:0;border:0;background:transparent;box-shadow:none;accent-color:#84d8cf;cursor:pointer;touch-action:pan-y}
+.game-audio-dialog :focus-visible{outline:2px solid #a9e7df;outline-offset:4px}
+.game-audio-button{position:fixed;z-index:20;left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid #ffffff55;border-radius:50%;background:#172233ed;color:#f3f5fa;cursor:pointer}
+.game-audio-button svg{width:21px;height:21px}

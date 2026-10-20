@@ -7,6 +7,7 @@ COPY apps/server/package.json apps/server/package.json
 RUN npm install
 COPY packages/shared packages/shared
 COPY apps/web apps/web
+COPY game-audio game-audio
 ARG VITE_SOCKET_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
 RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/web

@@ -12,7 +12,7 @@ services:
     environment: [PORT=3001, REDIS_URL=redis://redis:6379, WEB_ORIGIN=http://localhost:8080, INSTANCE_NAME=server-2]
     depends_on: [redis]
   frontend:
-    build: { context: ., dockerfile: apps/web/Dockerfile, args: { VITE_SOCKET_URL: http://localhost:8080 } }
+    build: { context: .., dockerfile: avalon/apps/web/Dockerfile, args: { VITE_SOCKET_URL: http://localhost:8080 } }
   nginx:
     image: nginx:1.27-alpine
     ports: ["8080:80"]

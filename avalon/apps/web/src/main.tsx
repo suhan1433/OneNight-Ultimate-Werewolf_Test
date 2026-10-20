@@ -1,3 +1,4 @@
+import { gameAudio } from './audio-settings';
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import ReactDOM from 'react-dom/client';
 import {ROLE_DEFINITIONS,type AvalonOptions,type ClientGameState,type DelegableAssassinRole,type RoleType} from '@werewolf/shared';
@@ -1012,7 +1013,7 @@ function App(){
     {game&&<PhaseBanner game={game}/>}
     <div className="app" data-phase={game?.phase??'home'}>
       {game&&<button className="leave-room" onClick={()=>setConfirmLeave(true)} aria-label="방 나가기"><span>↗</span> 나가기</button>}
-      <div className="utility-actions">{game?.selfRole&&game.phase!=='result'&&game.phase!=='role_reveal'&&<button className="dossier-button" onClick={()=>setDossierOpen(value=>!value)}><EyeIcon size={15}/> 내 역할</button>}<button className="help-button" onClick={()=>setHelpOpen(true)} aria-label="게임 도움말">?</button></div>
+      <div className="utility-actions"><button className="help-button" aria-label="음향 설정" title="음향 설정" onClick={gameAudio.openSettings}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4ZM17 8a6 6 0 0 1 0 8M20 5a10 10 0 0 1 0 14"/></svg></button>{game?.selfRole&&game.phase!=='result'&&game.phase!=='role_reveal'&&<button className="dossier-button" onClick={()=>setDossierOpen(value=>!value)}><EyeIcon size={15}/> 내 역할</button>}<button className="help-button" onClick={()=>setHelpOpen(true)} aria-label="게임 도움말">?</button></div>
       {!game?<Home/>
         :holdLobby&&lobbySnap.current?<Lobby game={lobbySnap.current} starting/>
         :game.phase==='lobby'?<Lobby game={game}/>

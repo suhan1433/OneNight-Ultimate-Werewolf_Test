@@ -1,3 +1,5 @@
+import { gameAudio } from './audio-settings';
+import { preferAmbientAudio } from '../../game-audio/audio';
 import { useEffect, useState } from 'react';
 import type { Card, Game, Mission, Session, Suit } from './types';
 
@@ -123,22 +125,25 @@ type FxPrefs = { sound: boolean; haptic: boolean };
 const fxKey = 'planet-nine-fx';
 let prefs: FxPrefs = { sound: false, haptic: false };
 try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(fxKey) ?? '{}') }; } catch { /* 기본값 유지 */ }
-export const getFx = () => prefs;
+export const getFx = () => ({ ...prefs, sound: !gameAudio.getSettings().muted });
 const buzz: Record<FxKind, number | number[]> = { tap: 8, play: 14, comm: [10, 40, 10], win: [20, 60, 20, 60, 40], fail: [60, 40, 60] };
 const tone: Record<FxKind, [number, number]> = { tap: [520, 0.05], play: [330, 0.08], comm: [880, 0.18], win: [660, 0.4], fail: [160, 0.3] };
 let audio: AudioContext | undefined;
-const preferAmbientAudio = () => { try { const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession; if (session) session.type = 'ambient'; } catch { /* 지원하지 않는 브라우저 */ } };
-const releaseAudioSession = () => { const active = audio; audio = undefined; if (active && active.state !== 'closed') void active.close().catch(() => undefined); };
-export const setFx = (next: Partial<FxPrefs>) => { prefs = { ...prefs, ...next }; try { localStorage.setItem(fxKey, JSON.stringify(prefs)); } catch { /* 무시 */ } if (!prefs.sound) releaseAudioSession(); };
+let output: GainNode | undefined;
+let unbind: (() => void) | undefined;
+const releaseAudioSession = () => { const active = audio; audio = undefined; output = undefined; unbind?.(); unbind = undefined; if (active && active.state !== 'closed') void active.close().catch(() => undefined); };
+gameAudio.subscribe(() => { if (gameAudio.volume('effects') === 0) releaseAudioSession(); });
+export const setFx = (next: Partial<FxPrefs>) => { prefs = { ...prefs, ...next }; if (next.sound !== undefined) gameAudio.update({ muted: !next.sound }); try { localStorage.setItem(fxKey, JSON.stringify(prefs)); } catch { /* 무시 */ } };
 export function cue(kind: FxKind) {
   if (prefs.haptic) navigator.vibrate?.(buzz[kind]);
-  if (!prefs.sound) return;
+  if (gameAudio.volume('effects') === 0) return;
   try {
     preferAmbientAudio();
-    audio ??= new AudioContext();
+    if (!audio) { audio = new AudioContext(); output = audio.createGain(); unbind = gameAudio.bindGain(output, 'effects'); output.connect(audio.destination); }
+    if (audio.state !== 'running' && audio.state !== 'closed') void audio.resume().catch(() => undefined);
     const osc = audio.createOscillator(); const gain = audio.createGain();
     osc.frequency.value = tone[kind][0]; gain.gain.value = 0.04;
-    osc.connect(gain); gain.connect(audio.destination); osc.start(); osc.stop(audio.currentTime + tone[kind][1]);
+    osc.connect(gain); gain.connect(output!); osc.start(); osc.stop(audio.currentTime + tone[kind][1]);
   } catch { /* 오디오 불가 시 무시 */ }
 }
 

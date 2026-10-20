@@ -1,11 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { gameAudio } from './audio-settings';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Meld, Tile } from '@rummikub/rules';
 import { orderMeld, validateMeld } from '@rummikub/rules';
 import type { PublicView } from '@rummikub/protocol';
 import { webPlatform } from '@rummikub/platform';
 import { emit } from './socket.js';
 import { sfx } from './sound.js';
-import { Ring, SortMode, TileView, isNum, sortAll, sortByGroup, sortByRun } from './tiles.js';
+import { Ring, SortMode, SoundToggle, TileView, isNum, sortAll, sortByGroup, sortByRun } from './tiles.js';
 import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker, jokerReplacement } from './editor.js';
 import { HAND, MELD, Pos, Slots, arrangeSlots, findSpot, fitHand, fitMobileHand, layoutTable, meldInsertIndex, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
 import { checkMeld } from './meldRules.js';
@@ -124,7 +125,6 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const L = (x: number, y: number) => toLocalPoint(stage(), fr, x, y);
   const C = (x: number, y: number) => toClientPoint(stage(), fr, x, y);
   const RL = (el: Element) => toLocalRect(stage(), fr, el.getBoundingClientRect());
-  const muted = useSyncExternalStore(sfx.subscribe, sfx.isMuted);
 
   const me = view.playerId, myTurn = view.turn?.playerId === me;
   const self = view.players.find(p => p.id === me);
@@ -660,12 +660,13 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
           <span className={`tp-hint ${drag ? feedback.tone : canCommit ? 'good' : ''}`}>{drag ? feedback.text : hint}</span>
         </div>
         {!game.online && <span className="offline">연결 끊김</span>}
+        <SoundToggle />
         <button className="menu-btn" onClick={() => setMenu(m => !m)} aria-expanded={menu} aria-label="메뉴"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg></button>
       </header>
       {menu && <>
         <div className="scrim" onClick={() => setMenu(false)} />
         <div className="menu" role="menu">
-          <button role="menuitem" onClick={() => sfx.toggle()}>{muted ? '소리 켜기' : '소리 끄기'}</button>
+          <button role="menuitem" onClick={() => { setMenu(false); gameAudio.openSettings(); }}>음향 설정</button>
           <button role="menuitemcheckbox" aria-checked={autoSend} onClick={() => setAutoSend(v => { const n = !v; try { localStorage.setItem('rk-auto', n ? '1' : '0'); } catch { /* 무시 */ } return n; })}>시간 종료 시 자동 확정 · {autoSend ? '켜짐' : '꺼짐'}</button>
           <button role="menuitem" onClick={() => { setCoach(true); setMenu(false); }}>조작 방법</button>
           {fr.rot && <button role="menuitem" onClick={flip}>화면 방향 뒤집기</button>}

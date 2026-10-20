@@ -1,3 +1,4 @@
+import { gameAudio } from './audio-settings';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import ReactDOM from "react-dom/client";
 import { createPortal } from "react-dom";
@@ -18,7 +19,6 @@ import {
   requestId,
   saveSession,
   session,
-  setNarrationEnabled,
   socket,
   recoverExpiredAction,
   syncRoom,
@@ -206,11 +206,9 @@ function ProfileDialog({ game, onClose }: { game: ClientGameState; onClose: () =
 
 function App() {
   const game = useGame((s) => s.game);
-  const tts = useGame((s) => s.tts);
   const help = useGame((s) => s.help);
   const error = useGame((s) => s.error);
   const connectionState = useGame((s) => s.connectionState);
-  const setTts = useGame((s) => s.setTts);
   const setHelp = useGame((s) => s.setHelp);
   const setError = useGame((s) => s.setError);
   const [nightRecordOpen, setNightRecordOpen] = useState(false);
@@ -274,18 +272,7 @@ function App() {
       {dawn && <DawnSky />}
       {game && (
         <>
-          <button
-            className="audio-fab"
-            aria-label={tts ? "안내 음성 끄기" : "안내 음성 켜기"}
-            title={tts ? "안내 음성 끄기" : "안내 음성 켜기"}
-            onClick={() => {
-              const next = !tts;
-              setTts(next);
-              setNarrationEnabled(next);
-            }}
-          >
-            {tts ? <Icon.Sound /> : <Icon.Mute />}
-          </button>
+          <button className="audio-fab" aria-label="음향 설정" title="음향 설정" onClick={gameAudio.openSettings}><Icon.Sound /></button>
           {game.selfRole && game.phase !== "result" && (
             <div className="night-record-controls">
               <button
