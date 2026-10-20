@@ -43,6 +43,7 @@ COPY skullking skullking
 COPY spacecrew spacecrew
 COPY rummikub rummikub
 COPY game-selector game-selector
+COPY game-audio game-audio
 # All browser apps share /app/apps/web/dist.
 RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web \
   && npm --prefix avalon run build \
