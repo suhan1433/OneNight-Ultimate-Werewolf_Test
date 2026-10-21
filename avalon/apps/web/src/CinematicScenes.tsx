@@ -180,6 +180,8 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
   const anim=(name:string,dur:number,lag:number)=>failTimes.length?{animation:failTimes.map(t=>`${name} ${dur}s ease ${(t+lag).toFixed(2)}s both`).join(',')}:undefined;
   return <section ref={root} className={`cs cs-quest${reveal?' is-reveal':''}${resolved?' is-resolved':''}${fails?' has-fail':' flawless'}${game.questResult?.success?' quest-success':' quest-failure'}${clock.final?' cs-final':''}${still?' is-still':''}`} style={vars({'--result-at':`${resultAt}s`,'--after-at':`${end-.5}s`,'--count':total})}>
     <div className="cs-spot" aria-hidden="true"/>
+    {reveal&&!resolved&&!clock.final&&<><i className="cs-letterbox top" aria-hidden="true"/><i className="cs-letterbox bottom" aria-hidden="true"/></>}
+    {resolved&&!clock.final&&<><i className="cs-verdict-flash" aria-hidden="true"/><i className="cs-verdict-wave" aria-hidden="true"/></>}
     <SceneCaption eyebrow={`QUEST ${game.round+1} · THE ALTAR`} title={reveal?'원정의 진실':'중앙 제단에 카드를 봉인합니다'} body={reveal?'카드를 섞어 한 장씩 공개합니다. 누가 제출했는지는 공개되지 않습니다.':`봉인된 카드 ${count} / ${total}장 · 원정대원만 카드를 제출할 수 있습니다.`}/>
     <div className="cs-altar-camera"><div className="cs-altar-quake" style={reveal&&failTimes.length?{animation:[...failTimes.map(x=>`csQuake .5s ease ${(x+.08).toFixed(2)}s both`),`csQuakeBig .9s ease ${resultAt.toFixed(2)}s both`].join(',')}:undefined}><div className="cs-altar" ref={altar}>
       <AltarFace/><div className="cs-altar-glow"/><div className="cs-altar-seal"><Sigil size={150}/></div>

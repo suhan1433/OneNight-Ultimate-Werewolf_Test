@@ -21,9 +21,6 @@ export function useImmersion(){
       ty=35+Math.max(-30,Math.min(30,e.beta-40))*.9;
     };
     if(!reduced){
-      raf=requestAnimationFrame(loop);
-      addEventListener('pointermove',move,{passive:true});
-      addEventListener('deviceorientation',tilt);
     }
 
     /* 2. 버튼 파문 + 짧은 햅틱 */

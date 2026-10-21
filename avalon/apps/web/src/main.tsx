@@ -18,6 +18,9 @@ import './cinematic.css';
 import './chat-mobile.css';
 import './chat-game-bar.css';
 import './profile.css';
+import './immersion.css';
+import './cinematic-plus.css';
+import {useImmersion} from './immersion';
 import {CHARACTERS,characterById,myAvatarId,setMyAvatarId,serverAvatarId,syncAvatar,useCharacterResolver,PlayerAvatar,PlayerEmoji,ProfileDialog,type Character} from './profile';
 import {TeamScene,QuestScene,AssassinScene,EndingScene} from './CinematicScenes';
 import {GateIntro,Table,useGateIntro} from './GateIntro';
@@ -948,6 +951,7 @@ function RoleDossier({game,close}:{game:ClientGameState;close:()=>void}){
 }
 
 function App(){
+  useImmersion();
   const{game,error,setError,setGame}=useGame();
   useRecordedAudio(game);
   const[chatOpen,setChatOpen]=useState(false);
