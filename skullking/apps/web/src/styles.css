@@ -163,6 +163,12 @@ button:disabled{opacity:.38;cursor:not-allowed}
 /* ═════════ 게임: 나무 탁자 한 장 ═════════ */
 .game{height:100dvh;max-width:1280px;margin:auto;display:flex;flex-direction:column;padding:0 clamp(.5rem,2vw,1.5rem);position:relative}
 .game-head{display:flex;align-items:center;justify-content:space-between;padding:.7rem 0 .2rem}
+/* 카드 배치 전환 토글 (나가기 버튼 바로 아래) */
+.head-left{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem}
+.layout-toggle{color:var(--bone-3);border-width:1px;border-radius:999px}
+.layout-toggle button{font-size:.66rem;padding:.22rem .6rem;white-space:nowrap}
+.layout-toggle button.on{background:rgba(233,220,196,.16)!important;color:var(--bone)!important}
+
 .voyage-mark{display:flex;align-items:baseline;gap:.5rem}.voyage-mark small{font:700 .62rem var(--sans);letter-spacing:.26em;color:var(--bone-3)}.voyage-mark b{font:900 1.6rem/1 var(--serif)}.voyage-mark .of{font-size:.78rem;color:var(--bone-2)}
 /* 탁자 위 카드 배치(--cw 카드 너비 · --rx/--ry 중심에서 퍼지는 정도 · --at 카드 무리의 세로 중심).
    .felt 자체의 실제 크기(cqw/cqh)에 맞춰 잡는다 → 좌석 프로필·이름·점수표에 닿지 않는 한도 안에서 가장 크게.
@@ -184,6 +190,34 @@ button:disabled{opacity:.38;cursor:not-allowed}
   .felt[data-n="8"] .arena{--at:60%;--rx:1.4;--ry:0.8;--cw:min(150px,calc(30.7cqh - 36.2px))}
   .felt[data-n="9"] .arena{--at:60%;--rx:1.4;--ry:0.8;--cw:min(150px,calc(22.0cqh - 3.0px))}
 }
+/* ═════════ 카드 배치 ②: 자리 앞에 놓기 (ring) ═════════
+   각자 자기 좌석에서 탁자 중심 쪽으로 --kx/--ky 만큼 들어온 자리에 카드를 놓는다(겹침 없음 · 카드 최대).
+   좌석은 .felt 의 (50±38%, 46±35%) 타원 위에 있으므로 카드도 같은 타원의 안쪽 비율(k)로 둔다. */
+.felt[data-layout="ring"] .arena{--at:52%;--kx:0.35;--ky:0.5;--cw:max(28px,min(140px,calc(64.2cqw - 174.4px),calc(23.4cqh - 16.4px)))}
+.felt[data-layout="ring"][data-n="4"] .arena{--at:52%;--kx:0.35;--ky:0.5;--cw:max(28px,min(112px,calc(41.5cqw - 83.4px),calc(20.6cqh - 24.7px)))}
+.felt[data-layout="ring"][data-n="5"] .arena{--at:52%;--kx:0.35;--ky:0.5;--cw:max(28px,min(112px,calc(17.7cqw - 14.6px),calc(16.9cqh - 18.3px)))}
+.felt[data-layout="ring"][data-n="6"] .arena{--at:52%;--kx:0.35;--ky:0.65;--cw:max(28px,min(112px,calc(31.8cqw - 70.4px),calc(16.9cqh - 25.5px)))}
+.felt[data-layout="ring"][data-n="7"] .arena{--at:52%;--kx:0.35;--ky:0.65;--cw:max(28px,min(112px,calc(25.8cqw - 63.3px),calc(14.8cqh - 23.7px)))}
+.felt[data-layout="ring"][data-n="8"] .arena{--at:52%;--kx:0.5;--ky:0.5;--cw:max(28px,min(112px,calc(35.5cqw - 98.3px),calc(15.0cqh - 39.6px)))}
+.felt[data-layout="ring"][data-n="9"] .arena{--at:52%;--kx:0.5;--ky:0.5;--cw:max(28px,min(112px,calc(33.4cqw - 93px),calc(9.2cqh - 8.5px)))}
+@container felt (min-aspect-ratio:5/4){
+  .felt[data-layout="ring"] .arena{--at:46%;--kx:0.5;--ky:0.5;--cw:max(28px,min(160px,calc(33.5cqh + 35.4px)))}
+  .felt[data-layout="ring"][data-n="4"] .arena{--at:64%;--kx:0.5;--ky:0.5;--cw:max(28px,min(150px,calc(25.7cqh - 2.9px)))}
+  .felt[data-layout="ring"][data-n="5"] .arena{--at:46%;--kx:0.5;--ky:0.8;--cw:max(28px,min(150px,calc(27.8cqh - 10.4px)))}
+  .felt[data-layout="ring"][data-n="6"] .arena{--at:64%;--kx:0.35;--ky:0.65;--cw:max(28px,min(150px,calc(17.2cqh - 5.6px)))}
+  .felt[data-layout="ring"][data-n="7"] .arena{--at:56%;--kx:0.35;--ky:0.8;--cw:max(28px,min(150px,calc(18.5cqh - 4.8px)))}
+  .felt[data-layout="ring"][data-n="8"] .arena{--at:60%;--kx:0.5;--ky:0.65;--cw:max(28px,min(150px,calc(16.7cqh - 6.9px)))}
+  .felt[data-layout="ring"][data-n="9"] .arena{--at:56%;--kx:0.35;--ky:0.8;--cw:max(28px,min(150px,calc(16.7cqh - 16.9px)))}
+}
+.felt[data-layout="ring"] .played{translate:calc(var(--ax)*var(--kx)*38cqw) calc(var(--ay)*var(--ky)*35cqh);rotate:calc(var(--rot)*.25)}
+.felt[data-layout="ring"] .lead,.felt[data-layout="ring"] .trick-result,.felt[data-layout="ring"] .sweep-note{top:0;translate:-50% -50%}
+.felt[data-layout="ring"] .lead{translate:-50% -50%}
+/* 자리 앞에 놓이면 누구 카드인지 분명하므로 이름표는 '낸 순서' 번호만 카드 모서리에 남긴다 */
+.felt[data-layout="ring"] .tag-pill{translate:calc(var(--ax)*var(--kx)*38cqw - var(--cw)/2 + 3px) calc(var(--ay)*var(--ky)*35cqh - var(--cw)*.709 + 3px);height:auto;padding:0;gap:0;background:none!important;box-shadow:none!important;opacity:1}
+.felt[data-layout="ring"] .tag-pill .tp-av,.felt[data-layout="ring"] .tag-pill b{display:none}
+.felt[data-layout="ring"] .tag-pill .ord{width:20px;height:20px;box-shadow:var(--sh-1)}
+.felt[data-layout="ring"] .tag-pill.focused .ord{box-shadow:0 0 0 2px var(--blood),var(--sh-1)}
+
 .chart{position:absolute;left:50%;top:52%;width:min(96%,780px);height:70%;translate:-50% -50%;rotate:-1.2deg;background:url('./textures/parchment.jpg') 0 0/512px;border-radius:2px;box-shadow:var(--sh-3),inset 0 0 70px rgba(100,64,22,.45);overflow:hidden}
 .chart svg{display:block;width:100%;height:100%}
 

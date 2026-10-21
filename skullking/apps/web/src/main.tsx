@@ -9,6 +9,7 @@ import { useGame } from './store';
 import { fx } from './fx';
 import { Avatar, Icon } from './icons';
 import { Bubble, ChatInput, useChatSync } from './chat';
+import { setTableLayout, useTableLayout } from './table-layout';
 import './styles.css';
 
 const soundEnabled=()=>!gameAudio.getSettings().muted && gameAudio.getSettings().master > 0;
@@ -288,7 +289,9 @@ function Landing() {
     {help&&<Help close={()=>setHelp(false)}/>}
   </main>;
 }
-function GameHeader({round,cards,onHelp,title}:{round?:number;cards?:number;onHelp:()=>void;title?:string}){const game=useGame(s=>s.game)!;return <header className="game-head"><button className="leave" onClick={()=>leaveRoom(game.roomCode)} aria-label="방 나가기"><Icon name="back"/><span>나가기</span></button><span className="voyage-mark">{title??<><small>ROUND</small><b>{round}</b><span className="of">{cards}장</span></>}</span><div className="game-tools"><button className="tool sound-toggle" type="button" aria-label="음향 설정" title="음향 설정" onClick={event=>{unlock();gameAudio.openSettings(event);}}><Icon name="sound"/></button><button className="tool help-orb" onClick={onHelp} aria-label="도움말 열기"><Icon name="help"/></button></div></header>;}
+/* 카드 배치 전환: 겹쳐 놓기(기존) ↔ 자리 앞에 놓기 */
+function LayoutToggle(){const layout=useTableLayout();return <div className="seg layout-toggle" role="group" aria-label="카드 배치"><button type="button" className={layout==='stack'?'on':''} aria-pressed={layout==='stack'} onClick={()=>setTableLayout('stack')} title="카드를 가운데로 모아 겹쳐 놓기">겹쳐놓기</button><button type="button" className={layout==='ring'?'on':''} aria-pressed={layout==='ring'} onClick={()=>setTableLayout('ring')} title="카드를 각자 자리 앞에 놓기">자리 앞</button></div>;}
+function GameHeader({round,cards,onHelp,title}:{round?:number;cards?:number;onHelp:()=>void;title?:string}){const game=useGame(s=>s.game)!;return <header className="game-head"><div className="head-left"><button className="leave" onClick={()=>leaveRoom(game.roomCode)} aria-label="방 나가기"><Icon name="back"/><span>나가기</span></button>{title===undefined&&<LayoutToggle/>}</div><span className="voyage-mark">{title??<><small>ROUND</small><b>{round}</b><span className="of">{cards}장</span></>}</span><div className="game-tools"><button className="tool sound-toggle" type="button" aria-label="음향 설정" title="음향 설정" onClick={event=>{unlock();gameAudio.openSettings(event);}}><Icon name="sound"/></button><button className="tool help-orb" onClick={onHelp} aria-label="도움말 열기"><Icon name="help"/></button></div></header>;}
 /* 비딩 중 '선(첫 카드를 내는 사람)'과 내가 몇 번째로 카드를 내는지 한눈에 보여 준다. */
 function playOrder(game:NonNullable<ReturnType<typeof useGame.getState>['game']>){const n=game.players.length;const s=Math.max(0,game.players.findIndex(p=>p.id===game.leaderId));const ids=Array.from({length:n},(_,j)=>game.players[(s+j)%n]?.id);return {n,mine:Math.max(0,ids.indexOf(game.playerId))+1,leader:game.players[s]?.nickname??'—'};}
 function OrderStrip(){const game=useGame(s=>s.game)!;const o=playOrder(game);const meLead=game.leaderId===game.playerId;return <div className="order-strip" role="status"><span className="os-lead"><i>선</i>{meLead?'나':o.leader}</span><span className="os-me">내 순서 <b>{o.mine}</b>/{o.n}{meLead&&<small> · 첫 카드</small>}</span></div>;}
@@ -355,6 +358,7 @@ function Table(){
  const [openSeat,setOpenSeat]=useState<string|null>(null);
  useEffect(()=>{if(!openSeat)return;const t=setTimeout(()=>setOpenSeat(null),3200);return()=>clearTimeout(t);},[openSeat]);
  const [focus,setFocus]=useState<string|null>(null);
+ const tableLayout=useTableLayout();
  useEffect(()=>{if(!focus)return;const t=setTimeout(()=>setFocus(null),3000);return()=>clearTimeout(t);},[focus]);
  useEffect(()=>{setFocus(null);},[game.trick.length]);
  /* 좌석은 내가 맨 아래, 나머지는 시계 방향으로 둘러앉는다. 낸 카드도 자기 좌석 방향에서 날아와 약간 삐뚤게 놓인다. */
@@ -388,7 +392,7 @@ function Table(){
  const before=prevGame.current;const trickJustEnded=before!==game&&before.trick.length>0&&before.round===game.round&&before.phase!=='bidding'&&game.phase!=='bidding'&&(game.trick.length<before.trick.length||game.trick[0]?.card.id!==before.trick[0].card.id);
  if((game.phase==='roundScore'||game.phase==='result')&&!sweep&&!trickJustEnded)return <Score/>;
  return <main className={'game '+(bidding?'is-bidding':'is-play')}><GameHeader round={game.round} cards={game.cardsThisRound} onHelp={()=>setHelp(true)}/>
- <section className={'felt'+(sweep?.winner?' won':'')+(reveal?' revealing':'')} data-n={Math.min(nP,9)}>
+ <section className={'felt'+(sweep?.winner?' won':'')+(reveal?' revealing':'')} data-n={Math.min(nP,9)} data-layout={tableLayout}>
   <Chart/>
   {log.round===game.round&&log.ids.length>0&&<div className="tricklog" aria-label="트릭 기록">{log.ids.map((id,i)=>{const nm=id?pname(game,id):'파괴';return <i key={i} className={id?'':'void'} title={'트릭 '+(i+1)+': '+nm}>{id?ini(nm):'✕'}</i>;})}</div>}
   {game.players.filter(p=>p.id!==game.playerId).map(seatEl)}{game.players.filter(p=>p.id===game.playerId).map(seatEl)}
