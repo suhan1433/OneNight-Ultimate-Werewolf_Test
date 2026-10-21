@@ -1,0 +1,81 @@
+/* Avalon immersion layer v2 — main.tsx 에서 profile.css 다음, 맨 마지막에 import.
+   기존 파일은 수정하지 않고 덮어쓰기만 합니다. (v1 의 .app>* / button 전역 position / 카드 transform 덮어쓰기는
+   고정 위치 UI·카드 뒤집기 연출을 깨뜨릴 수 있어 제거했습니다) */
+:root{--im-ease:cubic-bezier(.2,.8,.2,1)}
+
+/* 1. 방이 숨 쉰다 */
+.ambient::before{background:
+  radial-gradient(520px circle at var(--mx,50%) var(--my,30%),rgba(255,212,140,.2),transparent 70%),
+  radial-gradient(ellipse 85% 55% at 50% -10%,rgba(48,118,126,.55),transparent 70%),
+  radial-gradient(ellipse 70% 50% at 50% 115%,rgba(28,48,92,.5),transparent 70%);
+  animation:flicker 7s linear infinite,imBreath 6s ease-in-out infinite}
+@keyframes imBreath{50%{filter:brightness(1.12)}}
+.ambient::after{animation:grain 1.2s steps(1) infinite}
+/* 불씨: 화면 고정, 클릭은 통과 */
+html::before,html::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:1;mix-blend-mode:screen;opacity:.4;background-repeat:repeat}
+html::before{background-image:radial-gradient(1.6px 1.6px at 12% 80%,#ffc87a,transparent),radial-gradient(1.2px 1.2px at 38% 60%,#ffd9a0,transparent),radial-gradient(1.8px 1.8px at 64% 90%,#ffb35c,transparent),radial-gradient(1.2px 1.2px at 86% 70%,#ffe2b0,transparent);background-size:420px 520px;animation:imEmber 22s linear infinite}
+html::after{background-image:radial-gradient(1px 1px at 22% 40%,#ffe9c4,transparent),radial-gradient(1.4px 1.4px at 52% 75%,#ffbf70,transparent);background-size:560px 640px;opacity:.28;animation:imEmber 34s linear infinite reverse}
+@keyframes imEmber{to{background-position:-60px -520px,40px -520px,-30px -520px,70px -520px}}
+:root[data-vt-still]::before,:root[data-vt-still]::after,:root[data-rv-still]::before,:root[data-rv-still]::after{animation-play-state:paused}
+
+/* 2. 장면 전환 — opacity/translate 만 사용(고정 위치 자식을 깨지 않도록 filter 금지) */
+.board,.home,.gate-card{animation:imScene .7s var(--im-ease) backwards}
+@keyframes imScene{from{opacity:0;translate:0 20px}}
+.board>*{animation:imRise .65s var(--im-ease) backwards}
+.board>:nth-child(2){animation-delay:.1s}.board>:nth-child(3){animation-delay:.2s}.board>:nth-child(n+4){animation-delay:.3s}
+@keyframes imRise{from{opacity:0;translate:0 22px}}
+
+/* 3. 내 차례를 '화면 전체'가 알려준다 — 프레임이 금빛으로 맥동, 리본은 빛이 훑음 */
+body:has(.turn-pill):before{border-color:rgba(240,209,138,.5);animation:imTurn 2.4s ease-in-out infinite}
+@keyframes imTurn{50%{box-shadow:inset 0 0 0 6px rgba(240,209,138,.05),inset 0 0 160px rgba(240,209,138,.16)}}
+.turn-pill{position:relative;animation:imPill 1.8s ease-in-out infinite}
+@keyframes imPill{0%,100%{box-shadow:0 0 0 0 rgba(240,209,138,.55)}50%{box-shadow:0 0 0 9px rgba(240,209,138,0)}}
+.phase-ribbon{position:relative;overflow:hidden;animation:imScene .6s var(--im-ease) backwards}
+.phase-ribbon::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 35%,rgba(255,236,190,.34) 50%,transparent 65%);transform:translateX(-130%);animation:imSweep 1.2s ease-out .25s both}
+@keyframes imSweep{to{transform:translateX(130%)}}
+.ribbon-kicker{letter-spacing:.3em;text-shadow:0 0 14px rgba(240,209,138,.6)}
+
+/* 4. 원탁 */
+.table:after{animation:imHeart 5s ease-in-out infinite}
+@keyframes imHeart{50%{opacity:.55;transform:scale(1.08)}}
+.table-center{text-shadow:0 0 22px rgba(255,214,150,.5)}
+.seat .avatar{animation:imFloat 5.5s ease-in-out infinite}
+.seat:nth-child(even) .avatar{animation-delay:-2.4s}.seat:nth-child(3n) .avatar{animation-delay:-4s}
+@keyframes imFloat{50%{translate:0 -3px}}
+.seat button.selected .avatar{position:relative}
+.seat button.selected .avatar::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--brass-hi);pointer-events:none;animation:imPulse 1.8s ease-out infinite}
+@keyframes imPulse{from{opacity:.85;transform:scale(.95)}to{opacity:0;transform:scale(1.55)}}
+.leader-crown{animation:imCrown 3.2s ease-in-out infinite;filter:drop-shadow(0 0 10px rgba(255,214,120,.85))}
+@keyframes imCrown{50%{translate:0 -4px;rotate:4deg}}
+.quest-slot.active,.quest-slot.on{animation:imSlot 2.4s ease-in-out infinite}
+@keyframes imSlot{50%{box-shadow:0 0 28px 2px rgba(240,209,138,.4)}}
+
+/* 5. 투표 장면 */
+.vt-note{animation:imRise 1s var(--im-ease) .4s backwards;letter-spacing:.04em}
+.vt-voted{animation:imStamp .5s var(--ease-spring,var(--im-ease)) backwards}
+@keyframes imStamp{from{opacity:0;scale:2.2;rotate:-12deg}}
+.vt-summary b{font-family:var(--numeral);font-size:1.5em;text-shadow:0 0 22px currentColor}
+.vt-summary .a{color:var(--good-300)}.vt-summary .r{color:var(--evil-300)}
+.vt-continue .primary:not(:disabled){animation:imCta 2.8s ease-in-out infinite}
+
+/* 6. 손맛 */
+.primary{position:relative;overflow:hidden;isolation:isolate}
+.primary:not(:disabled)::after{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(110deg,transparent 38%,rgba(255,255,255,.5) 50%,transparent 62%);transform:translateX(-140%);animation:imGleam 4.2s ease-in-out 1.2s infinite}
+@keyframes imGleam{0%,60%{transform:translateX(-140%)}100%{transform:translateX(140%)}}
+@keyframes imCta{50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 3px 0 #74501b,0 18px 40px -8px rgba(220,178,98,.95)}}
+.im-ripple{position:absolute;border-radius:50%;pointer-events:none;width:12px;height:12px;margin:-6px 0 0 -6px;background:radial-gradient(circle,rgba(255,236,190,.75),transparent 70%);animation:imRipple .65s ease-out forwards}
+@keyframes imRipple{to{transform:scale(22);opacity:0}}
+.round-history-item>button,.plate,.roster>div{transition:transform .3s var(--im-ease),border-color .3s,box-shadow .3s}
+.round-history-item>button:hover,.plate:hover,.roster>div:hover{transform:translateY(-2px);border-color:var(--hair-strong);box-shadow:0 14px 26px -14px #000,0 0 22px -8px rgba(255,206,130,.5)}
+.toast{animation:imToast .5s var(--ease-spring,var(--im-ease)) both}
+@keyframes imToast{from{opacity:0;translate:0 -18px;scale:.94}}
+.help-modal,.role-dossier,.confirm-modal,.round-detail,.role-detail{animation:imModal .45s var(--im-ease) backwards}
+@keyframes imModal{from{opacity:0;translate:0 26px;scale:.96}}
+.result-stage h1,.cs-ending-title{animation:imTitle 1.4s var(--im-ease) backwards}
+@keyframes imTitle{from{opacity:0;letter-spacing:.4em}}
+
+@media(prefers-reduced-motion:reduce){
+  html::before,html::after,.board,.board>*,.home,.gate-card,.phase-ribbon,.phase-ribbon::after,.turn-pill,body:before,.table:after,.seat .avatar,.leader-crown,.primary,.primary::after,.quest-slot,.vt-voted,.vt-note,.toast,.help-modal,.role-dossier,.confirm-modal,.round-detail,.role-detail,.result-stage h1,.cs-ending-title{animation:none!important}
+  .im-ripple{display:none}
+}
+@media(max-width:640px){html::after{display:none}.seat .avatar{animation:none}}

@@ -1,0 +1,74 @@
+/* Avalon cinematic-plus — 원정 투표 / 성공·실패 카드 / 원정대 구성 / 원정 결과 / 엔딩 몰입 보강.
+   main.tsx 에서 immersion.css 다음에 import. 기존 파일은 수정하지 않습니다.
+   (고정 위치 자식을 보호하려고 transform 은 잎(leaf) 요소에만 건다) */
+
+/* ===== A. 원정대 찬성/반대 투표: 코인을 '고르는' 무게감 ===== */
+.vote-tokens .token{transition:scale .45s var(--ease-spring),translate .45s var(--ease-spring),opacity .35s,filter .35s,box-shadow .3s;animation:imIdle 4.6s ease-in-out infinite}
+.vote-tokens .token.reject{animation-delay:-2.3s}
+@keyframes imIdle{50%{translate:0 -4px}}
+.vote-tokens .token:hover:not(:disabled){scale:1.06}
+.vote-tokens .token.active{scale:1.14;translate:0 -12px;animation:none;position:relative}
+.vote-tokens .token.active::after{content:'';position:absolute;inset:-10px;border-radius:50%;pointer-events:none;border:2px solid currentColor;animation:imLock .9s ease-out both}
+.vote-tokens .token.approve{color:var(--good-300)}.vote-tokens .token.reject{color:var(--evil-300)}
+@keyframes imLock{from{opacity:.9;scale:.8}to{opacity:0;scale:1.9}}
+.vote-tokens:has(.token.active) .token:not(.active){opacity:.4;scale:.9;filter:saturate(.4) brightness(.75);animation:none}
+/* 선택한 쪽 색으로 화면 가장자리가 물든다 */
+body:has(.vote-tokens .token.approve.active):after{box-shadow:inset 0 0 180px rgba(79,143,214,.28);transition:box-shadow .6s}
+body:has(.vote-tokens .token.reject.active):after{box-shadow:inset 0 0 180px rgba(184,56,79,.32);transition:box-shadow .6s}
+
+/* ===== B. 원정 성공/실패 카드: 비밀 카드를 쥐는 긴장 ===== */
+.qcard{transition:translate .45s var(--ease-spring),rotate .45s var(--ease-spring),scale .45s var(--ease-spring),opacity .35s,filter .35s,box-shadow .3s;animation:imHold 5s ease-in-out infinite}
+.qcard.fail{animation-delay:-2.5s}
+@keyframes imHold{50%{translate:0 -3px;rotate:.6deg}}
+.qcard:hover:not(:disabled){translate:0 -8px;rotate:-1.5deg}
+.qcard.active{translate:0 -16px;scale:1.07;rotate:0deg;animation:none}
+body:has(.qcard.active) .qcard:not(.active){opacity:.35;scale:.93;filter:saturate(.3) brightness(.7);animation:none}
+.qcard:disabled{filter:grayscale(.8) brightness(.6);animation:none}
+/* 실패 카드를 쥐면 방 전체가 어두워지고 붉은 불씨 / 성공이면 청백으로 */
+body:has(.qcard.fail.active):after{box-shadow:inset 0 0 220px rgba(184,56,79,.45);transition:box-shadow .7s}
+body:has(.qcard.success.active):after{box-shadow:inset 0 0 220px rgba(120,180,255,.3);transition:box-shadow .7s}
+body:has(.qcard.fail.active) .ambient::before{filter:hue-rotate(-18deg) brightness(.75)}
+
+/* ===== C. 원정대 구성: 리더의 손으로 기사를 부르는 느낌 ===== */
+.cs-team .cs-seat button{transition:scale .4s var(--ease-spring),filter .3s}
+.cs-team .cs-seat button:not(:disabled):hover{scale:1.1;filter:drop-shadow(0 0 16px rgba(253,233,180,.7))}
+.cs-team .cs-seat.selected .cs-avatar{animation:imKnight 2.6s ease-in-out infinite}
+@keyframes imKnight{50%{box-shadow:0 0 0 2px var(--brass-hi),0 0 34px 6px rgba(253,233,180,.55)}}
+.cs-team .cs-seat.leader .cs-crown{filter:drop-shadow(0 0 12px rgba(255,214,120,.9));animation:imCrown 3.2s ease-in-out infinite}
+.cs-selection>div>span{animation:imChip .5s var(--ease-spring) backwards}
+@keyframes imChip{from{opacity:0;scale:.5;translate:0 10px}}
+.cs-team.is-ready .cs-core strong{animation:imBeat 1.4s ease-in-out infinite;text-shadow:0 0 26px rgba(253,233,180,.9)}
+@keyframes imBeat{0%,100%{scale:1}14%{scale:1.14}28%{scale:1}42%{scale:1.08}}
+.cs-team.is-ready .cs-propose:not(:disabled){animation:imCta 1.6s ease-in-out infinite}
+.cs-team.is-proposing .cs-seat:not(.selected){opacity:.35;filter:saturate(.4);transition:opacity .9s,filter .9s}
+
+/* ===== D. 원정 결과: 판결이 '내려앉는' 순간 ===== */
+.cs-quest.is-reveal:not(.is-resolved) .cs-caption{animation:imBreath 2.4s ease-in-out infinite}
+.cs-quest.is-still .cs-altar-camera{filter:brightness(.55) contrast(1.1);transition:filter .5s}
+.cs-quest-verdict h2{animation:imVerdictStamp 1s var(--ease-spring) .15s backwards;letter-spacing:.12em}
+.cs-quest.quest-success .cs-quest-verdict h2{text-shadow:0 0 34px rgba(139,184,236,.9)}
+.cs-quest.quest-failure .cs-quest-verdict h2{text-shadow:0 0 34px rgba(224,86,111,.95)}
+@keyframes imVerdictStamp{0%{opacity:0;scale:2.4;letter-spacing:.5em}55%{opacity:1;scale:.94}100%{scale:1}}
+.cs-quest .cs-score span.now{animation:imPill 1.8s ease-in-out infinite}
+.cs-quest.is-resolved.has-fail .cs-spot{animation:imBreath 3.4s ease-in-out infinite;filter:hue-rotate(-20deg)}
+.cs-progress b.no{text-shadow:0 0 14px var(--evil-300)}.cs-progress b.ok{text-shadow:0 0 14px var(--good-300)}
+
+/* ===== E. 엔딩: 이야기의 마지막 장 ===== */
+.cs-ending-title h1{animation:imEnd 2.2s var(--im-ease) backwards}
+@keyframes imEnd{0%{opacity:0;letter-spacing:.7em;scale:1.2}40%{opacity:1}100%{scale:1}}
+.cs-ending-title p{animation:imRise 1.2s var(--im-ease) 1.2s backwards}
+.cs-ending.good .cs-ending-title h1{text-shadow:0 0 60px rgba(255,226,150,.8)}
+.cs-ending.evil .cs-ending-title h1{text-shadow:0 0 60px rgba(224,86,111,.8);animation:imEnd 2.2s var(--im-ease) backwards,imDread 4s ease-in-out 2.4s infinite}
+@keyframes imDread{50%{opacity:.82;translate:0 1px}}
+/* 정체 공개 카드가 한 장씩 뒤집히며 등장, 승리 진영은 빛남 */
+.cs-identity-grid>*{animation:imFlipIn .8s var(--ease-spring) backwards}
+.cs-identity-grid>:nth-child(1){animation-delay:.2s}.cs-identity-grid>:nth-child(2){animation-delay:.35s}.cs-identity-grid>:nth-child(3){animation-delay:.5s}.cs-identity-grid>:nth-child(4){animation-delay:.65s}.cs-identity-grid>:nth-child(5){animation-delay:.8s}.cs-identity-grid>:nth-child(n+6){animation-delay:.95s}
+@keyframes imFlipIn{from{opacity:0;translate:0 24px;rotate:-4deg;scale:.9}}
+.cs-ending-summary{animation:imRise 1s var(--im-ease) 1.4s backwards}
+.cs-ending.good.cs-final .cs-ending-world{animation:imBreath 5s ease-in-out infinite}
+.cs-ending.evil.cs-final .cs-ending-world{filter:saturate(.7) brightness(.9)}
+
+@media(prefers-reduced-motion:reduce){
+  .vote-tokens .token,.qcard,.cs-team .cs-seat.selected .cs-avatar,.cs-selection>div>span,.cs-team.is-ready .cs-core strong,.cs-team.is-ready .cs-propose,
+  .cs-quest-verdict h2,.cs-quest .cs-score span.now,.cs-ending-title h1,.cs-ending-title p,.cs-identity-grid>*,.cs-ending-summary,.cs-ending-world{animation:none!important}
+}
