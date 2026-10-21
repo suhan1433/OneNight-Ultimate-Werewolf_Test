@@ -164,8 +164,26 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .game{height:100dvh;max-width:1280px;margin:auto;display:flex;flex-direction:column;padding:0 clamp(.5rem,2vw,1.5rem);position:relative}
 .game-head{display:flex;align-items:center;justify-content:space-between;padding:.7rem 0 .2rem}
 .voyage-mark{display:flex;align-items:baseline;gap:.5rem}.voyage-mark small{font:700 .62rem var(--sans);letter-spacing:.26em;color:var(--bone-3)}.voyage-mark b{font:900 1.6rem/1 var(--serif)}.voyage-mark .of{font-size:.78rem;color:var(--bone-2)}
-.felt{position:relative;flex:1;min-height:0;--cw:clamp(66px,14vw,118px);--rx:.78;--ry:.6}
-.felt[data-n="5"],.felt[data-n="6"]{--cw:clamp(60px,12vw,104px);--rx:.88;--ry:.66}.felt[data-n="7"],.felt[data-n="8"],.felt[data-n="9"]{--cw:clamp(54px,10.5vw,90px);--rx:1.02;--ry:.78}
+/* 탁자 위 카드 배치(--cw 카드 너비 · --rx/--ry 중심에서 퍼지는 정도 · --at 카드 무리의 세로 중심).
+   .felt 자체의 실제 크기(cqw/cqh)에 맞춰 잡는다 → 좌석 프로필·이름·점수표에 닿지 않는 한도 안에서 가장 크게.
+   세로 화면(폰)은 폭, 가로 화면(데스크톱)은 높이가 한계라서 둘을 나눠 잡는다. 값은 3~9인 × 7개 화면 크기를 실측해 정했다. */
+.felt{position:relative;flex:1;min-height:0;container:felt/size}
+.arena{--at:52%;--rx:0.8;--ry:0.7;--cw:max(clamp(66px,14vw,118px),min(128px,calc(39.4cqw - 85.1px),calc(23.6cqh - 39.6px)))}
+.felt[data-n="4"] .arena{--rx:0.65;--ry:1.0;--cw:max(clamp(66px,14vw,118px),min(128px,calc(29.9cqw - 45.4px),calc(22.0cqh - 24.1px)))}
+.felt[data-n="5"] .arena{--rx:0.8;--ry:1.0;--cw:max(clamp(60px,12vw,104px),min(128px,calc(26.4cqw - 42.4px),calc(20.5cqh - 26.1px)))}
+.felt[data-n="6"] .arena{--rx:0.8;--ry:1.0;--cw:max(clamp(60px,12vw,104px),min(128px,calc(25.3cqw - 44.1px),calc(22.5cqh - 31.6px)))}
+.felt[data-n="7"] .arena{--rx:1.0;--ry:1.0;--cw:max(clamp(54px,10.5vw,90px),min(128px,calc(23.5cqw - 37.2px),calc(20.0cqh - 37.4px)))}
+.felt[data-n="8"] .arena{--rx:1.0;--ry:1.0;--cw:max(clamp(54px,10.5vw,90px),min(128px,calc(23.5cqw - 35.9px),calc(18.0cqh - 30.2px)))}
+.felt[data-n="9"] .arena{--rx:1.0;--ry:1.0;--cw:max(clamp(54px,10.5vw,90px),min(128px,calc(19.6cqw - 24.5px),calc(16.3cqh - 23.4px)))}
+@container felt (min-aspect-ratio:5/4){
+  .arena{--at:52%;--rx:1.3;--ry:0.5;--cw:min(160px,calc(37.6cqh - 5.6px))}
+  .felt[data-n="4"] .arena{--at:62%;--rx:1.4;--ry:0.6;--cw:min(150px,calc(32.2cqh - 30.1px))}
+  .felt[data-n="5"] .arena{--at:56%;--rx:1.4;--ry:0.6;--cw:min(150px,calc(26.9cqh + 5.0px))}
+  .felt[data-n="6"] .arena{--at:60%;--rx:1.4;--ry:0.8;--cw:min(150px,calc(30.7cqh - 36.2px))}
+  .felt[data-n="7"] .arena{--at:58%;--rx:1.4;--ry:0.7;--cw:min(150px,calc(23.4cqh + 2.3px))}
+  .felt[data-n="8"] .arena{--at:60%;--rx:1.4;--ry:0.8;--cw:min(150px,calc(30.7cqh - 36.2px))}
+  .felt[data-n="9"] .arena{--at:60%;--rx:1.4;--ry:0.8;--cw:min(150px,calc(22.0cqh - 3.0px))}
+}
 .chart{position:absolute;left:50%;top:52%;width:min(96%,780px);height:70%;translate:-50% -50%;rotate:-1.2deg;background:url('./textures/parchment.jpg') 0 0/512px;border-radius:2px;box-shadow:var(--sh-3),inset 0 0 70px rgba(100,64,22,.45);overflow:hidden}
 .chart svg{display:block;width:100%;height:100%}
 
@@ -192,7 +210,7 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .revealing .seat .tally,.revealing .seat .state{animation:stamp .55s var(--spring) calc(.25s + var(--si,0)*.1s) both}
 
 /* 중앙: 낸 카드 */
-.arena{position:absolute;left:50%;top:52%;width:0;height:0;z-index:4}
+.arena{position:absolute;left:50%;top:var(--at,52%);width:0;height:0;z-index:4}
 .trick,.sweep{position:absolute;left:0;top:0}
 .played{position:absolute;left:calc(var(--cw)/-2);top:calc(var(--cw)*-.72);width:var(--cw);translate:calc(var(--ax)*var(--cw)*var(--rx) + var(--jx)) calc(var(--ay)*var(--cw)*var(--ry) + var(--jy));rotate:var(--rot);transition:filter .2s,scale .2s var(--ease)}
 .played .card.small{width:100%;height:auto;aspect-ratio:110/156;border-radius:calc(var(--cw)*.06);box-shadow:3px 5px 9px rgba(0,0,0,.5)}
@@ -219,7 +237,7 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .declared-tag.pirate{background:var(--blood);color:var(--bone)}.declared-tag.escape{background:var(--paper);color:var(--ink)}
 .declared-value{position:absolute;right:-6px;top:-6px;z-index:2;background:var(--paper);color:var(--ink);font:900 .8rem var(--serif);padding:.1rem .35rem;border-radius:2px;box-shadow:var(--sh-1);display:flex}
 .played.as-pirate .card{outline:2px solid var(--blood);outline-offset:1px}.played.as-escape .card{filter:saturate(.35) brightness(.85)}
-.lead{position:absolute;left:0;top:calc(var(--cw)*1.2);translate:-50% 0;white-space:nowrap;display:flex;gap:.35rem;align-items:center;font:700 .66rem var(--sans);letter-spacing:.16em;color:var(--ink-2)}
+.lead{position:absolute;left:0;top:calc(var(--cw)*(var(--ry) + .6));translate:-50% 0;white-space:nowrap;display:flex;gap:.35rem;align-items:center;font:700 .66rem var(--sans);letter-spacing:.16em;color:var(--ink-2)}
 .empty{position:absolute;left:0;top:0;translate:-50% -50%;width:max-content;display:grid;gap:.5rem;justify-items:center;color:var(--ink-2);text-align:center}
 .hintline{font:600 .85rem var(--serif);letter-spacing:.08em;opacity:.75}
 .lastwin{display:flex;gap:.35rem;align-items:center;font-size:.74rem;color:var(--ink-3)}.lastwin b{color:var(--ink)}
@@ -233,8 +251,8 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .sweep-card{--o:.55;animation:sweepDim .45s var(--ease) both,sweepAway .6s var(--ease-io) calc(var(--sd,.5s) + var(--i,0)*.04s) forwards}
 .sweep.has-late{--sd:1.15s}
 .sweep-card.win{--o:1}.sweep-card.win .card{outline:2px solid var(--gold);outline-offset:1px;box-shadow:0 0 30px rgba(216,164,61,.5),3px 5px 9px rgba(0,0,0,.5)}
-.trick-result{position:absolute;left:0;top:calc(var(--cw)*1.25);translate:-50% 0;white-space:nowrap;display:flex;gap:.5rem;align-items:center;padding:.4rem 1rem;background:var(--paper);color:var(--ink);border-radius:2px;box-shadow:var(--sh-2);font:600 .85rem var(--serif);animation:rise .4s var(--ease) both}.trick-result .ico{color:var(--blood)}
-.sweep-note{position:absolute;left:0;top:calc(var(--cw)*1.25);translate:-50% 0;white-space:nowrap;font-size:.76rem;padding:.3rem .8rem;background:var(--paper);color:var(--blood);border-radius:2px;box-shadow:var(--sh-1)}
+.trick-result{position:absolute;left:0;top:calc(var(--cw)*(var(--ry) + .65));translate:-50% 0;white-space:nowrap;display:flex;gap:.5rem;align-items:center;padding:.4rem 1rem;background:var(--paper);color:var(--ink);border-radius:2px;box-shadow:var(--sh-2);font:600 .85rem var(--serif);animation:rise .4s var(--ease) both}.trick-result .ico{color:var(--blood)}
+.sweep-note{position:absolute;left:0;top:calc(var(--cw)*(var(--ry) + .65));translate:-50% 0;white-space:nowrap;font-size:.76rem;padding:.3rem .8rem;background:var(--paper);color:var(--blood);border-radius:2px;box-shadow:var(--sh-1)}
 .seat.collect{animation:collect .55s var(--ease) .85s both}.seat.collect.late{animation-delay:1.5s}
 .trick-plus{position:absolute;top:-1.4rem;left:50%;translate:-50% 0;font:900 .85rem var(--serif);font-style:normal;color:var(--gold-hi);text-shadow:1px 2px 2px #000;animation:plus 1.2s var(--ease) .9s both}.seat.late .trick-plus{animation-delay:1.55s}
 
