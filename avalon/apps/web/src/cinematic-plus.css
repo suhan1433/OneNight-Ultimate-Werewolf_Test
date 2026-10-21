@@ -239,3 +239,12 @@ body:has(.qcard.fail.active) .ambient::before{filter:hue-rotate(-18deg) brightne
 /* 실패 카드: 그을림은 가장자리에만, 작은 글씨는 읽히게 */
 .cs-qcard.fail .cs-card-front{background:radial-gradient(ellipse at 50% 50%,transparent 42%,rgba(25,6,2,.6) 100%),radial-gradient(ellipse at 50% 100%,rgba(190,60,30,.4),transparent 55%),var(--parch-noise),linear-gradient(170deg,#dcc28e,#b88e52 60%,#94683a)}
 .cs-qcard.fail .cs-card-front small{color:#5a0f1a;opacity:1;font-weight:700}
+
+/* ===== K. 모바일 보정: 코인은 항상 정원, 카드 문구는 단어 단위 개행 ===== */
+.vote-tokens{align-items:center;justify-content:center}
+.vote-tokens .token{--d:clamp(96px,28vw,128px);flex:none;box-sizing:border-box;width:var(--d);height:var(--d);min-width:0;min-height:0;max-width:none;padding:0;align-self:center;aspect-ratio:1/1;border-radius:50%}
+.vote-tokens .token span{white-space:nowrap;line-height:1}
+.quest-cards{align-items:center}
+.qcard{flex:none;box-sizing:border-box;padding:0 8px;align-self:center}
+.qcard span{max-width:100%;text-align:center;word-break:keep-all;overflow-wrap:normal;text-wrap:balance;font-size:clamp(14px,4.2vw,17px);letter-spacing:.06em;line-height:1.3}
+.qcard small{white-space:nowrap}
