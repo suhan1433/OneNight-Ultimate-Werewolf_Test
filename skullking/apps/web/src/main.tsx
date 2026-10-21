@@ -1,5 +1,5 @@
 import { gameAudio } from './audio-settings';
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { Fragment, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Card, CardDeclaration, CardOptions, GameConfig, PendingDecision, PlayedCard, Suit } from '@skullking/shared';
 import { cardArt } from './card-art';
@@ -10,6 +10,8 @@ import { fx } from './fx';
 import { Avatar, Icon } from './icons';
 import { Bubble, ChatInput, useChatSync } from './chat';
 import { setTableLayout, useTableLayout } from './table-layout';
+import { CardExample } from './CardExample';
+import { cardLessons } from './card-examples';
 import './styles.css';
 
 const soundEnabled=()=>!gameAudio.getSettings().muted && gameAudio.getSettings().master > 0;
@@ -148,21 +150,24 @@ function CardPicker({cards,cta,onPick,disabled}:{cards:Card[];cta:string;onPick:
     <button className="primary" disabled={!sel||disabled} onClick={()=>{const c=cards.find(x=>x.id===sel);if(c){setSel(null);onPick(c);}}}>{sel?cta:'카드를 한 장 고르세요'}</button></>;
 }
 const helpTabs=['기본 규칙','서열','점수','특수 카드','해적 능력'] as const;
-function Tile({img,title,desc,tag}:{img:string;title:string;desc:string;tag?:string}){return <div className="tile"><img src={art(img)} alt={title} loading="lazy" draggable={false}/><div><b>{title}{tag&&<em>{tag}</em>}</b><p>{desc}</p></div></div>;}
-function Beat({a,b,note,bonus}:{a:string;b:string;note:string;bonus:string}){return <div className="beat"><img src={art(a)} alt="" draggable={false}/><span className="beat-arrow">이긴다<Icon name="next"/></span><img src={art(b)} alt="" draggable={false}/><div><b>{note}</b><em>{bonus}</em></div></div>;}
+const HelpExampleContext=createContext<(art:string,title:string)=>void>(()=>{});
+function HelpCardImage({img,title}:{img:string;title:string}){const open=useContext(HelpExampleContext);const picture=<img src={art(img)} alt={title} loading="lazy" draggable={false}/>;return cardLessons[img]?<button type="button" className="help-card-image" aria-label={title+' 동작 예시 보기'} onClick={()=>open(img,title)}>{picture}</button>:picture;}
+function Tile({img,title,desc,tag}:{img:string;title:string;desc:string;tag?:string}){const open=useContext(HelpExampleContext);const content=<><img src={art(img)} alt={title} loading="lazy" draggable={false}/><div><b>{title}{tag&&<em>{tag}</em>}</b><p>{desc}</p>{cardLessons[img]&&<span className="tile-example-link">3인 동작 예시 보기 <Icon name="next"/></span>}</div></>;return cardLessons[img]?<button type="button" className="tile interactive-tile" aria-label={title+' 동작 예시 보기'} onClick={()=>open(img,title)}>{content}</button>:<div className="tile">{content}</div>;}
+function Beat({a,b,note,bonus}:{a:string;b:string;note:string;bonus:string}){return <div className="beat"><HelpCardImage img={a} title={a==='skull-king'?'Skull King':a==='pirate-rosie'?'Pirate':'Mermaid'}/><span className="beat-arrow">이긴다<Icon name="next"/></span><HelpCardImage img={b} title={b==='skull-king'?'Skull King':b==='pirate-rosie'?'Pirate':'Mermaid'}/><div><b>{note}</b><em>{bonus}</em></div></div>;}
 /** 도움말 공통 조각: 탭마다 같은 틀(제목+한 줄 요약 → 섹션)로 맞춘다 */
 const HHead=({title,lead}:{title:string;lead:string})=><header className="hhead"><h2>{title}</h2><p>{lead}</p></header>;
 const HSec=({title,tag,children}:{title:string;tag?:string;children:ReactNode})=><section className="hsec"><h3>{title}{tag&&<small>{tag}</small>}</h3>{children}</section>;
 function Help({close}:{close:()=>void}) {
   const [tab,setTab]=useState<typeof helpTabs[number]>('기본 규칙');
+  const [example,setExample]=useState<{art:string;title:string}|null>(null);
   const bodyRef=useRef<HTMLDivElement>(null);
   const tabsRef=useRef<HTMLElement>(null);const [edge,setEdge]=useState({l:false,r:false});
   const idx=helpTabs.indexOf(tab);const go=(d:number)=>setTab(t=>helpTabs[Math.min(helpTabs.length-1,Math.max(0,helpTabs.indexOf(t)+d))]);
   const measure=()=>{const e=tabsRef.current;if(e)setEdge({l:e.scrollLeft>4,r:e.scrollLeft+e.clientWidth<e.scrollWidth-4});};
-  useEffect(()=>{const h=(e:KeyboardEvent)=>{if(e.key==='Escape')close();else if(e.key==='ArrowRight')go(1);else if(e.key==='ArrowLeft')go(-1);};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[close]);
+  useEffect(()=>{const h=(e:KeyboardEvent)=>{if(example)return;if(e.key==='Escape')close();else if(e.key==='ArrowRight')go(1);else if(e.key==='ArrowLeft')go(-1);};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[close,example]);
   useEffect(()=>{window.addEventListener('resize',measure);return()=>window.removeEventListener('resize',measure);},[]);
   useEffect(()=>{bodyRef.current?.scrollTo({top:0});const e=tabsRef.current;const b=e?.querySelector<HTMLElement>('.on');if(e&&b)e.scrollTo({left:b.offsetLeft-(e.clientWidth-b.clientWidth)/2,behavior:'smooth'});measure();},[tab]);
-  return <div className="modal" onClick={close}><div className="help book" role="dialog" aria-label="도움말" onClick={e=>e.stopPropagation()}>
+  return <HelpExampleContext.Provider value={(art,title)=>setExample({art,title})}><div className="modal" onClick={close} {...(example?{inert:''}:{})} aria-hidden={example?true:undefined}><div className="help book" role="dialog" aria-label="도움말" onClick={e=>e.stopPropagation()}>
     <button type="button" className="help-x" onClick={close} aria-label="도움말 닫기"><Icon name="close"/></button>
     <nav className={'help-tabs'+(edge.l?' fade-l':'')+(edge.r?' fade-r':'')} role="tablist" ref={tabsRef} onScroll={measure}>{helpTabs.map(t=><button key={t} role="tab" aria-selected={t===tab} className={t===tab?'on':''} onClick={()=>setTab(t)}>{t}</button>)}</nav>
     <div className="help-body" ref={bodyRef} key={tab}>
@@ -186,7 +191,7 @@ function Help({close}:{close:()=>void}) {
       {tab==='서열'&&<>
         <HHead title="카드 서열" lead="숫자 카드끼리는 리드 수트의 높은 숫자가 이기고, 특수 카드는 서로 상성이 있습니다."/>
         <HSec title="기본 높낮이">
-          <div className="ladder">{[['escape','Escape','숫자 카드보다 낮음'],['parrot-9','숫자 카드','리드 수트 중 최고'],['jolly-9','졸리 로저','숫자 수트의 트럼프'],['pirate-rosie','Pirate','숫자 카드보다 높음']].map(([i,t,d],k)=><Fragment key={i}>{k>0&&<span className="lad-arrow"><Icon name="next"/></span>}<figure><img src={art(i)} alt={t} draggable={false}/><figcaption><b>{t}</b>{d}</figcaption></figure></Fragment>)}</div>
+          <div className="ladder">{[['escape','Escape','숫자 카드보다 낮음'],['parrot-9','숫자 카드','리드 수트 중 최고'],['jolly-9','졸리 로저','숫자 수트의 트럼프'],['pirate-rosie','Pirate','숫자 카드보다 높음']].map(([i,t,d],k)=><Fragment key={i}>{k>0&&<span className="lad-arrow"><Icon name="next"/></span>}<figure><HelpCardImage img={i} title={t}/><figcaption><b>{t}</b>{d}</figcaption></figure></Fragment>)}</div>
           <p className="hnote">서열이 같으면 먼저 낸 카드가 이깁니다.</p>
         </HSec>
         <HSec title="캐릭터 카드 상성">
@@ -206,14 +211,17 @@ function Help({close}:{close:()=>void}) {
         <HSec title="확장" tag="옵션"><div className="tiles">
           <Tile img="first-mate-con" title="First Mate Con" desc="Skull King 또는 Mermaid가 Con을 잡으면 +30점"/><Tile img="davy-jones" title="Davy Jones' Locker" desc="Davy Jones가 제거한 다른 Sea Monster마다 +20점"/><Tile img="parrot-8-expansion" title="확장 8 / 7" desc="확장 8은 +5점, 확장 7은 −5점. 기본 카드에는 적용되지 않습니다."/></div></HSec></>}
       {tab==='특수 카드'&&<>
-        <HHead title="특수 카드" lead="수트 의무와 상관없이 언제든 낼 수 있습니다."/>
+        <HHead title="특수 카드" lead="카드를 누르면 3인 플레이 예시로 동작을 볼 수 있습니다. 확장 숫자 카드는 수트 따라내기 규칙을 지킵니다."/>
         <HSec title="기본"><div className="tiles">
+          <Tile img="pirate-rosie" title="Pirate" desc="숫자 카드와 인어를 이깁니다. 같은 해적끼리는 먼저 낸 카드가 이깁니다. 해적 능력 옵션을 켜면 승리 직후 능력을 사용합니다."/>
+          <Tile img="skull-king" title="Skull King" desc="해적을 이기고 한 장마다 +30점을 적립합니다. 인어에게는 집니다."/>
+          <Tile img="mermaid-alyra" title="Mermaid" desc="숫자 카드를 이기고 일반 해적에게 집니다. 스컬킹이 있으면 인어가 승리하고 +40점을 적립합니다."/>
           <Tile img="tigress" title="Tigress" desc="낼 때 Pirate 또는 Escape를 선택합니다. Pirate로 내면 Pirate의 서열과 보너스가 적용되고, Escape로 내면 이길 수 없으며 포획 보너스도 없습니다."/>
           <Tile img="escape" title="Escape" desc="숫자 카드나 Pirate 같은 승리 카드에는 이기지 못합니다. 모두가 Escape·Loot·Escape로 선언한 Tigress만 냈다면 가장 먼저 낸 카드가 이깁니다."/></div></HSec>
         <HSec title="어드밴스드" tag="옵션"><div className="tiles">
           <Tile img="loot" title="Loot" desc="Escape처럼 이기지 않는 카드입니다. 다른 사람이 Loot를 가져가고 두 사람 모두 예측을 맞히면 각각 +20점을 받습니다."/>
           <Tile img="kraken" title="Kraken" desc="트릭 전체를 파괴해 아무도 가져가지 못합니다. 다음 리더는 Kraken이 없었다면 이겼을 사람입니다."/>
-          <Tile img="white-whale" title="White Whale" desc="특수 카드를 제거하고, 수트와 상관없이 가장 높은 숫자 카드가 이깁니다. 숫자 카드가 없으면 트릭을 버리고 처음 낸 사람이 다음 트릭을 리드합니다."/></div></HSec>
+          <Tile img="white-whale" title="White Whale" desc="특수 카드를 제거하고, 수트와 상관없이 가장 높은 숫자 카드가 이깁니다. 숫자 카드가 없으면 트릭을 버리고 흰 고래를 낸 사람이 다음 트릭을 리드합니다."/></div></HSec>
         <HSec title="확장" tag="옵션"><div className="tiles">
           <Tile img="spotted-stingray" title="Spotted Stingray" desc="White Whale처럼 특수 카드를 제거하지만 가장 낮은 숫자 카드가 이깁니다. 동률이면 먼저 낸 카드가 이깁니다."/>
           <Tile img="wild-monkey-15" title="Wild Monkey 15" desc="리드 수트가 초록·보라·노랑이면 그 수트의 15로 냅니다. 수트가 아직 없으면 세 수트 중 하나를 선언합니다. 검정으로는 선언할 수 없고, 검정이 리드되면 트럼프에게 집니다."/>
@@ -223,7 +231,7 @@ function Help({close}:{close:()=>void}) {
           <Tile img="walk-the-plank" title="Walk the Plank" desc="트릭이 끝나면 일반 Pirate 한 장을 제거해야 합니다. 여러 장이면 내가 고릅니다. 제거된 Pirate는 승자 판정, Skull King 보너스, Con 능력에서 제외됩니다."/>
           <Tile img="parrot-zero-fourteen" title="확장 0/14" desc="낼 때 0 또는 14를 선언합니다. 확장 14는 14 보너스를 주지 않습니다."/>
           <Tile img="parrot-8-expansion" title="확장 7 / 8" desc="일반 수트 카드처럼 냅니다. 딴 확장 7은 −5점, 확장 8은 +5점입니다. 기본 덱의 7·8에는 적용되지 않습니다."/></div></HSec>
-        <p className="hnote">Sea Monster가 여러 장 나오면 가장 나중에 낸 괴물의 효과를 적용합니다. Davy Jones만 순서와 상관없이 모든 괴물을 제거합니다. 승자를 정할 카드가 하나도 없으면 트릭을 버리고, 처음 카드를 낸 사람이 다음 트릭을 시작합니다.</p></>}
+        <p className="hnote">Sea Monster가 여러 장 나오면 가장 나중에 낸 괴물의 효과를 적용합니다. Davy Jones만 순서와 상관없이 모든 괴물을 제거합니다. 승자를 정할 카드가 하나도 없으면 트릭을 버리고, 처음 카드를 낸 사람이 다음 트릭을 시작합니다. 단, 숫자가 없는 White Whale 트릭에서는 흰 고래를 낸 사람이 다음 리더가 됩니다.</p></>}
       {tab==='해적 능력'&&<>
         <HHead title="해적 능력" lead="해적 능력 옵션을 켠 경우에만 사용합니다."/>
         <p className="hnote" style={{marginTop:0,marginBottom:'1.1rem'}}>Pirate 또는 First Mate Con으로 트릭을 이긴 직후에 사용하며, 다음 라운드로 미룰 수 없습니다. 단, <b>Harry</b>만 마지막 트릭 뒤에도 사용할 수 있습니다.</p>
@@ -240,7 +248,7 @@ function Help({close}:{close:()=>void}) {
     <footer className="help-foot">
       <button type="button" className="prev" disabled={idx===0} onClick={()=>go(-1)}><Icon name="back"/><span>이전</span></button>
       <div className="help-dots" role="group" aria-label={'도움말 페이지 '+(idx+1)+' / '+helpTabs.length}>{helpTabs.map((t,i)=><button key={t} type="button" className={i===idx?'on':''} onClick={()=>setTab(t)} aria-label={t} aria-current={i===idx?'page':undefined}/>)}</div>
-      {idx<helpTabs.length-1?<button type="button" className="primary next" onClick={()=>go(1)}>다음 · {helpTabs[idx+1]}<Icon name="next"/></button>:<button type="button" className="primary next" onClick={close}>확인</button>}</footer></div></div>;
+      {idx<helpTabs.length-1?<button type="button" className="primary next" onClick={()=>go(1)}>다음 · {helpTabs[idx+1]}<Icon name="next"/></button>:<button type="button" className="primary next" onClick={close}>확인</button>}</footer></div></div>{example&&<CardExample key={example.art} art={example.art} title={example.title} close={()=>setExample(null)}/>}</HelpExampleContext.Provider>;
 }
 const modes:Array<[GameConfig['roundMode'],string,string]>=[['classic','Classic','1–10장'],['evenKeeled','Even Keeled','2·4·6·8·10장'],['brawl','Skip to the Brawl','6–10장'],['swift','Swift-n-Salty','5장 × 5'],['broadside','Broadside','10장 × 10'],['whirlpool','Whirlpool','9·7·5·3·1장 × 2'],['bedtime','Past Your Bedtime','1장']];
 const advancedCards:CardOptions={...emptyCards,kraken:true,whale:true,loot:true,pirateAbilities:true};

@@ -408,6 +408,45 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .beat-arrow{display:flex;align-items:center;gap:.2rem;font:700 .74rem var(--sans);color:var(--blood);white-space:nowrap}
 .beat b{display:block;font:900 .88rem var(--serif)}.beat em{font:700 .78rem var(--sans);font-style:normal;color:var(--blood)}
 
+/* 도움말 카드 실습: 실제 게임과 분리된 3인 트릭 재생 */
+.tiles .interactive-tile{width:100%;text-align:left;white-space:normal;border-radius:0;align-items:start;line-height:1.55;background:rgba(255,248,224,.25)!important;border-color:rgba(42,28,16,.28)!important}
+.tiles .interactive-tile:hover{border-color:var(--blood)!important;background:rgba(255,248,224,.5)!important}
+.tile-example-link{display:flex;align-items:center;gap:.2rem;margin-top:.45rem;font:700 .7rem var(--sans);color:var(--blood)}
+.help-card-image{display:block;padding:0;border:0!important;background:none!important;box-shadow:none!important;max-width:74px;width:100%}
+.help-card-image img{display:block}.help-card-image:hover img{outline:2px solid var(--blood);outline-offset:3px}
+.card-example-overlay{z-index:90;background:rgba(6,3,1,.86);padding:.8rem}
+.modal>.card-example{width:100%;max-width:740px;max-height:94dvh;padding:1.5rem;text-align:left;overscroll-behavior:contain;line-height:1.65}
+.example-heading{display:grid;grid-template-columns:64px 1fr;gap:1rem;padding-right:1.5rem;align-items:center}
+.example-heading>img{width:64px;border-radius:4px;box-shadow:var(--sh-1)}
+.example-heading small{font-size:.7rem;color:var(--blood);font-weight:700}.example-heading h2{font-size:1.25rem;margin:.15rem 0 .35rem}.example-heading p{font-size:.83rem;color:var(--ink-2)}
+.example-variants{display:flex;flex-wrap:wrap;gap:.4rem;margin:1rem 0}.example-variants button{padding:.4rem .65rem;font-size:.75rem}.example-variants .selected{border-color:var(--blood)!important;color:var(--blood)!important;background:rgba(141,46,37,.12)!important}
+.example-table{position:relative;isolation:isolate;overflow:hidden;margin-top:1rem;padding:.6rem .9rem 1rem;border-radius:8px;background:radial-gradient(ellipse at center,#3b5148,#172b28);box-shadow:inset 0 0 35px #071b1b80;border:3px solid #6c4b2e;color:var(--bone);min-height:230px}
+.example-table-label{text-align:center;font-size:.7rem;letter-spacing:.1em;color:#d7ccae;padding:.2rem 0 .65rem}
+.example-seats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;position:relative;z-index:1}
+.example-seat{text-align:center;min-width:0}.example-seat>b{display:flex;justify-content:center;align-items:center;gap:.35rem;font-family:var(--serif);margin-bottom:.65rem}.example-seat>b span{font:400 .65rem var(--sans);color:#d7ccae}.example-seat.winner>b,.example-seat.winner>b span{color:var(--gold-hi)}
+.example-played{display:flex;justify-content:center;gap:.25rem;min-width:0}
+.example-card-slot{width:min(100%,91px);min-width:0;flex:0 1 91px;position:relative}
+.example-card-slot figure{position:relative;margin:0;animation:exampleDeal .45s var(--ease) both}
+.example-card-slot img,.example-card-back{display:block;width:100%;aspect-ratio:110/156;border-radius:4px;box-shadow:var(--sh-1);object-fit:cover}
+.example-card-slot figcaption{font-size:.63rem;line-height:1.4;color:var(--bone);margin-top:.45rem;overflow-wrap:anywhere}
+.example-card-back{display:grid;place-items:center;border:1px dashed #b8c7be66;background:repeating-linear-gradient(45deg,#ffffff03 0 4px,#ffffff08 4px 5px)}.example-card-back span{font-size:.7rem;color:#c6d0c8}
+.example-seat.winner .example-card-slot:not(.removed) img{outline:2px solid var(--gold-hi);outline-offset:3px;box-shadow:0 0 20px #f1cf7a55}
+.example-card-slot.removed img{filter:grayscale(1);opacity:.22;transition:filter .6s,opacity .6s}
+.example-card-slot.sunk figure{animation:exampleSink 1.3s var(--ease) both}
+.example-card-mark{position:absolute;left:50%;top:40%;translate:-50% -50%;padding:.1rem .5rem;border:2px solid #f0bca8;color:#ffe3cf;background:#69201acc;font:900 .8rem var(--serif);rotate:-12deg;white-space:nowrap}
+.example-vortex{position:absolute;z-index:0;inset:-70%;background:repeating-conic-gradient(from 0deg,#6ab7a344 0deg 18deg,transparent 18deg 45deg);mask-image:radial-gradient(ellipse,#000 8%,transparent 50%);animation:spin 5s linear infinite;pointer-events:none}
+.example-table.destroyed{background:radial-gradient(ellipse,#102220,#061511)}
+.example-caption{margin-top:.85rem;min-height:118px;padding:.8rem 1rem;border-left:3px solid var(--blood);background:rgba(255,248,224,.3)}
+.example-caption>small{font-size:.66rem;color:var(--ink-3)}.example-caption h3{font-size:.95rem;margin:.1rem 0 .35rem}.example-caption p{font-size:.83rem;color:var(--ink-2)}
+.example-outcomes{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.65rem}.example-outcomes span{font-size:.7rem;font-weight:700;padding:.15rem .5rem;background:#5f452815;border:1px solid #5f452840;border-radius:3px}
+.example-progress{display:flex;gap:.4rem;margin:.75rem 0}.example-progress button{height:24px;padding:0;flex:1;border:0!important;box-shadow:none!important;background:linear-gradient(transparent 10px,#5f452830 10px 14px,transparent 14px)!important}.example-progress button.reached{background:linear-gradient(transparent 10px,var(--blood) 10px 14px,transparent 14px)!important}.example-progress button[aria-current]{outline:1px solid var(--blood);outline-offset:0}
+.example-controls{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:.55rem}.example-controls button{padding:.65rem .4rem;font-size:.8rem;letter-spacing:0}
+.example-note{font-size:.74rem;color:var(--ink-2);margin-top:.9rem;padding-top:.75rem;border-top:1px dotted #5f452855}.example-back{display:block;margin:.75rem auto 0;font-size:.76rem}
+@keyframes exampleDeal{from{opacity:0;transform:translateY(-26px) rotate(-8deg) scale(.85)}to{opacity:1;transform:none}}
+@keyframes exampleSink{0%{transform:none}45%{transform:translateY(9px) rotate(-12deg) scale(.9)}100%{transform:translateY(24px) rotate(-20deg) scale(.68);opacity:.4}}
+@media(max-width:520px){.modal>.card-example{padding:1rem}.example-heading{grid-template-columns:48px 1fr;gap:.65rem}.example-heading>img{width:48px}.example-heading h2{font-size:1.1rem}.example-heading p{font-size:.76rem}.example-table{padding:.5rem .45rem .8rem;min-height:208px}.example-seats{gap:.4rem}.example-seat>b{flex-direction:column;gap:0}.example-caption{padding:.65rem .75rem}.example-caption p{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){.card-example-overlay,.modal>.card-example,.example-card-slot figure,.example-card-slot.sunk figure,.example-vortex{animation:none!important}.example-card-slot.removed img{transition:none}.example-card-slot.sunk figure{opacity:.4}}
+
 /* ═════════ 정산: 선장의 항해 일지 ═════════ */
 .game.score{height:auto;min-height:100dvh;padding-bottom:3rem;display:block}
 .roundhead,.finale{display:grid;justify-items:center;gap:.5rem;text-align:center;padding:1.4rem 0 .4rem}
