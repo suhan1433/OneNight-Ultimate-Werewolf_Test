@@ -74,17 +74,18 @@ test('MP3 backgrounds play after a gesture, respect volume, switch scenes and st
   await expect.poll(async () => (await tracks(page)).every(t => t.paused)).toBe(true);
 });
 
-test('start bell, role reveal and vote landing use the provided effects without duplicate updates', async ({ page }) => {
+test('start bell, role voice and vote landing use the provided effects without duplicate updates', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await setGame(page, game('lobby'));
   await page.getByRole('button', { name: '음향 설정', exact: true }).click();
   await page.getByRole('button', { name: '음향 설정 닫기' }).click();
-  await setGame(page, game('role_reveal'));
+  await setGame(page, { ...game('role_reveal'), selfRole: 'merlin' });
   await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('게임시작_종소리') && t.time > 0)).toBe(true);
   expect((await tracks(page)).find(t => t.src.includes('대기실_벽난로'))?.paused).toBe(false);
   expect((await tracks(page)).find(t => t.src.includes('대기실_벽난로'))?.pauses).toBe(0);
   await page.getByRole('button', { name: '길게 누르기 어렵다면 — 탭으로 바로 확인' }).click();
-  await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('역할확인_카드넘어갈때') && t.duration > .5)).toBe(true);
+  await expect.poll(async () => (await tracks(page)).some(t => t.src.includes('avalon_role_mp3/멀린.mp3') && t.duration > 0)).toBe(true);
+  expect((await tracks(page)).filter(t => t.src.includes('역할확인_카드넘어갈때'))).toHaveLength(0);
   await setGame(page, game('team_vote'));
   const voted = { ...game('team_vote'), teamVotesCompleted: 1 };
   await setGame(page, voted);
