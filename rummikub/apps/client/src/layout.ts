@@ -1,7 +1,7 @@
 /**
  * 레이아웃/제스처용 순수 함수 — React/DOM 의존 없음.
  *  · 손패  : 칸(slot) 단위 랙. 빈 칸이 곧 사용자가 만든 묶음 구분선이다.
- *  · 테이블: 조합을 자유 위치(캔버스)에 놓고, 겹치면 밀어내고, 부족한 공간은 아래로 확장한다.
+ *  · 테이블: 조합을 자유 위치에 놓고, 공간이 부족하면 타일을 줄여 화면 안에 모두 표시한다.
  */
 import type { Tile } from '@rummikub/rules';
 
@@ -16,29 +16,24 @@ export const handSpare = (n: number) => Math.max(6, Math.ceil(n * 0.25));
 export const mobileHandSpare = (n: number) => Math.max(6, Math.ceil(n * 0.2));
 
 /** 칸 수가 (n + 여유) 이상이면서 높이 예산 안에 들어가는 가장 큰 타일 */
-export function fitHand(n: number, W: number, budgetH: number, max: number): HandFit {
-  const need = n + handSpare(n);
+export function fitHand(n: number, W: number, budgetH: number, max: number, spare = handSpare(n)): HandFit {
+  const need = n + spare;
   const at = (tw: number): HandFit => {
     const cols = W > 0 ? Math.max(1, Math.floor((W + HAND.gapX) / (tw + HAND.gapX))) : 14;
     const rows = Math.ceil(need / cols);
     return { tw, rows, cols, cells: rows * cols, h: rows * (Math.round(tw * 1.4) + HAND.rowExtra) + HAND.padY };
   };
-  for (let tw = max; tw >= HAND.min; tw--) { const f = at(tw); if (f.h <= budgetH) return f; }
-  return at(HAND.min);
+  // A crowded or narrow rack must still show every tile, including on desktop.
+  for (let tw = Math.max(1, Math.min(max, Math.floor(W) || max)); tw >= 1; tw--) { const f = at(tw); if (f.h <= budgetH) return f; }
+  return at(1);
 }
 
 /** 모바일은 랙 높이를 일정하게 유지하고, 장수와 화면 면적으로 타일 크기를 정한다. */
-export function fitMobileHand(n: number, W: number, H: number): HandFit {
+export function fitMobileHand(n: number, W: number, H: number, budgetH?: number): HandFit {
   // A long, shallow rack leaves the table most of the screen. Never hide tiles in a scroll area.
-  const budget = Math.max(46, Math.floor(H * (H > W ? 0.28 : 0.32)));
+  const budget = budgetH ?? Math.max(46, Math.floor(H * (H > W ? 0.28 : 0.32)));
   const max = Math.min(42, Math.max(28, Math.floor(H * 0.095)));
-  for (let tw = max; tw >= 1; tw--) {
-    const cols = Math.max(1, Math.floor((W + HAND.gapX) / (tw + HAND.gapX)));
-    const rows = Math.ceil((n + mobileHandSpare(n)) / cols);
-    const h = rows * (Math.round(tw * 1.4) + HAND.rowExtra) + HAND.padY;
-    if (h <= budget) return { tw, cols, rows, cells: rows * cols, h };
-  }
-  return fitHand(n, W, budget, HAND.min);
+  return fitHand(n, W, budget, max, mobileHandSpare(n));
 }
 
 /** 이전 배치를 최대한 유지하면서 칸 수/타일 구성에 맞춘다. 새 타일은 원래 자리(home) → 마지막 타일 뒤 → 앞쪽 빈 칸 순. */
@@ -127,11 +122,12 @@ export function findSpot(placed: Rect[], w: number, h: number, W: number, H: num
   if (want) { xs.add(clamp(want.x, 0, Math.max(0, W - w))); ys.add(clamp(want.y, 0, Math.max(0, H - h))); }
   for (const r of placed) { xs.add(r.x + r.w + g); xs.add(r.x - w - g); xs.add(r.x); ys.add(r.y + r.h + g); ys.add(r.y - h - g); ys.add(r.y); }
   let best: { x: number; y: number } | null = null, bestScore = Infinity;
-  for (const y of ys) {
+  for (const y of [...ys].sort((a, b) => a - b)) {
     if (y < 0 || y + h > H) continue;
-    for (const x of xs) {
+    for (const x of [...xs].sort((a, b) => a - b)) {
       if (x < 0 || x + w > W) continue;
       const rect = { x, y, w, h }; if (placed.some(p => overlaps(rect, p))) continue;
+      if (!want) return { x, y };
       const score = want ? Math.hypot(x - want.x, y - want.y) : y * 100000 + x;
       if (score < bestScore) { bestScore = score; best = { x, y }; }
     }
@@ -143,31 +139,33 @@ export function findSpot(placed: Rect[], w: number, h: number, W: number, H: num
  * 모든 조합을 W×H 캔버스에 놓는다.
  *  · 저장된 위치(pos)는 최대한 지키고, focus(방금 바뀐 조합)가 우선권을 갖는다 — 겹치면 다른 조합이 밀려난다.
  *  · 위치 없는 조합은 빈자리를 위·왼쪽부터 채운다.
- *  · 타일 크기는 가로로 긴 조합에만 맞춘다. 테이블이 차면 아래로 확장하고 새 조합을 위한 빈자리를 남긴다.
- *  · pos는 화면 높이 H 기준이므로 캔버스가 늘어나도 기존 조합은 움직이지 않는다.
+ *  · 테이블 크기는 고정한다. 기존 위치 → 정돈 순으로 시도하고, 부족하면 타일을 축소한다.
+ *  · 새 조합(또는 끄는 묶음)을 놓을 빈자리도 같은 화면 안에 확보한다.
  */
 export function layoutTable(items: TableItem[], W: number, H: number, maxTw: number, focus: ReadonlySet<string> = new Set(), reserveCount = 3): TableLayout {
   const longest = Math.max(3, reserveCount, ...items.map(it => it.n));
-  const tw = Math.max(1, Math.min(maxTw, Math.floor((W - MELD.padX - (longest - 1) * MELD.gapT) / longest)));
-  if (W <= 0 || H <= 0) return { tw, rects: new Map(), W, H, height: H, fits: false };
+  const max = Math.max(1, Math.min(maxTw, Math.floor((W - MELD.padX - (longest - 1) * MELD.gapT) / longest)));
+  if (W <= 0 || H <= 0) return { tw: max, rects: new Map(), W, H, height: H, fits: false };
   const order = [...items].sort((a, b) => Number(focus.has(b.id)) - Number(focus.has(a.id)) || Number(!!b.pos) - Number(!!a.pos));
-  const placed: Rect[] = [], rects = new Map<string, Rect>();
-  const rowH = meldSize(1, tw).h + MELD.gap;
-  let height = Math.max(H, ...items.map(it => Math.max(0, (it.pos?.fy ?? 0) * H) + meldSize(it.n, tw).h));
-  for (const it of order) {
-    const { w, h } = meldSize(it.n, tw);
-    const want = it.pos ? { x: clamp(it.pos.fx * W, 0, Math.max(0, W - w)), y: Math.max(0, it.pos.fy * H) } : undefined;
-    let spot = findSpot(placed, w, h, W, height, want);
-    if (!spot) {
-      height += rowH;
-      spot = findSpot(placed, w, h, W, height, want);
+  const compact = [...items].sort((a, b) => b.n - a.n);
+  let last: TableLayout = { tw: 1, rects: new Map(), W, H, height: H, fits: false };
+  for (let tw = max; tw >= 1; tw--) {
+    for (const keepPositions of [true, false]) {
+      const placed: Rect[] = [], rects = new Map<string, Rect>();
+      for (const it of keepPositions ? order : compact) {
+        const { w, h } = meldSize(it.n, tw);
+        const want = keepPositions && it.pos ? { x: clamp(it.pos.fx * W, 0, Math.max(0, W - w)), y: clamp(it.pos.fy * H, 0, Math.max(0, H - h)) } : undefined;
+        const spot = findSpot(placed, w, h, W, H, want);
+        if (!spot) break;
+        const rect = { ...spot, w, h }; placed.push(rect); rects.set(it.id, rect);
+      }
+      const spare = meldSize(Math.max(3, reserveCount), tw);
+      const fits = rects.size === items.length && !!findSpot(placed, spare.w, spare.h, W, H);
+      last = { tw, rects, W, H, height: H, fits };
+      if (fits) return last;
     }
-    if (!spot) return { tw, rects, W, H, height, fits: false };
-    const rect = { ...spot, w, h }; placed.push(rect); rects.set(it.id, rect);
   }
-  const spare = meldSize(Math.max(3, reserveCount), tw);
-  if (!findSpot(placed, spare.w, spare.h, W, height)) height += rowH;
-  return { tw, rects, W, H, height, fits: true };
+  return last;
 }
 
 /** Empty gaps belong to the canvas. Only the body of a meld accepts insertion. */

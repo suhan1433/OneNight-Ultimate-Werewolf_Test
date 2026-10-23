@@ -14,6 +14,15 @@ const ids = (s: Slots) => s.filter((v): v is number => v !== null).sort((a, b) =
   ok(f14.tw >= f30.tw && f30.tw >= f44.tw && f44.tw >= 20, '타일이 늘면 작아지되 최소 크기 이상');
   ok(f14.cols * (f14.tw + 3) <= W + 3, '한 줄 칸 수가 폭을 넘지 않는다'); }
 
+for (const [W, H, max] of [[300, 98, 42], [510, 110, 42], [900, 180, 56]]) {
+  for (const n of [14, 44, 80, 106]) {
+    const f = fitHand(n, W!, H!, max!);
+    ok(f.h <= H! && f.cols * (f.tw + 3) - 3 <= W! && f.cells >= n + handSpare(n), `버튼 패널 제외한 손패 자동 맞춤: ${W}×${H}, ${n}장`);
+  }
+  const few = fitHand(14, W!, H!, max!), many = fitHand(80, W!, H!, max!);
+  ok(few.tw > many.tw && fitHand(14, W!, H!, max!).tw === few.tw, '손패가 늘면 축소하고 줄면 다시 확대');
+}
+
 /* ── 칸 배치 ── */
 for (const [W, H] of [[530, 320], [640, 390], [780, 430]]) {
   const counts = [14, 24, 36, 44];
@@ -22,7 +31,7 @@ for (const [W, H] of [[530, 320], [640, 390], [780, 430]]) {
   ok(fits.every((f, i) => i === 0 || f.tw <= fits[i - 1]!.tw) && fits[0]!.tw > fits[3]!.tw, `모바일 ${W}×${H}: 장수가 많아지면 자동 축소 (${fits.map(f => f.tw).join('/')})`);
   const few = layoutTable([{ id: 'a', n: 3 }], W!, 140, 33);
   const many = layoutTable(Array.from({ length: 16 }, (_, i) => ({ id: `${i}`, n: 4 })), W!, 140, 33);
-  ok(many.tw === few.tw && many.height > few.height && many.rects.size === 16, `모바일 ${W}×${H}: 타일 크기를 유지하며 테이블 자동 확장`);
+  ok(many.tw < few.tw && many.height === 140 && many.rects.size === 16, `모바일 ${W}×${H}: 타일 자동 축소로 테이블 전체 표시`);
 }
 
 { const cols = 10, cells = 20;
@@ -60,9 +69,9 @@ const inside = (rs: Rect[], W: number, H: number) => rs.every(r => r.x >= 0 && r
 { const W = 640, H = 200, items = [6, 4, 3, 5, 3, 4, 3, 6, 3].map((n, i) => ({ id: 'm' + i, n }));
   const L = layoutTable(items, W, H, 52); const rs = [...L.rects.values()];
   ok(L.fits && rs.length === items.length && noOverlap(rs) && inside(rs, W, L.height), `자동 배치: 겹치지 않고 캔버스 안에 (tw=${L.tw})`);
-  const L2 = layoutTable(items.slice(0, 3), W, H, 52); ok(L2.tw === L.tw && L.height > L2.height, '조합이 늘어나면 타일 크기 대신 공간이 늘어난다');
+  const L2 = layoutTable(items.slice(0, 3), W, H, 52); ok(L.tw < L2.tw && L.height === H && L2.height === H, '조합이 늘어나면 화면 높이를 유지하며 타일을 줄인다');
   const many = Array.from({ length: 30 }, (_, i) => ({ id: 'x' + i, n: 4 })); const Lm = layoutTable(many, W, H, 52);
-  ok(noOverlap([...Lm.rects.values()]) && Lm.tw >= MELD.min, `30개도 겹침 없이 (tw=${Lm.tw}, fits=${Lm.fits})`); }
+  ok(Lm.fits && Lm.rects.size === 30 && noOverlap([...Lm.rects.values()]) && inside([...Lm.rects.values()], W, H), `30개도 겹침 없이 (tw=${Lm.tw}, fits=${Lm.fits})`); }
 { // 저장된 위치를 지킨다
   const W = 640, H = 240, items = [{ id: 'a', n: 3, pos: { fx: 0.6, fy: 0.5 } }, { id: 'b', n: 3 }];
   const L = layoutTable(items, W, H, 40), a = L.rects.get('a')!;
@@ -78,12 +87,12 @@ const inside = (rs: Rect[], W: number, H: number) => rs.every(r => r.x >= 0 && r
   const s = findSpot(placed, 120, 80, 640, 200, { x: 150, y: 10 })!; const r = { x: s.x, y: s.y, w: 120, h: 80 };
   ok(noOverlap([r, ...placed]) && Math.hypot(s.x - 150, s.y - 10) < 100, 'findSpot: 겹치면 가장 가까운 빈 자리로 비켜선다 (' + s.x + ',' + s.y + ')');
   ok(findSpot([{ x: 0, y: 0, w: 640, h: 200 }], 50, 50, 640, 200) === null, 'findSpot: 자리가 없으면 null'); }
-// Dense late-game tables retain readable tiles and an empty drop area.
+// Dense late-game tables fit every meld and an empty drop area in the visible table.
 for (const [W, H] of [[460, 150], [720, 180], [330, 330]]) {
   for (const counts of [Array(26).fill(4), [13, 13, 13, 13, 13, 13, 13, 13], Array(35).fill(3)]) {
     const items = counts.map((n, i) => ({ id: `dense-${i}`, n, pos: { fx: (i % 5) * .18, fy: (i % 4) * .22 } }));
     const L = layoutTable(items, W!, H!, 38), rs = [...L.rects.values()];
-    ok(L.fits && rs.length === items.length && noOverlap(rs) && inside(rs, W!, L.height) && L.tw >= MELD.min, `확장 테이블: ${W}×${H}, ${counts.reduce((a, b) => a + b, 0)}장`);
+    ok(L.fits && rs.length === items.length && noOverlap(rs) && inside(rs, W!, H!) && L.height === H!, `화면 안 자동 맞춤: ${W}×${H}, ${counts.reduce((a, b) => a + b, 0)}장`);
     const spare = meldSize(3, L.tw);
     ok(!!findSpot(rs, spare.w, spare.h, W!, L.height), '꽉 찬 테이블에도 새 조합을 놓을 빈자리 유지');
   }
@@ -92,11 +101,13 @@ for (const [W, H] of [[460, 150], [720, 180], [330, 330]]) {
   const W = 460, H = 150;
   const initial = layoutTable(Array.from({ length: 20 }, (_, i) => ({ id: `stable-${i}`, n: 4 })), W, H, 38);
   const items = [...initial.rects].map(([id, r]) => ({ id, n: 4, pos: { fx: r.x / W, fy: r.y / H } }));
-  const next = layoutTable([...items, { id: 'extra', n: 4 }], W, H, 38);
+  const stable = layoutTable(items, W, H, 38);
   ok(items.every(it => {
-    const before = initial.rects.get(it.id)!, after = next.rects.get(it.id)!;
+    const before = initial.rects.get(it.id)!, after = stable.rects.get(it.id)!;
     return before.x === after.x && before.y === after.y;
-  }), '캔버스가 확장되어도 화면 아래쪽까지 기존 조합 위치 유지');
+  }), '동일한 테이블 재계산 시 위치와 배율 안정성 유지');
+  const next = layoutTable([...items, { id: 'extra', n: 4 }], W, H, 38);
+  ok(next.fits && next.rects.size === 21 && inside([...next.rects.values()], W, H), '새 조합 추가 후에도 모든 조합이 화면 안에 표시');
   const reserved = layoutTable(items, W, H, 38, new Set(), 8), spare = meldSize(8, reserved.tw);
   ok(!!findSpot([...reserved.rects.values()], spare.w, spare.h, W, reserved.height), '여러 장을 끌 때 선택한 묶음 크기만큼 빈자리 확보');
   ok(fitMobileHand(14, 780, 390).tw >= 36, '일반 모바일 손패는 기존보다 조금 더 큰 크기로 표시');

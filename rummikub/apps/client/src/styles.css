@@ -506,8 +506,8 @@ html{touch-action:manipulation}
 
 .bd{--tw:44px;--th:calc(var(--tw)*1.4);--mtw:40px;--rtw:36px;--accent:var(--lamp);--felt-a:#2f6050;--felt-b:#1d3b32;
   --sa-t:var(--env-t);--sa-r:var(--env-r);--sa-b:var(--env-b);--sa-l:var(--env-l);--ease:cubic-bezier(.2,.8,.2,1);
-  container:bd/size;position:relative;width:100%;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) var(--actw,96px);grid-template-rows:auto minmax(0,1fr) auto;
-  grid-template-areas:"top top" "felt act" "rack rack";gap:6px 8px;
+  container:bd/size;position:relative;width:100%;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) clamp(208px,26%,280px);grid-template-rows:auto minmax(0,1fr) var(--rackh,108px);
+  grid-template-areas:"top top" "felt felt" "rack act";gap:6px 8px;
   padding:calc(8px + var(--sa-t)) calc(10px + var(--sa-r)) calc(6px + var(--sa-b)) calc(10px + var(--sa-l));
   overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
   background:var(--grain),radial-gradient(ellipse at 50% 30%,#4a3220,var(--wood1) 55%,var(--wood0))}
@@ -566,10 +566,8 @@ html{touch-action:manipulation}
 
 /* 테이블(펠트) */
 .bd-fw{grid-area:felt;position:relative;min-height:0;min-width:0;display:flex}
-.bd-felt{position:relative;flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#ffffff55 transparent;touch-action:none;padding:8px;border-radius:14px;background:radial-gradient(ellipse at 50% 40%,var(--felt-a),var(--felt-b) 80%);box-shadow:inset 0 0 0 1px #ffffff18,inset 0 6px 22px #0005;transition:box-shadow .15s}
+.bd-felt{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden;touch-action:none;padding:8px;border-radius:14px;background:radial-gradient(ellipse at 50% 40%,var(--felt-a),var(--felt-b) 80%);box-shadow:inset 0 0 0 1px #ffffff18,inset 0 6px 22px #0005;transition:box-shadow .15s}
 .bd-felt:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
-.bd-space-hint{position:absolute;right:12px;bottom:8px;z-index:4;padding:4px 8px;border-radius:12px;background:#122a24df;color:#ffffffb3;font-size:.65rem;pointer-events:none}
-.bd.dragging .bd-space-hint{opacity:0}
 .bd-felt.over{box-shadow:inset 0 0 0 3px #ffffff88,inset 0 6px 22px #0005}
 .bd-melds{--tw:var(--mtw);--th:calc(var(--mtw)*1.4);position:relative;display:block;height:100%}
 .bm{position:absolute;display:flex;flex-direction:column;box-sizing:border-box;padding:0 2px;border-radius:7px;background:#0000002b;box-shadow:inset 0 0 0 1px #ffffff12;transition:background .16s,box-shadow .16s}
@@ -609,7 +607,7 @@ html{touch-action:manipulation}
 @keyframes sel-in{from{opacity:0;translate:0 8px}}
 
 /* 손패: 내 앞의 랙. 내 차례에는 램프에 비친다. 높이는 JS가 정확히 계산(스크롤 없음). */
-.bd-rack{grid-area:rack;min-width:0;padding:4px 6px 6px;border-radius:14px 14px 5px 5px;background:var(--grain),linear-gradient(#5a3d28,var(--rail) 20%,#3b2617);box-shadow:inset 0 1px 0 #ffffff26,0 3px 0 #1b0f08;transition:box-shadow .4s,background .4s}
+.bd-rack{grid-area:rack;min-width:0;min-height:0;padding:4px 6px 6px;border-radius:14px 14px 5px 5px;background:var(--grain),linear-gradient(#5a3d28,var(--rail) 20%,#3b2617);box-shadow:inset 0 1px 0 #ffffff26,0 3px 0 #1b0f08;transition:box-shadow .4s,background .4s}
 .bd.theirs .bd-rack{background:var(--grain),linear-gradient(#3f2c1e,#33231a 20%,#271a11)}
 .bd.mine .bd-rack{box-shadow:inset 0 1px 0 #ffffff30,0 0 0 2px #ffbf6bcc,0 -6px 28px #ffb05a55,0 3px 0 #1b0f08}
 .bd-rack.over{box-shadow:inset 0 0 0 3px #ffffff88,0 3px 0 #1b0f08}
@@ -658,24 +656,17 @@ html{touch-action:manipulation}
 .tile-flight{position:absolute;transform-origin:top left;pointer-events:none;will-change:transform}
 .tile-flight .tile{width:100%;height:100%;margin:0;opacity:1;transform:none;filter:none;animation:none;transition:none;pointer-events:none}
 
-/* 오른쪽 열: 손패 수 · 정렬/정돈/추천 · 되돌리기 · 확정/뽑기 (터치 영역 40px 이상) */
-.bd-act{grid-area:act;display:flex;flex-direction:column;gap:5px;min-height:0;justify-content:flex-end}
-.bd-controls{display:contents;margin:0;padding:0;border:0;min-width:0}
-.bd-info{display:grid;gap:3px;justify-items:center;font-size:.72rem;font-weight:700;color:#e9dcc2;text-align:center}
-.bd-info .hc b{font:800 1.25rem var(--f-num);margin-right:2px}
-.bd-info .meter{padding-bottom:5px;white-space:normal;font-size:.66rem}
-.bd-tools{display:grid;grid-template-columns:1fr;gap:5px}
-.bd-sorts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+/* 손패 오른쪽 조작 패널: 왼쪽 정렬/정돈/복구, 오른쪽 확정/뽑기. */
+.bd-act{grid-area:act;min-width:0;min-height:0}
+.bd-controls{height:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(70px,.72fr);grid-template-rows:minmax(32px,1.2fr) minmax(26px,1fr) minmax(28px,1fr);grid-template-areas:"sort go" "tidy go" "undo go";gap:4px 6px;margin:0;padding:0 0 6px;border:0;min-width:0}
+.bd-tools{grid-area:tidy;display:grid;min-height:0}
+.bd-sorts{grid-area:sort;display:grid;grid-template-columns:1fr 1fr;gap:4px;min-height:0}
+.bd-act button:not(.go){min-width:0;min-height:0;padding:0 4px!important;border-radius:8px;font-size:.72rem}
 .bd-act .bd-sorts button{font-weight:800;transition:background .15s,box-shadow .15s,color .15s}
-.bd-act .bd-sorts button{min-height:50px;font-size:.84rem}
-.bd-act .bd-tidy{min-height:46px}
-.bd-act .urow button{min-height:46px}
-.bd-act .go{max-height:160px}
 .bd-act .bd-sorts button[aria-pressed=true]{background:#ffbf6b2e;box-shadow:inset 0 0 0 1.5px var(--lamp);color:var(--lamp)}
-.bd-act button:not(.go){min-height:40px;padding:0 4px!important;border-radius:11px;font-size:.78rem}
-.bd-act .urow{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.bd-act .urow{grid-area:undo;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;min-height:0}
 .bd-act .urow button{font-size:1.15rem}
-.bd-act .go{flex:1;min-height:64px;max-height:132px;display:grid;place-content:center;gap:2px;font-size:1.2rem;border-radius:16px}
+.bd-act .go{grid-area:go;min-width:0;min-height:0;display:grid;place-content:center;gap:4px;font-size:clamp(1rem,2vw,1.3rem);border-radius:12px}
 .bd-act .go small{font-size:.66rem;font-weight:700;opacity:.7}
 .bd .go.ready{background:linear-gradient(180deg,#e4f8e0,#9bd0a4 55%,#74b083);color:#0f2a14;box-shadow:inset 0 1px 0 #fff,0 4px 0 #4c8559,0 6px 0 #356042,0 10px 12px -4px #000c;animation:okglow 1.6s ease-in-out infinite}
 @keyframes okglow{50%{box-shadow:inset 0 1px 0 #fff,0 4px 0 #4c8559,0 6px 0 #356042,0 0 26px #8fc197cc}}
@@ -697,11 +688,7 @@ html{touch-action:manipulation}
 /* 보드 크기별 보정(container query: 돌려진 화면에서도 보드 기준) */
 @container bd (max-width:760px){.chip2 .who{display:none}.chip2 .ring{--s:30px}.tp-hint{font-size:.64rem}}
 @container bd (max-width:600px){.bd-top .chips{gap:4px}.tp{padding-inline:8px}.tp-main b{font-size:.9rem}}
-@container bd (max-height:400px){
-  .bd-act{gap:4px}.bd-act button:not(.go){min-height:36px;font-size:.72rem}.bd-act .go{min-height:52px;font-size:1.05rem}
-  .bd-info .hc b{font-size:1.05rem}.bd-info .meter{font-size:.6rem;padding-bottom:4px}
-}
-@container bd (max-height:340px){.bd-act button:not(.go){min-height:32px}.bd-top{min-height:38px}.tp{height:38px}.menu-btn{width:36px;height:36px}}
+@container bd (max-height:340px){.bd-top{min-height:38px}.tp{height:38px}.menu-btn{width:36px;height:36px}}
 @media(prefers-reduced-motion:reduce){.bd .ghost>.gstack,.bm-tile,.rack-tile{transition:none}.edge{animation:none!important}}
 
 /* ── v7.1 손패: 완성된 덩어리 표시 · 램프 · 질감 · 알림 ── */
@@ -712,8 +699,6 @@ html{touch-action:manipulation}
 .bd.theirs .bd-felt::before{background:radial-gradient(ellipse 65% 75% at 50% 0%,#bcd3e11c,transparent 72%)}
 .bd .tile{background:radial-gradient(#0000000f .6px,transparent .8px) 0 0/3px 3px,linear-gradient(180deg,#fffaf0,#f6ecd5 60%,#e8d9b6)}
 .bd .banner.slate{color:#cfe2ee;box-shadow:0 0 0 2px var(--slate),0 0 40px #8fb0c466;font-size:1.35rem}
-.bd-info .hc b{display:inline-block;animation:bump .3s var(--spring)}
-@keyframes bump{from{transform:scale(1.5)}}
 
 /* ── v7.2 정렬 버튼: 1·2·3(같은 색 연속) / 7·7·7(같은 숫자 다른 색) ── */
 .bd-act .bd-sorts button{display:grid;place-content:center;justify-items:center;gap:3px;padding:4px 2px!important}
@@ -724,8 +709,6 @@ html{touch-action:manipulation}
 @container bd (max-height:340px){.bd-sorts small{display:none}}
 
 /* ── v7.3 저장점 ── */
-.bd-info .ckpt{font-size:.62rem;font-weight:800;color:#a9b7bf}
-.bd-info .ckpt.at{color:#b9edc0}
 .menu button[aria-checked=true]{color:var(--lamp)}
 
 .bd-act .go{word-break:keep-all;padding:0 4px;line-height:1.2}
