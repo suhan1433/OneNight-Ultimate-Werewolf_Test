@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import type { Game, Send } from './types';
 import { inviteLink } from './lib';
 import { Avatar, MissionMap, Rules } from './ui';
+import { HeaderActions } from './HeaderActions';
 
 /** 대기실: 관측선 브리지. 참가자가 앉으면 좌석 표시등이 켜지고 통신선이 이어진다. */
 export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send; onLeave: () => void; onHelp: () => void }) {
@@ -20,7 +21,7 @@ export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send;
     <header className="lobby-top">
       <button type="button" className="bar-btn leave" onClick={onLeave}>나가기</button>
       <button type="button" className="code-btn" onClick={copy} aria-label={`방 코드 ${game.code}, 눌러서 복사`}><span>방 코드</span><b>{game.code}</b><small>{copied ? '복사됨' : '눌러서 복사'}</small></button>
-      <button type="button" className="bar-btn round" onClick={onHelp} aria-label="도움말">?</button>
+      <HeaderActions onHelp={onHelp} />
     </header>
     <section className="bridge-sec" aria-label="관측선 브리지">
       <h2>관측선 브리지 <small>{game.players.length}/{game.maxPlayers}</small></h2>

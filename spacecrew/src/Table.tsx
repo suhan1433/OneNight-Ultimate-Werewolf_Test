@@ -7,6 +7,7 @@ import { Hand } from './Hand';
 import { CommSheet } from './CommSheet';
 import { PhasePanel } from './PhasePanel';
 import { CrewBoard } from './CrewBoard';
+import { HeaderActions } from './HeaderActions';
 import { Briefing } from './Briefing';
 import { Result } from './Result';
 import type { View } from './view';
@@ -21,7 +22,7 @@ function TopBar({ game, signal, lost, openDrawer, onLeave }: { game: Game; signa
       <span className="tricks" aria-label={`트릭 ${Math.min(game.trickNo + 1, game.totalTricks)} / ${game.totalTricks}`}>트릭 <b>{Math.min(game.trickNo + 1, game.totalTricks)}/{game.totalTricks}</b></span>
       <SignalMeter signal={signal} lost={lost} />
     </div>
-    <button type="button" className="bar-btn round" onClick={() => openDrawer('help')} aria-label="도움말">?</button>
+    <HeaderActions onHelp={() => openDrawer('help')} />
   </header>;
 }
 

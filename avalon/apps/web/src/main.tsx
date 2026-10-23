@@ -28,6 +28,7 @@ import {RV,findMates,useHold} from './RoleScene';
 import {LOBBY_TL,LobbyBackdrop,LobbyGlow,RoomCode,StartCurtain,shakeVars,useRoster,type GlowHandle} from './LobbyScene';
 import {buildPlan,coinStyle,readVotes,tintOf,useNewCoins,useReducedMotion,useRevealEffects,useTableMetrics,type Plan} from './VoteScene';
 import {roleArtFor} from './role-art';
+import {useTeamVote} from './team-vote';
 
 const base:AvalonOptions={assassin:false,assassinationAbilityRole:null,percival:false,morgana:false,mordred:false,oberon:false,revealVoteIdentities:true};
 const ROLE_OPTION_KEYS=['assassin','percival','morgana','mordred','oberon'] as const;
@@ -423,11 +424,17 @@ function ActiveRoles({game}:{game:ClientGameState}){
 /* 방 옵션 '원정 기록 투표자 공개'
    OFF: 코인은 중앙에 쌓였다가 섞인 뒤 나뉜다. 개인별 투표는 읽지 않고 합계만 쓴다 (익명).
    ON : 섞지 않는다. 각자 자리 앞에 놓인 코인이 그 사람의 선택이며, 공개 때 그 코인이 그대로 뒤집히고 좌석에 '찬성/반대' 표식이 남는다.
-        서버가 개인별 투표를 아직 주지 않았으면(readVotes=null) 잠깐 대기하고, 끝내 안 오면 안전하게 섞기 연출로 대체한다. */
+        서버에 개인별 투표가 없으면(readVotes=null) 집계만으로 섞기 연출을 사용한다. */
 function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boolean|null;setApprove:(value:boolean)=>void}){
   const rootRef=useRef<HTMLDivElement>(null);
   const tableRef=useRef<HTMLDivElement>(null);
   const isResult=game.phase==='vote_result';
+  const ballot=useTeamVote(game);
+  const[skipped,setSkipped]=useState(false);
+  useLayoutEffect(()=>{
+    setSkipped(false);
+    if(isResult)rootRef.current?.scrollIntoView({block:'start',behavior:'instant'});
+  },[isResult,game.round,game.rejectCount]);
   const totals=game.voteResult;
   const voteCount=isResult?(totals?.approve??0)+(totals?.reject??0):game.teamVotesCompleted;
   const seed=`${game.roomCode}|${game.round}|${[...game.proposedTeam].sort().join(',')}`;
@@ -438,14 +445,8 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
   const identityOn=!!game.options?.revealVoteIdentities;
   const placement:'seat'|'pile'=identityOn?'seat':'pile';
   const voteKey=isResult&&identityOn?(readVotes(game)?.map(value=>value?'1':'0').join('')??''):'';
-  const[voteWaitOver,setVoteWaitOver]=useState(false);
-  useEffect(()=>{
-    if(!isResult||!identityOn||voteKey){setVoteWaitOver(false);return;}
-    const id=window.setTimeout(()=>setVoteWaitOver(true),1500);
-    return()=>window.clearTimeout(id);
-  },[isResult,identityOn,voteKey]);
-  const holdPlan=isResult&&identityOn&&!voteKey&&!voteWaitOver;              // ON 인데 개인별 투표가 아직 안 왔다: 섞지 말고 기다린다
-  const plan=useMemo<Plan|null>(()=>isResult&&totals&&!holdPlan?buildPlan(totals.approve,totals.reject,seed,{seats:seatCount,leaderIndex,votes:voteKey?[...voteKey].map(value=>value==='1'):null}):null,[isResult,holdPlan,totals?.approve,totals?.reject,seed,seatCount,leaderIndex,voteKey]);
+  // Totals and identities arrive together in ROOM_STATE. No extra client-side wait.
+  const plan=useMemo<Plan|null>(()=>isResult&&totals?buildPlan(totals.approve,totals.reject,seed,{seats:seatCount,leaderIndex,votes:voteKey?[...voteKey].map(value=>value==='1'):null}):null,[isResult,totals?.approve,totals?.reject,seed,seatCount,leaderIndex,voteKey]);
   const revealing=isResult&&!!plan;
   const coinSeats=isResult?Array.from({length:voteCount},(_,seat)=>seat):game.players.map((player,seat)=>player.hasVoted?seat:-1).filter(seat=>seat>=0);
   const reduced=useReducedMotion();
@@ -455,8 +456,8 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
     if(voteCount>previousCoins.current)recordedAudio.play('coin');
     previousCoins.current=voteCount;
   },[isResult,voteCount]);
-  useTableMetrics(tableRef,rootRef,revealing&&!reduced);
-  useRevealEffects(plan,revealing&&!reduced);
+  useTableMetrics(tableRef,rootRef,revealing&&!reduced&&!skipped);
+  useRevealEffects(plan,revealing&&!reduced&&!skipped);
 
   const style=plan?{'--R':`${plan.R}s`,'--S':`${plan.S}s`,'--ld':`${plan.ft[plan.N-1]!-.25}s`,'--sd':`${plan.S+1.2}s`,'--cd':`${plan.S+2}s`,'--kd':`${plan.S+.4}s`} as React.CSSProperties:undefined;
   const point=(id:string)=>{
@@ -467,9 +468,10 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
   const teamPoints=game.proposedTeam.map(point).join(' ');
   const resultPassed=totals?.passed??false;
 
-  return <section ref={rootRef} className={`vt${revealing?' is-reveal':''}${revealing?(resultPassed?' ok':' no'):''}${plan?.mode==='identity'?' identity':''}${placement==='seat'?' seat-coins':''}${reduced?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
+  return <section ref={rootRef} className={`vt${revealing?' is-reveal':''}${revealing?(resultPassed?' ok':' no'):''}${plan?.mode==='identity'?' identity':''}${placement==='seat'?' seat-coins':''}${reduced||skipped?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
     <span className="vt-sr">{isResult?`찬성 ${totals?.approve??0}표, 반대 ${totals?.reject??0}표`: `투표 ${voteCount}/${game.players.length}명 완료`}</span>
     {revealing&&<div className="vt-dark" aria-hidden="true"/>}
+    {isResult&&plan&&!reduced&&!skipped&&<div className="vt-result-bar" role="status"><span>투표 완료 · 결과 공개 중</span><button type="button" onClick={()=>setSkipped(true)}>투표 결과 바로 보기</button></div>}
     <div className="vt-wrap">
       <div className="vt-tilt vt-tilt--table">
         <div ref={tableRef} className={`table vt-table table--${game.players.length}`}>
@@ -507,7 +509,7 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
       <div className="vt-continue"><button className="primary" disabled={game.hasContinued} onClick={()=>call('VOTE_RESULT_CONTINUE',{roomCode:game.roomCode})}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button></div>
     </>:null) : <div className="vote-stage">
       <h2>원정대 투표</h2><div className="team-chips">{game.proposedTeam.map(id=><span className="chip" key={id}><PlayerAvatar playerId={id} size={18}/>{game.players.find(player=>player.id===id)?.nickname}</span>)}</div>
-      {game.players.find(player=>player.id===game.playerId)?.hasVoted?<><Pips done={game.teamVotesCompleted} total={game.players.length}/><p className="waiting">다른 기사를 기다리는 중<Dots/></p></>:<><div className="vote-tokens"><button className={`token approve${approve===true?' active':''}`} onClick={()=>setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button><button className={`token reject${approve===false?' active':''}`} onClick={()=>setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button></div><button className="primary seal-btn" disabled={approve===null} onClick={()=>approve!==null&&call('TEAM_VOTE',{roomCode:game.roomCode,approve})}>원정 투표하기 ({game.teamVotesCompleted}/{game.players.length})</button></>}</div>}
+      {ballot.submitting||ballot.hasVoted?<><Pips done={game.teamVotesCompleted} total={game.players.length}/><p className="waiting" role="status">{ballot.submitting?'투표 제출 중…':'투표 완료 · 다른 기사를 기다리는 중'}<Dots/></p></>:<><div className="vote-tokens"><button className={`token approve${approve===true?' active':''}`} onClick={()=>setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button><button className={`token reject${approve===false?' active':''}`} onClick={()=>setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button></div><button className="primary seal-btn" disabled={approve===null} onClick={()=>approve!==null&&ballot.submit(approve)}>원정 투표하기 ({game.teamVotesCompleted}/{game.players.length})</button></>}</div>}
   </section>;
 }
 
@@ -576,10 +578,10 @@ type ChatMsg=NonNullable<ClientGameState['chat']>[number];
 const chatAt=(m:ChatMsg)=>(m as {at?:number}).at;
 const chatTime=(at?:number)=>at?new Date(at).toLocaleTimeString('ko-KR',{hour:'numeric',minute:'2-digit'}):'';
 let chatDraft=''; // 채팅을 닫았다 열어도 쓰던 글 유지
-type ChatSize='mini'|'half'|'full';
+type ChatSize='mini'|'half';
 // 모바일 채팅은 '독(mini)'과 '시트(half)' 두 단계뿐이다. (예전 mini→half→full 3단계는 체감상 너무 자주 바뀌었다)
 //  독   : 게임 위에 항상 떠 있다. 대화 말풍선(최근 3개)은 게임 위에 겹쳐 보이되 터치는 통과, 입력창·행동 버튼만 눌린다.
-//  시트 : 지난 대화를 읽을 때만 연다. 높이 78% — 위쪽에 게임이 살짝 보이고, 거기를 탭하거나 ⌄ 를 누르면 독으로 돌아간다.
+//  시트 : 지난 대화를 읽을 때 연다. 화면 절반 이하를 사용해 위쪽 게임을 계속 볼 수 있다.
 const CHAT_COMPOSE_H=60;                 // 입력창 줄 높이(px)
 const CHAT_ACT_H=56;                     // 행동 줄(준비·투표·계속) 높이
 const CHAT_FEED_ROW_H=34;                // 말풍선 한 줄 높이. 줄 수는 화면 높이에 맞춰 1~3개(키보드·가로모드에서는 줄임)
@@ -669,6 +671,7 @@ function ChatAction({game,st,toGame}:{game:ClientGameState;st:ReturnType<typeof 
   const[pick,setPick]=useState<boolean|null>(null);
   const[busy,setBusy]=useState(false);
   useEffect(()=>{setPick(null);setBusy(false);},[game.phase,game.round,game.rejectCount,st.act]);
+  const ballot=useTeamVote(game);
   const room=game.roomCode;
   const fire=(name:string,data:Record<string,unknown>={})=>{if(busy)return;setBusy(true);Promise.resolve(call(name,{roomCode:room,...data})).finally(()=>window.setTimeout(()=>setBusy(false),600));};
   const names=game.proposedTeam.map(id=>game.players.find(p=>p.id===id)?.nickname).filter(Boolean).join(' · ');
@@ -678,10 +681,11 @@ function ChatAction({game,st,toGame}:{game:ClientGameState;st:ReturnType<typeof 
     case 'ready':btns=<button type="button" className="ac-act-go" disabled={busy} onClick={()=>fire('PLAYER_READY')}>준비 완료</button>;break;
     case 'start':btns=<button type="button" className="ac-act-go" disabled={busy} onClick={()=>fire('GAME_START')}>게임 시작</button>;break;
     case 'vote':
+      if(ballot.submitting){text='투표 제출 중…';btns=<button type="button" className="ac-act-go" disabled>제출 중…</button>;break;}
       text=names?`원정대 ${names}`:st.text;
       btns=pick===null
         ?<><button type="button" className="ac-act-yes" onClick={()=>setPick(true)}>찬성</button><button type="button" className="ac-act-no" onClick={()=>setPick(false)}>반대</button></>
-        :<><button type="button" className="ac-act-sub" disabled={busy} onClick={()=>setPick(null)}>변경</button><button type="button" className={pick?'ac-act-yes on':'ac-act-no on'} disabled={busy} onClick={()=>fire('TEAM_VOTE',{approve:pick})}>{pick?'찬성':'반대'} 확정</button></>;
+        :<><button type="button" className="ac-act-sub" disabled={busy} onClick={()=>setPick(null)}>변경</button><button type="button" className={pick?'ac-act-yes on':'ac-act-no on'} disabled={busy} onClick={()=>ballot.submit(pick)}>{pick?'찬성':'반대'} 확정</button></>;
       break;
     case 'continue':
       btns=<button type="button" className="ac-act-go" disabled={busy} onClick={()=>fire(game.phase==='quest_result'?'QUEST_RESULT_CONTINUE':'VOTE_RESULT_CONTINUE')}>계속</button>;
@@ -743,8 +747,15 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
   useEffect(()=>{if(!isMini)return;const iv=window.setInterval(()=>tick(x=>x+1),4000);return()=>window.clearInterval(iv);},[isMini]);
   const feed=isMini&&!revealing?messages.slice(-feedRows).filter(m=>Date.now()-(arrivals.current.get(m.id)??0)<CHAT_FEED_TTL):[];
   const hiddenUnseen=(()=>{if(!isMini)return 0;const i=seenRef.current?messages.findIndex(m=>m.id===seenRef.current):-1;const tail=i>=0?messages.slice(i+1):messages;const shown=new Set(feed.map(m=>m.id));return tail.filter(m=>m.playerId!==game.playerId&&!shown.has(m.id)).length;})();
-  const dockSolid=CHAT_COMPOSE_H+(showAct?CHAT_ACT_H:0);          // 실제로 눌리는 영역 = 게임 화면이 비워 줘야 하는 높이
-  const feedPad=revealing?0:feedRows*(CHAT_FEED_ROW_H+4)+8;        // 말풍선(패널 위로 자라남)이 차지할 수 있는 높이 — 게임 화면 여백 계산용
+  const[composeHeight,setComposeHeight]=useState(CHAT_COMPOSE_H);
+  const composeRef=useRef<HTMLFormElement>(null);
+  useLayoutEffect(()=>{
+    const el=composeRef.current;if(!mobile||!el)return;
+    const observer=new ResizeObserver(()=>setComposeHeight(Math.ceil(el.getBoundingClientRect().height)));
+    observer.observe(el);return()=>observer.disconnect();
+  },[mobile]);
+  const dockSolid=composeHeight+(showAct?CHAT_ACT_H:0);          // 실제로 눌리는 영역 = 게임 화면이 비워 줘야 하는 높이
+  const feedPad=feed.length?feed.length*(CHAT_FEED_ROW_H+4)+8:0;        // 말풍선(패널 위로 자라남)이 차지할 수 있는 높이 — 게임 화면 여백 계산용
   const dockTotal=dockSolid+feedPad;            // 겹쳐 보이는 말풍선까지 포함한 패널 전체 높이 (공개 연출 중엔 말풍선을 숨긴다)
   const toBottom=(smooth=false)=>{const el=listRef.current;if(el)el.scrollTo({top:el.scrollHeight,behavior:smooth?'smooth':'auto'});};
 
@@ -777,9 +788,9 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
     return()=>{ro.disconnect();window.removeEventListener('chatviewportsettled',onSettled);};
   },[isMini]);
 
-  // 모바일 하단 도킹 채팅: mini(항상 보임, 게임이 거의 그대로) → half → full.
-  // mini/half 는 게임 화면이 시트 높이만큼 위로 스크롤될 수 있게 여백을 만들고, full 은 배경을 잠근다.
-  // half 에서 키보드가 올라오면 전체 높이를, mini 는 키보드 바로 위에 그대로 붙어 게임을 계속 보여준다.
+  // 모바일 하단 도킹 채팅: mini(항상 보임) ↔ half(지난 대화).
+  // 시트 뒤 게임 버튼도 스크롤해서 볼 수 있게 실제 높이만큼 여백을 둔다.
+  // 키보드가 올라와도 게임이 보이도록 시트 높이를 제한하고 입력창을 키보드 위에 붙인다.
   const sizeRef=useRef<ChatSize|null>(null);
   const animTimer=useRef(0);
   useLayoutEffect(()=>{
@@ -790,14 +801,16 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
       if(!panel)return;
       const vvH=vv?.height??window.innerHeight,top0=vv?.offsetTop??0;
       const kb=window.innerHeight-vvH>120;
+      const keyboardPad=kb?Math.max(0,window.innerHeight-top0-vvH):0;
       const mode:ChatSize=size; // 키보드가 올라와도 크기를 강제로 키우지 않는다 (mini 는 키보드 바로 위에 붙고 게임이 계속 보인다)
       let h:string,y:string,pad:string;
       if(mode==='mini'){
         const safe=kb?'0px':'env(safe-area-inset-bottom,0px)';
-        h=`calc(${dockSolid}px + ${safe})`;y=`calc(${top0+vvH}px - ${dockSolid}px - ${safe})`;pad=`calc(${dockTotal}px + ${safe})`;
+        h=`calc(${dockSolid}px + ${safe})`;y=`calc(${top0+vvH}px - ${dockSolid}px - ${safe})`;pad=`calc(${dockTotal+keyboardPad}px + ${safe})`;
       }else{
-        const hh=kb||mode==='full'?vvH:Math.min(vvH,Math.max(320,Math.round(vvH*.78)));
-        h=`${hh}px`;y=`${top0+vvH-hh}px`;pad=mode==='full'?'0px':`${Math.max(320,Math.round(window.innerHeight*.78))}px`;
+        // Keep part of the board visible even with the keyboard open.
+        const hh=Math.min(vvH,Math.min(kb?300:380,Math.max(220,Math.round(vvH*.48))));
+        h=`${hh}px`;y=`${top0+vvH-hh}px`;pad=`${hh+keyboardPad}px`;
       }
       const put=(el:HTMLElement,k:string,v:string)=>{if(el.style.getPropertyValue(k)!==v)el.style.setProperty(k,v);};
       // top 변경은 매번 레이아웃을 다시 잡는다. 키보드를 따라가는 좌표는 합성 단계에서
@@ -807,8 +820,7 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
       const kbs=String(kb);if(panel.dataset.keyboard!==kbs)panel.dataset.keyboard=kbs;
       put(root,'--chat-pad',pad);
       if(!root.classList.contains('chat-half'))root.classList.add('chat-half');
-      const lock=mode!=='mini'&&kb;                       // 시트에서 키보드가 열린 동안만 뒤 화면 스크롤 잠금
-      if(root.classList.contains('chat-open')!==lock)root.classList.toggle('chat-open',lock);
+      root.classList.remove('chat-open'); // 채팅 중에도 보드를 스크롤할 수 있다.
     };
     // 독 ↔ 시트 전환일 때만 높이·위치를 부드럽게 움직인다. 키보드 때문에 생기는 변화는 즉시 따라가야 하므로 애니메이션을 걸지 않는다.
     if(panel&&sizeRef.current!==size&&sizeRef.current!==null){
@@ -826,11 +838,12 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
     fit();vv?.addEventListener('resize',schedule);vv?.addEventListener('scroll',schedule);window.addEventListener('resize',schedule);
     return()=>{cancelAnimationFrame(raf);window.clearTimeout(settleTimer);vv?.removeEventListener('resize',schedule);vv?.removeEventListener('scroll',schedule);window.removeEventListener('resize',schedule);root.classList.remove('chat-open','chat-half');delete root.dataset.chatAnim;delete root.dataset.viewportMoving;root.style.removeProperty('--chat-pad');};
   },[mobile,size,dockSolid,dockTotal]);
-  // 핸들/제목줄: 탭 = 펼치기(mini→half), 위로 끌기 = 크게, 아래로 끌기 = 작게(키보드가 열려 있으면 키보드부터 내림)
+  // 제목줄을 아래로 끌면 접는다. 키보드가 열려 있으면 키보드부터 내린다.
   const onSheetDown=(e:React.PointerEvent)=>{
     const y0=e.clientY;
     const up=(ev:PointerEvent)=>{
       window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);
+      if(ev.type==='pointercancel')return;
       if(ev.clientY-y0>48){
         if(inputRef.current&&document.activeElement===inputRef.current){inputRef.current.blur();return;}   // 키보드가 열려 있으면 키보드부터
         setSize('mini');
@@ -917,7 +930,7 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
       {unread>0&&<button type="button" className="ac-new" onClick={()=>{toBottom(true);setUnread(0);}}>새 메시지 {unread>1?`${unread}개 `:''}↓</button>}
     </div>
     </>}
-    <form className="ac-compose" onSubmit={send}>
+    <form ref={composeRef} className="ac-compose" onSubmit={send}>
       {isMini&&<button type="button" className="ac-expand" onClick={()=>setSize('half')} aria-label={hiddenUnseen>0?`지난 대화 보기, 새 메시지 ${hiddenUnseen}개`:'지난 대화 보기'}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>{hiddenUnseen>0&&<em className="ac-badge">{hiddenUnseen>99?'99+':hiddenUnseen}</em>}</button>}
       <textarea ref={inputRef} rows={1} value={draft} maxLength={300} autoComplete="off" enterKeyHint="enter" placeholder="원탁에 메시지 보내기" aria-label="채팅 메시지"
         onChange={event=>setDraft(event.target.value)}

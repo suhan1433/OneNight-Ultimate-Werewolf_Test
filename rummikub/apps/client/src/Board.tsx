@@ -8,7 +8,7 @@ import { emit } from './socket.js';
 import { sfx } from './sound.js';
 import { Ring, SortMode, SoundToggle, TileView, isNum, sortAll, sortByGroup, sortByRun } from './tiles.js';
 import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker, jokerReplacement } from './editor.js';
-import { HAND, MELD, Pos, Slots, arrangeSlots, findSpot, fitHand, fitMobileHand, layoutTable, meldInsertIndex, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
+import { HAND, MELD, Pos, Slots, arrangeSlots, findSpot, fitHand, fitMobileHand, hitMeld, layoutTable, meldInsertIndex, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
 import { checkMeld } from './meldRules.js';
 import { useTileMotion } from './motion.js';
 import { toClientPoint, toLocalPoint, toLocalRect, useFrame } from './orient.js';
@@ -53,7 +53,7 @@ function useSize<T extends HTMLElement>() {
 }
 
 /**
- * 가로 전용 보드 — 전체 테이블 맞춤, 자유 배치.
+ * 가로 전용 보드 — 자동 확장 테이블, 자유 배치.
  *  · 손패: 칸(slot) 랙. 타일을 빈 칸 아무 데나 놓을 수 있고, 빈 칸이 곧 내가 만든 묶음 구분선이다.
  *  · 테이블: 조합마다 위치가 있다. 위쪽 손잡이(⠿)를 끌어 원하는 곳으로 옮기고, 빈 곳에 놓으면 그 자리에 새 조합이 생긴다.
  *  · 규칙: 같은 색 연속 숫자(런)는 왼쪽 → 오른쪽으로 작은 수부터 "놓인 순서대로" 유효하다(6·5·7 은 ⚠).
@@ -108,13 +108,16 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const seenTable = useRef<Set<number> | null>(null);
   const justCommitted = useRef(false);
   const gest = useRef<Gest | null>(null);
-  const A = useRef<{ move: (e: PointerEvent) => void; up: (e: PointerEvent) => void; cancel: () => void }>({ move: () => {}, up: () => {}, cancel: () => {} });
+  const pan = useRef<{ pid: number; y: number; scroll: number } | null>(null);
+  const A = useRef<{ move: (e: PointerEvent) => void; up: (e: PointerEvent) => void; cancel: () => void; scroll: (dt: number) => void }>({ move: () => {}, up: () => {}, cancel: () => {}, scroll: () => {} });
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const revealMeld = useRef<string | null>(null);
   const ghostRef = useRef<HTMLDivElement | null>(null);
   const spotRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const dragFrame = useRef<number | null>(null);
   const pendingPointer = useRef<PointerEvent | null>(null);
+  const lastPointer = useRef<PointerEvent | null>(null);
   const suppressClick = useRef(false);
   const [bdRef, bsz] = useSize<HTMLElement>();
   const [feltRef, fsz] = useSize<HTMLElement>();
@@ -199,18 +202,26 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const opps = Array.from({ length: Math.max(0, n - 1) }, (_, i) => view.players[(mineIdx + i + 1) % n]!);
 
   // 손패(칸 랙)와 테이블(자유 캔버스)은 한 화면을 나눠 쓴다.
-  // 모바일은 손패가 늘어도 테이블 공간을 유지하고, 양쪽 타일을 각각 자동 축소한다.
+  // 손패는 화면에 맞추고, 테이블은 타일 가독성을 유지하며 아래로 확장한다.
   const wide = bsz.w >= 900 && bsz.h >= 600;
   const hf = useMemo(() => {
     const n = Math.max(draft.hand.length, view.hand.length);
-    return wide ? fitHand(n, hsz.w, Math.floor(bsz.h * 0.3), 52) : fitMobileHand(n, hsz.w, bsz.h);
+    return wide ? fitHand(n, hsz.w, Math.floor(bsz.h * 0.32), 56) : fitMobileHand(n, hsz.w, bsz.h);
   }, [draft.hand.length, view.hand.length, hsz.w, bsz.h, wide]);
   // ResizeObserver measures the actual felt after the rack, header and safe areas have taken space.
   const layout = useMemo(() => layoutTable(
     draft.table.map(m => ({ id: m.id, n: m.tiles.length, pos: tpos[m.id] })),
-    fsz.w, fsz.h, wide ? 54 : Math.max(26, Math.min(46, Math.floor(bsz.h * 0.12))), focus,
-  ), [draft.table, tpos, focus, fsz.w, fsz.h, bsz.h, wide]);
+    fsz.w, fsz.h, wide ? 54 : Math.max(26, Math.min(46, Math.floor(bsz.h * 0.12))), focus, Math.max(3, drag?.ids.length ?? 0),
+  ), [draft.table, tpos, focus, fsz.w, fsz.h, bsz.h, wide, drag?.ids.length]);
   const mtw = layout.tw;
+  useLayoutEffect(() => {
+    const id = revealMeld.current, el = feltRef.current;
+    const r = id ? layout.rects.get(id) : undefined;
+    if (!el || !r) return;
+    revealMeld.current = null;
+    if (r.y < el.scrollTop) el.scrollTop = r.y;
+    else if (r.y + r.h > el.scrollTop + layout.H) el.scrollTop = r.y + r.h - layout.H;
+  }, [layout]);
 
   // 레이아웃이 정한 자리를 저장해 두어, 다른 조합이 늘거나 줄어도 내 조합이 제자리에 있게 한다
   useEffect(() => {
@@ -298,8 +309,8 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     const cr = RL(c), { w, h } = meldSize(count, layout.tw), H = Math.max(layout.H, layout.height);
     const want = { x: a.x - cr.left - w / 2, y: a.y - cr.top - h / 2 };
     const others = [...layout.rects.entries()].filter(([id]) => !exclude.includes(id)).map(([, r]) => r);
-    const s = findSpot(others, w, h, layout.W, H, want) ?? { x: Math.max(0, Math.min(layout.W - w, want.x)), y: Math.max(0, Math.min(H - h, want.y)) };
-    return { ...s, w, h };
+    const s = findSpot(others, w, h, layout.W, H, want) ?? findSpot(others, w, h, layout.W, H + h + MELD.gap, want);
+    return s ? { ...s, w, h } : null;
   };
   const place = (ids: number[], dest: Exclude<Dest, { to: 'hand' }>, aimPt?: { x: number; y: number }) => {
     if (!ids.length || !myTurn) return;
@@ -315,6 +326,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     leaving.forEach(([id, i]) => { if (i >= 0) home.current.set(id, i); });
     sfx.clack(); webPlatform.haptics.tick();
     if (!r.ok) return;
+    if (dest.to === 'new' && r.meldId) revealMeld.current = r.meldId;
     setLanded(new Set(ids)); setTimeout(() => setLanded(new Set()), 520);
     if (spot && r.meldId) { setTpos(p => ({ ...p, [r.meldId!]: toFrac(spot) })); setFocus(new Set([r.meldId])); }
     else if (r.meldId) setFocus(new Set([r.meldId]));
@@ -423,7 +435,9 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       const active = dragRef.current?.drop;
       const candidates = [...layout.rects].sort(([a], [b]) => Number(b === active?.meldId) - Number(a === active?.meldId));
       for (const [id, r] of candidates) {
-        if (cx < r.x - 9 || cx > r.x + r.w + 9 || cy < r.y - 7 || cy > r.y + r.h + 7) continue;
+        if (!hitMeld(r, cx, cy)) continue;
+        // A group being moved should not catch its own invisible source tiles.
+        if (id === dragRef.current?.meld) continue;
         const m = draft.table.find(m => m.id === id); if (!m) continue;
         let index = meldInsertIndex(cx - r.x, m.tiles.length, layout.tw);
         if (active?.kind === 'meld' && active.meldId === id && active.tid !== undefined) {
@@ -489,7 +503,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   };
 
   const onDown = (e: React.PointerEvent) => {
-    if (e.button > 0 || gest.current || !e.isPrimary || commitBusy || drawBusy || coach) return;
+    if (e.button > 0 || gest.current || pan.current || !e.isPrimary || commitBusy || drawBusy || coach) return;
     suppressClick.current = false;
     const target = e.target as HTMLElement, lp = L(e.clientX, e.clientY);
     const grip = target.closest<HTMLElement>('[data-mh]');
@@ -503,7 +517,14 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       gest.current = { id: -1, meld: m.id, ids: m.tiles.map(x => x.tileId), sx: lp.x, sy: lp.y, pid: e.pointerId, tw: layout.tw, grabX: fr0 ? lp.x - fr0.left : 0, grabY: fr0 ? lp.y - fr0.top : 0, started: false, long: false, line: [], lo: 0, hi: 0, dir: 1 };
       return;
     }
-    const t = target.closest<HTMLElement>('[data-t]'); if (!t) return;
+    const t = target.closest<HTMLElement>('[data-t]');
+    if (!t) {
+      if (target.closest('[data-felt]') && feltRef.current) {
+        pan.current = { pid: e.pointerId, y: lp.y, scroll: feltRef.current.scrollTop };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      return;
+    }
     if (!myTurn && !t.closest('[data-rack]')) return; // 상대 차례에도 손패는 미리 정리할 수 있다
     if (myTurn && needInitial && LOCK_TABLE_BEFORE_INITIAL && origIds.has(Number(t.dataset.t))) { game.setNotice('첫 등록 전에는 테이블 타일을 옮길 수 없어요.'); return; }
     stopTimers(gest.current);
@@ -538,7 +559,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     dragRef.current = { ...previous, ...a, drop };
     if (ghostRef.current) ghostRef.current.style.transform = `translate3d(${a.x + previous.ox}px, ${a.y + previous.oy}px, 0)`;
     if (ghostRef.current) { // 움직이는 방향으로 살짝 기울어져 무게감이 느껴진다
-      const tilt = Math.max(-9, Math.min(9, (a.x - previous.x) * .7));
+      const tilt = Math.max(-3, Math.min(3, (a.x - previous.x) * .22));
       ghostRef.current.style.setProperty('--tilt', `${tilt}deg`);
       clearTimeout(tiltT.current); tiltT.current = setTimeout(() => ghostRef.current?.style.setProperty('--tilt', '0deg'), 90);
     }
@@ -547,7 +568,14 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     if (!sameDrop(previous.drop, drop)) { if (previous.drop.kind !== drop.kind || previous.drop.meldId !== drop.meldId) webPlatform.haptics.tick(); setDrag(dragRef.current); }
   };
   A.current.move = (e: PointerEvent) => {
+    if (pan.current?.pid === e.pointerId && feltRef.current) {
+      const delta = L(e.clientX, e.clientY).y - pan.current.y;
+      feltRef.current.scrollTop = pan.current.scroll - delta;
+      if (Math.abs(delta) > 4) suppressClick.current = true;
+      return;
+    }
     if (!gest.current || gest.current.pid !== e.pointerId) return;
+    lastPointer.current = e;
     pendingPointer.current = e;
     if (dragFrame.current !== null) return;
     dragFrame.current = requestAnimationFrame(() => {
@@ -556,10 +584,37 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       if (latest) movePointer(latest);
     });
   };
+  A.current.scroll = (dt: number) => {
+    const e = lastPointer.current, el = feltRef.current;
+    if (!e || !el || !gest.current?.started) return;
+    const p = L(e.clientX, e.clientY), r = RL(el);
+    if (p.x < r.left || p.x > r.right || p.y < r.top || p.y > r.bottom) return;
+    const edge = Math.min(40, r.height / 4);
+    const speed = p.y < r.top + edge ? -(1 - (p.y - r.top) / edge)
+      : p.y > r.bottom - edge ? 1 - (r.bottom - p.y) / edge : 0;
+    const before = el.scrollTop;
+    el.scrollTop += speed * dt * .55;
+    if (el.scrollTop !== before) movePointer(e);
+  };
+  useEffect(() => {
+    if (!drag) return;
+    let frame = 0, previous = performance.now();
+    const tick = (now: number) => {
+      A.current.scroll(Math.min(32, now - previous)); previous = now;
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [!!drag]);
   A.current.up = (e: PointerEvent) => {
+    if (pan.current?.pid === e.pointerId) {
+      pan.current = null;
+      if (bdRef.current?.hasPointerCapture(e.pointerId)) bdRef.current.releasePointerCapture(e.pointerId);
+      return;
+    }
     const g = gest.current; if (!g || g.pid !== e.pointerId) return;
     if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
-    dragFrame.current = null; pendingPointer.current = null;
+    dragFrame.current = null; pendingPointer.current = null; lastPointer.current = null;
     if (g.started && e.type !== 'pointercancel') movePointer(e);
     stopTimers(g); gest.current = null; setPress(null);
     if (bdRef.current?.hasPointerCapture(e.pointerId)) bdRef.current.releasePointerCapture(e.pointerId);
@@ -569,9 +624,11 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     if (d && e.type !== 'pointercancel') { const a = aim(L(e.clientX, e.clientY), e.pointerType); dropTo(d.ids, d.drop, landingAim(a, d.ids.length, d), g.meld); }
   };
   A.current.cancel = () => {
+    const p = pan.current; pan.current = null;
+    if (p && bdRef.current?.hasPointerCapture(p.pid)) bdRef.current.releasePointerCapture(p.pid);
     const g = gest.current;
     if (g?.started) captureMotion();
-    stopTimers(g); gest.current = null; dragRef.current = null; pendingPointer.current = null;
+    stopTimers(g); gest.current = null; dragRef.current = null; pendingPointer.current = null; lastPointer.current = null;
     if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
     dragFrame.current = null;
     if (g && bdRef.current?.hasPointerCapture(g.pid)) bdRef.current.releasePointerCapture(g.pid);
@@ -646,7 +703,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       className={`bd ${myTurn ? 'mine' : 'theirs'} ${drag ? 'dragging' : ''} ${urgent ? 'urgent' : ''} ${fr.rot ? `rot ${fr.dir === 1 ? 'rot1' : 'rotn'}` : ''} ${dealing ? 'dealing' : ''}`}
       style={{ ['--mtw' as string]: `${mtw}px`, ['--rtw' as string]: `${hf.tw}px`, ['--rth' as string]: `${Math.round(hf.tw * 1.4)}px`, ['--actw' as string]: wide ? '140px' : '96px',
         ...(fr.rot ? { width: fr.vh, height: fr.vw, transform: fr.dir === 1 ? `translateX(${fr.vw}px) rotate(90deg)` : `translateY(${fr.vh}px) rotate(-90deg)` } : null) }}
-      onContextMenu={e => e.preventDefault()} onPointerDown={onDown} onLostPointerCapture={() => { if (gest.current) A.current.cancel(); }} onClickCapture={e => { if (suppressClick.current) { e.stopPropagation(); suppressClick.current = false; } }}>
+      onContextMenu={e => e.preventDefault()} onPointerDown={onDown} onLostPointerCapture={() => { if (gest.current || pan.current) A.current.cancel(); }} onClickCapture={e => { if (suppressClick.current) { e.stopPropagation(); suppressClick.current = false; } }}>
       <div className="edge" aria-hidden="true" />
       <div className="tline" aria-hidden="true"><i style={{ transform: `scaleX(${(view.turn ? pct : 0) / 100})` }} /></div>
       {banner && <div className={`banner ${slate ? 'slate' : ''}`} aria-hidden="true">{banner}</div>}
@@ -676,8 +733,8 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       </>}
 
       <div className="bd-fw">
-        <section ref={feltRef} className={`bd-felt ${drag?.drop.kind === 'new' ? 'over' : ''}`} data-felt aria-label="테이블">
-          <div ref={canvasRef} className="bd-melds" style={{ height: '100%' }}>
+        <section ref={feltRef} className={`bd-felt ${drag?.drop.kind === 'new' ? 'over' : ''}`} data-felt aria-label="테이블 · 빈 곳을 끌거나 스크롤해서 이동" tabIndex={0}>
+          <div ref={canvasRef} className="bd-melds" style={{ height: Math.max(layout.H, layout.height) }}>
             {draft.table.map(m => {
               const i = info.get(m.id), r = layout.rects.get(m.id); if (!r) return null;
               const hovering = drag?.drop.kind === 'meld' && drag.drop.meldId === m.id && drag.meld !== m.id;
@@ -705,6 +762,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
           </div>
           {draft.table.length === 0 && <div className="bd-empty"><b>{myTurn ? '첫 조합을 놓아 보세요' : '테이블이 비어 있어요'}</b><span>{myTurn ? `같은 색 연속 숫자 · 같은 숫자 다른 색${needInitial ? ` · 합계 ${view.config.initialMeldMin}점 이상` : ''}` : '내 차례가 오기 전에 손패를 정리해 보세요'}</span></div>}
         </section>
+        {layout.height > layout.H + 1 && <span className="bd-space-hint" aria-hidden="true">↕ 빈 곳을 끌어 여유 공간으로 이동</span>}
         {selected.length > 0 && <div className="bd-sel" role="toolbar" aria-label="선택한 타일">
           <b>{selected.length}장</b>
           {selectedLine.length > 1 && selectedLine.length !== selected.length && <button onClick={() => setSelected(selectedLine)}>묶음 선택</button>}

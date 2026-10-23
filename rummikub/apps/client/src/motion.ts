@@ -2,10 +2,10 @@ import { useLayoutEffect, useRef } from 'react';
 import type { DependencyList, RefObject } from 'react';
 
 const EASE = 'cubic-bezier(.22,.78,.24,1)';
-type TileFrame = { rect: DOMRect; face: HTMLElement; width: string; height: string };
-type Snapshot = { tiles: Map<number, TileFrame>; melds: Map<string, DOMRect>; draw?: DOMRect };
+type TileFrame = { rect: DOMRect; face: HTMLElement; width: string; height: string; onTable: boolean };
+type Snapshot = { tiles: Map<number, TileFrame>; melds: Map<string, DOMRect>; draw?: DOMRect; scrollTop: number };
 type Flight = { node: HTMLElement; target: HTMLElement; opacity: string; animation: Animation };
-const empty = (): Snapshot => ({ tiles: new Map(), melds: new Map() });
+const empty = (): Snapshot => ({ tiles: new Map(), melds: new Map(), scrollTop: 0 });
 
 /** Flights live above scroll containers, so rack ↔ table moves never get clipped. */
 export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: DependencyList, toLocal: (r: DOMRect) => DOMRect = r => r) {
@@ -21,6 +21,7 @@ export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: Dependen
 
   const measure = (includeGhost: boolean): Snapshot => {
     const result = empty();
+    result.scrollTop = root.current?.querySelector('.bd-felt')?.scrollTop ?? 0;
     root.current?.querySelectorAll<HTMLElement>('[data-tid]').forEach(wrapper => {
       if (!includeGhost && wrapper.closest('.ghost')) return;
       const tile = wrapper.querySelector<HTMLElement>('.tile'); if (!tile) return;
@@ -28,6 +29,7 @@ export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: Dependen
       result.tiles.set(Number(wrapper.dataset.tid), {
         rect: L(tile), face: tile.cloneNode(true) as HTMLElement,
         width: style.width, height: style.height,
+        onTable: !!wrapper.closest('[data-felt]'),
       });
     });
     root.current?.querySelectorAll<HTMLElement>('[data-m]').forEach(meld => {
@@ -59,6 +61,13 @@ export function useTileMotion(root: RefObject<HTMLElement>, layoutKeys: Dependen
     if (!root.current) return;
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const from = pending.current ?? { ...baseline.current, tiles: new Map([...baseline.current.tiles].map(([id, tile]) => [id, { ...tile }])), melds: new Map(baseline.current.melds) };
+    // Scrolling moves the canvas, not the tiles within it. This also covers
+    // revealing a new meld below the viewport immediately after a drop.
+    const delta = (root.current.querySelector('.bd-felt')?.scrollTop ?? 0) - from.scrollTop;
+    if (delta) {
+      from.tiles.forEach(tile => { if (tile.onTable) tile.rect = new DOMRect(tile.rect.x, tile.rect.y - delta, tile.rect.width, tile.rect.height); });
+      from.melds.forEach((r, id) => from.melds.set(id, new DOMRect(r.x, r.y - delta, r.width, r.height)));
+    }
     if (!pending.current) {
       flights.current.forEach((flight, id) => { const tile = from.tiles.get(id); if (tile) tile.rect = L(flight.node); });
       root.current.querySelectorAll<HTMLElement>('[data-m]').forEach(meld => {

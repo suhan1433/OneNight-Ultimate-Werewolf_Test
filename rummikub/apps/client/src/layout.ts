@@ -1,7 +1,7 @@
 /**
  * 레이아웃/제스처용 순수 함수 — React/DOM 의존 없음.
  *  · 손패  : 칸(slot) 단위 랙. 빈 칸이 곧 사용자가 만든 묶음 구분선이다.
- *  · 테이블: 조합을 자유 위치(캔버스)에 놓고, 겹치면 밀어내고, 안 들어가면 빈 공간을 정돈하고 타일을 줄인다.
+ *  · 테이블: 조합을 자유 위치(캔버스)에 놓고, 겹치면 밀어내고, 부족한 공간은 아래로 확장한다.
  */
 import type { Tile } from '@rummikub/rules';
 
@@ -30,8 +30,8 @@ export function fitHand(n: number, W: number, budgetH: number, max: number): Han
 /** 모바일은 랙 높이를 일정하게 유지하고, 장수와 화면 면적으로 타일 크기를 정한다. */
 export function fitMobileHand(n: number, W: number, H: number): HandFit {
   // A long, shallow rack leaves the table most of the screen. Never hide tiles in a scroll area.
-  const budget = Math.max(42, Math.floor(H * (H > W ? 0.25 : 0.28)));
-  const max = Math.min(38, Math.max(26, Math.floor(H * 0.085)));
+  const budget = Math.max(46, Math.floor(H * (H > W ? 0.28 : 0.32)));
+  const max = Math.min(42, Math.max(28, Math.floor(H * 0.095)));
   for (let tw = max; tw >= 1; tw--) {
     const cols = Math.max(1, Math.floor((W + HAND.gapX) / (tw + HAND.gapX)));
     const rows = Math.ceil((n + mobileHandSpare(n)) / cols);
@@ -143,35 +143,36 @@ export function findSpot(placed: Rect[], w: number, h: number, W: number, H: num
  * 모든 조합을 W×H 캔버스에 놓는다.
  *  · 저장된 위치(pos)는 최대한 지키고, focus(방금 바뀐 조합)가 우선권을 갖는다 — 겹치면 다른 조합이 밀려난다.
  *  · 위치 없는 조합은 빈자리를 위·왼쪽부터 채운다.
- *  · 빈 공간을 정돈하고 모든 조합이 화면 안에 들어올 때까지 크기를 맞춘다(스크롤 없음).
+ *  · 타일 크기는 가로로 긴 조합에만 맞춘다. 테이블이 차면 아래로 확장하고 새 조합을 위한 빈자리를 남긴다.
+ *  · pos는 화면 높이 H 기준이므로 캔버스가 늘어나도 기존 조합은 움직이지 않는다.
  */
-export function layoutTable(items: TableItem[], W: number, H: number, maxTw: number, focus: ReadonlySet<string> = new Set()): TableLayout {
-  const empty = (tw: number): TableLayout => ({ tw, rects: new Map(), W, H, height: 0, fits: true });
-  if (W <= 0 || H <= 0 || !items.length) return empty(Math.min(maxTw, 40));
+export function layoutTable(items: TableItem[], W: number, H: number, maxTw: number, focus: ReadonlySet<string> = new Set(), reserveCount = 3): TableLayout {
+  const longest = Math.max(3, reserveCount, ...items.map(it => it.n));
+  const tw = Math.max(1, Math.min(maxTw, Math.floor((W - MELD.padX - (longest - 1) * MELD.gapT) / longest)));
+  if (W <= 0 || H <= 0) return { tw, rects: new Map(), W, H, height: H, fits: false };
   const order = [...items].sort((a, b) => Number(focus.has(b.id)) - Number(focus.has(a.id)) || Number(!!b.pos) - Number(!!a.pos));
-  const place = (tw: number, compact = false) => {
-    const Hb = H, placed: Rect[] = [], rects = new Map<string, Rect>();
-    const sequence = compact ? [...items].sort((a, b) => b.n - a.n) : order;
-    for (const it of sequence) {
-      const { w, h } = meldSize(it.n, tw); if (w > W || h > Hb) return null;
-      let spot: { x: number; y: number } | null;
-      if (it.pos && !compact) {
-        const x = clamp(it.pos.fx * W, 0, W - w), y = clamp(it.pos.fy * H, 0, Hb - h), r = { x, y, w, h };
-        spot = placed.some(p => overlaps(r, p)) ? findSpot(placed, w, h, W, Hb, { x, y }) : { x, y };
-      } else spot = findSpot(placed, w, h, W, Hb);
-      if (!spot) return null;
-      const rect = { ...spot, w, h }; placed.push(rect); rects.set(it.id, rect);
+  const placed: Rect[] = [], rects = new Map<string, Rect>();
+  const rowH = meldSize(1, tw).h + MELD.gap;
+  let height = Math.max(H, ...items.map(it => Math.max(0, (it.pos?.fy ?? 0) * H) + meldSize(it.n, tw).h));
+  for (const it of order) {
+    const { w, h } = meldSize(it.n, tw);
+    const want = it.pos ? { x: clamp(it.pos.fx * W, 0, Math.max(0, W - w)), y: Math.max(0, it.pos.fy * H) } : undefined;
+    let spot = findSpot(placed, w, h, W, height, want);
+    if (!spot) {
+      height += rowH;
+      spot = findSpot(placed, w, h, W, height, want);
     }
-    return rects;
-  };
-  const done = (tw: number, rects: Map<string, Rect>, fits: boolean): TableLayout => ({ tw, rects, W, H, fits, height: Math.max(H, ...[...rects.values()].map(r => r.y + r.h)) });
-  // Preserve the player's arrangement first. Compact only when it would force smaller tiles.
-  // Search every size: packing with saved positions is not monotonic, so binary search can miss a fit.
-  for (let tw = maxTw; tw >= 1; tw--) {
-    const rects = place(tw) ?? place(tw, true);
-    if (rects) return done(tw, rects, true);
+    if (!spot) return { tw, rects, W, H, height, fits: false };
+    const rect = { ...spot, w, h }; placed.push(rect); rects.set(it.id, rect);
   }
-  return empty(1); // Only possible while the viewport has no usable area.
+  const spare = meldSize(Math.max(3, reserveCount), tw);
+  if (!findSpot(placed, spare.w, spare.h, W, height)) height += rowH;
+  return { tw, rects, W, H, height, fits: true };
+}
+
+/** Empty gaps belong to the canvas. Only the body of a meld accepts insertion. */
+export function hitMeld(r: Rect, x: number, y: number): boolean {
+  return x >= r.x && x <= r.x + r.w && y >= r.y + 4 && y <= r.y + r.h;
 }
 
 /** Stable insertion boundary based on layout coordinates, never animated tile positions. */

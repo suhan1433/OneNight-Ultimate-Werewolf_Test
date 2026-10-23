@@ -566,7 +566,10 @@ html{touch-action:manipulation}
 
 /* 테이블(펠트) */
 .bd-fw{grid-area:felt;position:relative;min-height:0;min-width:0;display:flex}
-.bd-felt{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden;touch-action:none;padding:8px;border-radius:14px;background:radial-gradient(ellipse at 50% 40%,var(--felt-a),var(--felt-b) 80%);box-shadow:inset 0 0 0 1px #ffffff18,inset 0 6px 22px #0005;transition:box-shadow .15s}
+.bd-felt{position:relative;flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#ffffff55 transparent;touch-action:none;padding:8px;border-radius:14px;background:radial-gradient(ellipse at 50% 40%,var(--felt-a),var(--felt-b) 80%);box-shadow:inset 0 0 0 1px #ffffff18,inset 0 6px 22px #0005;transition:box-shadow .15s}
+.bd-felt:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+.bd-space-hint{position:absolute;right:12px;bottom:8px;z-index:4;padding:4px 8px;border-radius:12px;background:#122a24df;color:#ffffffb3;font-size:.65rem;pointer-events:none}
+.bd.dragging .bd-space-hint{opacity:0}
 .bd-felt.over{box-shadow:inset 0 0 0 3px #ffffff88,inset 0 6px 22px #0005}
 .bd-melds{--tw:var(--mtw);--th:calc(var(--mtw)*1.4);position:relative;display:block;height:100%}
 .bm{position:absolute;display:flex;flex-direction:column;box-sizing:border-box;padding:0 2px;border-radius:7px;background:#0000002b;box-shadow:inset 0 0 0 1px #ffffff12;transition:background .16s,box-shadow .16s}
@@ -616,6 +619,7 @@ html{touch-action:manipulation}
 .bd .cell.tgt{background:#ffbf6b38;box-shadow:inset 0 0 0 2px #ffd79f,0 0 12px #ffbf6b33}
 .bd-hand .cell.tgt::after{content:'+';position:absolute;inset:0;display:grid;place-items:center;color:var(--lamp);font-size:14px;pointer-events:none}
 .rack-tile{display:flex;transition:transform 160ms var(--ease)}
+.bd:not(.dragging) .rack-tile,.bd:not(.dragging) .bm-tile{transition:none}
 .bd.dealing .rack-tile{animation:deal .5s var(--spring) both;animation-delay:calc(var(--k)*26ms)}
 @keyframes deal{from{opacity:0;transform:translateY(-80px) rotate(-9deg) scale(.8)}}
 
@@ -635,7 +639,7 @@ html{touch-action:manipulation}
 .bd .tile.ghosted{opacity:.16;filter:none;transform:none}
 .bd .tile.flash{animation:trace 3.2s ease-out}
 .bd .tile.landed{animation:land .26s var(--spring) .18s both}
-@keyframes land{0%{transform:translateY(-5px) scale(1.07)}55%{transform:translateY(1px) scale(.98)}100%{transform:none}}
+@keyframes land{from{filter:brightness(1.14)}to{filter:none}}
 .bd .tile.pressing{animation:pickup .16s var(--ease) forwards}
 @keyframes pickup{to{transform:translateY(-4px) scale(1.05);filter:drop-shadow(0 5px 6px #ffbf6b55)}}
 .bd .tile:focus-visible,.bd button:focus-visible{outline:2px solid var(--lamp);outline-offset:4px}
@@ -643,7 +647,7 @@ html{touch-action:manipulation}
 
 /* 끄는 중인 타일: 손가락 위쪽에 떠서 놓을 자리를 가리지 않는다. 움직이는 쪽으로 기운다. */
 .bd .ghost{position:absolute;left:0;top:0;z-index:40;pointer-events:none;will-change:transform}
-.bd .ghost>.gstack{display:flex;gap:2px;transform:rotate(var(--tilt,0deg)) scale(1.1);transform-origin:50% 85%;transition:transform .14s ease-out;filter:drop-shadow(0 14px 10px #000a);animation:lift .14s ease-out}
+.bd .ghost>.gstack{display:flex;gap:2px;transform:rotate(var(--tilt,0deg)) scale(1.04);transform-origin:50% 85%;transition:transform .1s ease-out;filter:drop-shadow(0 14px 10px #000a);animation:lift .1s ease-out}
 @keyframes lift{from{transform:scale(1)}}
 .bd .ghost .tile{margin-bottom:0;transform:none;transition:none;cursor:grabbing;animation:none}
 .bd .ghost>.gstack>.ts+.ts{margin-left:0}

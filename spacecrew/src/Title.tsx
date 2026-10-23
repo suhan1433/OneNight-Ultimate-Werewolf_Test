@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { Request } from './types';
 import { readNick, saveNick } from './lib';
 import { Starfield } from './ui';
+import { HeaderActions } from './HeaderActions';
 
 /** 타이틀/참가: 관측창 너머 태양계 외곽. 방 만들기/참가는 한 카드 안에서 전환한다. */
 export function Title({ request, onSession, onHelp }: { request: Request; onSession: (reply: unknown) => void; onHelp: () => void }) {
@@ -18,7 +19,7 @@ export function Title({ request, onSession, onHelp }: { request: Request; onSess
     finally { setBusy(false); }
   };
   return <main className="title-scene">
-    <button type="button" className="help-fab" onClick={onHelp}><b>?</b> 도움말</button>
+    <HeaderActions onHelp={onHelp} title />
     <div className="window" role="img" aria-label="관측창 너머 태양계 외곽. 먼 곳에서 신호가 한 번 들어옵니다.">
       <Starfield scoped />
       <svg className="solar" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">

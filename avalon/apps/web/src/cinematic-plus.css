@@ -242,9 +242,23 @@ body:has(.qcard.fail.active) .ambient::before{filter:hue-rotate(-18deg) brightne
 
 /* ===== K. 모바일 보정: 코인은 항상 정원, 카드 문구는 단어 단위 개행 ===== */
 .vote-tokens{align-items:center;justify-content:center}
-.vote-tokens .token{--d:clamp(96px,28vw,128px);flex:none;box-sizing:border-box;width:var(--d);height:var(--d);min-width:0;min-height:0;max-width:none;padding:0;align-self:center;aspect-ratio:1/1;border-radius:50%}
+.vote-tokens .token{--d:clamp(76px,22vw,104px);flex:none;box-sizing:border-box;width:var(--d);height:var(--d);min-width:0;min-height:0;max-width:none;padding:0;align-self:center;aspect-ratio:1/1;border-radius:50%}
 .vote-tokens .token span{white-space:nowrap;line-height:1}
 .quest-cards{align-items:center}
-.qcard{flex:none;box-sizing:border-box;padding:0 8px;align-self:center}
+.qcard{--choice-width:clamp(96px,27vw,136px);flex:none;box-sizing:border-box;width:var(--choice-width);height:calc(var(--choice-width)*1.4);min-width:0;min-height:0;max-width:none;max-height:none;aspect-ratio:5/7;padding:0 8px;align-self:center}
 .qcard span{max-width:100%;text-align:center;word-break:keep-all;overflow-wrap:normal;text-wrap:balance;font-size:clamp(14px,4.2vw,17px);letter-spacing:.06em;line-height:1.3}
 .qcard small{white-space:nowrap}
+
+/* Older layers animate transform and scale simultaneously. Use one modest
+   selection effect so touch devices never enlarge the choices twice. */
+.vote-tokens button.token,.quest-cards button.qcard{--choice-scale:1;--choice-lift:0px;animation:none;transform:none;translate:0;rotate:0deg;scale:1;touch-action:manipulation}
+.vote-tokens button.token.active,.quest-cards button.qcard.active{--choice-scale:1.04;--choice-lift:-4px;animation:none;transform:none;translate:0 -4px;rotate:0deg;scale:1.04}
+.vote-tokens:has(.token.active) button.token:not(.active),.quest-cards:has(.qcard.active) button.qcard:not(.active){scale:.98}
+@media(hover:hover) and (pointer:fine){
+  .vote-tokens button.token:hover:not(:disabled),.quest-cards button.qcard:hover:not(:disabled){transform:none;translate:0 -4px;rotate:0deg;scale:1.04}
+}
+@media(hover:none){
+  .vote-tokens button.token:hover:not(:disabled),.quest-cards button.qcard:hover:not(:disabled){transform:none;translate:0 var(--choice-lift);rotate:0deg;scale:var(--choice-scale)}
+}
+.vt-result-bar{position:relative;z-index:31;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:8px;margin:8px 0 12px;font-size:12px;color:var(--muted)}
+.vt-result-bar button{min-height:40px;padding:8px 14px;touch-action:manipulation;color:var(--gold-300)}
