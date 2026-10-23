@@ -406,7 +406,7 @@ button.card{cursor:pointer}
   .dock{padding-bottom:calc(6px + var(--safe-b))}
   .hand.row{display:flex;overflow-x:auto;overflow-y:hidden;padding:64px 16px 10px;scroll-snap-type:x proximity;scrollbar-width:none;margin-top:-30px}
   .hand.row .card{--cw:clamp(56px,16vw,68px);--ch:calc(var(--cw)*1.43);margin-left:calc(var(--cw)*-.4);scroll-snap-align:center;transition:transform var(--t-card) cubic-bezier(.2,.8,.2,1),filter var(--t-fast)}
-  .hand.row .card:first-child{margin-left:0}
+  .hand.row .card:first-child{margin-left:auto}.hand.row .card:last-child{margin-right:auto} /* 카드가 적으면 가운데 정렬, 넘치면 auto=0 이라 정상 스크롤 */
   .hand.row .card.live{transform:translateY(-14px)}.hand.row .card.sunk{transform:translateY(8px)}
   .hand.row .card.picked{transform:translateY(-44px) scale(1.3);z-index:20;filter:none}
   .pick-bar{position:fixed;left:50%;bottom:calc(var(--safe-b) + 190px);width:calc(100% - 20px)}

@@ -506,7 +506,7 @@ html{touch-action:manipulation}
 
 .bd{--tw:44px;--th:calc(var(--tw)*1.4);--mtw:40px;--rtw:36px;--accent:var(--lamp);--felt-a:#2f6050;--felt-b:#1d3b32;
   --sa-t:var(--env-t);--sa-r:var(--env-r);--sa-b:var(--env-b);--sa-l:var(--env-l);--ease:cubic-bezier(.2,.8,.2,1);
-  container:bd/size;position:relative;width:100%;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) clamp(208px,26%,280px);grid-template-rows:auto minmax(0,1fr) var(--rackh,108px);
+  container:bd/size;position:relative;width:100%;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) var(--actw,clamp(208px,26%,280px));grid-template-rows:auto minmax(0,1fr) var(--rackh,108px);
   grid-template-areas:"top top" "felt felt" "rack act";gap:6px 8px;
   padding:calc(8px + var(--sa-t)) calc(10px + var(--sa-r)) calc(6px + var(--sa-b)) calc(10px + var(--sa-l));
   overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
@@ -566,7 +566,10 @@ html{touch-action:manipulation}
 
 /* 테이블(펠트) */
 .bd-fw{grid-area:felt;position:relative;min-height:0;min-width:0;display:flex}
-.bd-felt{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden;touch-action:none;padding:8px;border-radius:14px;background:radial-gradient(ellipse at 50% 40%,var(--felt-a),var(--felt-b) 80%);box-shadow:inset 0 0 0 1px #ffffff18,inset 0 6px 22px #0005;transition:box-shadow .15s}
+.bd-felt{position:relative;flex:1;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;touch-action:none;padding:8px;border-radius:14px;background:radial-gradient(ellipse at 50% 40%,var(--felt-a),var(--felt-b) 80%);box-shadow:inset 0 0 0 1px #ffffff18,inset 0 6px 22px #0005;transition:box-shadow .15s}
+.bd-felt::-webkit-scrollbar{display:none}
+.bd-scroll{position:absolute;right:3px;top:8px;bottom:8px;width:4px;z-index:7;border-radius:2px;background:#ffffff14;pointer-events:none}
+.bd-scroll i{display:block;width:100%;border-radius:2px;background:#ffffff8c}
 .bd-felt:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
 .bd-felt.over{box-shadow:inset 0 0 0 3px #ffffff88,inset 0 6px 22px #0005}
 .bd-melds{--tw:var(--mtw);--th:calc(var(--mtw)*1.4);position:relative;display:block;height:100%}
@@ -578,11 +581,11 @@ html{touch-action:manipulation}
 .bm-row{position:relative;display:flex;gap:2px;flex:none}
 .bm-tile{display:flex;flex:none;transition:transform 160ms var(--ease);will-change:transform}
 /* 조합 손잡이: 눈에 띄는 작은 막대 + 위쪽으로 넓은 터치 영역 */
-.bm-grip{all:unset;box-sizing:border-box;position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:4px;flex:none;cursor:grab;touch-action:none}
-.bm-grip::before{content:'';width:24px;height:3px;border-radius:2px;background:#ffffff66;transition:background .15s,width .15s}
-.bm-grip::after{content:'';position:absolute;left:-2px;right:-2px;top:-16px;height:22px}
+.bm-grip{all:unset;box-sizing:border-box;position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:14px;flex:none;cursor:grab;touch-action:none}
+.bm-grip::before{content:'';width:36px;height:4px;border-radius:2px;background:#ffffff80;transition:background .15s,width .15s}
+.bm-grip::after{content:'';position:absolute;left:0;right:0;top:-5px;bottom:-1px}
 .bm-grip .dots{display:none}
-.bm:hover .bm-grip::before,.bd.dragging .bm-grip::before{background:#fff;width:30px}
+.bm:hover .bm-grip::before,.bd.dragging .bm-grip::before{background:#fff;width:44px}
 .bm-error{position:absolute;right:-4px;top:-5px;z-index:3;width:16px;height:16px;border-radius:50%;background:var(--bad);color:#fff;text-align:center;font:800 11px/16px var(--f-ui);pointer-events:none;box-shadow:0 1px 3px #000a}
 .bm-insert{position:absolute;top:0;height:calc(var(--mtw)*1.4);display:grid;place-items:center;border:1px dashed #d6f2d2b3;border-radius:4px;background:#c9efca24;color:#d6f2d2;font-size:14px;pointer-events:none}
 .bm.pulse{animation:splitpulse 1s ease-out}

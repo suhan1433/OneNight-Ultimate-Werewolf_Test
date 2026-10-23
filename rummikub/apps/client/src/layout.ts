@@ -36,6 +36,26 @@ export function fitMobileHand(n: number, W: number, H: number, budgetH?: number)
   return fitHand(n, W, budget, max, mobileHandSpare(n));
 }
 
+const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * 손패 타일 크기 정책 (데스크톱/모바일 공통).
+ *  · 시작 크기(pref)를 넉넉히 잡고, 손패가 늘면 "줄 수를 먼저 늘리고" 그다음에 타일을 줄인다.
+ *  · 1차 예산(soft) 안에서 편안한 크기(comfort) 이상이 나오면 그대로 쓴다.
+ *  · 그 밑으로 내려가야 하면 예산(hard)을 키워 테이블 공간을 조금 더 내주고, 그래도 안 되면 그때 줄인다.
+ *  · 타일 수가 늘수록 크기는 줄기만 하므로(단조) 크기가 튀거나 되돌아가지 않는다.
+ */
+export function fitRack(n: number, W: number, H: number, wide: boolean): HandFit {
+  const h = H > 0 ? H : 600, spare = wide ? handSpare(n) : mobileHandSpare(n), pad = 10;
+  const pref = wide ? clampN(Math.floor(h * 0.085), 52, 76) : clampN(Math.floor(h * 0.12), 36, 48);
+  const comfort = wide ? 44 : 34;
+  const soft = Math.floor(h * (wide ? 0.30 : 0.42)) - pad, hard = Math.floor(h * (wide ? 0.40 : 0.50)) - pad;
+  const a = fitHand(n, W, soft, pref, spare);
+  // comfort 이상은 soft 예산으로, comfort 미만에서만 hard 예산을 쓴다. 칸마다 "받아들이는 예산"이 정해져 있으므로
+  // 장수가 늘면 크기는 줄기만 한다(단조) — 26장에서 20장보다 커지는 식의 역전이 없다.
+  return a.tw >= comfort ? a : fitHand(n, W, hard, Math.min(pref, comfort - 1), spare);
+}
+
 /** 이전 배치를 최대한 유지하면서 칸 수/타일 구성에 맞춘다. 새 타일은 원래 자리(home) → 마지막 타일 뒤 → 앞쪽 빈 칸 순. */
 export function normalizeSlots(prev: Slots, ids: number[], cells: number, home?: ReadonlyMap<number, number>): Slots {
   const want = new Set(ids), out: Slots = Array(cells).fill(null), done = new Set<number>();
@@ -109,8 +129,10 @@ export function slotLine(slots: Slots, cols: number, tile: (id: number) => Tile 
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Pos = { fx: number; fy: number };           // 캔버스 크기에 대한 비율(타일 크기가 바뀌어도 자리가 유지된다)
 export type TableItem = { id: string; n: number; pos?: Pos };
-export type TableLayout = { tw: number; rects: Map<string, Rect>; W: number; H: number; height: number; fits: boolean };
-export const MELD = { padX: 4, gapT: 2, rowExtra: 10, gap: 10, min: 14 };
+/** H = 캔버스 실제 높이(보이는 높이보다 클 수 있다 → 테이블이 세로 스크롤). baseH = 보이는 높이. pos.fy는 baseH 기준이라 캔버스가 늘어도 조합이 제자리에 있다. */
+export type TableLayout = { tw: number; rects: Map<string, Rect>; W: number; H: number; baseH: number; height: number; fits: boolean };
+/** rowExtra = 손잡이 14 + 타일 아래 여백 6. hit = 조합 바깥으로 넓힌 드롭 인식 여유(gap의 절반보다 작게). */
+export const MELD = { padX: 4, gapT: 2, rowExtra: 20, gap: 12, min: 14, hit: 5 };
 
 export const meldSize = (n: number, tw: number) => ({ w: n * tw + (n - 1) * MELD.gapT + MELD.padX, h: Math.round(tw * 1.4) + MELD.rowExtra });
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -136,41 +158,61 @@ export function findSpot(placed: Rect[], w: number, h: number, W: number, H: num
 }
 
 /**
- * 모든 조합을 W×H 캔버스에 놓는다.
+ * 모든 조합을 캔버스에 놓는다.
  *  · 저장된 위치(pos)는 최대한 지키고, focus(방금 바뀐 조합)가 우선권을 갖는다 — 겹치면 다른 조합이 밀려난다.
  *  · 위치 없는 조합은 빈자리를 위·왼쪽부터 채운다.
- *  · 테이블 크기는 고정한다. 기존 위치 → 정돈 순으로 시도하고, 부족하면 타일을 축소한다.
- *  · 새 조합(또는 끄는 묶음)을 놓을 빈자리도 같은 화면 안에 확보한다.
+ *  · 공간이 모자라면 ① 타일을 minTw까지 줄이고 ② 그래도 모자라면 캔버스를 세로로 늘린다(스크롤) ③ 끝까지 안 되면 줄 바꿈으로 쌓는다.
+ *    → 글자가 읽히지 않을 만큼 작아지지 않고, 놓을 자리는 항상 남는다.
+ *  · 새 조합(또는 끄는 묶음)을 놓을 빈자리도 항상 확보한다.
  */
-export function layoutTable(items: TableItem[], W: number, H: number, maxTw: number, focus: ReadonlySet<string> = new Set(), reserveCount = 3): TableLayout {
+export function layoutTable(items: TableItem[], W: number, viewH: number, maxTw: number, focus: ReadonlySet<string> = new Set(), reserveCount = 3, minTw = 1, maxScreens = 3): TableLayout {
   const longest = Math.max(3, reserveCount, ...items.map(it => it.n));
   const max = Math.max(1, Math.min(maxTw, Math.floor((W - MELD.padX - (longest - 1) * MELD.gapT) / longest)));
-  if (W <= 0 || H <= 0) return { tw: max, rects: new Map(), W, H, height: H, fits: false };
+  if (W <= 0 || viewH <= 0) return { tw: max, rects: new Map(), W, H: viewH, baseH: viewH, height: viewH, fits: false };
   const order = [...items].sort((a, b) => Number(focus.has(b.id)) - Number(focus.has(a.id)) || Number(!!b.pos) - Number(!!a.pos));
   const compact = [...items].sort((a, b) => b.n - a.n);
-  let last: TableLayout = { tw: 1, rects: new Map(), W, H, height: H, fits: false };
-  for (let tw = max; tw >= 1; tw--) {
+  const floor = clamp(minTw, 1, max);
+  const spareN = Math.max(3, reserveCount);
+
+  const attempt = (tw: number, H: number): TableLayout | null => {
+    const spare = meldSize(spareN, tw);
+    // 면적만으로도 불가능하면 비싼 배치 탐색을 건너뛴다(필요조건).
+    const area = items.reduce((sum, it) => { const m = meldSize(it.n, tw); return sum + m.w * m.h; }, spare.w * spare.h);
+    if (area > W * H) return null;
     for (const keepPositions of [true, false]) {
       const placed: Rect[] = [], rects = new Map<string, Rect>();
       for (const it of keepPositions ? order : compact) {
         const { w, h } = meldSize(it.n, tw);
-        const want = keepPositions && it.pos ? { x: clamp(it.pos.fx * W, 0, Math.max(0, W - w)), y: clamp(it.pos.fy * H, 0, Math.max(0, H - h)) } : undefined;
+        const want = keepPositions && it.pos ? { x: clamp(it.pos.fx * W, 0, Math.max(0, W - w)), y: clamp(it.pos.fy * viewH, 0, Math.max(0, H - h)) } : undefined;
         const spot = findSpot(placed, w, h, W, H, want);
         if (!spot) break;
         const rect = { ...spot, w, h }; placed.push(rect); rects.set(it.id, rect);
       }
-      const spare = meldSize(Math.max(3, reserveCount), tw);
-      const fits = rects.size === items.length && !!findSpot(placed, spare.w, spare.h, W, H);
-      last = { tw, rects, W, H, height: H, fits };
-      if (fits) return last;
+      if (rects.size === items.length && findSpot(placed, spare.w, spare.h, W, H)) return { tw, rects, W, H, baseH: viewH, height: H, fits: true };
     }
+    return null;
+  };
+
+  // ① 보이는 영역 안에서: 큰 타일부터 minTw까지
+  for (let tw = max; tw >= floor; tw--) { const r = attempt(tw, viewH); if (r) return r; }
+  // ② minTw 그대로 두고 캔버스를 한 줄씩 늘린다(세로 스크롤)
+  const maxH = Math.round(viewH * Math.max(1, maxScreens)), step = meldSize(1, floor).h + MELD.gap;
+  for (let H = viewH + step; H <= maxH; H += step) { const r = attempt(floor, H); if (r) return r; }
+  // ③ 최후: 줄 바꿈으로 쌓는다(항상 성공). 위치는 정돈되지만 아무것도 사라지지 않는다.
+  const rects = new Map<string, Rect>(); let x = 0, y = 0, rowH = 0;
+  for (const it of compact) {
+    const { w, h } = meldSize(it.n, floor);
+    if (x > 0 && x + w > W) { x = 0; y += rowH + MELD.gap; rowH = 0; }
+    rects.set(it.id, { x, y, w, h }); x += w + MELD.gap; rowH = Math.max(rowH, h);
   }
-  return last;
+  const H = Math.max(viewH, y + rowH + MELD.gap + meldSize(spareN, floor).h);
+  return { tw: floor, rects, W, H, baseH: viewH, height: H, fits: true };
 }
 
 /** Empty gaps belong to the canvas. Only the body of a meld accepts insertion. */
 export function hitMeld(r: Rect, x: number, y: number): boolean {
-  return x >= r.x && x <= r.x + r.w && y >= r.y + 4 && y <= r.y + r.h;
+  const k = MELD.hit; // 조합 가장자리 바로 바깥까지 "이 조합에 끼우기"로 인식 → 작은 타일/손가락으로도 놓기 쉽다
+  return x >= r.x - k && x <= r.x + r.w + k && y >= r.y - k && y <= r.y + r.h + k;
 }
 
 /** Stable insertion boundary based on layout coordinates, never animated tile positions. */

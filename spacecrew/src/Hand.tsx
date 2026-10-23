@@ -13,8 +13,8 @@ export function Hand({ game, view, send, recordPlay, compact }: { game: Game; vi
   useEffect(() => { if (sel && !hand.some(c => c.id === sel)) setSel(null); }, [hand, sel]);
   const playable = (c: Card) => view.myTurn && view.legal.has(c.id);
   const play = (c: Card) => { if (!playable(c)) return; cue('play'); recordPlay(c); setSel(null); send('CARD_PLAY', { cardId: c.id }); };
-  // 웹에서는 카드를 확인한 뒤 내기 버튼으로 확정한다. 모바일은 같은 카드 재탭도 지원한다.
-  const onCard = (c: Card) => { cue('tap'); if (compact && sel === c.id) play(c); else setSel(c.id); };
+  // 같은 카드를 한 번 더 누르면 제출한다(웹·모바일 공통). 버튼으로도 낼 수 있다.
+  const onCard = (c: Card) => { cue('tap'); if (sel === c.id) play(c); else setSel(c.id); };
   const onKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
     if (e.key === 'Escape') { setSel(null); return; }
     const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : e.key === 'Home' ? -i : e.key === 'End' ? hand.length - 1 - i : 0;
@@ -29,7 +29,7 @@ export function Hand({ game, view, send, recordPlay, compact }: { game: Game; vi
   return <section className={`hand-zone ${compact ? 'compact' : ''} ${view.canComm ? 'has-comm' : ''}`} aria-label={`내 손패 ${hand.length}장`}>
     {picked && <div className="pick-bar" role="status">
       <b>{cardName(picked)}</b>
-      {playable(picked) ? <span>{compact ? '한 번 더 누르거나 버튼으로 내세요' : '선택한 카드를 확인한 뒤 내세요'}</span> : <span>{why}</span>}
+      {playable(picked) ? <span>한 번 더 누르거나 버튼으로 내세요</span> : <span>{why}</span>}
       <button type="button" className="primary" disabled={!playable(picked)} onClick={() => play(picked)}>이 카드 내기</button>
       <button type="button" onClick={() => setSel(null)}>취소</button>
     </div>}
