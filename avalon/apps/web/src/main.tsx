@@ -951,7 +951,7 @@ function HelpModal({close}:{close:()=>void}){
     <section className="help-modal" onClick={event=>event.stopPropagation()}>
       <header><div><small>THE RESISTANCE: AVALON</small><h2>게임 도움말</h2></div><button onClick={close} aria-label="도움말 닫기">×</button></header>
       <div className="help-scroll">
-        <button type="button" className="help-example-link" onClick={()=>{document.getElementById('avalon-example-step')?.focus({preventScroll:true});document.getElementById('avalon-five-player-example')?.scrollIntoView({block:'start'});}}>처음이라면 · 5인 예시 플레이 따라가기 ↓</button>
+        <button type="button" className="help-example-link" onClick={()=>{const example=document.getElementById('avalon-five-player-example');example?.querySelector<HTMLElement>('.gl-heading')?.focus({preventScroll:true});example?.scrollIntoView({block:'start'});}}>처음이라면 · 5인 예시 플레이 따라가기 ↓</button>
         <section><h3>승리 조건</h3><div className="help-rule-grid"><div><FactionSeal team="good" size={30}/><p><b>선의 승리</b><br/>원정 3회 성공 후 암살 능력 보유자가 멀린을 찾지 못하면 승리합니다.</p></div><div><FactionSeal team="evil" size={30}/><p><b>악의 승리</b><br/>원정 3회 실패, 5회 연속 부결, 또는 멀린 암살 성공 시 승리합니다.</p></div></div></section>
         <section><h3>한 라운드의 흐름</h3><ol className="help-flow"><li>리더가 정해진 인원의 원정대를 지명합니다.</li><li>전원이 찬성·반대를 비밀리에 투표하고 함께 공개합니다.</li><li>승인된 원정대원만 비밀 원정 카드를 냅니다.</li><li>성공/실패 카드 수를 공개하고 다음 리더에게 넘깁니다.</li></ol><p className="help-note">선은 반드시 <b>성공</b> 카드를 냅니다. 악은 성공 또는 실패를 선택합니다. 7명 이상 게임의 4번째 원정은 실패 카드 2장부터 실패입니다.</p></section>
         <FivePlayerExample/>

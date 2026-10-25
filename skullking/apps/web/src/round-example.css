@@ -1,0 +1,4 @@
+.sk-lesson-card{display:block;width:48px;height:68px;object-fit:cover;border-radius:4px;box-shadow:var(--sh-1)}
+.round-example .gl-hand .sk-lesson-card{width:60px;height:85px}
+.sk-score-equation{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:9px;padding:12px;border:1px solid var(--gl-line);background:var(--gl-wash);text-align:center}
+.sk-score-equation>span{display:grid;font-size:11px}.sk-score-equation b{font-size:17px}.sk-score-equation>strong{font-size:21px;color:var(--gl-accent)}

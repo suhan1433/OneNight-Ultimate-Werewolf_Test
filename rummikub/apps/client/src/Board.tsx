@@ -8,7 +8,7 @@ import { emit } from './socket.js';
 import { sfx } from './sound.js';
 import { Ring, SortMode, SoundToggle, TileView, isNum, sortAll, sortByGroup, sortByRun } from './tiles.js';
 import { Ctx, Dest, Draft, Result, mergeHandOrder, moveTiles, signature, swapJoker, jokerReplacement } from './editor.js';
-import { HAND, MELD, Pos, Slots, arrangeSlots, findSpot, fitRack, hitMeld, layoutTable, meldInsertIndex, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
+import { HAND, MELD, Pos, Slots, arrangeSlots, findSpot, fitRack, hitMeld, layoutTable, meldGap, meldGrip, meldInsertIndex, meldPad, meldSize, normalizeSlots, placeInSlots, slotLine } from './layout.js';
 import { checkMeld } from './meldRules.js';
 import { useTileMotion } from './motion.js';
 import { toClientPoint, toLocalPoint, toLocalRect, useFrame } from './orient.js';
@@ -211,14 +211,14 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const wide = bsz.w >= 900 && bsz.h >= 600;
   // 손패: 시작부터 크게, 장수가 늘면 줄 수를 먼저 늘리고 그다음에 줄인다(fitRack).
   const hf = useMemo(() => fitRack(Math.max(draft.hand.length, view.hand.length), hsz.w, bsz.h, wide), [draft.hand.length, view.hand.length, hsz.w, bsz.h, wide]);
-  const rackHeight = Math.max(96, hf.h + 10);
+  const rackHeight = Math.max(56, hf.h + 5);
   // 테이블: 읽히는 최소 크기(tableMin)까지만 줄이고, 모자라면 세로로 늘려 스크롤한다. 놓을 자리는 항상 남는다.
-  const tableMax = wide ? Math.max(48, Math.min(64, Math.floor(bsz.h * 0.075))) : Math.max(28, Math.min(44, Math.floor(bsz.h * 0.115)));
-  const tableMin = wide ? 38 : 28;
-  const actW = wide ? 'clamp(208px,26%,280px)' : 'clamp(176px,22%,240px)';
+  const tableMax = wide ? Math.max(48, Math.min(64, Math.floor(bsz.h * 0.075))) : Math.max(28, Math.min(46, Math.floor(bsz.h * 0.12)));
+  const tableMin = wide ? 28 : 14; // 이 밑으로는 읽기 힘들다. 그 전까지는 스크롤 없이 계속 줄여서 한 화면에 넣는다.
+  const actW = wide ? '100px' : '42px';
   const layout = useMemo(() => layoutTable(
     draft.table.map(m => ({ id: m.id, n: m.tiles.length, pos: tpos[m.id] })),
-    fsz.w, fsz.h, tableMax, focus, Math.max(3, drag?.ids.length ?? 0), tableMin, 4,
+    fsz.w, fsz.h, tableMax, focus, Math.max(3, drag?.ids.length ?? 0), tableMin, 1,
   ), [draft.table, tpos, focus, fsz.w, fsz.h, tableMax, tableMin, drag?.ids.length]);
   const mtw = layout.tw;
 
@@ -256,7 +256,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     const id = reveal.current, f = feltRef.current; if (!id || !f) return;
     const r = layout.rects.get(id); if (!r) return;
     reveal.current = null;
-    const top = r.y + 8, bottom = top + r.h, view = f.clientHeight; // 8 = 테이블 안쪽 여백
+    const top = r.y + 3, bottom = top + r.h, view = f.clientHeight; // 3 = 테이블 안쪽 여백
     if (top < f.scrollTop + 4) f.scrollTop = Math.max(0, top - 12);
     else if (bottom > f.scrollTop + view - 4) f.scrollTop = bottom - view + 12;
   }, [layout]);
@@ -322,7 +322,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
     const cr = RL(c), { w, h } = meldSize(count, layout.tw), H = layout.H;
     const want = { x: a.x - cr.left - w / 2, y: a.y - cr.top - h / 2 };
     const others = [...layout.rects.entries()].filter(([id]) => !exclude.includes(id)).map(([, r]) => r);
-    const s = findSpot(others, w, h, layout.W, H, want);
+    const s = findSpot(others, w, h, layout.W, H, want, meldGap(layout.tw));
     return s ? { ...s, w, h } : null;
   };
   const place = (ids: number[], dest: Exclude<Dest, { to: 'hand' }>, aimPt?: { x: number; y: number }) => {
@@ -348,7 +348,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       if (L) { // 나뉜 오른쪽 조합은 왼쪽 조합 바로 옆에
         const cnt = new Map(r.draft.table.map(m => [m.id, m.tiles.length])), left = { ...L, ...meldSize(cnt.get(r.meldId!) ?? 1, layout.tw) }, { w, h } = meldSize(cnt.get(r.splitId) ?? 1, layout.tw);
         const others = [...layout.rects.entries()].filter(([id]) => id !== r.meldId).map(([, x]) => x);
-        const sp = findSpot([...others, left], w, h, layout.W, layout.H, { x: left.x + left.w + MELD.gap, y: left.y });
+        const sp = findSpot([...others, left], w, h, layout.W, layout.H, { x: left.x + left.w + meldGap(layout.tw), y: left.y }, meldGap(layout.tw));
         if (sp) setTpos(p => ({ ...p, [r.splitId!]: toFrac(sp) }));
       }
       setFocus(new Set([r.meldId ?? '', r.splitId])); setPulse(new Set([r.meldId ?? '', r.splitId])); setTimeout(() => setPulse(new Set()), 1000); setTip('끼운 자리에서 조합을 나눴어요');
@@ -448,7 +448,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       const active = dragRef.current?.drop;
       const candidates = [...layout.rects].sort(([a], [b]) => Number(b === active?.meldId) - Number(a === active?.meldId));
       for (const [id, r] of candidates) {
-        if (!hitMeld(r, cx, cy)) continue;
+        if (!hitMeld(r, cx, cy, meldGap(layout.tw))) continue;
         // A group being moved should not catch its own invisible source tiles.
         if (id === dragRef.current?.meld) continue;
         const m = draft.table.find(m => m.id === id); if (!m) continue;
@@ -518,7 +518,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
 
   const startPan = (e: React.PointerEvent, target: HTMLElement, lp: { x: number; y: number }) => {
     const f = feltRef.current;
-    if (!f || !target.closest('[data-felt]') || f.scrollHeight <= f.clientHeight + 1) return;
+    if (!f || !f.classList.contains('scrolls') || !target.closest('[data-felt]')) return;
     suppressClick.current = false;
     pan.current = { pid: e.pointerId, y: lp.y, top: f.scrollTop, moved: false };
   };
@@ -561,7 +561,7 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
   const edgeScroll = (a: { x: number; y: number }, ev: PointerEvent) => {
     const E = edge.current, f = feltRef.current; E.last = ev;
     let v = 0;
-    if (f && f.scrollHeight > f.clientHeight + 1) {
+    if (f && f.classList.contains('scrolls')) {
       const r = RL(f), Z = 46, top = r.top, bottom = r.top + r.height;
       if (a.x >= r.left && a.x <= r.left + r.width) {
         if (a.y < top + Z && a.y > top - 24) v = -Math.min(1, (top + Z - a.y) / Z);
@@ -731,6 +731,11 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
           <span className={`tp-hint ${drag ? feedback.tone : canCommit ? 'good' : ''}`}>{drag ? feedback.text : hint}</span>
         </div>
         {!game.online && <span className="offline">연결 끊김</span>}
+        {!myTurn
+    ? <button className="primary go wait" disabled>대기 중<small>손패 정리 가능</small></button>
+    : changed
+    ? <button className={`primary go ${canCommit ? 'ready' : ''}`} disabled={!canCommit || !game.online || commitBusy} onClick={() => commit()}>{commitBusy ? '확정 중…' : canCommit ? '✓ 확정' : placed.length && !initialReady ? `${placedPoints}/${view.config.initialMeldMin}점` : '확인 필요'}</button>
+    : <button className="primary go" disabled={!game.online || drawBusy} onClick={onDraw}>{drawBusy ? '뽑는 중…' : '뽑기'}<small>남은 {view.poolCount}</small></button>}
         <SoundToggle />
         <button className="menu-btn" onClick={() => setMenu(m => !m)} aria-expanded={menu} aria-label="메뉴"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg></button>
       </header>
@@ -747,8 +752,8 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       </>}
 
       <div className="bd-fw">
-        <section ref={feltRef} className={`bd-felt ${drag?.drop.kind === 'new' ? 'over' : ''}`} data-felt aria-label="테이블" tabIndex={0} onScroll={syncScroll}>
-          <div ref={canvasRef} className="bd-melds" style={{ height: layout.H }}>
+        <section ref={feltRef} className={`bd-felt ${drag?.drop.kind === 'new' ? 'over' : ''} ${layout.H > fsz.h + 1 ? 'scrolls' : ''}`} data-felt aria-label="테이블" tabIndex={0} onScroll={syncScroll}>
+          <div ref={canvasRef} className="bd-melds" style={{ height: layout.H, ['--grip' as string]: `${meldGrip(mtw)}px`, ['--mpad' as string]: `${meldPad(mtw)}px` }}>
             {draft.table.map(m => {
               const i = info.get(m.id), r = layout.rects.get(m.id); if (!r) return null;
               const hovering = drag?.drop.kind === 'meld' && drag.drop.meldId === m.id && drag.meld !== m.id;
@@ -776,8 +781,8 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
           </div>
           {draft.table.length === 0 && <div className="bd-empty"><b>{myTurn ? '첫 조합을 놓아 보세요' : '테이블이 비어 있어요'}</b><span>{myTurn ? `같은 색 연속 숫자 · 같은 숫자 다른 색${needInitial ? ` · 합계 ${view.config.initialMeldMin}점 이상` : ''}` : '내 차례가 오기 전에 손패를 정리해 보세요'}</span></div>}
         </section>
-        {sc.total > sc.view + 1 && (() => {
-          const track = sc.view - 16, th = Math.max(26, track * sc.view / sc.total), tt = sc.top / (sc.total - sc.view) * (track - th);
+        {layout.H > fsz.h + 1 && sc.total > sc.view + 1 && (() => {
+          const track = sc.view - 6, th = Math.max(26, track * sc.view / sc.total), tt = sc.top / (sc.total - sc.view) * (track - th);
           return <div className="bd-scroll" aria-hidden="true"><i style={{ height: th, transform: `translateY(${tt}px)` }} /></div>;
         })()}
         {selected.length > 0 && <div className="bd-sel" role="toolbar" aria-label="선택한 타일">
@@ -799,26 +804,21 @@ export function Board({ view, game, onExit }: { view: PublicView; game: GameApi;
       <aside className="bd-act">
         <fieldset className="bd-controls" disabled={commitBusy || drawBusy} aria-label="게임 조작">
         <div className="bd-sorts" role="group" aria-label="손패 정렬">
-          <button aria-pressed={sortMode === 'run'} onClick={() => sortBy('run')} aria-label="같은 색 연속 숫자로 정렬 (예: 빨강 1, 2, 3)">
+          <button className="s-run" aria-pressed={sortMode === 'run'} onClick={() => sortBy('run')} aria-label="같은 색 연속 숫자로 정렬 (예: 빨강 1, 2, 3)">
             <span className="mini" aria-hidden="true"><i className="red">1</i><i className="red">2</i><i className="red">3</i></span><small>같은 색</small>
           </button>
-          <button aria-pressed={sortMode === 'group'} onClick={() => sortBy('group')} aria-label="같은 숫자 다른 색으로 정렬 (예: 빨강 7, 검정 7, 파랑 7)">
+          <button className="s-group" aria-pressed={sortMode === 'group'} onClick={() => sortBy('group')} aria-label="같은 숫자 다른 색으로 정렬 (예: 빨강 7, 검정 7, 파랑 7)">
             <span className="mini" aria-hidden="true"><i className="red">7</i><i className="black">7</i><i className="blue">7</i></span><small>다른 색</small>
           </button>
         </div>
         <div className="bd-tools">
-          <button className="bd-tidy" onClick={tidyTable} aria-label="테이블 조합 자동 정돈" title="테이블 정돈">테이블 정돈</button>
+          <button className="bd-tidy" onClick={tidyTable} aria-label="테이블 조합 자동 정돈" title="테이블 정돈">정돈</button>
         </div>
         <div className="urow">
-          <button disabled={!past.length || commitBusy || drawBusy} onClick={undo} aria-label="되돌리기">↶</button>
-          <button disabled={!future.length || commitBusy || drawBusy} onClick={redo} aria-label="다시 실행">↷</button>
-          <button disabled={!myTurn || !changed || commitBusy} onClick={reset} aria-label={ckpt && !atCkpt ? '저장점으로 되돌리기' : '턴 처음 상태로'} title={ckpt && !atCkpt ? '저장점으로' : '턴 처음으로'}>⟲</button>
+          <button className="u-undo" disabled={!past.length || commitBusy || drawBusy} onClick={undo} aria-label="되돌리기">↶</button>
+          <button className="u-redo" disabled={!future.length || commitBusy || drawBusy} onClick={redo} aria-label="다시 실행">↷</button>
+          <button className="u-reset" disabled={!myTurn || !changed || commitBusy} onClick={reset} aria-label={ckpt && !atCkpt ? '저장점으로 되돌리기' : '턴 처음 상태로'} title={ckpt && !atCkpt ? '저장점으로' : '턴 처음으로'}>⟲</button>
         </div>
-        {!myTurn
-          ? <button className="primary go wait" disabled>대기 중<small>손패 정리 가능</small></button>
-          : changed
-          ? <button className={`primary go ${canCommit ? 'ready' : ''}`} disabled={!canCommit || !game.online || commitBusy} onClick={() => commit()}>{commitBusy ? '확정 중…' : canCommit ? '✓ 확정' : placed.length && !initialReady ? `${placedPoints}/${view.config.initialMeldMin}점` : '확인 필요'}</button>
-          : <button className="primary go" disabled={!game.online || drawBusy} onClick={onDraw}>{drawBusy ? '뽑는 중…' : '뽑기'}<small>남은 {view.poolCount}</small></button>}
         </fieldset>
       </aside>
 

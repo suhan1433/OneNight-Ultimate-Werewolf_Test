@@ -248,10 +248,10 @@ function Help({close}:{close:()=>void}) {
           <Tile img="mary-thorne" title="Mary Thorne" desc="플레이어 한 명(자신 포함)의 손패에서 무작위로 카드 한 장을 정합니다. 그 카드는 다음 트릭에 수트 규칙과 상관없이 내야 합니다."/>
           <Tile img="first-mate-con" title="Con이 잡은 Pirate" desc="Con으로 이긴 트릭에서 잡은 Pirate들의 능력을 차례로 사용할 수 있습니다. 상대가 낸 Juanita의 능력도 포함됩니다."/></div></HSec></>}
     </div>
-    <footer className="help-foot">
+    {tab!=='3인 예시'&&<footer className="help-foot">
       <button type="button" className="prev" disabled={idx===0} onClick={()=>go(-1)}><Icon name="back"/><span>이전</span></button>
       <div className="help-dots" role="group" aria-label={'도움말 페이지 '+(idx+1)+' / '+helpTabs.length}>{helpTabs.map((t,i)=><button key={t} type="button" className={i===idx?'on':''} onClick={()=>setTab(t)} aria-label={t} aria-current={i===idx?'page':undefined}/>)}</div>
-      {idx<helpTabs.length-1?<button type="button" className="primary next" onClick={()=>go(1)}>다음 · {helpTabs[idx+1]}<Icon name="next"/></button>:<button type="button" className="primary next" onClick={close}>확인</button>}</footer></div></div>{example&&<CardExample key={example.art} art={example.art} title={example.title} close={()=>setExample(null)}/>}</HelpExampleContext.Provider>;
+      {idx<helpTabs.length-1?<button type="button" className="primary next" onClick={()=>go(1)}>다음 · {helpTabs[idx+1]}<Icon name="next"/></button>:<button type="button" className="primary next" onClick={close}>확인</button>}</footer>}</div></div>{example&&<CardExample key={example.art} art={example.art} title={example.title} close={()=>setExample(null)}/>}</HelpExampleContext.Provider>;
 }
 const modes:Array<[GameConfig['roundMode'],string,string]>=[['classic','Classic','1–10장'],['evenKeeled','Even Keeled','2·4·6·8·10장'],['brawl','Skip to the Brawl','6–10장'],['swift','Swift-n-Salty','5장 × 5'],['broadside','Broadside','10장 × 10'],['whirlpool','Whirlpool','9·7·5·3·1장 × 2'],['bedtime','Past Your Bedtime','1장']];
 const advancedCards:CardOptions={...emptyCards,kraken:true,whale:true,loot:true,pirateAbilities:true};

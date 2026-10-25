@@ -40,3 +40,14 @@
 .ae-controls{display:flex;justify-content:space-between;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid #c9a35c33}
 .ae-controls button{min-height:44px;padding:10px 14px;font-size:13px}
 @media(max-width:600px){.ae-roles{grid-template-columns:repeat(2,minmax(0,1fr))}.ae-roles figure{grid-template-columns:44px minmax(0,1fr);align-items:center;gap:8px;padding:9px;text-align:left;justify-items:start}.ae-roles img{width:44px}.ae-roles figcaption{font-size:10px}.ae-roles figcaption b{font-size:12px}.ae-quest-cards{gap:8px;padding:8px 0}.ae-quest-cards>span{width:64px;height:86px}}
+/* 신하 한 사람의 시점으로 보는 연습 원탁 */
+.ae-practice-table{position:relative;min-height:260px;width:100%;border-radius:16px;background:radial-gradient(ellipse at center,#15333d99 0 38%,transparent 39%);isolation:isolate}
+.ae-practice-center{position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);text-align:center;color:var(--gold-300);font-size:12px;z-index:-1;white-space:nowrap}.ae-practice-center small{display:block;font-size:9px;color:var(--muted)}
+.ae-practice-seat{position:absolute;left:var(--seat-x);top:var(--seat-y);transform:translate(-50%,-50%);display:grid;justify-items:center;gap:3px;width:90px;padding:5px 2px;background:#0c1921;border:1px solid #c9a35c44;border-radius:8px;text-align:center;color:var(--parchment);font:inherit;line-height:1.4;box-shadow:none}
+button.ae-practice-seat:hover:not(:disabled),button.ae-practice-seat:active:not(:disabled){transform:translate(-50%,-50%);background:#18303c}
+.ae-practice-seat b{font-size:11px}.ae-practice-seat small{font-size:9px;color:var(--muted);overflow-wrap:anywhere}.ae-practice-seat em{font-size:9px;font-style:normal;color:var(--gold-300)}
+.ae-practice-seat.self{border-color:var(--good-300)}.ae-practice-seat.chosen{box-shadow:0 0 0 2px var(--gold-300)}.ae-practice-seat.suspect{outline:2px dashed var(--gold-300);outline-offset:3px}
+.ae-practice-face{display:grid;place-items:center;width:30px;height:36px;background:#c9a35c0d;border:1px solid #c9a35c33;border-radius:3px;color:var(--muted);font-size:19px}.ae-practice-face img{width:100%;height:100%;object-fit:cover}
+.ae-selected-party{padding:10px;border:1px solid var(--gl-line);background:var(--gl-wash);color:var(--gold-300);font-weight:700;text-align:center}
+.ae-vote-separate{display:grid;gap:8px;padding:12px;border:1px dashed var(--gold-500);font-size:12px}.ae-quest-cards .hidden{border-style:dashed;color:var(--muted);background:#c9a35c0a}
+@media(max-width:600px){.ae-practice-table{min-height:250px}.ae-practice-seat{width:60px;padding:5px 1px}.ae-practice-seat b{font-size:10px}.ae-practice-seat small{font-size:8px}.ae-practice-center{font-size:10px}.ae-practice-center small{font-size:8px}}

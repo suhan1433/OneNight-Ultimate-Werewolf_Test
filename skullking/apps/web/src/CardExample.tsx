@@ -7,7 +7,7 @@ export function CardExample({ art, title, close }: { art: string; title: string;
   const lesson = cardLessons[art];
   const [variant, setVariant] = useState(0);
   const [step, setStep] = useState(0);
-  const [playing, setPlaying] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const [playing, setPlaying] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   const example = lesson.examples[variant];
   const end = example.plays.length + 2;

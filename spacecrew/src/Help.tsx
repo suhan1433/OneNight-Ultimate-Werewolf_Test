@@ -21,8 +21,9 @@ export function HelpBody() {
     <details open><summary>3인 예시 플레이 · 차근차근 따라가기</summary><HelpExample /></details>
     <details><summary>카드 내는 법</summary>
       <p>색 카드 4가지(분홍 ●, 파랑 ▲, 초록 ■, 노랑 ★)는 1~9, 로켓 🚀은 1~4예요.</p>
-      <ul><li>먼저 나온 카드와 <b>같은 색이 있으면 반드시 그 색</b>을 내요.</li><li>같은 색이 없으면 <b>아무 카드나</b> 낼 수 있어요.</li><li>같은 색끼리는 <b>큰 숫자</b>가 이겨요. <b>로켓은 가장 강해요.</b></li><li>내 차례에는 <b>밝게 빛나는 카드</b>만 낼 수 있어요. 어두운 카드는 지금 낼 수 없어요.</li><li>카드를 먼저 선택한 뒤 ‘이 카드 내기’로 확정해요. 모바일에서는 선택한 카드를 한 번 더 눌러도 낼 수 있어요. 키보드는 ←→로 카드를 옮기고 Enter로 선택해요.</li></ul>
-      <div className="demo"><Demo card={sample('B', 5)} note="먼저 나온 카드" /><Demo card={sample('B', 3)} note="같은 색이라 낼 수 있음" /><Demo card={sample('R', 1)} note="파랑이 없을 때 이김" /></div></details>
+      <ul><li>먼저 나온 카드와 <b>같은 색이 있으면 반드시 그 색</b>을 내요.</li><li>같은 색이 없으면 <b>아무 카드나</b> 낼 수 있어요.</li><li>같은 색끼리는 <b>큰 숫자</b>가 이겨요. <b>로켓은 모든 색 카드를 이겨요.</b> 로켓이 여러 장이면 숫자가 가장 큰 로켓이 이겨요.</li><li>내 차례에는 <b>밝게 빛나는 카드</b>만 낼 수 있어요. 어두운 카드는 지금 낼 수 없어요.</li><li>카드를 먼저 선택한 뒤 ‘이 카드 내기’로 확정해요. 모바일에서는 선택한 카드를 한 번 더 눌러도 낼 수 있어요. 키보드는 ←→로 카드를 옮기고 Enter로 선택해요.</li></ul>
+      <div className="demo"><Demo card={sample('B', 5)} note="먼저 나온 카드" /><Demo card={sample('B', 3)} note="같은 색이라 낼 수 있음" /><Demo card={sample('R', 4)} note="손패에 파랑이 없을 때 낼 수 있어요" /></div>
+      <p className="tip">이 예시에서는 로켓 4를 낸 사람이 이겨요. 로켓이 파랑 5·파랑 3보다 강하기 때문이에요.</p></details>
     <details><summary>과제와 통신</summary>
       <dl className="terms"><dt><span className="token">1</span><span className="token">2</span></dt><dd>순서 표시. 작은 번호부터 달성해요.</dd><dt><span className="token">›</span><span className="token">››</span></dt><dd>화살표 표시. › 다음에 ›› 순서예요.</dd><dt><span className="token">Ω</span></dt><dd>가장 마지막에 달성해요.</dd></dl>
       <p>카드 이야기는 말로 할 수 없어요. 대신 미션마다 한 번, 카드 한 장을 공개해 단서를 줘요.</p>
@@ -47,7 +48,7 @@ export function Tutorial({ onDone }: { onDone: () => void }) {
   const finish = () => { markTutorialSeen(); onDone(); };
   const slides = [
     { h: '같은 팀, 같은 목표', p: '서로 이기는 게임이 아니에요. 미션의 과제 카드를 정해진 사람이 따내면 모두 성공해요.', demo: <div className="demo"><span className="task-chip"><CardFace card={sample('P', 6)} size="md" /><TaskToken task={{ ...sample('P', 6), ownerId: null, done: false, order: 1 }} /></span><span className="task-chip"><CardFace card={sample('Y', 2)} size="md" /></span></div> },
-    { h: '카드는 이렇게 내요', p: '먼저 나온 색이 손에 있으면 반드시 같은 색을 내요. 없으면 아무 카드나, 로켓🚀은 가장 강해요. 낼 수 있는 카드만 밝게 빛나요.', demo: <div className="demo"><Demo card={sample('B', 5)} note="먼저 나온 카드" /><Demo card={sample('B', 3)} note="같은 색을 내요" /><Demo card={sample('R', 1)} note="로켓은 최강" /></div> },
+    { h: '카드는 이렇게 내요', p: '먼저 나온 색이 손에 있으면 반드시 같은 색을 내요. 없으면 아무 카드나 낼 수 있어요. 로켓은 모든 색 카드를 이기고, 로켓끼리는 큰 숫자가 이겨요. 낼 수 있는 카드만 밝게 빛나요.', demo: <div className="demo"><Demo card={sample('B', 5)} note="먼저 나온 카드" /><Demo card={sample('B', 3)} note="같은 색을 내요" /><Demo card={sample('R', 4)} note="이 트릭은 로켓 4가 이겨요" /></div> },
     { h: '말 대신 통신', p: '트릭의 첫 카드가 놓이기 전, 누구나 한 번 카드를 공개해 단서를 줄 수 있어요. 마커가 맨 위면 가장 높은 카드, 가운데면 유일한 카드, 맨 아래면 가장 낮은 카드예요.', demo: <div className="demo"><Demo card={sample('G', 7)} spot="top" note="가장 높음" /><Demo card={sample('Y', 4)} spot="mid" note="유일함" /><Demo card={sample('B', 2)} spot="bottom" note="가장 낮음" /></div> },
     { h: '3초 안에 내 할 일 찾기', p: '청록 링이 켜진 좌석이 지금 차례예요. 손패 위의 한 줄 안내가 내가 할 일을 알려줘요.', demo: <div className="demo col"><span className="mini-seat"><span className="av"><span className="avatar">루</span><span className="turn-ring" /></span><b>루나</b><em className="turn-tag">차례</em></span><p className="status t-act"><b>▶ 내 차례 · 빛나는 카드 중 한 장을 내세요</b></p></div> },
   ];
