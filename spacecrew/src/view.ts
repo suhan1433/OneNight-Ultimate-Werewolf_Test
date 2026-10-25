@@ -19,20 +19,20 @@ export function useGameView(game: Game | null) {
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [finalTrick, setFinalTrick] = useState<TrickCard[]>([]);
   const [briefing, setBriefing] = useState(false);
-  const prev = useRef({ phase: null as string | null, trick: [] as Game['trick'], done: new Set<string>() });
+  const prev = useRef({ phase: null as string | null, trickNo: 0, trick: [] as Game['trick'], done: new Set<string>() });
   const myPlay = useRef<Card | null>(null);
   const timers = useRef<number[]>([]);
   const clear = () => { timers.current.forEach(id => window.clearTimeout(id)); timers.current = []; };
   useEffect(() => clear, []);
 
   useEffect(() => {
-    if (!game) { prev.current = { phase: null, trick: [], done: new Set() }; clear(); setReveal(null); setBriefing(false); setFinalTrick([]); return; }
+    if (!game) { prev.current = { phase: null, trickNo: 0, trick: [], done: new Set() }; clear(); setReveal(null); setBriefing(false); setFinalTrick([]); return; }
     const p = prev.current;
     if (game.phase === 'lobby') { setBriefing(false); clear(); setReveal(null); setFinalTrick([]); }
     else if (p.phase === 'lobby') setBriefing(true); // 대기실 → 시작 전환을 직접 본 경우에만 브리핑
     const winnerId = game.lastTrick?.winnerId;
-    // 비어 있지 않던 트릭이 비워졌다 = 트릭 종료
-    if (game.phase !== 'lobby' && game.trick.length === 0 && p.trick.length > 0 && winnerId) {
+    // 성공·실패로 끝난 트릭은 서버가 카드를 그대로 보관하므로 트릭 번호로 종료를 감지한다.
+    if (game.phase !== 'lobby' && p.phase !== null && game.trickNo > p.trickNo && winnerId) {
       const known: TrickCard[] = game.lastTrick?.cards ?? p.trick;
       const missing: TrickCard[] = game.players.filter(pl => !known.some(k => k.playerId === pl.id)).map(pl => ({ playerId: pl.id, card: pl.id === game.playerId ? myPlay.current : null }));
       const cards = [...known, ...missing];
@@ -44,7 +44,7 @@ export function useGameView(game: Game | null) {
       timers.current.push(window.setTimeout(() => setReveal(r => r && { ...r, stage: 'sweep' }), at)); at += t.sweep;
       timers.current.push(window.setTimeout(() => setReveal(null), at));
     }
-    prev.current = { phase: game.phase, trick: game.trick, done: new Set(game.tasks.filter(t => t.done).map(t => t.id)) };
+    prev.current = { phase: game.phase, trickNo: game.trickNo, trick: game.trick, done: new Set(game.tasks.filter(t => t.done).map(t => t.id)) };
   }, [game]);
 
   return {
@@ -62,7 +62,7 @@ export function deriveView(game: Game, reveal: Reveal | null, briefing: boolean,
   const seats = game.players.map((player, i) => ({ player, angle: seatAngle(i, meIdx, n), isMe: i === meIdx }));
   const byId = (id: string | null | undefined): Player | undefined => game.players.find(p => p.id === id);
   const cmdIdx = Math.max(0, game.players.findIndex(p => p.id === game.commanderId));
-  const assigner = game.players[(cmdIdx + game.assignmentCursor) % n];
+  const assigner = game.players[game.mission.distribute ? cmdIdx : (cmdIdx + game.assignmentCursor) % n];
   const isCommander = game.commanderId === game.playerId;
   const playing = kind === 'play';
   const resolving = !!reveal;

@@ -408,6 +408,49 @@ button:disabled{opacity:.38;cursor:not-allowed}
 .beat-arrow{display:flex;align-items:center;gap:.2rem;font:700 .74rem var(--sans);color:var(--blood);white-space:nowrap}
 .beat b{display:block;font:900 .88rem var(--serif)}.beat em{font:700 .78rem var(--sans);font-style:normal;color:var(--blood)}
 
+/* 도움말 3인 라운드 예시 */
+.help .walk-start{width:100%;justify-content:space-between;gap:.6rem;margin:0 0 1.2rem;padding:.8rem;font-size:.84rem;text-align:left;white-space:normal;border-color:var(--blood)!important;color:var(--blood)!important}
+.round-example{min-width:0}
+.walk-progress{font-size:.74rem;font-weight:700;color:var(--blood);margin-bottom:.7rem}
+.walk-step{display:grid;gap:.9rem;min-width:0;font-size:.84rem;color:var(--ink-2)}
+.walk-step>h3{font-size:1rem;color:var(--ink);padding-bottom:.5rem;border-bottom:1px solid #5f452850}
+.walk-step b{color:var(--ink)}
+.walk-step .walk-note{font-size:.76rem;padding:.7rem .8rem;border-left:3px solid var(--blood);background:#fff8e040}
+.walk-hands{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem}
+.walk-hands section{min-width:0;padding:.7rem .5rem;border:1px solid #5f452850;background:#fff8e040}
+.walk-hands h4{margin:0 0 .6rem;font:900 .88rem var(--serif);color:var(--ink)}
+.walk-hands section>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.4rem}
+.walk-hands figure,.walk-plays figure{min-width:0;margin:0;display:flex;flex-direction:column;align-items:center;gap:.5rem;text-align:center}
+.walk-hands img{width:100%;max-width:58px;aspect-ratio:110/156;object-fit:cover;border-radius:4px;box-shadow:var(--sh-1)}
+.walk-hands figcaption{font-size:.66rem;line-height:1.5;overflow-wrap:anywhere}
+.walk-bids{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.walk-bids>div{display:grid;gap:.45rem;align-content:start;padding:.75rem .5rem;border:1px solid #5f452850;text-align:center}
+.walk-bids strong{font:900 1.25rem var(--serif);color:var(--blood)}
+.walk-bids span{font-size:.74rem}
+.walk-trick{padding:.8rem .65rem;background:radial-gradient(ellipse,#3b5148,#172b28);border:3px solid #6c4b2e;border-radius:8px;color:var(--bone)}
+.walk-table-label{text-align:center;font-size:.72rem;color:#d7ccae;margin-bottom:.8rem}
+.walk-plays{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem}
+.walk-plays figure{padding:.5rem .3rem;border:1px solid #b8c7be55;border-radius:5px}
+.walk-plays figure>b{font:900 .84rem var(--serif);color:var(--bone)}
+.walk-plays img{width:100%;max-width:78px;aspect-ratio:110/156;object-fit:cover;border-radius:4px;box-shadow:var(--sh-1)}
+.walk-plays figcaption,.walk-plays figure>p{font-size:.72rem;line-height:1.5;overflow-wrap:anywhere}
+.walk-plays figure>strong{font-size:.72rem;color:var(--gold-hi)}
+.walk-plays .walk-winner{border-color:var(--gold-hi);background:#f1cf7a12}
+.walk-plays .walk-winner img{outline:2px solid var(--gold-hi);outline-offset:2px}
+.walk-answers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.walk-answers button{min-height:44px;padding:.6rem .3rem;font-size:.84rem}
+.walk-answers button[aria-pressed=true]{border-color:var(--blood)!important;color:var(--blood)!important;background:#8d2e2515!important}
+.walk-feedback{display:grid;gap:.6rem;padding:.75rem;border:1px solid #5f452850;background:#fff8e040}
+.walk-ledger{min-width:0;overflow-x:auto}
+.walk-ledger table{width:100%;border-collapse:collapse;font-size:.8rem;text-align:center;font-variant-numeric:tabular-nums}
+.walk-ledger caption{text-align:left;margin-bottom:.6rem;font-weight:700;color:var(--ink)}
+.walk-ledger th,.walk-ledger td{padding:.65rem .3rem;border-bottom:1px solid #5f452850;white-space:nowrap}
+.walk-ledger thead{background:#5f452815;color:var(--ink)}
+.walk-controls{display:flex;justify-content:space-between;gap:.6rem;margin-top:1rem;padding-top:1rem;border-top:1px solid #5f452850}
+.walk-controls button{min-height:44px;padding:.65rem .9rem;font-size:.84rem;letter-spacing:0}
+@media(max-width:560px){.walk-hands{grid-template-columns:1fr}.walk-hands section{padding:.7rem}.walk-hands img{max-width:62px}.walk-plays{gap:.35rem}.walk-trick{padding:.65rem .35rem}.walk-plays figure{padding:.5rem .15rem}.walk-plays figure>b{font-size:.76rem}.walk-plays figcaption,.walk-plays figure>p,.walk-plays figure>strong{font-size:.66rem}.walk-ledger table{font-size:.68rem}.walk-ledger th,.walk-ledger td{padding:.6rem .2rem}}
+@media(max-width:360px){.help-foot{grid-template-columns:auto minmax(0,1fr)}.help-foot .next{grid-column:2;grid-row:1;max-width:100%;white-space:normal}.help-foot .help-dots{grid-column:1/-1;grid-row:2;justify-self:center}}
+
 /* 도움말 카드 실습: 실제 게임과 분리된 3인 트릭 재생 */
 .tiles .interactive-tile{width:100%;text-align:left;white-space:normal;border-radius:0;align-items:start;line-height:1.55;background:rgba(255,248,224,.25)!important;border-color:rgba(42,28,16,.28)!important}
 .tiles .interactive-tile:hover{border-color:var(--blood)!important;background:rgba(255,248,224,.5)!important}

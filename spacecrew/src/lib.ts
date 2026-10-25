@@ -16,6 +16,14 @@ export const sortHand = (hand: Card[]) => [...hand].sort((a, b) => ORDER.indexOf
 export const cardName = (card: Card) => `${SUITS[card.suit].name} ${card.value}`;
 export const cardLabel = (card: Card) => `${SUITS[card.suit].icon} ${card.value}`;
 
+export function decisionLabel(game: Pick<Game, 'mission' | 'decisionResponses'>, playerId: string): string {
+  const answer = game.decisionResponses?.[playerId];
+  if (answer === undefined) return '응답 대기';
+  if (game.mission.special === 'sick') return answer ? '좋음' : '나쁨';
+  if (game.mission.special === 'finalPattern') return answer ? '선호함' : '선호하지 않음';
+  return answer ? '예' : '아니오';
+}
+
 /* ───────── 저장소 ───────── */
 export const sessionKey = 'planet-nine-online-session';
 export const readSession = (): Session | null => { try { return JSON.parse(localStorage.getItem(sessionKey) ?? 'null'); } catch { return null; } };
@@ -89,8 +97,9 @@ export const missionRules = (m: Mission): string[] => {
 };
 
 /** 과제 카드가 없는 특수 미션에서도, 지정된 승무원의 역할을 좌석에 표시한다. */
-export function missionRoleForPlayer(game: Pick<Game, 'mission' | 'targetId' | 'targetBId'>, playerId: string): string | null {
+export function missionRoleForPlayer(game: Pick<Game, 'mission' | 'targetId' | 'targetBId' | 'pinkNineHolderId'>, playerId: string): string | null {
   const { special } = game.mission;
+  if (special === 'pink' && game.pinkNineHolderId === playerId) return '분홍 9 소유자';
   if (game.targetId === playerId) {
     const labels: Record<string, string> = {
       sick: '아픈 요원',

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { Game, Send } from './types';
-import { cardLabel } from './lib';
+import { cardLabel, decisionLabel } from './lib';
 import { CardFace, Rules, TaskChip } from './ui';
 import type { View } from './view';
 
@@ -70,6 +70,6 @@ export function PhasePanel({ game, view, send }: { game: Game; view: View; send:
   return <Shell tag="커맨더의 결정" title={game.mission.special === 'finalPattern' && game.targetStep === 1 ? '마지막 트릭 담당자를 지정하세요' : '특수 미션 대상을 지정하세요'}>
     <p>{game.mission.text}</p><Rules mission={game.mission} />
     {needsResponses && <><p className="sub">{response.question}</p><div className="choices"><button disabled={answered !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: true })}>{response.yes}</button><button disabled={answered !== undefined} onClick={() => send('DECISION_RESPONSE', { yes: false })}>{response.no}</button></div><p className="sub">{all ? `모든 응답 완료 · ${response.note}` : `${count(game.decisionResponses)}/${game.players.length}명 응답`}</p></>}
-    <div className="choices">{game.players.filter(p => p.id !== excluded).map(p => <button key={p.id} className={commander && all ? 'primary' : ''} disabled={!commander || !all} onClick={() => send('TARGET_SELECT', { targetId: p.id })}>{p.nickname}</button>)}</div>
+    <div className="choices" aria-live="polite">{game.players.filter(p => p.id !== excluded).map(p => <button key={p.id} className={commander && all ? 'primary' : ''} disabled={!commander || !all} onClick={() => send('TARGET_SELECT', { targetId: p.id })}>{p.nickname}{needsResponses && ` · ${decisionLabel(game, p.id)}`}</button>)}</div>
   </Shell>;
 }

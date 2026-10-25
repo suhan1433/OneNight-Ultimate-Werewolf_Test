@@ -1,0 +1,42 @@
+.help-example-link{width:100%;min-height:44px;padding:12px;margin-bottom:20px;text-align:left;white-space:normal;color:var(--gold-300);border:1px solid #c9a35c77;background:#c9a35c12}
+.avalon-example{min-width:0;scroll-margin-top:12px}
+.avalon-example .ae-intro{margin:0 0 16px;font-size:13px;line-height:1.65;color:var(--muted)}
+.ae-progress{margin:0 0 10px;font-size:12px;font-weight:700;color:var(--gold-300)}
+.ae-step{display:grid;gap:14px;min-width:0;color:var(--parchment);font-size:13px;line-height:1.75}
+.ae-step h4{margin:0;font-size:16px;line-height:1.6;color:var(--gold-300)}
+.ae-step p{margin:0}
+.ae-step .ae-note{padding:11px 12px;background:#c9a35c12;border-left:2px solid var(--gold-500);font-size:12px;color:var(--muted)}
+.ae-roles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.ae-roles figure{display:grid;justify-items:center;align-content:start;gap:8px;margin:0;padding:12px 6px;border:1px solid #c9a35c33;background:#070f1c88;text-align:center;min-width:0}
+.ae-roles img{width:100%;max-width:70px;aspect-ratio:3/4;object-fit:cover;border-radius:5px}
+.ae-roles figcaption{display:grid;gap:3px;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.ae-roles figcaption b{font-size:13px}
+.ae-roles figcaption small{font-size:11px}
+.ae-roles .good{border-top:2px solid var(--good-300)}.ae-roles .good small{color:var(--good-300)}
+.ae-roles .evil{border-top:2px solid var(--evil-300)}.ae-roles .evil small{color:var(--evil-300)}
+.ae-choices{display:flex;flex-wrap:wrap;gap:8px}
+.ae-choices button{flex:1 1 64px;min-height:44px;padding:10px;font-size:13px}
+.ae-choices button[aria-pressed=true],.ae-answers button[aria-pressed=true]{border-color:var(--gold-300);background:#c9a35c20;color:var(--gold-300)}
+.ae-step .ae-feedback{display:grid;gap:10px;padding:12px;border:1px solid #c9a35c55;background:#0a122188;line-height:1.75}
+.ae-sizes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.ae-sizes>div{display:grid;gap:3px;padding:9px 3px;text-align:center;border:1px solid #c9a35c44;background:#070f1c88}
+.ae-sizes span{font-size:11px;color:var(--muted)}.ae-sizes b{font-size:14px;color:var(--gold-300)}
+.ae-team{display:grid;gap:10px;padding:12px;border:1px solid #c9a35c44;background:#070f1c88}
+.ae-team p{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px}.ae-team p span{font-size:12px;color:var(--muted)}
+.ae-team>div{display:flex;gap:8px;flex-wrap:wrap}
+.ae-team>div>span{padding:5px 12px;border:1px solid #c9a35c66;border-radius:18px;color:var(--gold-300)}
+.ae-votes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.ae-votes>div{display:grid;gap:8px;justify-items:center;padding:10px 3px;border:1px solid #c9a35c33;background:#070f1c88;font-size:12px}
+.ae-votes .approve{color:var(--good-300)}.ae-votes .reject{color:var(--evil-300)}
+.ae-quest-cards{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding:8px}
+.ae-quest-cards>span{display:grid;place-items:center;width:70px;height:94px;border-radius:7px;border:1px solid currentColor;font-weight:800;font-size:16px}
+.ae-quest-cards .success{color:var(--good-300);background:#5f92d118}.ae-quest-cards .fail{color:var(--evil-300);background:#c14a5f18}
+.ae-answers{display:grid;gap:8px}.ae-answers button{min-height:44px;padding:12px;text-align:left;white-space:normal;font-size:13px;line-height:1.6}
+.ae-results{display:flex;flex-wrap:wrap;gap:8px}.ae-results span{padding:6px 10px;border:1px solid #c9a35c44;font-size:12px;color:var(--muted)}
+.ae-results .success{border-color:var(--good-300);color:var(--good-300)}.ae-results .fail{border-color:var(--evil-300);color:var(--evil-300)}
+.ae-step .ae-ending{display:grid;gap:8px;padding:14px;border:1px solid currentColor}.ae-ending span{font-size:12px;color:var(--parchment)}
+.ae-ending.good{color:var(--good-300)}.ae-ending.evil{color:var(--evil-300)}
+.ae-recap{display:grid;gap:9px;margin:0;padding-left:20px}.ae-recap li::marker{color:var(--gold-300)}
+.ae-controls{display:flex;justify-content:space-between;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid #c9a35c33}
+.ae-controls button{min-height:44px;padding:10px 14px;font-size:13px}
+@media(max-width:600px){.ae-roles{grid-template-columns:repeat(2,minmax(0,1fr))}.ae-roles figure{grid-template-columns:44px minmax(0,1fr);align-items:center;gap:8px;padding:9px;text-align:left;justify-items:start}.ae-roles img{width:44px}.ae-roles figcaption{font-size:10px}.ae-roles figcaption b{font-size:12px}.ae-quest-cards{gap:8px;padding:8px 0}.ae-quest-cards>span{width:64px;height:86px}}

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { pathToFileURL } from 'node:url';
 import { randomBytes, randomUUID } from 'node:crypto';
 import express from 'express';
 import { Server } from 'socket.io';
@@ -20,7 +21,7 @@ const SUITS = {
   R: { name: '로켓', icon: '🚀', color: '#edf2ff' },
 };
 
-// Planet Nine logbook.  Mission settings come from the supplied local-play reference.
+// Planet Nine logbook, checked against 스페쿠_룰북.pdf and 스페쿠_미션룰북.pdf.
 const MISSIONS = {
   1: { tasks: 1, label: '첫 번째 신호', text: '과제 카드 1장을 올바른 승무원이 가져오세요.' },
   2: { tasks: 2, label: '궤도 보정', text: '과제 카드 2장을 올바른 승무원이 가져오세요.' },
@@ -111,16 +112,21 @@ function validName(value) { const name = String(value || '').trim().slice(0, 16)
 function mission(room) { return MISSIONS[room.missionId]; }
 function requireSession(socket, roomCode) { if (socket.data.room !== roomCode || !socket.data.playerId) throw Error('유효하지 않은 게임 세션입니다.'); return socket.data.playerId; }
 function bind(socket, room, player) { socket.data.room = room.code; socket.data.playerId = player.id; socket.join(roomChannel(room.code)); }
-function playerPublic(room, p) { return { id: p.id, nickname: p.nickname, isBot: !!p.isBot, connected: p.connected, ready: p.ready, cardsLeft: p.hand.length, wins: p.wins, comm: p.comm }; }
+function playerPublic(room, p) { return { id: p.id, nickname: p.nickname, isBot: !!p.isBot, connected: p.connected, ready: p.ready, cardsLeft: p.hand.length, wins: p.wins, comm: p.comm ? { ...p.comm, played: !p.hand.some(card => card.id === p.comm.card.id) } : null }; }
 function legalCards(room, player) { if (room.turnId !== player.id || Date.now() < (room.nextTurnReadyAt ?? 0)) return []; if (!room.trick.length) return player.hand.map(c => c.id); const lead = room.trick[0].card.suit; const follows = player.hand.filter(card => card.suit === lead); return (follows.length ? follows : player.hand).map(card => card.id); }
 function taskPublic(task) { return { ...task }; }
+function visibleTasks(room) {
+  if (!mission(room).distribute || room.phase !== 'assign') return room.tasks;
+  const next = room.tasks.find(task => !task.ownerId);
+  return room.tasks.filter(task => task.ownerId || task === next);
+}
 function view(room, playerId) {
   const self = getPlayer(room, playerId);
   return {
     code: room.code, playerId, hostId: room.hostId, maxPlayers: room.maxPlayers, missionId: room.missionId, mission: mission(room), phase: room.phase,
     players: room.players.map(p => playerPublic(room, p)), commanderId: room.commanderId, turnId: room.turnId, leaderId: room.leaderId,
-    hand: self.hand, legalCardIds: legalCards(room, self), tasks: room.tasks.map(taskPublic), trick: room.trick, lastTrick: room.lastTrick,
-    trickNo: room.trickNo, totalTricks: room.totalTricks, assignmentCursor: room.assignmentCursor, sickId: room.sickId, targetId: room.targetId, targetBId: room.targetBId, targetStep: room.targetStep, decisionResponses: room.decisionResponses, distressVotes: room.distressVotes, distressDirections: room.distressDirections, distressActive: !!room.distressActive, distressPassed: !!room.distressPasses[playerId], distressPassCount: Object.keys(room.distressPasses).length, result: room.result, log: room.log.slice(-10),
+    hand: self.hand, legalCardIds: legalCards(room, self), tasks: visibleTasks(room).map(taskPublic), trick: room.trick, lastTrick: room.lastTrick,
+    trickNo: room.trickNo, totalTricks: room.totalTricks, assignmentCursor: room.assignmentCursor, sickId: room.sickId, pinkNineHolderId: room.pinkNineHolderId, targetId: room.targetId, targetBId: room.targetBId, targetStep: room.targetStep, decisionResponses: room.decisionResponses, distressVotes: room.distressVotes, distressDirections: room.distressDirections, distressActive: !!room.distressActive, distressPassed: !!room.distressPasses[playerId], distressPassCount: Object.keys(room.distressPasses).length, result: room.result, log: room.log.slice(-10),
   };
 }
 function send(room) { room.players.forEach(player => { if (player.socketId) io.to(player.socketId).emit('ROOM_STATE', view(room, player.id)); }); scheduleBotTurn(room); }
@@ -154,14 +160,32 @@ function deal(room) {
   room.commanderId = room.players.find(p => p.hand.some(c => c.id === 'R4')).id;
   room.leaderId = room.commanderId; room.turnId = room.commanderId;
   room.tasks = taskCards(mission(room).tasks, mission(room), cards); room.hiddenTasks = null; if (mission(room).special === 'allTasks') { room.hiddenTasks = room.tasks; room.tasks = []; } room.trick = []; room.lastTrick = null; room.trickNo = 0; room.totalTricks = Math.floor(cards.length / room.players.length);
-  room.assignmentCursor = 0; room.sickId = null; room.targetId = null; room.targetBId = null; room.targetStep = 0; room.wonWithOne = 0; room.rocketWins = []; room.pinkWins = 0; room.result = null; room.decisionResponses = {}; room.distressVotes = {}; room.distressDirections = {}; room.distressPasses = {}; room.distressActive = keepDistress; room.distressDirection = null; room.nextTurnReadyAt = 0;
+  room.assignmentCursor = 0; room.sickId = null; room.targetId = null; room.targetBId = null; room.targetStep = 0; room.targetWins = 0; room.pinkNineHolderId = null; room.wonWithOne = 0; room.rocketWins = []; room.pinkWins = 0; room.result = null; room.decisionResponses = {}; room.distressVotes = {}; room.distressDirections = {}; room.distressPasses = {}; room.distressActive = keepDistress; room.distressDirection = null; room.nextTurnReadyAt = 0;
   if (['sick', 'noComm', 'allTasks', 'oneTrick', 'firstLast', 'finalPattern'].includes(mission(room).special)) room.phase = 'chooseTarget';
-  else if (mission(room).special === 'pink') { const holder = room.players.find(player => player.hand.some(card => card.id === 'P9')); room.targetId = previousPlayer(room, holder.id).id; room.phase = 'distressVote'; }
+  else if (mission(room).special === 'pink') { const holder = room.players.find(player => player.hand.some(card => card.id === 'P9')); room.pinkNineHolderId = holder.id; room.targetId = nextPlayer(room, holder.id).id; appendLog(room, `●9 소유자: ${holder.nickname} · 분홍 수집 담당: ${getPlayer(room, room.targetId).nickname}`); room.phase = 'distressVote'; }
   else if (room.tasks.length) startTaskAssignment(room);
   else room.phase = 'distressVote';
   appendLog(room, `👑 ${getPlayer(room, room.commanderId).nickname} 님이 커맨더입니다.`);
 }
-function currentAssigner(room) { return room.players[(room.players.findIndex(p => p.id === room.commanderId) + room.assignmentCursor) % room.players.length]; }
+function currentAssigner(room) { if (mission(room).distribute) return getPlayer(room, room.commanderId); return room.players[(room.players.findIndex(p => p.id === room.commanderId) + room.assignmentCursor) % room.players.length]; }
+function canAssignTask(room, ownerId) {
+  const total = room.tasks.length;
+  const counts = room.players.map(player => room.tasks.filter(task => task.ownerId === player.id).length + Number(player.id === ownerId));
+  const remaining = room.tasks.filter(task => !task.ownerId).length - 1;
+  return counts.every(count => count <= Math.ceil(total / room.players.length))
+    && counts.reduce((sum, count) => sum + Math.max(0, Math.floor(total / room.players.length) - count), 0) <= remaining;
+}
+function assignTask(room, task, owner) {
+  if (mission(room).distribute) {
+    if (task !== room.tasks.find(item => !item.ownerId)) throw Error('현재 공개된 과제부터 배정해야 합니다.');
+    if (!canAssignTask(room, owner.id)) throw Error('과제는 가능한 한 균등하게 분배해야 합니다.');
+  }
+  task.ownerId = owner.id;
+  room.assignmentCursor += 1;
+  room.decisionResponses = {};
+  appendLog(room, `📌 ${owner.nickname} 님이 ${cardLabel(task)} 과제를 맡았습니다.`);
+  if (room.tasks.every(item => item.ownerId)) startPrePlay(room);
+}
 function startTaskAssignment(room) {
   // Token changes happen after tasks are revealed but before anyone chooses one.
   room.decisionResponses = {};
@@ -208,7 +232,7 @@ function resolveTrick(room) {
     // Consecutive order tokens may be completed in the same trick.  Only a
     // lower token that remains unresolved after this trick is a violation.
     if (task.order && room.tasks.some(other => other.order && other.order < task.order && before.has(other.id) && !completedIds.has(other.id))) return taskFailure(room, `①→② 순서가 아닌 과제를 먼저 완료했습니다.`);
-    if (!task.order && room.tasks.some(other => other.order && before.has(other.id))) return taskFailure(room, '순서 토큰 과제를 모두 완료하기 전에 다른 과제를 완료했습니다.');
+    if (!task.order && room.tasks.some(other => other.order && before.has(other.id) && !completedIds.has(other.id))) return taskFailure(room, '순서 토큰 과제를 모두 완료하기 전에 다른 과제를 완료했습니다.');
     if (task.arrow && room.tasks.some(other => other.arrow && other.arrow < task.arrow && before.has(other.id) && !completedIds.has(other.id))) return taskFailure(room, `화살표 순서가 아닌 과제를 먼저 완료했습니다.`);
     if (task.omega && room.tasks.some(other => other.id !== task.id && before.has(other.id) && !completedIds.has(other.id))) return taskFailure(room, 'Ω 과제는 마지막에 완료해야 합니다.');
     if (rule === 'omegaLastTrick' && task.omega && room.trickNo !== room.totalTricks) return taskFailure(room, 'Ω 과제는 마지막 트릭에서 완료해야 합니다.');
@@ -224,13 +248,40 @@ function resolveTrick(room) {
   if (rule === 'firstLast') { const edge = room.trickNo === 1 || room.trickNo === room.totalTricks; if (winner.id === room.targetId) { if (!edge || win.card.suit === 'R') return taskFailure(room, '지정된 승무원은 로켓 없이 첫·마지막 트릭만 이겨야 합니다.'); } else if (edge) return taskFailure(room, '첫·마지막 트릭은 지정된 승무원이 이겨야 합니다.'); }
   if (rule === 'finalPattern') { const expected = room.trickNo <= 4 ? room.targetId : room.trickNo === room.totalTricks ? room.targetBId : null; if ((expected && winner.id !== expected) || (!expected && (winner.id === room.targetId || winner.id === room.targetBId))) return taskFailure(room, '최종 패턴과 다른 승리자입니다.'); }
   if (rule === 'pink') { const pinkCount = cards.filter(item => item.card.suit === 'P').length; if (pinkCount && winner.id !== room.targetId) return taskFailure(room, '분홍 카드는 지정된 승무원이 모두 가져와야 합니다.'); room.pinkWins += pinkCount; }
-  if (rule === 'swap' && room.trickNo === 1) { const picked = room.players.map((player, index) => ({ player, card: room.players[(index + 1) % room.players.length].hand[Math.floor(Math.random() * room.players[(index + 1) % room.players.length].hand.length)] })); picked.forEach(({ card }) => { const owner = room.players.find(player => player.hand.includes(card)); owner.hand = owner.hand.filter(item => item !== card); }); picked.forEach(({ player, card }) => player.hand.push(card)); }
+  if (rule === 'swap' && room.trickNo === 1) { const picked = room.players.map(player => ({ player, card: previousPlayer(room, player.id).hand[Math.floor(Math.random() * previousPlayer(room, player.id).hand.length)] })); picked.forEach(({ card }) => { const owner = room.players.find(player => player.hand.includes(card)); owner.hand = owner.hand.filter(item => item !== card); }); picked.forEach(({ player, card }) => player.hand.push(card)); }
   const allDone = room.tasks.every(task => task.done);
-  const goalsMet = rule === 'winOne' ? room.wonWithOne >= 1 : rule === 'winTwoOnes' ? room.wonWithOne >= 2 : rule === 'rockets' || rule === 'rocketOrder' ? new Set(room.rocketWins).size === 4 : rule === 'oneTrick' ? room.targetWins === 1 : rule === 'firstLast' || rule === 'finalPattern' || rule === 'pink' ? room.trickNo === room.totalTricks && (rule !== 'pink' || room.pinkWins === 9) : true;
-  if (allDone && goalsMet && !['noNine', 'sick', 'balanced', 'balancedCommander', 'firstLast', 'finalPattern', 'pink', 'rockets', 'rocketOrder', 'oneTrick'].includes(rule)) return finishMission(room, true, '모든 과제를 완료했습니다.');
+  const goalsMet = rule === 'winOne' ? room.wonWithOne >= 1 : rule === 'winTwoOnes' ? room.wonWithOne >= 2 : rule === 'rockets' || rule === 'rocketOrder' ? new Set(room.rocketWins).size === 4 : rule === 'oneTrick' ? room.targetWins === 1 : rule === 'pink' ? room.pinkWins === 9 : rule === 'firstLast' || rule === 'finalPattern' ? room.trickNo === room.totalTricks : rule === 'noNine' ? room.tasks.length > 0 || room.trickNo === room.totalTricks : true;
+  if (allDone && goalsMet && !['sick', 'balanced', 'balancedCommander', 'firstLast', 'finalPattern', 'oneTrick'].includes(rule)) return finishMission(room, true, '모든 과제를 완료했습니다.');
   if (room.trickNo >= room.totalTricks) return goalsMet && allDone ? finishMission(room, true, '모든 목표를 완료했습니다.') : finishMission(room, false, '남은 트릭이 없는데 목표를 완료하지 못했습니다.');
   room.trick = []; room.leaderId = winner.id; room.turnId = winner.id;
   scheduleTurnReady(room);
+}
+function completeDistressVote(room) {
+  if (!room.players.every(player => player.id in room.distressVotes)) return;
+  if (room.players.every(player => room.distressVotes[player.id])) {
+    room.distressActive = true; room.distressMissionId = room.missionId;
+    room.distressDirections = {}; room.phase = 'distressDirection';
+    appendLog(room, '🆘 조난 신호를 사용합니다. 카드를 전달할 방향을 정하세요.');
+  } else { appendLog(room, '이번 시도에서는 카드를 전달하지 않습니다.'); startPlay(room); }
+}
+function completeDistressDirection(room) {
+  if (!room.players.every(player => player.id in room.distressDirections)) return;
+  const directions = Object.values(room.distressDirections);
+  if (new Set(directions).size !== 1) {
+    room.distressDirections = {}; appendLog(room, '🆘 전달 방향이 달라 다시 정합니다.');
+  } else {
+    room.distressDirection = directions[0]; room.phase = 'distressPass';
+    appendLog(room, `🆘 조난 신호: ${room.distressDirection === 'left' ? '왼쪽' : '오른쪽'} 이웃에게 카드를 전달합니다.`);
+  }
+}
+function completeDistressPass(room) {
+  if (!room.players.every(player => room.distressPasses[player.id])) return;
+  const passes = room.players.map(player => ({ from: player, card: player.hand.find(item => item.id === room.distressPasses[player.id]) }));
+  passes.forEach(({ from, card }) => { from.hand = from.hand.filter(item => item !== card); });
+  passes.forEach(({ from, card }) => (room.distressDirection === 'left' ? nextPlayer : previousPlayer)(room, from.id).hand.push(card));
+  room.players.forEach(player => player.hand.sort((a, b) => a.suit.localeCompare(b.suit) || a.value - b.value));
+  appendLog(room, `🆘 조난 신호: 모든 승무원이 ${room.distressDirection === 'left' ? '왼쪽' : '오른쪽'} 이웃에게 카드를 전달했습니다.`);
+  startPlay(room);
 }
 function isEligibleComm(player, card) {
   if (card.suit === 'R') return false;
@@ -261,7 +312,7 @@ function runBotTurn(room) {
   if (room.phase === 'chooseTarget') {
     const needsResponses = rule.special !== 'noComm';
     const responder = needsResponses && room.players.find(player => player.isBot && !(player.id in room.decisionResponses));
-    if (responder) { room.decisionResponses[responder.id] = true; appendLog(room, `🤖 ${responder.nickname} 님이 예라고 답했습니다.`); return; }
+    if (responder) { room.decisionResponses[responder.id] = true; appendLog(room, `🤖 ${responder.nickname} 님이 ${rule.special === 'sick' ? '좋음' : '예'}이라고 답했습니다.`); return; }
     const commander = getPlayer(room, room.commanderId);
     if (!commander?.isBot || (needsResponses && room.players.some(player => !(player.id in room.decisionResponses)))) return;
     const target = room.players.find(player => (rule.pick !== 'notCommander' || player.id !== commander.id) && (rule.special !== 'finalPattern' || player.id !== room.targetId));
@@ -279,16 +330,17 @@ function runBotTurn(room) {
       if (room.players.some(player => !(player.id in room.decisionResponses))) return;
     }
     const actor = getPlayer(room, rule.distribute ? room.commanderId : currentAssigner(room).id); if (!actor?.isBot) return;
-    const task = room.tasks.find(item => !item.ownerId && actor.hand.some(card => card.id === item.id)) || room.tasks.find(item => !item.ownerId); if (!task) return;
-    const owner = rule.distribute ? room.players.find(player => player.hand.some(card => card.id === task.id) && room.tasks.filter(item => item.ownerId === player.id).length < Math.ceil(room.tasks.length / room.players.length)) || room.players[0] : actor;
-    task.ownerId = owner.id; room.assignmentCursor += 1; appendLog(room, `🤖 ${owner.nickname} 님이 ${cardLabel(task)} 과제를 맡았습니다.`);
-    if (room.tasks.every(item => item.ownerId)) startPrePlay(room); return;
+    const task = (rule.distribute ? null : room.tasks.find(item => !item.ownerId && actor.hand.some(card => card.id === item.id))) || room.tasks.find(item => !item.ownerId); if (!task) return;
+    const candidates = room.players.filter(player => canAssignTask(room, player.id));
+    const owner = rule.distribute ? candidates.find(player => player.hand.some(card => card.id === task.id)) || candidates[0] : actor;
+    if (!owner) return;
+    assignTask(room, task, owner); return;
   }
   if (room.phase === 'tokenEdit' && getPlayer(room, room.commanderId)?.isBot) { appendLog(room, '🤖 순서 토큰 조정을 건너뜁니다.'); room.phase = 'assign'; return; }
   if (room.phase === 'taskTransfer') { const actor = room.players.find(player => player.isBot && room.tasks.some(task => task.ownerId === player.id)); const task = actor && room.tasks.find(item => item.ownerId === actor.id); if (!actor || !task) return; task.ownerId = nextPlayer(room, actor.id).id; room.phase = 'distressVote'; appendLog(room, '🤖 과제를 오른쪽 승무원에게 전달했습니다.'); return; }
-  if (room.phase === 'distressVote') { const actor = room.players.find(player => player.isBot && !(player.id in room.distressVotes)); if (!actor) return; room.distressVotes[actor.id] = false; appendLog(room, `🤖 ${actor.nickname} 님이 조난 신호를 사용하지 않습니다.`); if (room.players.every(player => player.id in room.distressVotes)) startPlay(room); return; }
-  if (room.phase === 'distressDirection') { const actor = room.players.find(player => player.isBot && !(player.id in room.distressDirections)); if (!actor) return; room.distressDirections[actor.id] = Object.values(room.distressDirections)[0] ?? 'left'; if (room.players.every(player => player.id in room.distressDirections)) { room.distressDirection = Object.values(room.distressDirections)[0]; room.phase = 'distressPass'; } return; }
-  if (room.phase === 'distressPass') { const actor = room.players.find(player => player.isBot && !room.distressPasses[player.id]); const card = actor?.hand.find(item => item.suit !== 'R'); if (!actor || !card) return; room.distressPasses[actor.id] = card.id; return; }
+  if (room.phase === 'distressVote') { const actor = room.players.find(player => player.isBot && !(player.id in room.distressVotes)); if (!actor) return; room.distressVotes[actor.id] = false; appendLog(room, `🤖 ${actor.nickname} 님이 조난 신호를 사용하지 않습니다.`); completeDistressVote(room); return; }
+  if (room.phase === 'distressDirection') { const actor = room.players.find(player => player.isBot && !(player.id in room.distressDirections)); if (!actor) return; room.distressDirections[actor.id] = Object.values(room.distressDirections)[0] ?? 'left'; completeDistressDirection(room); return; }
+  if (room.phase === 'distressPass') { const actor = room.players.find(player => player.isBot && !room.distressPasses[player.id]); const card = actor?.hand.find(item => item.suit !== 'R'); if (!actor || !card) return; room.distressPasses[actor.id] = card.id; completeDistressPass(room); return; }
   if (room.phase === 'play') { const actor = getPlayer(room, room.turnId); if (!actor?.isBot) return; const card = actor.hand.find(item => legalCards(room, actor).includes(item.id)); if (!card) return; actor.hand = actor.hand.filter(item => item.id !== card.id); room.trick.push({ playerId: actor.id, card }); appendLog(room, `🤖 ${actor.nickname} 님이 ${cardLabel(card)}를 냈습니다.`); if (room.trick.length === room.players.length) resolveTrick(room); else room.turnId = nextPlayer(room, actor.id).id; }
 }
 
@@ -313,19 +365,23 @@ io.on('connection', socket => {
   ack(socket, 'ROOM_LEAVE', data => { const room = rooms.get(String(data?.code || socket.data.room || '').toUpperCase()); if (!room) return; const player = getPlayer(room, socket.data.playerId); if (!player) return; if (room.phase === 'lobby') { room.players = room.players.filter(item => item.id !== player.id); if (!room.players.length) { rooms.delete(room.code); return; } if (room.hostId === player.id) room.hostId = room.players[0].id; } else { player.connected = false; player.socketId = null; } socket.leave(roomChannel(room.code)); socket.data.room = null; socket.data.playerId = null; send(room); });
   ack(socket, 'MISSION_SET', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const missionId = Number(data.missionId); if (actor !== room.hostId || room.phase !== 'lobby') throw Error('방장만 미션을 고를 수 있습니다.'); if (!MISSIONS[missionId]) throw Error('지원하지 않는 미션입니다.'); if (missionId !== room.missionId) { room.distressActive = false; room.distressMissionId = null; } room.missionId = missionId; send(room); });
   ack(socket, 'GAME_START', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (actor !== room.hostId) throw Error('방장만 시작할 수 있습니다.'); if (room.phase !== 'lobby') throw Error('이미 시작했습니다.'); if (room.players.length < 3) throw Error('최소 3명이 필요합니다.'); if (room.players.length !== room.maxPlayers) throw Error(`모든 좌석(${room.maxPlayers}명)이 채워져야 합니다.`); if (!room.players.every(p => p.ready)) throw Error('모든 승무원이 준비해야 합니다.'); deal(room); send(room); });
-  ack(socket, 'DECISION_RESPONSE', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const distributing = room.phase === 'assign' && mission(room).distribute; if (room.phase !== 'chooseTarget' && !distributing) throw Error('지금은 응답할 때가 아닙니다.'); if (actor in room.decisionResponses) throw Error('이미 답했습니다.'); room.decisionResponses[actor] = !!data.yes; appendLog(room, `🗣 ${getPlayer(room, actor).nickname} 님이 ${data.yes ? '예' : '아니오'}라고 답했습니다.`); send(room); });
-  ack(socket, 'TARGET_SELECT', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const rule = mission(room); if (room.phase !== 'chooseTarget' || actor !== room.commanderId) throw Error('커맨더만 지정할 수 있습니다.'); if (rule.special !== 'noComm' && room.players.some(player => !(player.id in room.decisionResponses))) throw Error('모든 승무원의 응답을 먼저 받아야 합니다.'); const target = getPlayer(room, String(data.targetId)); if (!target || (rule.pick === 'notCommander' && target.id === room.commanderId) || (rule.special === 'finalPattern' && room.targetId === target.id)) throw Error('선택할 수 없는 승무원입니다.'); if (rule.special === 'finalPattern' && room.targetStep === 0) { room.targetId = target.id; room.targetStep = 1; room.decisionResponses = {}; appendLog(room, '첫 4트릭 담당자가 지정되었습니다.'); send(room); return; } room.targetId ??= target.id; if (rule.special === 'finalPattern') room.targetBId = target.id; if (rule.special === 'sick') room.sickId = target.id; if (rule.special === 'allTasks') { room.tasks = room.hiddenTasks ?? []; room.hiddenTasks = null; room.tasks.forEach(task => { task.ownerId = target.id; }); } if (room.tasks.length && rule.special !== 'allTasks') room.phase = 'assign'; else startPrePlay(room); appendLog(room, '특수 미션 대상을 지정했습니다.'); send(room); });
-  ack(socket, 'TASK_ASSIGN', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const rule = mission(room); if (room.phase !== 'assign' || (rule.distribute ? room.commanderId : currentAssigner(room).id) !== actor) throw Error('지금은 과제를 선택할 차례가 아닙니다.'); if (rule.distribute && room.players.some(player => !(player.id in room.decisionResponses))) throw Error('모든 승무원의 응답을 먼저 받아야 합니다.'); const task = room.tasks.find(t => t.id === String(data.taskId)); const owner = rule.distribute ? getPlayer(room, String(data.ownerId)) : getPlayer(room, actor); if (!task || task.ownerId || !owner) throw Error('선택할 수 없는 과제입니다.'); if (rule.distribute && room.tasks.filter(item => item.ownerId === owner.id).length >= Math.ceil(room.tasks.length / room.players.length)) throw Error('과제는 가능한 한 균등하게 분배해야 합니다.'); task.ownerId = owner.id; appendLog(room, `📌 ${owner.nickname} 님이 ${cardLabel(task)} 과제를 맡았습니다.`); room.assignmentCursor += 1; if (room.tasks.every(t => t.ownerId)) startPrePlay(room); else if (rule.distribute) room.decisionResponses = {}; send(room); });
+  ack(socket, 'DECISION_RESPONSE', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const distributing = room.phase === 'assign' && mission(room).distribute; if (room.phase !== 'chooseTarget' && !distributing) throw Error('지금은 응답할 때가 아닙니다.'); if (actor in room.decisionResponses) throw Error('이미 답했습니다.'); room.decisionResponses[actor] = !!data.yes; appendLog(room, `🗣 ${getPlayer(room, actor).nickname} 님이 ${mission(room).special === 'sick' ? (data.yes ? '좋음' : '나쁨') : (data.yes ? '예' : '아니오')}이라고 답했습니다.`); send(room); });
+  ack(socket, 'TARGET_SELECT', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const rule = mission(room); if (room.phase !== 'chooseTarget' || actor !== room.commanderId) throw Error('커맨더만 지정할 수 있습니다.'); if (rule.special !== 'noComm' && room.players.some(player => !(player.id in room.decisionResponses))) throw Error('모든 승무원의 응답을 먼저 받아야 합니다.'); const target = getPlayer(room, String(data.targetId)); if (!target || (rule.pick === 'notCommander' && target.id === room.commanderId) || (rule.special === 'finalPattern' && room.targetId === target.id)) throw Error('선택할 수 없는 승무원입니다.'); if (rule.special === 'finalPattern' && room.targetStep === 0) { room.targetId = target.id; room.targetStep = 1; room.decisionResponses = {}; appendLog(room, '첫 4트릭 담당자가 지정되었습니다.'); send(room); return; } room.targetId ??= target.id; if (rule.special === 'finalPattern') room.targetBId = target.id; if (rule.special === 'sick') room.sickId = target.id; if (rule.special === 'allTasks') { room.tasks = room.hiddenTasks ?? []; room.hiddenTasks = null; room.tasks.forEach(task => { task.ownerId = target.id; }); } if (room.tasks.length && rule.special !== 'allTasks') startTaskAssignment(room); else startPrePlay(room); appendLog(room, '특수 미션 대상을 지정했습니다.'); send(room); });
+  ack(socket, 'TASK_ASSIGN', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const rule = mission(room); if (room.phase !== 'assign' || (rule.distribute ? room.commanderId : currentAssigner(room).id) !== actor) throw Error('지금은 과제를 선택할 차례가 아닙니다.'); if (rule.distribute && room.players.some(player => !(player.id in room.decisionResponses))) throw Error('모든 승무원의 응답을 먼저 받아야 합니다.'); const task = room.tasks.find(t => t.id === String(data.taskId)); const owner = rule.distribute ? getPlayer(room, String(data.ownerId)) : getPlayer(room, actor); if (!task || task.ownerId || !owner) throw Error('선택할 수 없는 과제입니다.'); assignTask(room, task, owner); send(room); });
   ack(socket, 'TOKEN_EDIT', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const rule = mission(room); if (room.phase !== 'tokenEdit' || actor !== room.commanderId) throw Error('커맨더만 순서 토큰을 조정할 수 있습니다.'); const from = room.tasks.find(task => task.id === String(data.fromId)); const to = room.tasks.find(task => task.id === String(data.toId)); const hasToken = task => !!(task?.order || task?.arrow || task?.omega); if (!from || !to || from === to) throw Error('서로 다른 과제를 선택해 주세요.'); if (rule.tokenSwap) { if (!hasToken(from) || !hasToken(to)) throw Error('맞바꿀 순서 토큰 두 개를 선택해 주세요.'); for (const key of ['order', 'arrow', 'omega']) [from[key], to[key]] = [to[key], from[key]]; appendLog(room, '🔀 순서 토큰 두 개의 위치를 바꿨습니다.'); } else if (rule.tokenMove) { const key = ['order', 'arrow', 'omega'].find(name => from[name]); if (!key || hasToken(to)) throw Error('옮길 순서 토큰과 토큰이 없는 과제를 선택해 주세요.'); to[key] = from[key]; from[key] = key === 'omega' ? false : null; appendLog(room, '🔀 순서 토큰을 다른 과제로 옮겼습니다.'); } else throw Error('이 미션에는 토큰 조정이 없습니다.'); startPrePlay(room); send(room); });
   ack(socket, 'TOKEN_EDIT_SKIP', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (room.phase !== 'tokenEdit' || actor !== room.commanderId) throw Error('커맨더만 건너뛸 수 있습니다.'); startPrePlay(room); send(room); });
   ack(socket, 'TASK_TRANSFER', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (room.phase !== 'taskTransfer') throw Error('지금은 과제를 전달할 수 없습니다.'); const task = room.tasks.find(item => item.id === String(data.taskId) && item.ownerId === actor); const recipient = getPlayer(room, String(data.recipientId)); if (!task || !recipient || recipient.id === actor) throw Error('내 과제 하나를 다른 승무원에게 전달해야 합니다.'); task.ownerId = recipient.id; appendLog(room, `↗ ${getPlayer(room, actor).nickname} 님이 과제를 ${recipient.nickname} 님에게 전달했습니다.`); room.taskTransferred = true; room.phase = 'distressVote'; send(room); });
   ack(socket, 'TASK_TRANSFER_SKIP', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (room.phase !== 'taskTransfer' || actor !== room.commanderId) throw Error('커맨더만 전달 단계를 건너뛸 수 있습니다.'); room.phase = 'distressVote'; send(room); });
-  ack(socket, 'DISTRESS_VOTE', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (room.phase !== 'distressVote') throw Error('지금은 조난 신호를 결정할 때가 아닙니다.'); room.distressVotes[actor] = !!data.use; if (room.players.every(player => player.id in room.distressVotes)) { if (room.players.every(player => room.distressVotes[player.id])) { room.distressActive = true; room.distressMissionId = room.missionId; room.distressDirections = {}; room.phase = 'distressDirection'; appendLog(room, '🆘 조난 신호를 사용합니다. 카드를 전달할 방향을 정하세요.'); } else { appendLog(room, '조난 신호를 사용하지 않습니다.'); startPlay(room); } } send(room); });
-  ack(socket, 'DISTRESS_DIRECTION', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const direction = data.direction === 'left' || data.direction === 'right' ? data.direction : null; if (room.phase !== 'distressDirection' || !direction) throw Error('지금은 전달 방향을 정할 때가 아닙니다.'); if (actor in room.distressDirections) throw Error('이미 방향을 골랐습니다.'); room.distressDirections[actor] = direction; if (room.players.every(player => player.id in room.distressDirections)) { const directions = Object.values(room.distressDirections); if (new Set(directions).size !== 1) { room.distressDirections = {}; appendLog(room, '🆘 전달 방향이 달라 다시 정합니다.'); } else { room.distressDirection = directions[0]; room.phase = 'distressPass'; appendLog(room, `🆘 조난 신호: ${room.distressDirection === 'left' ? '왼쪽' : '오른쪽'} 이웃에게 카드를 전달합니다.`); } } send(room); });
-  ack(socket, 'DISTRESS_PASS', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (room.phase !== 'distressPass') throw Error('지금은 카드를 전달할 때가 아닙니다.'); if (room.distressPasses[actor]) throw Error('이미 전달할 카드를 골랐습니다.'); const card = getPlayer(room, actor).hand.find(item => item.id === String(data.cardId) && item.suit !== 'R'); if (!card) throw Error('로켓이 아닌 내 카드 한 장을 골라 주세요.'); room.distressPasses[actor] = card.id; if (room.players.every(player => room.distressPasses[player.id])) { const passes = room.players.map(player => ({ from: player, card: player.hand.find(item => item.id === room.distressPasses[player.id]) })); passes.forEach(({ from, card }) => { from.hand = from.hand.filter(item => item !== card); }); passes.forEach(({ from, card }) => (room.distressDirection === 'left' ? nextPlayer : previousPlayer)(room, from.id).hand.push(card)); room.players.forEach(player => player.hand.sort((a, b) => a.suit.localeCompare(b.suit) || a.value - b.value)); appendLog(room, `🆘 조난 신호: 모든 승무원이 ${room.distressDirection === 'left' ? '왼쪽' : '오른쪽'} 이웃에게 카드를 전달했습니다.`); startPlay(room); } send(room); });
+  ack(socket, 'DISTRESS_VOTE', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (room.phase !== 'distressVote') throw Error('지금은 조난 신호를 결정할 때가 아닙니다.'); room.distressVotes[actor] = !!data.use; completeDistressVote(room); send(room); });
+  ack(socket, 'DISTRESS_DIRECTION', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const direction = data.direction === 'left' || data.direction === 'right' ? data.direction : null; if (room.phase !== 'distressDirection' || !direction) throw Error('지금은 전달 방향을 정할 때가 아닙니다.'); if (actor in room.distressDirections) throw Error('이미 방향을 골랐습니다.'); room.distressDirections[actor] = direction; completeDistressDirection(room); send(room); });
+  ack(socket, 'DISTRESS_PASS', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (room.phase !== 'distressPass') throw Error('지금은 카드를 전달할 때가 아닙니다.'); if (room.distressPasses[actor]) throw Error('이미 전달할 카드를 골랐습니다.'); const card = getPlayer(room, actor).hand.find(item => item.id === String(data.cardId) && item.suit !== 'R'); if (!card) throw Error('로켓이 아닌 내 카드 한 장을 골라 주세요.'); room.distressPasses[actor] = card.id; completeDistressPass(room); send(room); });
   ack(socket, 'COMMUNICATE', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const player = getPlayer(room, actor); const rule = mission(room); if (room.phase !== 'play' || room.trick.length || room.trickNo + 1 < (rule.commFrom || 1)) throw Error('통신은 새 트릭의 첫 카드가 나오기 전에만 할 수 있습니다.'); if (rule.special === 'noComm' && room.targetId === actor) throw Error('지정된 승무원은 통신할 수 없습니다.'); if (player.comm) throw Error('통신은 미션에서 한 번만 할 수 있습니다.'); const card = player.hand.find(c => c.id === String(data.cardId)); if (!card || !isEligibleComm(player, card)) throw Error('해당 무늬의 최고 또는 최저 카드만 통신할 수 있습니다.'); const same = player.hand.filter(c => c.suit === card.suit); const marker = same.length === 1 ? '유일' : card.value === Math.max(...same.map(c => c.value)) ? '최고' : '최저'; player.comm = { card, marker: rule.deadZone ? '?' : marker }; appendLog(room, `📡 ${player.nickname} 님이 통신했습니다.`); send(room); });
   ack(socket, 'CARD_PLAY', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); const player = getPlayer(room, actor); if (room.phase !== 'play' || room.turnId !== actor) throw Error('지금은 당신의 차례가 아닙니다.'); const card = player.hand.find(c => c.id === String(data.cardId)); if (!card) throw Error('손패에 없는 카드입니다.'); if (!legalCards(room, player).includes(card.id)) throw Error('선도 무늬를 따라야 합니다.'); player.hand = player.hand.filter(c => c.id !== card.id); room.trick.push({ playerId: actor, card }); if (room.trick.length === room.players.length) resolveTrick(room); else room.turnId = nextPlayer(room, actor).id; send(room); });
   ack(socket, 'GAME_RESTART', data => { const room = roomByPayload(data); const actor = requireSession(socket, room.code); if (actor !== room.hostId || room.phase !== 'result') throw Error('방장만 다시 시작할 수 있습니다.'); if (room.result?.win) { room.distressActive = false; room.distressMissionId = null; } room.players.forEach(p => { p.ready = true; }); room.phase = 'lobby'; room.tasks = []; room.trick = []; room.result = null; appendLog(room, '↺ 모든 승무원이 준비 완료된 대기실로 돌아왔습니다.'); send(room); });
   socket.on('disconnect', () => { const room = rooms.get(socket.data.room); const player = room && getPlayer(room, socket.data.playerId); if (!player || player.socketId !== socket.id) return; player.connected = false; player.socketId = null; send(room); });
 });
-server.listen(PORT, () => console.log(`The Crew online server: http://localhost:${PORT}`));
+export { MISSIONS, server, io, rooms, createRoom, deal, view, resolveTrick, runBotTurn, currentAssigner, assignTask, canAssignTask, legalCards };
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  server.listen(PORT, () => console.log(`The Crew online server: http://localhost:${PORT}`));
+}

@@ -8,6 +8,7 @@ import type { View } from './view';
 export function CommSlot({ player }: { player: Player }) {
   const c = player.comm; const spot = c ? spotOf(c.marker) : null;
   if (!c) return <div className="comm-slot" aria-label={`${player.nickname} 통신 전`}><span className="sec-label" aria-hidden="true">📡 통신</span><span>통신 전</span></div>;
+  if (c.played) return <div className="comm-slot" aria-label={`${player.nickname} 통신 사용 완료`}><span className="sec-label" aria-hidden="true">📡 통신</span><span>통신 사용 완료</span></div>;
   return <div className="comm-slot full" key={c.card.id} aria-label={`${player.nickname} 통신: ${SUITS[c.card.suit].name} ${c.card.value} ${spot ? spotInfo[spot].long : c.marker}`}>
     <span className="sec-label" aria-hidden="true">📡 통신</span>
     <span className="with-rail"><CardFace card={c.card} size="xs" />{spot && <MarkerRail spot={spot} />}</span>
@@ -40,7 +41,7 @@ export function Seat({ player, game, view, variant, angle = 0 }: Props) {
         <b>{name}{commander && <em className="badge" title="커맨더">⌖</em>}</b>
         <small>{player.cardsLeft}장 · 과제 {doneCount}/{tasks.length}</small>
       </div>
-      <span className="chip-comm" aria-label={c ? `통신 ${SUITS[c.card.suit].name} ${c.card.value}` : '통신 전'}>{c ? <>{SUITS[c.card.suit].icon}{c.card.value}{spot && <i>{spotInfo[spot].glyph}</i>}</> : '통신 ○'}</span>
+      <span className="chip-comm" aria-label={c?.played ? '통신 사용 완료' : c ? `통신 ${SUITS[c.card.suit].name} ${c.card.value}` : '통신 전'}>{c?.played ? '통신 완료' : c ? <>{SUITS[c.card.suit].icon}{c.card.value}{spot && <i>{spotInfo[spot].glyph}</i>}</> : '통신 ○'}</span>
       {active && <em className="turn-tag">{turnWord}</em>}
       {!player.connected && <em className="turn-tag off">끊김</em>}
     </li>;

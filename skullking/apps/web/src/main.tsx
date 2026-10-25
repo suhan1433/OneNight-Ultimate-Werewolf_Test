@@ -11,6 +11,7 @@ import { Avatar, Icon } from './icons';
 import { Bubble, ChatInput, useChatSync } from './chat';
 import { setTableLayout, useTableLayout } from './table-layout';
 import { CardExample } from './CardExample';
+import { RoundExample } from './RoundExample';
 import { cardLessons } from './card-examples';
 import './styles.css';
 
@@ -149,7 +150,7 @@ function CardPicker({cards,cta,onPick,disabled}:{cards:Card[];cta:string;onPick:
   return <><div className="pick-row">{sortCards(cards,'suit').map(c=><CardView key={c.id} card={c} className={sel===c.id?'picked-card':''} onClick={()=>setSel(sel===c.id?null:c.id)}/>)}</div>
     <button className="primary" disabled={!sel||disabled} onClick={()=>{const c=cards.find(x=>x.id===sel);if(c){setSel(null);onPick(c);}}}>{sel?cta:'카드를 한 장 고르세요'}</button></>;
 }
-const helpTabs=['기본 규칙','서열','점수','특수 카드','해적 능력'] as const;
+const helpTabs=['기본 규칙','3인 예시','서열','점수','특수 카드','해적 능력'] as const;
 const HelpExampleContext=createContext<(art:string,title:string)=>void>(()=>{});
 function HelpCardImage({img,title}:{img:string;title:string}){const open=useContext(HelpExampleContext);const picture=<img src={art(img)} alt={title} loading="lazy" draggable={false}/>;return cardLessons[img]?<button type="button" className="help-card-image" aria-label={title+' 동작 예시 보기'} onClick={()=>open(img,title)}>{picture}</button>:picture;}
 function Tile({img,title,desc,tag}:{img:string;title:string;desc:string;tag?:string}){const open=useContext(HelpExampleContext);const content=<><img src={art(img)} alt={title} loading="lazy" draggable={false}/><div><b>{title}{tag&&<em>{tag}</em>}</b><p>{desc}</p>{cardLessons[img]&&<span className="tile-example-link">3인 동작 예시 보기 <Icon name="next"/></span>}</div></>;return cardLessons[img]?<button type="button" className="tile interactive-tile" aria-label={title+' 동작 예시 보기'} onClick={()=>open(img,title)}>{content}</button>:<div className="tile">{content}</div>;}
@@ -173,6 +174,7 @@ function Help({close}:{close:()=>void}) {
     <div className="help-body" ref={bodyRef} key={tab}>
       {tab==='기본 규칙'&&<>
         <HHead title="기본 규칙" lead="예측한 만큼 정확히 트릭을 따는 게임입니다."/>
+        <button type="button" className="walk-start" onClick={()=>setTab('3인 예시')}>처음이라면 · 3인 예시 플레이 따라가기 <Icon name="next"/></button>
         <HSec title="라운드 진행"><ol className="steps">
           <li><div><b>카드 받기</b>방에서 고른 항해 방식대로 받습니다. Classic은 1라운드 1장에서 시작해 라운드마다 1장씩 늘어납니다.</div></li>
           <li><div><b>예측</b>손패를 보고 이번 라운드에 딸 트릭 수를 정합니다. 모두 정하면 동시에 공개됩니다.</div></li>
@@ -188,6 +190,7 @@ function Help({close}:{close:()=>void}) {
             <div className="hbox"><b>수트가 정해지지 않음</b><p>Pirate, Mermaid, Skull King, Kraken, White Whale, First Mate Con으로 리드한 경우입니다. 그 트릭에는 리드 수트가 없습니다.</p></div>
           </div>
         </HSec></>}
+      {tab==='3인 예시'&&<RoundExample/>}
       {tab==='서열'&&<>
         <HHead title="카드 서열" lead="숫자 카드끼리는 리드 수트의 높은 숫자가 이기고, 특수 카드는 서로 상성이 있습니다."/>
         <HSec title="기본 높낮이">

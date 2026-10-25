@@ -19,7 +19,7 @@ export function CrewBoard({ game, view }: { game: Game; view: View }) {
         <span className="ord" aria-label={`${order}번째${active ? ', 지금 차례' : played ? ', 카드를 냈어요' : ''}`}><b>{order}</b>{active ? <i>▶</i> : played ? <i>✓</i> : null}</span>
         <div className="b-who"><b><span className="nm">{p.nickname}</span>{p.id === game.playerId && <em>나</em>}{game.commanderId === p.id && <em className="cmd" title="커맨더">⌖</em>}</b><small>{p.connected ? `${p.cardsLeft}장 · 트릭 ${p.wins}` : '연결 끊김'}</small></div>
         <div className="b-tasks">{tasks.length || missionRole ? <>{tasks.map(t => <TaskChip key={t.id} task={t} fail={failed && !t.done} />)}{missionRole && <small className="mission-role">{missionRole}</small>}</> : <small className="none">없음</small>}</div>
-        <div className="b-comm" aria-label={c ? `통신 ${cardLabel(c.card)} ${spot ? spotInfo[spot].long : c.marker}` : '통신 전'}>{c ? <span className="comm-fill" key={c.card.id}><span className="with-rail"><CardFace card={c.card} size="xs" />{spot && <MarkerRail spot={spot} />}</span>{!spot && <small className="mk">{c.marker}</small>}</span> : <small className="none">통신 전</small>}</div>
+        <div className="b-comm" aria-label={c?.played ? '통신 사용 완료' : c ? `통신 ${cardLabel(c.card)} ${spot ? spotInfo[spot].long : c.marker}` : '통신 전'}>{c?.played ? <small className="none">사용 완료</small> : c ? <span className="comm-fill" key={c.card.id}><span className="with-rail"><CardFace card={c.card} size="xs" />{spot && <MarkerRail spot={spot} />}</span>{!spot && <small className="mk">{c.marker}</small>}</span> : <small className="none">통신 전</small>}</div>
       </li>;
     })}</ol>
   </section>;

@@ -32,7 +32,7 @@ export function Drawer({ onClose, game }: { onClose: () => void; game: Game | nu
             return <li key={player.id}>
               <b>{player.nickname}{game.commanderId === player.id && <em className="badge">⌖ 커맨더</em>}</b>
               <span className="row">{assigned.length || missionRole ? <>{assigned.map(task => <TaskChip key={task.id} task={task} />)}{missionRole && <small className="mission-role">{missionRole}</small>}</> : <small>과제 없음</small>}</span>
-              <small>{player.comm ? `통신 ${cardLabel(player.comm.card)} ${spot ? spotInfo[spot].long : player.comm.marker}` : '통신 전'} · {player.cardsLeft}장 · 트릭 {player.wins}</small>
+              <small>{player.comm?.played ? '통신 사용 완료' : player.comm ? `통신 ${cardLabel(player.comm.card)} ${spot ? spotInfo[spot].long : player.comm.marker}` : '통신 전'} · {player.cardsLeft}장 · 트릭 {player.wins}</small>
             </li>;
           })}</ul>
           <p className="legend">{Object.values(SUITS).map(suit => `${suit.icon} ${suit.name}`).join('  ')}</p>

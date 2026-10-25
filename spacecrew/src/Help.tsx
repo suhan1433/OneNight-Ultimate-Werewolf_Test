@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { Card } from './types';
 import { getFx, markTutorialSeen, setFx } from './lib';
 import { CardFace, MarkerRail, TaskToken } from './ui';
+import { HelpExample } from './HelpExample';
 import type { Spot } from './lib';
 
 const sample = (suit: Card['suit'], value: number): Card => ({ id: `help-${suit}${value}`, suit, value });
@@ -15,8 +16,9 @@ export function HelpBody() {
   return <div className="help">
     <details open><summary>한 판의 흐름</summary>
       <p>더 크루는 모두가 한 팀인 협력 카드 게임이에요. 미션에 적힌 ‘과제 카드’를 정해진 사람이 따내면 모두 함께 성공해요.</p>
-      <ol><li><b>모이기</b> 방 코드를 공유하고 모두 ‘준비 완료’를 누르면 방장이 시작해요.</li><li><b>과제 나누기</b> 과제 카드가 테이블에 펼쳐져요. 커맨더부터 차례로 맡을 카드를 눌러 가져가요. 이때도 내 손패가 아래에 보여요.</li><li><b>카드 내기</b> 한 사람이 한 장씩 내면 ‘트릭’ 한 판이에요. 가장 센 카드를 낸 사람이 그 카드들을 가져가고 다음 판을 시작해요.</li><li><b>끝내기</b> 손패를 모두 쓰면 끝나요. 과제를 모두 해냈다면 성공!</li></ol>
+      <ol><li><b>모이기</b> 방 코드를 공유하고 모두 ‘준비 완료’를 누르면 방장이 시작해요.</li><li><b>과제 나누기</b> 과제 카드가 테이블에 펼쳐져요. 커맨더부터 차례로 맡을 카드를 눌러 가져가요. 이때도 내 손패가 아래에 보여요.</li><li><b>카드 내기</b> 한 사람이 한 장씩 내면 ‘트릭’ 한 판이에요. 로켓이 나왔다면 가장 큰 로켓이, 없다면 처음 나온 색 중 가장 큰 숫자가 이겨요. 이긴 사람이 카드들을 모두 가져가고 다음 트릭을 시작해요.</li><li><b>끝내기</b> 과제를 모두 끝내면 손패가 남아도 함께 성공해요. 특수 목표가 있는 미션은 해당 목표도 지켜야 해요.</li></ol>
       <p className="tip">실패는 이럴 때 나요: 내 과제 카드를 다른 사람이 가져갔을 때, 순서 표시를 어겼을 때. 실패해도 같은 미션에 다시 도전할 수 있어요.</p></details>
+    <details open><summary>3인 예시 플레이 · 차근차근 따라가기</summary><HelpExample /></details>
     <details><summary>카드 내는 법</summary>
       <p>색 카드 4가지(분홍 ●, 파랑 ▲, 초록 ■, 노랑 ★)는 1~9, 로켓 🚀은 1~4예요.</p>
       <ul><li>먼저 나온 카드와 <b>같은 색이 있으면 반드시 그 색</b>을 내요.</li><li>같은 색이 없으면 <b>아무 카드나</b> 낼 수 있어요.</li><li>같은 색끼리는 <b>큰 숫자</b>가 이겨요. <b>로켓은 가장 강해요.</b></li><li>내 차례에는 <b>밝게 빛나는 카드</b>만 낼 수 있어요. 어두운 카드는 지금 낼 수 없어요.</li><li>카드를 먼저 선택한 뒤 ‘이 카드 내기’로 확정해요. 모바일에서는 선택한 카드를 한 번 더 눌러도 낼 수 있어요. 키보드는 ←→로 카드를 옮기고 Enter로 선택해요.</li></ul>
