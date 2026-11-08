@@ -36,6 +36,17 @@ Render가 제공하는 `PORT`는 변경하지 않는다. 상태 확인 경로는
 `/rummikub/`와 `/api/rummikub/socket/`을 사용하며, 같은 도메인의 다른 게임
 Socket.IO 서버와 분리되어 있다.
 
+디셉션(네온 사건파일)은 `/deception/`과 `/api/deception/socket/`을 사용한다.
+내부 서버 포트는 `3007`이며 `/api/deception/health`로 개별 상태를 확인할 수 있다.
+루트 `Dockerfile`과 `apps/server/Dockerfile` 모두 같은 시작 스크립트로 실행한다.
+Render의 Dockerfile Path는 기존 설정을 유지하면 되고, `apps/server/Dockerfile`을
+사용할 때도 Docker Build Context는 저장소 루트로 지정한다. 외부 포트는 Render의
+`PORT` 하나를 사용하며 내부 포트 값을 환경변수 `PORT`에 설정하지 않는다.
+
+로컬에서 Render용 전체 빌드를 검증하려면 다른 게임의 npm 의존성과 함께
+`npx pnpm@10.11.0 --dir deception install --frozen-lockfile`을 실행한 후
+`npm run build:render`를 실행한다. 기존 `npm run build`는 종전 빌드 대상을 유지한다.
+
 ## GitHub + Vercel 배포
 
 배포 첫 화면(`/`)에서는 게임을 선택할 수 있습니다. 한밤의 늑대인간은

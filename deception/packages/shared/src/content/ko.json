@@ -1,0 +1,1051 @@
+{
+  "locale": "ko",
+  "cards": [
+    {
+      "id": "clue-01",
+      "kind": "clue",
+      "label": "항만 출입패스",
+      "icon": "search"
+    },
+    {
+      "id": "clue-02",
+      "kind": "clue",
+      "label": "보랏빛 주차권",
+      "icon": "search"
+    },
+    {
+      "id": "clue-03",
+      "kind": "clue",
+      "label": "접힌 화물표",
+      "icon": "search"
+    },
+    {
+      "id": "clue-04",
+      "kind": "clue",
+      "label": "소금 묻은 장갑",
+      "icon": "search"
+    },
+    {
+      "id": "clue-05",
+      "kind": "clue",
+      "label": "녹슨 사물함키",
+      "icon": "search"
+    },
+    {
+      "id": "clue-06",
+      "kind": "clue",
+      "label": "반쪽 승선권",
+      "icon": "search"
+    },
+    {
+      "id": "clue-07",
+      "kind": "clue",
+      "label": "별무늬 이어캡",
+      "icon": "search"
+    },
+    {
+      "id": "clue-08",
+      "kind": "clue",
+      "label": "청동 소매단추",
+      "icon": "search"
+    },
+    {
+      "id": "clue-09",
+      "kind": "clue",
+      "label": "투명 필름조각",
+      "icon": "search"
+    },
+    {
+      "id": "clue-10",
+      "kind": "clue",
+      "label": "숨긴 작업일지",
+      "icon": "search"
+    },
+    {
+      "id": "clue-11",
+      "kind": "clue",
+      "label": "찢긴 환전영수증",
+      "icon": "search"
+    },
+    {
+      "id": "clue-12",
+      "kind": "clue",
+      "label": "붉은 실타래",
+      "icon": "search"
+    },
+    {
+      "id": "clue-13",
+      "kind": "clue",
+      "label": "야광 단추",
+      "icon": "search"
+    },
+    {
+      "id": "clue-14",
+      "kind": "clue",
+      "label": "향 묻은 손수건",
+      "icon": "search"
+    },
+    {
+      "id": "clue-15",
+      "kind": "clue",
+      "label": "분홍 분필가루",
+      "icon": "search"
+    },
+    {
+      "id": "clue-16",
+      "kind": "clue",
+      "label": "접착제 얼룩",
+      "icon": "search"
+    },
+    {
+      "id": "clue-17",
+      "kind": "clue",
+      "label": "철가루 봉투",
+      "icon": "search"
+    },
+    {
+      "id": "clue-18",
+      "kind": "clue",
+      "label": "탄소 발자국",
+      "icon": "search"
+    },
+    {
+      "id": "clue-19",
+      "kind": "clue",
+      "label": "사라진 명찰",
+      "icon": "search"
+    },
+    {
+      "id": "clue-20",
+      "kind": "clue",
+      "label": "구겨진 지도",
+      "icon": "search"
+    },
+    {
+      "id": "clue-21",
+      "kind": "clue",
+      "label": "금빛 포장끈",
+      "icon": "search"
+    },
+    {
+      "id": "clue-22",
+      "kind": "clue",
+      "label": "검은 밀랍인장",
+      "icon": "search"
+    },
+    {
+      "id": "clue-23",
+      "kind": "clue",
+      "label": "깨진 렌즈필터",
+      "icon": "search"
+    },
+    {
+      "id": "clue-24",
+      "kind": "clue",
+      "label": "은색 머리핀",
+      "icon": "search"
+    },
+    {
+      "id": "clue-25",
+      "kind": "clue",
+      "label": "파란 병뚜껑",
+      "icon": "search"
+    },
+    {
+      "id": "clue-26",
+      "kind": "clue",
+      "label": "비뚤어진 도장",
+      "icon": "search"
+    },
+    {
+      "id": "clue-27",
+      "kind": "clue",
+      "label": "빛바랜 정기권",
+      "icon": "search"
+    },
+    {
+      "id": "clue-28",
+      "kind": "clue",
+      "label": "낙서한 메뉴판",
+      "icon": "search"
+    },
+    {
+      "id": "clue-29",
+      "kind": "clue",
+      "label": "분실물 꼬리표",
+      "icon": "search"
+    },
+    {
+      "id": "clue-30",
+      "kind": "clue",
+      "label": "흰 깃털장식",
+      "icon": "search"
+    },
+    {
+      "id": "clue-31",
+      "kind": "clue",
+      "label": "청록 잉크병",
+      "icon": "search"
+    },
+    {
+      "id": "clue-32",
+      "kind": "clue",
+      "label": "낡은 나침반",
+      "icon": "search"
+    },
+    {
+      "id": "clue-33",
+      "kind": "clue",
+      "label": "무광 기념주화",
+      "icon": "search"
+    },
+    {
+      "id": "clue-34",
+      "kind": "clue",
+      "label": "얼룩진 예약증",
+      "icon": "search"
+    },
+    {
+      "id": "clue-35",
+      "kind": "clue",
+      "label": "노란 배달봉투",
+      "icon": "search"
+    },
+    {
+      "id": "clue-36",
+      "kind": "clue",
+      "label": "동백 문양쪽지",
+      "icon": "search"
+    },
+    {
+      "id": "clue-37",
+      "kind": "clue",
+      "label": "벗겨진 페인트",
+      "icon": "search"
+    },
+    {
+      "id": "clue-38",
+      "kind": "clue",
+      "label": "비밀 암호판",
+      "icon": "search"
+    },
+    {
+      "id": "clue-39",
+      "kind": "clue",
+      "label": "멈춘 전자시계",
+      "icon": "search"
+    },
+    {
+      "id": "clue-40",
+      "kind": "clue",
+      "label": "이중 바닥상자",
+      "icon": "search"
+    },
+    {
+      "id": "clue-41",
+      "kind": "clue",
+      "label": "비어 있는 약통",
+      "icon": "search"
+    },
+    {
+      "id": "clue-42",
+      "kind": "clue",
+      "label": "돌돌 만 설계도",
+      "icon": "search"
+    },
+    {
+      "id": "clue-43",
+      "kind": "clue",
+      "label": "자수 놓인 커프",
+      "icon": "search"
+    },
+    {
+      "id": "clue-44",
+      "kind": "clue",
+      "label": "미완성 악보",
+      "icon": "search"
+    },
+    {
+      "id": "clue-45",
+      "kind": "clue",
+      "label": "흩어진 찻잎",
+      "icon": "search"
+    },
+    {
+      "id": "clue-46",
+      "kind": "clue",
+      "label": "보라 리본뱃지",
+      "icon": "search"
+    },
+    {
+      "id": "clue-47",
+      "kind": "clue",
+      "label": "자개 담뱃갑",
+      "icon": "search"
+    },
+    {
+      "id": "clue-48",
+      "kind": "clue",
+      "label": "단파 수신기",
+      "icon": "search"
+    },
+    {
+      "id": "clue-49",
+      "kind": "clue",
+      "label": "종이 연꽃",
+      "icon": "search"
+    },
+    {
+      "id": "clue-50",
+      "kind": "clue",
+      "label": "구멍 난 우편물",
+      "icon": "search"
+    },
+    {
+      "id": "clue-51",
+      "kind": "clue",
+      "label": "흐릿한 필름통",
+      "icon": "search"
+    },
+    {
+      "id": "clue-52",
+      "kind": "clue",
+      "label": "작은 모래시계",
+      "icon": "search"
+    },
+    {
+      "id": "clue-53",
+      "kind": "clue",
+      "label": "뒤집힌 체스말",
+      "icon": "search"
+    },
+    {
+      "id": "clue-54",
+      "kind": "clue",
+      "label": "찢어진 복권",
+      "icon": "search"
+    },
+    {
+      "id": "clue-55",
+      "kind": "clue",
+      "label": "부러진 스탬프",
+      "icon": "search"
+    },
+    {
+      "id": "clue-56",
+      "kind": "clue",
+      "label": "접힌 명함꽂이",
+      "icon": "search"
+    },
+    {
+      "id": "clue-57",
+      "kind": "clue",
+      "label": "맞지 않는 퍼즐",
+      "icon": "search"
+    },
+    {
+      "id": "clue-58",
+      "kind": "clue",
+      "label": "열쇠 없는 자물쇠",
+      "icon": "search"
+    },
+    {
+      "id": "clue-59",
+      "kind": "clue",
+      "label": "분리된 지퍼손잡이",
+      "icon": "search"
+    },
+    {
+      "id": "clue-60",
+      "kind": "clue",
+      "label": "수선한 구두굽",
+      "icon": "search"
+    },
+    {
+      "id": "means-01",
+      "kind": "means",
+      "label": "컨테이너 쇠걸쇠",
+      "icon": "tool"
+    },
+    {
+      "id": "means-02",
+      "kind": "means",
+      "label": "화물 인양고리",
+      "icon": "tool"
+    },
+    {
+      "id": "means-03",
+      "kind": "means",
+      "label": "선박 신호권총",
+      "icon": "tool"
+    },
+    {
+      "id": "means-04",
+      "kind": "means",
+      "label": "절단 와이어",
+      "icon": "tool"
+    },
+    {
+      "id": "means-05",
+      "kind": "means",
+      "label": "냉각제 앰풀",
+      "icon": "tool"
+    },
+    {
+      "id": "means-06",
+      "kind": "means",
+      "label": "고압 분사노즐",
+      "icon": "tool"
+    },
+    {
+      "id": "means-07",
+      "kind": "means",
+      "label": "작업용 볼트건",
+      "icon": "tool"
+    },
+    {
+      "id": "means-08",
+      "kind": "means",
+      "label": "자동 결속밴드",
+      "icon": "tool"
+    },
+    {
+      "id": "means-09",
+      "kind": "means",
+      "label": "산업용 접착수지",
+      "icon": "tool"
+    },
+    {
+      "id": "means-10",
+      "kind": "means",
+      "label": "항만 제어장치",
+      "icon": "tool"
+    },
+    {
+      "id": "means-11",
+      "kind": "means",
+      "label": "황동 문진봉",
+      "icon": "tool"
+    },
+    {
+      "id": "means-12",
+      "kind": "means",
+      "label": "수리용 토크렌치",
+      "icon": "tool"
+    },
+    {
+      "id": "means-13",
+      "kind": "means",
+      "label": "고정용 앵커볼트",
+      "icon": "tool"
+    },
+    {
+      "id": "means-14",
+      "kind": "means",
+      "label": "접이식 정비톱",
+      "icon": "tool"
+    },
+    {
+      "id": "means-15",
+      "kind": "means",
+      "label": "탄성 운반벨트",
+      "icon": "tool"
+    },
+    {
+      "id": "means-16",
+      "kind": "means",
+      "label": "가스 누출밸브",
+      "icon": "tool"
+    },
+    {
+      "id": "means-17",
+      "kind": "means",
+      "label": "절연 파괴침",
+      "icon": "tool"
+    },
+    {
+      "id": "means-18",
+      "kind": "means",
+      "label": "압축 공기실린더",
+      "icon": "tool"
+    },
+    {
+      "id": "means-19",
+      "kind": "means",
+      "label": "자기장 발생기",
+      "icon": "tool"
+    },
+    {
+      "id": "means-20",
+      "kind": "means",
+      "label": "운반용 체인",
+      "icon": "tool"
+    },
+    {
+      "id": "means-21",
+      "kind": "means",
+      "label": "회전식 절삭날",
+      "icon": "tool"
+    },
+    {
+      "id": "means-22",
+      "kind": "means",
+      "label": "가열된 봉인기",
+      "icon": "tool"
+    },
+    {
+      "id": "means-23",
+      "kind": "means",
+      "label": "냉동 보관캡슐",
+      "icon": "tool"
+    },
+    {
+      "id": "means-24",
+      "kind": "means",
+      "label": "금속 시험추",
+      "icon": "tool"
+    },
+    {
+      "id": "means-25",
+      "kind": "means",
+      "label": "비상 신호탄",
+      "icon": "tool"
+    },
+    {
+      "id": "means-26",
+      "kind": "means",
+      "label": "휴대 전기충격기",
+      "icon": "tool"
+    },
+    {
+      "id": "means-27",
+      "kind": "means",
+      "label": "응축 증기호스",
+      "icon": "tool"
+    },
+    {
+      "id": "means-28",
+      "kind": "means",
+      "label": "차량 견인줄",
+      "icon": "tool"
+    },
+    {
+      "id": "means-29",
+      "kind": "means",
+      "label": "세라믹 파쇄기",
+      "icon": "tool"
+    },
+    {
+      "id": "means-30",
+      "kind": "means",
+      "label": "독성 세척원액",
+      "icon": "tool"
+    },
+    {
+      "id": "means-31",
+      "kind": "means",
+      "label": "균형 잃은 선반",
+      "icon": "tool"
+    },
+    {
+      "id": "means-32",
+      "kind": "means",
+      "label": "도르래 추걸이",
+      "icon": "tool"
+    },
+    {
+      "id": "means-33",
+      "kind": "means",
+      "label": "강철 작업클램프",
+      "icon": "tool"
+    },
+    {
+      "id": "means-34",
+      "kind": "means",
+      "label": "몰래 푼 난간",
+      "icon": "tool"
+    },
+    {
+      "id": "means-35",
+      "kind": "means",
+      "label": "차폐 없는 전극",
+      "icon": "tool"
+    },
+    {
+      "id": "means-36",
+      "kind": "means",
+      "label": "포장용 열선",
+      "icon": "tool"
+    },
+    {
+      "id": "means-37",
+      "kind": "means",
+      "label": "작동한 승강판",
+      "icon": "tool"
+    },
+    {
+      "id": "means-38",
+      "kind": "means",
+      "label": "공업용 압착틀",
+      "icon": "tool"
+    },
+    {
+      "id": "means-39",
+      "kind": "means",
+      "label": "해치 잠금바",
+      "icon": "tool"
+    },
+    {
+      "id": "means-40",
+      "kind": "means",
+      "label": "주조용 금속봉",
+      "icon": "tool"
+    },
+    {
+      "id": "means-41",
+      "kind": "means",
+      "label": "원격 점화모듈",
+      "icon": "tool"
+    },
+    {
+      "id": "means-42",
+      "kind": "means",
+      "label": "경사 운반롤러",
+      "icon": "tool"
+    },
+    {
+      "id": "means-43",
+      "kind": "means",
+      "label": "화학 반응키트",
+      "icon": "tool"
+    },
+    {
+      "id": "means-44",
+      "kind": "means",
+      "label": "기밀 운송통",
+      "icon": "tool"
+    },
+    {
+      "id": "means-45",
+      "kind": "means",
+      "label": "무거운 조명암",
+      "icon": "tool"
+    },
+    {
+      "id": "means-46",
+      "kind": "means",
+      "label": "주방 압력밸브",
+      "icon": "tool"
+    },
+    {
+      "id": "means-47",
+      "kind": "means",
+      "label": "해양 채집창",
+      "icon": "tool"
+    },
+    {
+      "id": "means-48",
+      "kind": "means",
+      "label": "정밀 타공펀치",
+      "icon": "tool"
+    },
+    {
+      "id": "means-49",
+      "kind": "means",
+      "label": "산소 차단마스크",
+      "icon": "tool"
+    },
+    {
+      "id": "means-50",
+      "kind": "means",
+      "label": "고정식 윈치",
+      "icon": "tool"
+    },
+    {
+      "id": "means-51",
+      "kind": "means",
+      "label": "경보 우회회로",
+      "icon": "tool"
+    },
+    {
+      "id": "means-52",
+      "kind": "means",
+      "label": "무인 배송드론",
+      "icon": "tool"
+    },
+    {
+      "id": "means-53",
+      "kind": "means",
+      "label": "고출력 레이저펜",
+      "icon": "tool"
+    },
+    {
+      "id": "means-54",
+      "kind": "means",
+      "label": "급속 팽창폼",
+      "icon": "tool"
+    },
+    {
+      "id": "means-55",
+      "kind": "means",
+      "label": "보수용 리벳건",
+      "icon": "tool"
+    },
+    {
+      "id": "means-56",
+      "kind": "means",
+      "label": "막힌 환기필터",
+      "icon": "tool"
+    },
+    {
+      "id": "means-57",
+      "kind": "means",
+      "label": "공작용 조각끌",
+      "icon": "tool"
+    },
+    {
+      "id": "means-58",
+      "kind": "means",
+      "label": "유도용 금속레일",
+      "icon": "tool"
+    },
+    {
+      "id": "means-59",
+      "kind": "means",
+      "label": "위조된 안전핀",
+      "icon": "tool"
+    },
+    {
+      "id": "means-60",
+      "kind": "means",
+      "label": "뒤바뀐 배전판",
+      "icon": "tool"
+    }
+  ],
+  "tiles": [
+    {
+      "id": "location-01",
+      "kind": "location",
+      "title": "안개 부두",
+      "options": [
+        "등대 아래",
+        "검역 창고",
+        "수리 선착장",
+        "여객 대합실",
+        "부유 시장",
+        "하역 통로"
+      ]
+    },
+    {
+      "id": "location-02",
+      "kind": "location",
+      "title": "심야 시가지",
+      "options": [
+        "네온 골목",
+        "음악 다방",
+        "옥상 정원",
+        "지하 환승로",
+        "전자 상가",
+        "폐업 극장"
+      ]
+    },
+    {
+      "id": "location-03",
+      "kind": "location",
+      "title": "외곽 지구",
+      "options": [
+        "방조제 끝",
+        "풍력 관측소",
+        "물류 터미널",
+        "고가 철로",
+        "염전 작업장",
+        "산비탈 숙소"
+      ]
+    },
+    {
+      "id": "cause-04",
+      "kind": "cause",
+      "title": "마지막 이상",
+      "options": [
+        "강한 충돌",
+        "호흡 곤란",
+        "급격한 냉각",
+        "전기 반응",
+        "화학 노출",
+        "과도한 압력"
+      ]
+    },
+    {
+      "id": "hint-05",
+      "kind": "hint",
+      "title": "항구의 시각",
+      "options": [
+        "첫 배 출항",
+        "분주한 오전",
+        "햇빛 한가운데",
+        "저녁 교대",
+        "막차 직후",
+        "등대 소등"
+      ]
+    },
+    {
+      "id": "hint-06",
+      "kind": "hint",
+      "title": "남겨진 재질",
+      "options": [
+        "천과 실",
+        "유리 조각",
+        "금속 표면",
+        "종이 섬유",
+        "플라스틱",
+        "자연 재료"
+      ]
+    },
+    {
+      "id": "hint-07",
+      "kind": "hint",
+      "title": "주변의 소리",
+      "options": [
+        "기계 진동",
+        "음악 울림",
+        "빗물 낙하",
+        "발소리",
+        "사람 말소리",
+        "깊은 정적"
+      ]
+    },
+    {
+      "id": "hint-08",
+      "kind": "hint",
+      "title": "빛의 흔적",
+      "options": [
+        "네온 반사",
+        "손전등 빛",
+        "가로등 그림자",
+        "햇빛 얼룩",
+        "비상등 점멸",
+        "완전한 어둠"
+      ]
+    },
+    {
+      "id": "hint-09",
+      "kind": "hint",
+      "title": "물건의 상태",
+      "options": [
+        "오래 닳음",
+        "급히 수선",
+        "반쯤 분해",
+        "물에 젖음",
+        "새 포장",
+        "오염됨"
+      ]
+    },
+    {
+      "id": "hint-10",
+      "kind": "hint",
+      "title": "두 사람의 거리",
+      "options": [
+        "같은 일터",
+        "오랜 거래",
+        "최근 만남",
+        "친밀한 사이",
+        "우연한 접촉",
+        "서로 모름"
+      ]
+    },
+    {
+      "id": "hint-11",
+      "kind": "hint",
+      "title": "감춰진 목적",
+      "options": [
+        "약속 파기",
+        "비밀 은폐",
+        "물건 탈취",
+        "경쟁 제거",
+        "누군가 보호",
+        "뜻밖의 실수"
+      ]
+    },
+    {
+      "id": "hint-12",
+      "kind": "hint",
+      "title": "사건의 속도",
+      "options": [
+        "오랜 준비",
+        "기회를 기다림",
+        "즉석 결정",
+        "짧은 실랑이",
+        "반복된 시도",
+        "돌발 사고"
+      ]
+    },
+    {
+      "id": "hint-13",
+      "kind": "hint",
+      "title": "바닥의 자국",
+      "options": [
+        "질질 끌림",
+        "미끄러짐",
+        "작은 점무늬",
+        "반복된 발길",
+        "원형 눌림",
+        "깨끗한 표면"
+      ]
+    },
+    {
+      "id": "hint-14",
+      "kind": "hint",
+      "title": "공간의 크기",
+      "options": [
+        "한 사람 틈",
+        "작은 방",
+        "긴 복도",
+        "탁 트인 홀",
+        "높은 구조물",
+        "넓은 야외"
+      ]
+    },
+    {
+      "id": "hint-15",
+      "kind": "hint",
+      "title": "손에 남은 것",
+      "options": [
+        "기름기",
+        "분말",
+        "섬유 가닥",
+        "접힌 종이",
+        "흙먼지",
+        "아무것도 없음"
+      ]
+    },
+    {
+      "id": "hint-16",
+      "kind": "hint",
+      "title": "주변의 온도",
+      "options": [
+        "얼음 같은 냉기",
+        "서늘한 바람",
+        "일정한 실온",
+        "후끈한 열기",
+        "뜨거운 증기",
+        "급격한 변화"
+      ]
+    },
+    {
+      "id": "hint-17",
+      "kind": "hint",
+      "title": "물건의 쓰임",
+      "options": [
+        "운반 작업",
+        "개인 소장",
+        "장식과 기념",
+        "기록과 전달",
+        "수리와 제작",
+        "통제와 보안"
+      ]
+    },
+    {
+      "id": "hint-18",
+      "kind": "hint",
+      "title": "이동의 흔적",
+      "options": [
+        "배로 이동",
+        "차량 이동",
+        "계단 이용",
+        "물길 통과",
+        "지붕을 건넘",
+        "제자리 머묾"
+      ]
+    },
+    {
+      "id": "event-01",
+      "kind": "event",
+      "title": "일시 정전",
+      "options": [
+        "효과 적용",
+        "일회성",
+        "현재 라운드",
+        "순서 유지",
+        "정보 비공개",
+        "처리 후 폐기"
+      ],
+      "effect": "shorten",
+      "eventText": "이번 라운드 발표 시간을 10초 줄입니다. 최소 10초입니다."
+    },
+    {
+      "id": "event-02",
+      "kind": "event",
+      "title": "추가 교신",
+      "options": [
+        "효과 적용",
+        "일회성",
+        "현재 라운드",
+        "순서 유지",
+        "정보 비공개",
+        "처리 후 폐기"
+      ],
+      "effect": "lengthen",
+      "eventText": "이번 라운드 발표 시간을 10초 늘립니다."
+    },
+    {
+      "id": "event-03",
+      "kind": "event",
+      "title": "비상 경보",
+      "options": [
+        "효과 적용",
+        "일회성",
+        "현재 라운드",
+        "순서 유지",
+        "정보 비공개",
+        "처리 후 폐기"
+      ],
+      "effect": "shorten",
+      "eventText": "이번 라운드 발표 시간을 10초 줄입니다. 최소 10초입니다."
+    },
+    {
+      "id": "event-04",
+      "kind": "event",
+      "title": "야간 지원",
+      "options": [
+        "효과 적용",
+        "일회성",
+        "현재 라운드",
+        "순서 유지",
+        "정보 비공개",
+        "처리 후 폐기"
+      ],
+      "effect": "lengthen",
+      "eventText": "이번 라운드 발표 시간을 10초 늘립니다."
+    },
+    {
+      "id": "event-05",
+      "kind": "event",
+      "title": "폭우 대기",
+      "options": [
+        "효과 적용",
+        "일회성",
+        "현재 라운드",
+        "순서 유지",
+        "정보 비공개",
+        "처리 후 폐기"
+      ],
+      "effect": "untimed",
+      "eventText": "이번 라운드는 발표 시간 제한 없이 순서대로 발언합니다."
+    },
+    {
+      "id": "event-06",
+      "kind": "event",
+      "title": "통신 복구",
+      "options": [
+        "효과 적용",
+        "일회성",
+        "현재 라운드",
+        "순서 유지",
+        "정보 비공개",
+        "처리 후 폐기"
+      ],
+      "effect": "untimed",
+      "eventText": "이번 라운드는 발표 시간 제한 없이 순서대로 발언합니다."
+    }
+  ]
+}

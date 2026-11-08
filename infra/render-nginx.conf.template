@@ -56,6 +56,29 @@ server {
     proxy_pass http://127.0.0.1:3001/health;
   }
 
+  location /api/deception/socket/ {
+    proxy_pass http://127.0.0.1:3007/socket.io/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $http_host;
+    proxy_read_timeout 3600s;
+  }
+
+  location = /api/deception/health {
+    proxy_pass http://127.0.0.1:3007/health;
+  }
+
+  location = /deception {
+    absolute_redirect off;
+    return 301 /deception/$is_args$args;
+  }
+
+  location /deception/ {
+    alias /app/apps/web/dist/deception/;
+    try_files $uri $uri/ /deception/index.html;
+  }
+
   location /werewolf/ {
     alias /app/apps/web/dist/werewolf/;
     try_files $uri $uri/ /werewolf/index.html;

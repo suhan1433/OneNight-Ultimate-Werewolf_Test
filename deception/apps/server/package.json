@@ -1,0 +1,25 @@
+{
+  "name": "@deception/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@deception/shared": "workspace:*",
+    "socket.io": "4.8.3",
+    "xstate": "^5.20.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "socket.io-client": "4.8.3",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3"
+  }
+}

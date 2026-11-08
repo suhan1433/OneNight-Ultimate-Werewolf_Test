@@ -1,0 +1,1 @@
+{ "name": "네온 사건파일", "short_name": "사건파일", "lang": "ko", "start_url": "./", "scope": "./", "display": "standalone", "orientation": "portrait", "theme_color": "#090e1b", "background_color": "#090e1b", "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }] }

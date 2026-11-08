@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "concurrently -n server,web -c magenta,cyan \"npm run dev -w @werewolf/server\" \"npm run dev -w @werewolf/web\"",
     "dev:skullking": "npm --prefix skullking run dev",
+    "build:deception": "npx --yes pnpm@10.11.0 --dir deception build:integrated",
+    "build:render": "npm run build && npm run build:deception",
     "build": "npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web && npm --prefix avalon run build && npm --prefix skullking run build && npm --prefix spacecrew run build && npm --prefix rummikub run build && cp game-selector/index.html apps/web/dist/index.html && cp game-selector/launcher.css apps/web/dist/launcher.css",
     "test:audio": "node game-audio/audio.test.cjs",
     "test": "npm run test -w @werewolf/server",

@@ -1,15 +1,15 @@
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package*.json tsconfig.base.json ./
-COPY packages/shared/package.json packages/shared/package.json
-COPY apps/web/package.json apps/web/package.json
-COPY apps/server/package.json apps/server/package.json
-RUN npm install
-COPY packages/shared packages/shared
-COPY apps/web apps/web
-COPY game-audio game-audio
+COPY . .
+RUN npm install --global pnpm@10.11.0 \
+  && npm ci --include=dev \
+  && npm --prefix avalon ci --include=dev \
+  && npm --prefix skullking ci --include=dev \
+  && npm --prefix spacecrew ci --include=dev \
+  && npm --prefix rummikub ci --include=dev \
+  && pnpm --dir deception install --frozen-lockfile --prod=false
 ARG VITE_SOCKET_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
-RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/web
+RUN npm run build:render
 FROM nginx:1.27-alpine
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html

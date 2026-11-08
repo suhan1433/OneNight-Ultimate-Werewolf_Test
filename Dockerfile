@@ -1,16 +1,18 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 
-# Each game is currently an independent npm workspace.  Install all of them
+# Each game is an independent workspace (deception uses pnpm). Install all of them
 # before the integrated build writes their static files into apps/web/dist.
 COPY . .
 COPY game-audio game-audio
-RUN npm ci \
-  && npm --prefix avalon ci \
-  && npm --prefix skullking ci \
-  && npm --prefix spacecrew ci \
-  && npm --prefix rummikub ci \
-  && npm run build
+RUN npm install --global pnpm@10.11.0 \
+  && npm ci --include=dev \
+  && npm --prefix avalon ci --include=dev \
+  && npm --prefix skullking ci --include=dev \
+  && npm --prefix spacecrew ci --include=dev \
+  && npm --prefix rummikub ci --include=dev \
+  && pnpm --dir deception install --frozen-lockfile --prod=false \
+  && npm run build:render
 
 FROM node:22-alpine
 WORKDIR /app

@@ -1,0 +1,16 @@
+{
+  "name": "neon-casefiles",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "dev": "pnpm --filter @deception/shared build && pnpm --parallel --filter @deception/server --filter @deception/web dev",
+    "build": "pnpm -r build",
+    "build:integrated": "DECEPTION_INTEGRATED=true pnpm -r build",
+    "typecheck": "pnpm --filter @deception/shared build && pnpm -r typecheck",
+    "test": "pnpm --filter @deception/shared build && pnpm -r test",
+    "simulate": "pnpm --filter @deception/shared simulate",
+    "start": "pnpm --filter @deception/server start",
+    "test:e2e": "pnpm --filter @deception/web test:e2e"
+  }
+}
