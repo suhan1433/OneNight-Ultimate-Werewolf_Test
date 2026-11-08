@@ -5,7 +5,7 @@ import {
   type Page,
   type BrowserContext,
 } from "@playwright/test";
-import type { RoomView } from "@deception/shared";
+import { content, type RoomView } from "@deception/shared";
 import { mkdir } from "node:fs/promises";
 const shots = "../../docs/screenshots";
 interface User {
@@ -145,6 +145,7 @@ async function start(users: User[]) {
     (u) => u.view!.game!.private.myRole === "forensic",
   )!;
   await expect(murderer.page.locator(".night-cards")).toBeVisible();
+  await expect(murderer.page.locator(".night-cards .card-art")).toHaveCount(8);
   const own = murderer.view!.game!.players.find(
     (p) => p.id === murderer.view!.selfId,
   )!;
@@ -161,9 +162,11 @@ async function start(users: User[]) {
   await murderer.page
     .getByRole("button", { name: "이 두 장으로 확정" })
     .click();
+  await expect(forensic.page.getByText("범행 장소 타일을 선택하면 수사를 시작합니다.")).toBeVisible({ timeout: 50_000 });
+  await forensic.page.getByRole("button", { name: /안개 부두/ }).click();
   await expect(
     forensic.page.getByRole("tab", { name: "◉ 마커 배치" }),
-  ).toBeVisible({ timeout: 50_000 });
+  ).toBeVisible();
   const investigator = users.find(
     (u) => u.view!.game!.private.myRole === "investigator",
   )!;
@@ -193,6 +196,7 @@ async function solve(u: User, targetName: string, clue: string, means: string) {
     .locator(".target-option")
     .filter({ hasText: targetName })
     .click();
+  await expect(u.page.locator(".solve-cards .card-art")).toHaveCount(4);
   await u.page.locator(".solve-cards button").filter({ hasText: clue }).click();
   await u.page
     .locator(".solve-cards button")
@@ -257,6 +261,17 @@ for (const count of [6, 12])
       await investigator.page.getByRole("tab", { name: "⌕ 공개 카드" }).click();
       await investigator.page.setViewportSize({ width: 360, height: 640 });
       await expect(investigator.page.locator(".evidence-card")).toHaveCount(8);
+      const pictures = investigator.page.locator(".card-grid .card-art");
+      await expect(pictures).toHaveCount(8);
+      await expect.poll(() => pictures.evaluateAll((images) =>
+        images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
+      )).toBe(true);
+      const firstPicture = await pictures.first().getAttribute("src");
+      await pictures.first().click();
+      const enlarged = investigator.page.getByRole("dialog", { name: "증거 확대" });
+      await expect(enlarged.locator(".card-art")).toHaveAttribute("src", firstPicture!);
+      await expect(enlarged.getByText("그림보다 문구를 기준으로 추리하세요.")).toBeVisible();
+      await enlarged.getByRole("button", { name: "닫기", exact: true }).click();
       expect(
         await investigator.page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
@@ -279,7 +294,7 @@ for (const count of [6, 12])
       await forensic.page.screenshot({
         path: `${shots}/forensic-${count}-390.png`,
       });
-      await investigator.page.getByRole("button", { name: "메모" }).click();
+      await investigator.page.locator(".game-dock").getByRole("button", { name: "메모" }).click();
       const memo = investigator.page.getByLabel("개인 메모");
       await memo.fill("첫 단서: ");
       await memo.pressSequentially("항만", { delay: 300 });
@@ -290,7 +305,7 @@ for (const count of [6, 12])
         .click();
       await investigator.page.reload();
       await expect(investigator.page.locator(".phase-bar")).toBeVisible();
-      await investigator.page.getByRole("button", { name: "메모" }).click();
+      await investigator.page.locator(".game-dock").getByRole("button", { name: "메모" }).click();
       await expect(investigator.page.getByLabel("개인 메모")).toHaveValue(
         "첫 단서: 항만",
       );
@@ -331,6 +346,7 @@ for (const count of [6, 12])
           name: count === 12 ? "범인팀 승리" : "수사팀 승리",
         }),
       ).toBeVisible();
+      await expect(investigator.page.locator(".case-answer .card-art")).toHaveCount(2);
       await investigator.page.screenshot({
         path: `${shots}/result-${count}-390.png`,
       });
@@ -339,3 +355,113 @@ for (const count of [6, 12])
       for (const u of users) await u.context.close();
     }
   });
+
+test("mobile chat keeps focus while sending and preserves the next draft", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.goto("/");
+    await page.getByLabel("닉네임").fill("모바일 채팅");
+    await page.getByRole("button", { name: "수사실 만들기" }).click();
+    const input = page.getByLabel("채팅 메시지");
+    await expect(input).toBeEnabled();
+    // Delay the outbound chat packet so assertions cover the in-flight state.
+    await page.evaluate(() => {
+      const original = WebSocket.prototype.send;
+      WebSocket.prototype.send = function (data) {
+        if (typeof data === "string" && data.includes('["chat",')) {
+          const ws = this;
+          setTimeout(() => original.call(ws, data), 600);
+        } else original.call(this, data);
+      };
+    });
+    await input.fill("첫 메시지");
+    await input.focus();
+    await page.getByRole("button", { name: "메시지 보내기" }).tap();
+    await expect(input).toBeEnabled();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue("");
+    await input.fill("전송 중 다음 초안");
+    await expect(page.getByText("첫 메시지", { exact: true })).toBeVisible();
+    await expect(input).toHaveValue("전송 중 다음 초안");
+    await expect(input).toBeFocused();
+    await input.press("Enter");
+    await expect(page.getByText("전송 중 다음 초안", { exact: true })).toBeVisible();
+    await expect(input).toBeFocused();
+  } finally { await context.close(); }
+});
+
+test("invite sharing copies or opens native share and guests join from the link", async ({ browser }) => {
+  const { users, host, code } = await setup(browser, 1);
+  const guest = await user(browser);
+  try {
+    await host.page.evaluate(() => {
+      Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+        writeText: async (value: string) => { sessionStorage.setItem("test-invite", value); },
+      } });
+    });
+    await host.page.getByRole("button", { name: "🔗 초대 링크 보내기" }).click();
+    await expect(host.page.getByRole("button", { name: "✓ 초대 링크 복사됨" })).toBeVisible();
+    const link = await host.page.evaluate(() => sessionStorage.getItem("test-invite"));
+    expect(new URL(link!).searchParams.get("room")).toBe(code);
+    await guest.page.goto(link!);
+    await expect(guest.page.getByLabel("방 코드", { exact: true })).toHaveValue(code);
+    await guest.page.getByLabel("닉네임").fill("링크 손님");
+    await guest.page.getByRole("button", { name: "코드로 입장" }).click();
+    await expect(host.page.getByText("링크 손님", { exact: true })).toBeVisible();
+    await host.page.evaluate(() => {
+      Object.defineProperty(navigator, "share", { configurable: true, value: async (data: ShareData) => {
+        sessionStorage.setItem("native-share", data.url!);
+      } });
+    });
+    await host.page.locator(".invite-share").click();
+    expect(await host.page.evaluate(() => sessionStorage.getItem("native-share"))).toBe(link);
+    await host.page.evaluate(() => {
+      Object.defineProperty(navigator, "share", { configurable: true, value: async () => {
+        throw new DOMException("cancelled", "AbortError");
+      } });
+    });
+    await host.page.locator(".invite-share").click();
+    await expect(host.page.getByRole("alert")).toHaveCount(0);
+  } finally {
+    for (const u of [...users, guest]) await u.context.close();
+  }
+});
+
+test("lobby test bots stay ready after settings and allow solo game start", async ({ browser }) => {
+  const { users, host } = await setup(browser, 1);
+  try {
+    for (let i = 0; i < 3; i++) {
+      await host.page.getByRole("button", { name: "🤖 테스트 봇 추가" }).click();
+      await expect(host.page.locator(".member-card")).toHaveCount(i + 2);
+    }
+    await expect(host.page.locator(".member-card.is-ready")).toHaveCount(3);
+    await host.page.getByRole("button", { name: "⚙ 수사실 설정" }).click();
+    await host.page.getByRole("button", { name: "설정 저장" }).click();
+    await expect(host.page.locator(".member-card.is-ready")).toHaveCount(3);
+    await host.page.getByRole("button", { name: "준비하기", exact: true }).click();
+    await host.page.getByRole("button", { name: "사건 시작" }).click();
+    await expect(host.page.getByLabel("누르는 동안 비밀 역할 보기")).toBeVisible();
+    await hold(host.page, ".role-dossier", 100);
+    await host.page.getByRole("button", { name: "역할을 확인했어요" }).click();
+    await expect.poll(() => host.view?.game?.phase).toBe("CRIME_NIGHT");
+    expect(host.errors).toEqual([]);
+  } finally { for (const u of users) await u.context.close(); }
+});
+
+
+test("all 120 card illustrations are local, distinct SVG assets with matching labels", async ({ request }) => {
+  const illustrations = await Promise.all(content.cards.map(async (card) => {
+    const response = await request.get(`/cards/${card.id}.svg`);
+    expect(response.status(), card.id).toBe(200);
+    expect(response.headers()["content-type"], card.id).toContain("image/svg+xml");
+    const body = await response.text();
+    expect(body, card.id).toContain(`<title id="title">${card.label}</title>`);
+    expect(body, card.id).toContain('viewBox="0 0 128 128"');
+    expect(body, card.id).not.toMatch(/(?:href|src)=["']https?:/);
+    return body.replace(/<title[^>]*>.*?<\/title>/, "");
+  }));
+  expect(illustrations).toHaveLength(120);
+  expect(new Set(illustrations).size).toBe(120);
+});

@@ -276,7 +276,7 @@ test("M2 socket payload privacy, fixed night timing, chat permissions, solve and
       Math.max(...arrivalTimes) - Math.min(...arrivalTimes) < 50,
       "scheduled night broadcast arrival spread under 50ms on local server",
     );
-    await h.step(3_000);
+    await h.command(forensic, { type: "chooseLocation", tileId: forensic.view!.game!.tiles[0].id });
     await assert.rejects(h.send(investigator, "chat", { text: "too early" }));
     const firstTile = forensic.view!.game!.tiles[0];
     await h.command(forensic, {
@@ -378,3 +378,72 @@ test("M2 explicit departures before crime selection retain a renderable result",
     await h.close();
   }
 });
+
+
+test("test bots: host authority, capacity, readiness, removal and room cleanup", async () => {
+  const h = await harness();
+  try {
+    const host = await h.client();
+    const guest = await h.client();
+    const session = await h.send<Session>(host, "create", { name: "방장" });
+    await h.send(guest, "join", { code: session.code, name: "손님" });
+    await assert.rejects(h.send(guest, "addBot"));
+    for (let i = 0; i < 10; i++) await h.send(host, "addBot");
+    await h.flush();
+    assert.equal(host.view!.members.length, 12);
+    assert.ok(host.view!.members.filter((m) => m.isBot).every((m) => m.ready && m.connected));
+    await assert.rejects(h.send(host, "addBot"));
+    const bot = host.view!.members.find((m) => m.isBot)!;
+    assert.equal("token" in bot, false);
+    await h.send(host, "kick", { playerId: bot.id });
+    await h.send(host, "settings", { settings: host.view!.settings, forensicChoice: null });
+    await h.flush();
+    assert.ok(host.view!.members.filter((m) => m.isBot).every((m) => m.ready));
+    assert.ok(host.view!.members.filter((m) => !m.isBot).every((m) => !m.ready));
+    await h.send(host, "leave");
+    await h.flush();
+    assert.equal(guest.view!.hostId, guest.view!.selfId);
+    await h.send(guest, "leave");
+    const newcomer = await h.client();
+    await assert.rejects(h.send(newcomer, "join", { code: session.code, name: "새 손님" }));
+  } finally { await h.close(); }
+});
+
+for (const count of [4, 8])
+  test(`test bots: one human and ${count - 1} bots complete three rounds and rematch`, async () => {
+    const h = await harness();
+    try {
+      const host = await h.client();
+      await h.send(host, "create", { name: "혼자 테스트" });
+      for (let i = 1; i < count; i++) await h.send(host, "addBot");
+      await h.flush();
+      const bot = host.view!.members.find((m) => m.isBot)!;
+      await h.send(host, "settings", { settings: host.view!.settings, forensicChoice: bot.id });
+      await h.send(host, "ready", { ready: true });
+      await h.send(host, "start");
+      await assert.rejects(h.send(host, "addBot"));
+      await h.step(3_000);
+      await h.command(host, { type: "confirmRole" });
+      await h.step(1_500);
+      assert.equal(host.view!.game!.phase, "CRIME_NIGHT");
+      for (let i = 0; i < 250 && host.view!.game!.phase !== "RESULT"; i++) {
+        const game = host.view!.game!;
+        if (game.phase === "PRESENTATION" && game.presenterId === host.view!.selfId)
+          await h.command(host, { type: "endPresentation" });
+        if (game.phase === "REVERSAL" && game.private.myRole === "murderer") {
+          const target = game.players.find((p) => p.id !== host.view!.selfId && p.id !== game.forensicId && p.id !== game.private.accompliceId)!;
+          await h.command(host, { type: "reversalPick", targetId: target.id });
+        }
+        await h.step(1_500);
+      }
+      assert.equal(host.view!.game!.phase, "RESULT");
+      assert.ok(host.view!.game!.solution);
+      assert.ok(host.view!.game!.history.some((e) => e.type === "replace"));
+      assert.ok(host.view!.chat.some((m) => m.text.includes("[테스트 봇]")));
+      await h.send(host, "rematch");
+      await h.flush();
+      assert.equal(host.view!.game, null);
+      assert.ok(host.view!.members.filter((m) => m.isBot).every((m) => m.ready));
+      assert.equal(host.view!.members.find((m) => !m.isBot)!.ready, false);
+    } finally { await h.close(); }
+  });

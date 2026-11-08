@@ -338,16 +338,13 @@ export function tick(input: GameState, now: number): GameState {
     if (elapsed >= NIGHT.introMs + NIGHT.crimeMs) fallbackSolution(state);
     if (elapsed >= NIGHT_END) {
       state.phase = "SCENE_INTRO";
-      state.timer.deadline = now + 3_000;
+      state.timer.deadline = null;
     }
   } else if (state.phase === "SOLVING" && now >= state.solveLock!.expiresAt)
     restoreSolve(state);
   else if (state.timer.deadline !== null && now >= state.timer.deadline) {
     if (state.phase === "DEAL") {
       state.phase = "ROLE_REVEAL";
-      state.timer.deadline = null;
-    } else if (state.phase === "SCENE_INTRO") {
-      state.phase = "EVIDENCE_COLLECTION";
       state.timer.deadline = null;
     } else if (
       state.phase === "EVIDENCE_COLLECTION" &&
@@ -437,6 +434,7 @@ export function applyCommand(
       );
       requireRule(tile, "INVALID_TILE");
       state.tiles[0] = structuredClone(tile) as SceneTile;
+      state.phase = "EVIDENCE_COLLECTION";
       break;
     }
     case "placeMarker": {

@@ -75,6 +75,7 @@ export function canChat(
     );
   if (state.phase === "RESULT") return true;
   if (role === "forensic") return false;
+  if (state.phase === "ROUND_TRANSITION") return true;
   if (state.phase === "EVIDENCE_COLLECTION")
     return Object.keys(state.markers).length > 0;
   return state.phase === "PRESENTATION" && presenterId(state) === playerId;

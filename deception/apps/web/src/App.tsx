@@ -2,13 +2,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import QRCode from "qrcode";
-import type { Card, GameView, RoomView, Settings } from "@deception/shared";
+import { content, type Card, type GameView, type RoomView, type Settings } from "@deception/shared";
 import { command, enter, leave, request, run, useRoom } from "./store";
 import { FeedbackSettings, unlockAudio, useGameFeedback } from "./feedback";
+import { CardArt, CardFace } from "./CardArt";
 
 const roleDescriptions: Record<string, string> = {
   forensic:
-    "정답을 아는 유일한 안내자입니다. 장면 타일의 항목을 골라 수사팀을 도우세요. 채팅으로 힌트를 전달할 수 없습니다.",
+    "정답을 아는 안내자입니다. 장면 타일의 항목을 골라 수사팀을 도우세요. 채팅으로 힌트를 전달할 수 없습니다.",
   murderer:
     "자신의 단서와 수단을 한 장씩 골라 사건을 만드세요. 토론에서는 정체를 숨기고, 두 카드가 함께 지목되는 일을 막으세요.",
   accomplice:
@@ -206,6 +207,9 @@ function Help() {
         정답이 나와도 범인이 60초 안에 목격자를 찾아내면 범인팀이 역전합니다.
         범인과 공범만 비밀 채팅으로 상의할 수 있습니다.
       </p>
+      <h3>선택 규칙과 온라인 진행</h3>
+      <p>공범과 목격자는 6인 이상에서 선택할 수 있습니다. 기본 구성은 6인부터 공범, 8인부터 목격자를 추가합니다. 법의학자는 장소를 직접 선택하고, 2·3라운드에는 장소·사인을 제외한 타일 한 장을 교체합니다. 교체 중에도 자유 토론할 수 있습니다.</p>
+      <p>밤 40초, 마지막 마커 뒤 토론 10초, 해결 카드 선택 20초, 반전 60초는 온라인 진행을 위한 시간 제한입니다. 이벤트 타일은 이 게임의 오리지널 효과이며 설정에서 켤 수 있습니다.</p>
       <h3>연결이 끊겼나요?</h3>
       <p>
         같은 브라우저로 다시 열면 자동 복귀합니다. 법의학자가 끊기면 게임이
@@ -222,7 +226,8 @@ function Help() {
 function Home({ onHelp }: { onHelp: () => void }) {
   const [name, setName] = useState(localStorage.getItem("neon.name") || "");
   const [code, setCode] = useState(
-    new URLSearchParams(location.search).get("room") || "",
+    (new URLSearchParams(location.search).get("room") ||
+      new URLSearchParams(location.search).get("code") || "").replace(/\D/g, "").slice(0, 4),
   );
   const [busy, setBusy] = useState(false);
   const connected = useRoom((s) => s.connected);
@@ -329,6 +334,8 @@ function Chat({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const end = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const inFlight = useRef(false);
   const game = room.game;
   const criminal =
     game?.phase === "REVERSAL" &&
@@ -339,7 +346,8 @@ function Chat({
     (!game ||
       game.phase === "RESULT" ||
       (game.private.myRole !== "forensic" &&
-        ((game.phase === "EVIDENCE_COLLECTION" &&
+        (game.phase === "ROUND_TRANSITION" ||
+          (game.phase === "EVIDENCE_COLLECTION" &&
           Object.keys(game.markers).length > 0) ||
           (game.phase === "PRESENTATION" &&
             game.presenterId === room.selfId))) ||
@@ -358,12 +366,20 @@ function Chat({
           : "아직 채팅할 수 없는 단계입니다";
   async function send(e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim() || sending) return;
+    if (!text.trim() || inFlight.current || !allowed) return;
+    const message = text.trim();
+    inFlight.current = true;
     setSending(true);
+    setText("");
+    // Focus synchronously while the touch/submit gesture still permits the keyboard.
+    input.current?.focus({ preventScroll: true });
     try {
-      await request("chat", { text, channel });
-      setText("");
+      await request("chat", { text: message, channel });
+    } catch (error) {
+      setText((draft) => draft || message);
+      throw error;
     } finally {
+      inFlight.current = false;
       setSending(false);
     }
   }
@@ -409,15 +425,24 @@ function Chat({
         }}
       >
         <input
+          ref={input}
           aria-label="채팅 메시지"
+          enterKeyHint="send"
+          autoComplete="off"
           value={text}
-          disabled={!allowed || sending}
+          disabled={!allowed}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault();
+          }}
           onChange={(e) => setText(e.target.value)}
           maxLength={300}
           placeholder={placeholder}
         />
         <button
+          type="submit"
           aria-label="메시지 보내기"
+          onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           disabled={!allowed || !text.trim() || sending}
         >
           ↑
@@ -516,8 +541,8 @@ function SettingsEditor({
           />
         </label>
         <p className="muted">
-          설정을 저장하면 전원의 준비가 해제됩니다. 공범·목격자는 6인 이상에서
-          사용할 수 있습니다.
+          설정을 저장하면 사람 참가자의 준비가 해제됩니다. 테스트 봇은 준비를
+          유지합니다. 공범·목격자는 6인 이상에서 사용할 수 있습니다.
         </p>
         <button
           className="primary"
@@ -541,9 +566,32 @@ function Lobby({ room }: { room: RoomView }) {
   const [invite, setInvite] = useState(false);
   const [qr, setQr] = useState("");
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [addingBot, setAddingBot] = useState(false);
   const self = room.members.find((p) => p.id === room.selfId)!;
   const host = room.hostId === room.selfId;
-  const link = `${location.origin}${location.pathname}?room=${room.code}`;
+  const inviteUrl = new URL(location.pathname, location.origin);
+  inviteUrl.searchParams.set("room", room.code);
+  const link = inviteUrl.toString();
+  async function copyInvite() {
+    if (!navigator.clipboard) throw new Error("초대 창에서 링크를 길게 눌러 복사해 주세요.");
+    await navigator.clipboard.writeText(link);
+    setCopied(true);
+    setLinkCopied(true);
+  }
+  async function shareInvite() {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "네온 사건파일", text: `수사실 ${room.code}에 초대합니다.`, url: link });
+        return;
+      }
+      await copyInvite();
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+      setInvite(true);
+      useRoom.getState().setError(error instanceof Error ? error.message : "초대 링크를 공유하지 못했습니다.");
+    }
+  }
   useEffect(() => {
     void QRCode.toDataURL(link, {
       width: 240,
@@ -577,6 +625,9 @@ function Lobby({ room }: { room: RoomView }) {
           </div>
           <span>초대 링크 · QR ↗</span>
         </button>
+        <button type="button" className="secondary full invite-share" onClick={() => run(shareInvite())}>
+          {linkCopied ? "✓ 초대 링크 복사됨" : "🔗 초대 링크 보내기"}
+        </button>
         <div className="section-label">
           <span>시계방향 좌석</span>
           <span>{host ? "길게 끌어 순서 변경" : "방장이 순서를 정합니다"}</span>
@@ -600,6 +651,7 @@ function Lobby({ room }: { room: RoomView }) {
               <span className="member-name">
                 {p.name}
                 {p.id === room.selfId && <small>나</small>}
+                {p.isBot && <small>봇</small>}
               </span>
               <span className="member-status">
                 {p.id === room.hostId ? "♛ 방장 · " : ""}
@@ -640,9 +692,19 @@ function Lobby({ room }: { room: RoomView }) {
           </small>
         </div>
         {host && (
-          <button className="secondary full" onClick={() => setSettings(true)}>
-            ⚙ 수사실 설정
-          </button>
+          <div className="lobby-host-tools">
+            <button className="secondary full" disabled={addingBot || room.members.length >= 12}
+              onClick={() => {
+                setAddingBot(true);
+                run(request("addBot").finally(() => setAddingBot(false)));
+              }}>
+              🤖 테스트 봇 추가
+            </button>
+            <p className="muted">혼자서는 봇 3명 이상을 추가하세요. 봇은 자동 준비하며, 마커·추측은 진행 검증용 무작위 선택입니다.</p>
+            <button className="secondary full" onClick={() => setSettings(true)}>
+              ⚙ 수사실 설정
+            </button>
+          </div>
         )}
       </div>
       <Chat room={room} compact />
@@ -690,18 +752,9 @@ function Lobby({ room }: { room: RoomView }) {
             />
             <button
               className="primary"
-              onClick={() => {
-                if (navigator.clipboard)
-                  run(
-                    navigator.clipboard
-                      .writeText(link)
-                      .then(() => setCopied(true)),
-                  );
-                else
-                  useRoom
-                    .getState()
-                    .setError("링크를 길게 눌러 복사해 주세요.");
-              }}
+              onClick={() => run(copyInvite().catch(() => {
+                useRoom.getState().setError("초대 링크를 길게 눌러 복사해 주세요.");
+              }))}
             >
               {copied ? "복사했어요" : "초대 링크 복사"}
             </button>
@@ -868,7 +921,7 @@ function Night({ room }: { room: RoomView }) {
                       key={c.id}
                       onClick={() => setClue(c.id)}
                     >
-                      {c.label}
+                      <CardFace card={c} />
                     </button>
                   ))}
               </div>
@@ -882,7 +935,7 @@ function Night({ room }: { room: RoomView }) {
                       key={c.id}
                       onClick={() => setMeans(c.id)}
                     >
-                      {c.label}
+                      <CardFace card={c} />
                     </button>
                   ))}
               </div>
@@ -1084,7 +1137,7 @@ function SolveWizard({ room }: { room: RoomView }) {
                     setStage(stage + 1);
                   }}
                 >
-                  {c.label}
+                  <CardFace card={c} />
                 </button>
               ))}
           </div>
@@ -1094,10 +1147,10 @@ function SolveWizard({ room }: { room: RoomView }) {
             <Avatar name={target!.name} />
             <h3>{target!.name}</h3>
             <span className="evidence-card clue">
-              ⌕ {target?.cards.find((c) => c.id === clueId)?.label}
+              <CardFace card={target?.cards.find((c) => c.id === clueId)} />
             </span>
             <span className="evidence-card means">
-              ⚒ {target?.cards.find((c) => c.id === meansId)?.label}
+              <CardFace card={target?.cards.find((c) => c.id === meansId)} />
             </span>
             <p>확정하면 해결 기회 배지 한 개를 사용합니다.</p>
             <HoldButton
@@ -1298,6 +1351,7 @@ function Investigation({ room }: { room: RoomView }) {
                 법의학자가 새로운 타일을 선택하고 있습니다.
               </p>
             )}
+            {!fs && <Chat room={room} compact />}
             {game.history
               .filter((e) => e.type === "event" && e.round === game.round)
               .map((e, i) => (
@@ -1372,22 +1426,25 @@ function Investigation({ room }: { room: RoomView }) {
                     onPointerCancel={() => {
                       if (longPress.current) clearTimeout(longPress.current);
                     }}
-                    onClick={() => {
-                      if (!longFired.current)
+                    onClick={(event) => {
+                      if (longFired.current) return;
+                      if ((event.target as HTMLElement).closest(".card-art")) {
+                        setExpanded(c);
+                      } else {
                         setNotes((n) => ({
                           ...n,
                           [c.id]: ((n[c.id] || 0) + 1) % 4,
                         }));
+                      }
                     }}
                   >
-                    <span>{c.kind === "clue" ? "⌕" : "⚒"}</span>
-                    <strong>{c.label}</strong>
-                    <small>{["", "◯", "△", "✕"][notes[c.id] || 0]}</small>
+                    <CardFace card={c} />
+                    <small className="card-note">{["", "◯", "△", "✕"][notes[c.id] || 0]}</small>
                   </button>
                 ))}
             </div>
             <button className="matrix-link" onClick={() => setMatrix(true)}>
-              전체 카드 비교 ↗ · 탭하여 내 메모 표시
+              전체 카드 비교 ↗ · 그림 탭: 확대 / 이름 탭: 메모
             </button>
           </div>
         )}
@@ -1481,8 +1538,8 @@ function Investigation({ room }: { room: RoomView }) {
                         className={c.kind}
                         onClick={() => setExpanded(c)}
                       >
-                        {["", "◯ ", "△ ", "✕ "][notes[c.id] || 0]}
-                        {c.label}
+                        <CardFace card={c} />
+                        <small>{["", "◯", "△", "✕"][notes[c.id] || 0]}</small>
                       </button>
                     ))}
                   </div>
@@ -1499,6 +1556,7 @@ function Investigation({ room }: { room: RoomView }) {
                 ? "⌕ 핵심 단서 후보"
                 : "⚒ 범행 수단 후보"}
             </span>
+            <CardArt card={expanded} />
             <h2>{expanded.label}</h2>
             <p>그림보다 문구를 기준으로 추리하세요.</p>
           </div>
@@ -1623,10 +1681,10 @@ function Result({ room }: { room: RoomView }) {
       <div className="case-answer">
         <p className="eyebrow">범인은 {murderer.name}</p>
         <div className="evidence-card clue">
-          ⌕ {murderer.cards.find((c) => c.id === solution.clueId)?.label}
+          <CardFace card={murderer.cards.find((c) => c.id === solution.clueId)} />
         </div>
         <div className="evidence-card means">
-          ⚒ {murderer.cards.find((c) => c.id === solution.meansId)?.label}
+          <CardFace card={murderer.cards.find((c) => c.id === solution.meansId)} />
         </div>
       </div>
       <h2>드러난 신분</h2>
@@ -1876,9 +1934,8 @@ export function App() {
   );
 }
 function SceneIntro({ room }: { room: RoomView }) {
-  const [choice, setChoice] = useState("");
   return (
-    <div className="interlude">
+    <div className="interlude scene-intro">
       <p className="eyebrow">ARRIVING AT THE SCENE</p>
       <h1>
         비 내리는 항구,
@@ -1887,28 +1944,21 @@ function SceneIntro({ room }: { room: RoomView }) {
       </h1>
       {room.game!.private.myRole === "forensic" && (
         <div>
-          <p>범행 장소 선택 (기본: 안개 부두)</p>
-          {[
-            ["location-01", "안개 부두"],
-            ["location-02", "심야 시가지"],
-            ["location-03", "외곽 지구"],
-          ].map(([id, label]) => (
+          <p>범행 장소 타일을 선택하면 수사를 시작합니다.</p>
+          {content.tiles.filter((tile) => tile.kind === "location").map(({ id, title, options }) => (
             <button
-              className={`secondary full ${choice === id ? "selected" : ""}`}
+              className="secondary full"
               key={id}
               onClick={() =>
-                run(
-                  command({ type: "chooseLocation", tileId: id }).then(() =>
-                    setChoice(id),
-                  ),
-                )
+                run(command({ type: "chooseLocation", tileId: id }))
               }
             >
-              {label}
+              {title} · {options.join(" / ")}
             </button>
           ))}
         </div>
       )}
+      {room.game!.private.myRole !== "forensic" && <p>법의학자가 범행 장소를 선택하고 있습니다.</p>}
     </div>
   );
 }

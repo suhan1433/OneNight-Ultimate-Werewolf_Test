@@ -55,7 +55,7 @@ function select(s: GameState): GameState {
 function investigation(n = 8, options: Partial<Settings> = {}): GameState {
   let s = select(night(n, options));
   s = tick(s, s.nightStartedAt! + 40_000);
-  return tick(s, s.now + 3_000);
+  return act(s, forensicId(s), { type: "chooseLocation", tileId: s.tiles[0]!.id });
 }
 function markAll(s: GameState): GameState {
   for (const tile of s.tiles)
@@ -735,4 +735,27 @@ test("11 seeded scenario stress matrix across events and difficulties", () => {
       }
     }
   }
+});
+
+
+test("official rules: location choice waits for the forensic scientist", () => {
+  let s = tick(select(night()), 43_000);
+  s = tick(s, s.now + 60_000);
+  assert.equal(s.phase, "SCENE_INTRO");
+  assert.equal(s.timer.deadline, null);
+  assert.throws(() => act(s, forensicId(s), {
+    type: "placeMarker", tileId: s.tiles[0]!.id, option: 0,
+  }));
+  const location = content.tiles.filter((t) => t.kind === "location")[2]!;
+  s = act(s, forensicId(s), { type: "chooseLocation", tileId: location.id });
+  assert.equal(s.phase, "EVIDENCE_COLLECTION");
+  assert.equal(s.tiles[0]!.id, location.id);
+  assert.throws(() => act(s, forensicId(s), { type: "chooseLocation", tileId: location.id }));
+});
+
+test("official rules: replacement is part of free evidence discussion", () => {
+  const s = endRound(presentations(investigation()));
+  assert.equal(s.phase, "ROUND_TRANSITION");
+  for (const p of s.players)
+    assert.equal(canChat(s, p.id), p.id !== forensicId(s));
 });

@@ -11,6 +11,7 @@
     "test": "pnpm --filter @deception/shared build && pnpm -r test",
     "simulate": "pnpm --filter @deception/shared simulate",
     "start": "pnpm --filter @deception/server start",
-    "test:e2e": "pnpm --filter @deception/web test:e2e"
+    "test:e2e": "pnpm --filter @deception/web test:e2e",
+    "art:cards": "node scripts/generate-card-art.mjs"
   }
 }

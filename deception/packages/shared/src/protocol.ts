@@ -5,6 +5,7 @@ export interface LobbyMember {
   seat: number;
   connected: boolean;
   ready: boolean;
+  isBot?: boolean;
 }
 export interface ChatMessage {
   id: string;

@@ -6,6 +6,7 @@ import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import { Server, type Socket } from "socket.io";
 import { createActor, fromTransition } from "xstate";
 import { z } from "zod";
+import { botAction } from "./bots.js";
 import {
   applyCommand,
   canChat,
@@ -75,6 +76,7 @@ interface Room {
   chat: ChatMessage[];
   pausedAt: number | null;
   updatedAt: number;
+  nextBotAt: number;
 }
 const nicknameSchema = z.string().trim().min(1).max(20);
 const codeSchema = z.string().regex(/^\d{4}$/);
@@ -173,12 +175,13 @@ export function createApp(
       code: room.code,
       hostId: room.hostId,
       selfId: member.id,
-      members: room.members.map(({ id, name, seat, connected, ready }) => ({
+      members: room.members.map(({ id, name, seat, connected, ready, isBot }) => ({
         id,
         name,
         seat,
         connected,
         ready,
+        isBot: !!isBot,
       })),
       settings: { ...room.settings },
       forensicChoice: room.forensicChoice,
@@ -207,7 +210,7 @@ export function createApp(
   function normalizeLobby(room: Room) {
     room.members.forEach((m, i) => {
       m.seat = i;
-      m.ready = false;
+      m.ready = !!m.isBot;
     });
     if (room.members.length < 6 || !room.manualRoles) {
       const defaults = defaultSettings(room.members.length);
@@ -218,7 +221,8 @@ export function createApp(
       room.forensicChoice = null;
     if (!room.members.some((m) => m.id === room.hostId))
       room.hostId =
-        room.members.find((m) => m.connected)?.id ?? room.members[0]?.id ?? "";
+        room.members.find((m) => m.connected && !m.isBot)?.id ??
+        room.members.find((m) => !m.isBot)?.id ?? "";
   }
   function session(socket: Socket): { room: Room; member: Member } {
     const room = rooms.get(socket.data.code);
@@ -312,6 +316,7 @@ export function createApp(
         chat: [],
         pausedAt: null,
         updatedAt: now(),
+        nextBotAt: now(),
       };
       rooms.set(code, room);
       return bind(socket, room, member);
@@ -346,7 +351,7 @@ export function createApp(
       const member = room?.members.find(
         (m) => m.id === value.playerId && m.token === value.token,
       );
-      if (!room || !member) throw new Error("이전 세션이 만료됐습니다.");
+      if (!room || !member || member.isBot) throw new Error("이전 세션이 만료됐습니다.");
       if (socket.data.code && socket.data.code !== room.code)
         throw new Error("현재 방에서 먼저 나가 주세요.");
       if (socket.data.playerId && socket.data.playerId !== member.id)
@@ -361,6 +366,21 @@ export function createApp(
       const { room, member } = session(socket);
       if (current(room)) throw new Error("이미 게임이 진행 중입니다.");
       member.ready = ready;
+      emit(room);
+    });
+    handle("addBot", (payload) => {
+      z.object({}).strict().parse(payload);
+      const { room, member } = session(socket);
+      if (current(room) || member.id !== room.hostId)
+        throw new Error("방장만 대기실에서 테스트 봇을 추가할 수 있습니다.");
+      if (room.members.length >= 12) throw new Error("방이 가득 찼습니다.");
+      let number = 1;
+      while (room.members.some((m) => m.name === `테스트 봇 ${number}`)) number++;
+      const bot = newMember(`테스트 봇 ${number}`, room.members.length);
+      Object.assign(bot, { isBot: true, connected: true, ready: true, token: "" });
+      room.members.push(bot);
+      normalizeLobby(room);
+      room.updatedAt = now();
       emit(room);
     });
     handle("settings", (payload) => {
@@ -388,7 +408,7 @@ export function createApp(
       room.manualRoles = true;
       room.forensicChoice = value.forensicChoice;
       room.members.forEach((m) => {
-        m.ready = false;
+        m.ready = !!m.isBot;
       });
       emit(room);
     });
@@ -557,7 +577,7 @@ export function createApp(
       delete socket.data.code;
       delete socket.data.playerId;
       normalizeLobby(room);
-      if (!room.members.length) {
+      if (!room.members.some((m) => !m.isBot)) {
         room.actor?.stop();
         rooms.delete(room.code);
       } else emit(room);
@@ -618,7 +638,7 @@ export function createApp(
         sync(room, next);
       }
       if (room.hostId === member.id)
-        room.hostId = room.members.find((m) => m.connected)?.id ?? member.id;
+        room.hostId = room.members.find((m) => m.connected && !m.isBot)?.id ?? member.id;
       room.updatedAt = now();
       emit(room);
     });
@@ -630,7 +650,7 @@ export function createApp(
     if (heartbeat) heartbeatAt = time;
     for (const room of rooms.values()) {
       if (
-        !room.members.some((m) => m.connected) &&
+        !room.members.some((m) => m.connected && !m.isBot) &&
         time - room.updatedAt > 30 * 60_000
       ) {
         room.actor?.stop();
@@ -674,6 +694,30 @@ export function createApp(
       }
       room.actor!.send({ type: "TICK", now: time });
       game = current(room)!;
+      if (time >= room.nextBotAt && room.members.some((m) => !m.isBot && m.connected)) {
+        room.nextBotAt = time + 1_500;
+        for (const bot of room.members.filter((m) => m.isBot)) {
+          game = current(room)!;
+          if (game.phase === "ROLE_REVEAL" && game.confirmed.includes(bot.id)) continue;
+          const action = botAction(project(game, bot.id), bot.id, time);
+          if (!action) continue;
+          if (action.type === "endPresentation" && canChat(game, bot.id)) {
+            room.chat.push({
+              id: randomUUID(), playerId: bot.id, name: bot.name,
+              text: "[테스트 봇] 마커와 공개 카드를 확인했습니다. 다음 수사관에게 넘깁니다.",
+              at: time, channel: "public",
+            });
+            room.chat = room.chat.slice(-200);
+          }
+          room.actor!.send({
+            type: "COMMAND", now: time,
+            command: { id: randomUUID(), actorId: bot.id, action },
+          });
+          // One public action per interval keeps the flow readable on mobile.
+          if (action.type !== "confirmRole") break;
+        }
+        game = current(room)!;
+      }
       if (game.version !== before || heartbeat) emit(room);
     }
     for (const [key, value] of limits)

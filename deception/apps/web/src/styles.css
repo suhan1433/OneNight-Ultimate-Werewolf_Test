@@ -90,6 +90,8 @@ input:disabled{opacity:.5}
 .pill{padding:2px 12px;border-radius:99px;border:1.5px solid var(--brass);color:var(--brass);font-weight:700}
 .invite-card{display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 16px;border-radius:8px;background:var(--manila);color:#1b1a16;text-align:left;border-left:10px solid var(--red);font-weight:600;font-size:13px}
 .invite-card strong,.big-code{display:block;font:400 40px/1.1 var(--disp);letter-spacing:.14em}
+.invite-share{flex-shrink:0;color:var(--manila);border-color:var(--manila2)}
+.lobby-host-tools{display:flex;flex-direction:column;gap:8px}
 .member-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .member-card{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;padding:10px;border-radius:10px;background:var(--pave);border-top:4px solid var(--line)}
 .member-card.is-ready{border-top-color:var(--jade)}
@@ -138,6 +140,15 @@ input:disabled{opacity:.5}
 .evidence-card>span:first-child{color:var(--c);font-size:18px}
 .evidence-card small{font-size:16px;font-weight:700}
 .evidence-card.selected{outline:3px solid var(--brass);outline-offset:2px}
+.card-art{display:block;flex:none;width:52px;height:52px;object-fit:contain;border-radius:10px;user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none}
+.evidence-card .card-label{min-width:0;overflow-wrap:anywhere}
+.evidence-card .card-note{position:absolute;right:5px;bottom:4px;font-size:12px;line-height:1}
+.night:has(.night-cards){justify-content:flex-start}
+.night:has(.night-cards) .night-orb{display:none}
+.night-cards .evidence-card{min-height:64px;padding:6px 8px;gap:6px;font-size:13px}
+.night-cards .card-art{width:38px;height:38px;border-radius:7px}
+.solve-cards .evidence-card,.solve-summary .evidence-card{min-height:76px}
+.solve-cards .card-art,.solve-summary .card-art{width:60px;height:60px}
 .note-1{box-shadow:0 0 0 3px var(--jade),0 3px 0 #0006}.note-2{box-shadow:0 0 0 3px var(--brass),0 3px 0 #0006}
 .note-3{opacity:.4}.note-3 strong{text-decoration:line-through}
 .phase-bar{display:flex;align-items:center;justify-content:space-between;padding:4px 14px}
@@ -178,7 +189,21 @@ input:disabled{opacity:.5}
 .suspect-strip .presenting .avatar{box-shadow:0 0 0 3px var(--ink),0 0 0 5px var(--brass)}
 .card-column-head{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:2px 12px;font-weight:700;font-size:14px}
 .card-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;padding:6px 12px 12px}
+.card-grid .evidence-card{min-height:70px;padding:6px 8px;gap:6px;font-size:14px;cursor:pointer}
+.card-grid .card-art{width:50px;height:50px}
+.card-grid .evidence-card::after{width:5px;height:5px;right:4px;top:4px}
 .matrix-link{flex:none;min-height:40px;color:var(--mute);font-size:13px;text-decoration:underline}
+@media (max-height:700px){
+  .cards-view .suspect-strip{padding-top:4px;padding-bottom:4px}
+  .cards-view .suspect-strip button{min-height:60px;padding:4px;gap:1px}
+  .cards-view .suspect-strip .avatar{width:28px;height:28px}
+  .cards-view .suspect-strip .avatar small{font-size:12px}
+  .cards-view .card-grid{gap:6px;padding-bottom:6px}
+  .cards-view .evidence-card{min-height:44px;padding:3px 6px;gap:5px;font-size:12px}
+  .cards-view .card-art{width:34px;height:34px;border-radius:6px}
+  .night:has(.night-cards){padding:14px 16px;gap:8px}
+  .night:has(.night-cards) .night-time{font-size:34px}
+}
 .game-dock{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:6px 10px;border-top:1px solid var(--line);background:var(--pave)}
 .game-dock button{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:52px;border-radius:10px;font-size:18px;line-height:1.1}
 .game-dock span{font-size:12px;font-weight:600}
@@ -188,9 +213,14 @@ input:disabled{opacity:.5}
 .matrix>div>div{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .matrix button{min-height:38px;padding:4px 10px;border-radius:5px;border-left:6px solid var(--red);background:var(--manila);color:#1b1a16;font-size:13px;font-weight:600}
 .matrix button.means{border-left-color:var(--blue)}
+.matrix button{display:flex;align-items:center;gap:6px;max-width:100%;text-align:left}
+.matrix .card-art{width:34px;height:34px;border-radius:6px}
+.matrix .card-label{font-weight:600}
 .expanded-card{padding:28px 22px;border-radius:8px;border-left:14px solid var(--red);background:var(--manila);color:#1b1a16;display:flex;flex-direction:column;gap:8px}
 .expanded-card.means{border-left-color:var(--blue)}
 .expanded-card h2{font-size:38px}
+.expanded-card .card-art{width:min(100%,260px);height:auto;aspect-ratio:1;align-self:center;border-radius:20px}
+.expanded-card p{font-size:13px;opacity:.75}
 .timeline summary{min-height:44px;display:flex;align-items:center;color:var(--manila);font-weight:600}
 .timeline p{font-size:13px;color:var(--mute);padding:3px 0}
 .solve-overlay{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;background:var(--ink);box-shadow:inset 0 0 0 3px var(--red)}
@@ -209,6 +239,9 @@ input:disabled{opacity:.5}
 .waiting-overlay{position:absolute;inset:0;z-index:45;background:#05080af0}
 .pause-overlay{z-index:60}
 .interlude{flex:1}
+.scene-intro{min-height:0;overflow-y:auto;justify-content:flex-start}
+.scene-intro>div{width:100%;display:flex;flex-direction:column;gap:10px}
+.scene-intro .secondary{flex-shrink:0;padding:12px;text-align:left;white-space:normal}
 .interlude h1{font-size:34px}
 .waiting-overlay strong{font:400 44px var(--disp);color:var(--brass)}
 .pulse-ring{width:78px;height:78px;display:grid;place-items:center;border-radius:50%;border:3px solid var(--red);color:var(--red);font-size:30px;animation:ring 1.6s ease-out infinite}
@@ -225,6 +258,7 @@ input:disabled{opacity:.5}
 .result>.muted{text-align:center}
 .case-answer{display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:8px;background:var(--manila);color:#1b1a16}
 .case-answer .evidence-card{background:#fffaf0}
+.case-answer .card-art{width:64px;height:64px}
 .reveal-list>div{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
 .reveal-list strong{flex:1}
 .error-toast{position:absolute;left:12px;right:12px;bottom:84px;z-index:80;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;background:var(--red);color:var(--paper);font-weight:600;font-size:14px}
