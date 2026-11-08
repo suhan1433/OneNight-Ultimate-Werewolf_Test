@@ -254,6 +254,7 @@ export function createApp(
         const delta = now() - room.pausedAt;
         if (next.timer.deadline !== null) next.timer.deadline += delta;
         if (next.nightStartedAt !== null) next.nightStartedAt += delta;
+        if (next.crimeEndsAt !== null) next.crimeEndsAt += delta;
         if (next.solveLock) next.solveLock.expiresAt += delta;
         next.now = now();
         room.pausedAt = null;
@@ -482,20 +483,8 @@ export function createApp(
       const snapshot = room.actor.getSnapshot().context;
       if (snapshot.error) throw new Error(snapshot.error);
       room.updatedAt = now();
-      // Night commands only update entitled recipients. All clients get scheduled heartbeats.
-      if (parsed.action.type === "crimeSelect") {
-        for (const m of room.members)
-          if (
-            m.socketId &&
-            ["forensic", "murderer", "accomplice"].includes(
-              snapshot.game.roles[m.id],
-            )
-          )
-            io.to(m.socketId).emit("state", view(room, m));
-      } else if (
-        parsed.action.type !== "confirmRole" ||
-        snapshot.game.phase === "CRIME_NIGHT"
-      )
+      // Selection advances the public timeline, while role confirmations remain private.
+      if (parsed.action.type !== "confirmRole" || snapshot.game.phase === "CRIME_NIGHT")
         emit(room);
     });
     handle("chat", (payload) => {

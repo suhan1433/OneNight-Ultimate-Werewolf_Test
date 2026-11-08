@@ -20,6 +20,8 @@ export interface Settings {
   cardsPerKind: 3 | 4 | 5;
   events: boolean;
   presentationSeconds: 20 | 30 | 45 | 60 | null;
+  discussionSeconds: number | null;
+  crimeSeconds: number;
   accomplice: boolean;
   witness: boolean;
 }
@@ -87,6 +89,8 @@ export interface GameState {
   solution: Solution | null;
   witnessCandidates: string[];
   nightStartedAt: number | null;
+  crimeEndsAt: number | null;
+  presentationConsents: string[];
   tiles: SceneTile[];
   deck: SceneTile[];
   markers: Record<string, number>;
@@ -143,6 +147,8 @@ export interface GameView {
   presentationOrder: string[];
   timer: Timer;
   nightStartedAt: number | null;
+  crimeEndsAt: number | null;
+  presentationConsents: string[];
   solveLock: { expiresAt: number } | null;
   winner: Team | null;
   reason: string | null;

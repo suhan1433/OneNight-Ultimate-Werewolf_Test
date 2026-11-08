@@ -105,7 +105,10 @@ export function simulate(input: {
             meansId: target.cards.find((c) => c.kind === "means")!.id,
           });
         }
-      } else send(forensicId(state), { type: "beginPresentations" });
+      } else {
+        for (const p of state.players.filter((p) => !p.departed))
+          send(p.id, { type: "beginPresentations" });
+      }
     } else if (state.phase === "PRESENTATION") {
       send(presenterId(state)!, { type: "endPresentation" });
     } else if (state.phase === "ROUND_TRANSITION") {

@@ -12,7 +12,7 @@ export function botAction(view: GameView, playerId: string, now: number): Action
   if (view.phase === "ROLE_REVEAL") return { type: "confirmRole" };
   if (view.phase === "CRIME_NIGHT" && role === "murderer" && !view.private.solution) {
     const elapsed = now - view.nightStartedAt!;
-    if (elapsed >= NIGHT.introMs && elapsed < NIGHT.introMs + NIGHT.crimeMs)
+    if (elapsed >= NIGHT.introMs && now < view.crimeEndsAt!)
       return {
         type: "crimeSelect",
         clueId: pick(me.cards.filter((c) => c.kind === "clue"))!.id,
@@ -29,6 +29,8 @@ export function botAction(view: GameView, playerId: string, now: number): Action
     if (view.phase === "ROUND_TRANSITION")
       return { type: "replaceTile", tileId: pick(view.tiles.filter((t) => t.kind === "hint"))!.id };
   }
+  if (view.phase === "EVIDENCE_COLLECTION" && Object.keys(view.markers).length === 6 &&
+      !view.presentationConsents.includes(playerId)) return { type: "beginPresentations" };
   if (view.phase === "PRESENTATION" && view.presenterId === playerId) {
     if (view.round === 3 && me.hasBadge) return { type: "startSolve" };
     return { type: "endPresentation" };

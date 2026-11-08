@@ -10,6 +10,8 @@ export const settingsSchema = z
       z.literal(60),
       z.null(),
     ]),
+    discussionSeconds: z.number().int().min(10).max(600).nullable().default(10),
+    crimeSeconds: z.number().int().min(5).max(300).default(25),
     accomplice: z.boolean(),
     witness: z.boolean(),
   })

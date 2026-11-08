@@ -68,7 +68,10 @@ function markAll(s: GameState): GameState {
   return s;
 }
 function presentations(s: GameState): GameState {
-  return act(markAll(s), forensicId(s), { type: "beginPresentations" });
+  s = markAll(s);
+  for (const p of s.players.filter((p) => !p.departed))
+    s = act(s, p.id, { type: "beginPresentations" });
+  return s;
 }
 function endRound(s: GameState): GameState {
   while (s.phase === "PRESENTATION")
@@ -189,10 +192,11 @@ test("4.4 role confirmations gate the night and duplicate confirmations are harm
   assert.equal(s.confirmed.length, 1);
   assert.equal(s.phase, "ROLE_REVEAL");
 });
-test("4.4 fixed night windows even after early choice and without witness", () => {
+test("crime confirmation immediately advances to witness or scene with configurable timeout", () => {
   for (const n of [4, 8]) {
-    let s = night(n);
+    let s = night(n, { crimeSeconds: 90 });
     const start = s.nightStartedAt!;
+    assert.equal(s.crimeEndsAt, start + 93_000);
     const murderer = s.players.find((p) => s.roles[p.id] === "murderer")!;
     const action: Action = {
       type: "crimeSelect",
@@ -201,10 +205,27 @@ test("4.4 fixed night windows even after early choice and without witness", () =
     };
     assert.throws(() => act(s, murderer.id, action), /NIGHT_WINDOW/);
     s = select(s);
-    assert.equal(s.timer.deadline, start + 40_000);
-    assert.equal(tick(s, start + 39_999).phase, "CRIME_NIGHT");
-    assert.equal(tick(s, start + 40_000).phase, "SCENE_INTRO");
-    assert.throws(() => act(s, murderer.id, action), /SOLUTION_LOCKED/);
+    assert.equal(s.crimeEndsAt, start + 3_000);
+    if (s.settings.witness) {
+      assert.equal(s.phase, "CRIME_NIGHT");
+      assert.equal(s.timer.deadline, start + 15_000);
+      assert.equal(tick(s, start + 14_999).phase, "CRIME_NIGHT");
+      assert.equal(tick(s, start + 15_000).phase, "SCENE_INTRO");
+    } else {
+      assert.equal(s.phase, "SCENE_INTRO");
+      assert.equal(s.timer.deadline, null);
+    }
+    assert.throws(() => act(s, murderer.id, action));
+  }
+});
+test("configured crime deadline auto-selects exactly at timeout", () => {
+  for (const n of [4, 8]) {
+    const s = night(n, { crimeSeconds: 60 });
+    assert.equal(tick(s, s.crimeEndsAt! - 1).solution, null);
+    const expired = tick(s, s.crimeEndsAt!);
+    assert.ok(expired.solution);
+    assert.equal(expired.phase, n === 8 ? "CRIME_NIGHT" : "SCENE_INTRO");
+    assert.deepEqual(expired.solution, tick(s, s.crimeEndsAt!).solution);
   }
 });
 test("4.4 murderer timeout deterministically selects valid own cards", () => {
@@ -327,7 +348,8 @@ test("1.6 wrong solve spends badge, gives no partial feedback, retains presentat
   assert.throws(() => act(s, id, { type: "startSolve" }), /NO_BADGE/);
   const record = project(s, id).history.find((e) => e.type === "solve")!;
   assert.equal(record.correct, false);
-  assert.equal(record.solution, undefined);
+  assert.deepEqual(record.solution, s.history.find((e) => e.type === "solve")!.solution);
+  assert.equal(project(s, id).private.solution, undefined);
   s = presentations(s);
   assert.ok(s.presentationOrder.includes(id));
 });
@@ -659,20 +681,22 @@ test("8 investigator projection excludes solution, secret roles, deck and PRNG",
   view.players[0]!.cards.splice(0);
   assert.deepEqual(s, before);
 });
-test("4.4 private choice creates no public projection signal for uninvolved players", () => {
+test("early selection broadcasts progress without disclosing private cards or roles", () => {
   const before = tick(night(), 6_000);
   const after = select(before);
-  assert.deepEqual(
-    project(before, solver(before)),
-    project(after, solver(after)),
-  );
-  assert.equal(after.version, before.version);
+  const view = project(after, solver(after));
+  assert.equal(view.crimeEndsAt, after.now);
+  assert.ok(after.version > before.version);
+  assert.deepEqual(view.private, { myRole: "investigator" });
+  assert.equal(view.solution, undefined);
+  assert.equal(view.revealedRoles, undefined);
 });
-test("4.4 witness sees only shuffled pair after fixed witness boundary", () => {
-  const s = select(night());
-  const witness = roleId(s, "witness")!;
-  assert.deepEqual(project(s, witness).private, { myRole: "witness" });
-  const view = project(tick(s, s.nightStartedAt! + 28_000), witness);
+test("witness sees only shuffled pair immediately after selection", () => {
+  const initial = tick(night(), 6_000);
+  const witness = roleId(initial, "witness")!;
+  assert.deepEqual(project(initial, witness).private, { myRole: "witness" });
+  const s = select(initial);
+  const view = project(s, witness);
   assert.deepEqual(
     new Set(view.private.witnessCandidates),
     new Set([roleId(s, "murderer"), roleId(s, "accomplice")]),
@@ -758,4 +782,48 @@ test("official rules: replacement is part of free evidence discussion", () => {
   assert.equal(s.phase, "ROUND_TRANSITION");
   for (const p of s.players)
     assert.equal(canChat(s, p.id), p.id !== forensicId(s));
+});
+
+test("discussion timer starts at final marker and expires at configured duration", () => {
+  let s = investigation(6, { discussionSeconds: 120 });
+  assert.equal(s.timer.deadline, null);
+  s = markAll(s);
+  assert.equal(s.timer.deadline, s.now + 120_000);
+  assert.equal(tick(s, s.now + 119_999).phase, "EVIDENCE_COLLECTION");
+  assert.equal(tick(s, s.now + 120_000).phase, "PRESENTATION");
+});
+test("unlimited discussion waits for every player's consent, including forensic and spent badges", () => {
+  let s = markAll(wrongSolve(investigation(6, { discussionSeconds: null })));
+  assert.equal(s.timer.deadline, null);
+  const voters = s.players.filter((p) => p.id !== forensicId(s));
+  for (const p of voters) s = act(s, p.id, { type: "beginPresentations" });
+  s = act(s, voters[0]!.id, { type: "beginPresentations" });
+  assert.equal(s.presentationConsents.length, 5);
+  assert.equal(tick(s, s.now + 600_000).phase, "EVIDENCE_COLLECTION");
+  s = act(s, forensicId(s), { type: "beginPresentations" });
+  assert.equal(s.phase, "PRESENTATION");
+  s = endRound(s);
+  assert.deepEqual(s.presentationConsents, []);
+});
+test("unanimous consent ends a timed discussion immediately and departures reduce total", () => {
+  let s = markAll(investigation(6, { discussionSeconds: 300 }));
+  const missing = s.players.at(-1)!;
+  for (const p of s.players.filter((p) => p.id !== missing.id))
+    s = act(s, p.id, { type: "beginPresentations" });
+  assert.equal(s.phase, "EVIDENCE_COLLECTION");
+  const now = s.now;
+  s = departPlayer(s, missing.id, now);
+  assert.equal(s.phase, "PRESENTATION");
+  assert.equal(s.now, now);
+});
+test("solve history publicly identifies the guesser, target, and both cards without partial correctness", () => {
+  const s = wrongSolve(investigation());
+  for (const p of s.players) {
+    const view = project(s, p.id);
+    const guess = view.history.find((e) => e.type === "solve")!;
+    assert.equal(guess.playerId, solver(s));
+    assert.equal(guess.correct, false);
+    assert.deepEqual(guess.solution, s.history.find((e) => e.type === "solve")!.solution);
+    assert.deepEqual(Object.keys(guess).sort(), ["at", "correct", "playerId", "round", "solution", "type"]);
+  }
 });

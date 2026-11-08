@@ -241,7 +241,7 @@ test("M2 actor spoofing and client scheduler commands rejected", async () => {
     await h.close();
   }
 });
-test("M2 socket payload privacy, fixed night timing, chat permissions, solve and rematch", async () => {
+test("M2 socket privacy, immediate crime progression, chat permissions, solve and rematch", async () => {
   const h = await harness();
   try {
     const { host, players } = await h.game(6);
@@ -261,15 +261,7 @@ test("M2 socket payload privacy, fixed night timing, chat permissions, solve and
       meansId: publicPlayer.cards.find((c) => c.kind === "means")!.id,
     });
     await h.flush();
-    assert.equal(
-      investigator.packets.length,
-      before,
-      "private selection must not send an event to uninvolved clients",
-    );
-    assert.equal(investigator.view!.game!.phase, "CRIME_NIGHT");
-    await h.step(36_999);
-    assert.equal(investigator.view!.game!.phase, "CRIME_NIGHT");
-    await h.step(1);
+    assert.ok(investigator.packets.length > before, "selection immediately broadcasts the next phase");
     assert.equal(investigator.view!.game!.phase, "SCENE_INTRO");
     const arrivalTimes = players.map((p) => p.receivedAt.at(-1)!);
     assert.ok(
@@ -300,6 +292,16 @@ test("M2 socket payload privacy, fixed night timing, chat permissions, solve and
       ])
         assert.equal(payload.includes(`"${key}":`), false, key);
     }
+    for (const tile of forensic.view!.game!.tiles.slice(1))
+      await h.command(forensic, { type: "placeMarker", tileId: tile.id, option: 0 });
+    for (const p of players.slice(0, -1))
+      await h.command(p, { type: "beginPresentations" });
+    await h.flush();
+    assert.equal(investigator.view!.game!.presentationConsents.length, 5);
+    assert.equal(investigator.view!.game!.phase, "EVIDENCE_COLLECTION");
+    await h.command(players.at(-1)!, { type: "beginPresentations" });
+    await h.flush();
+    assert.equal(investigator.view!.game!.phase, "PRESENTATION");
     const solution = forensic.view!.game!.private.solution!;
     await h.command(investigator, { type: "startSolve" });
     await h.command(investigator, {
@@ -328,6 +330,7 @@ test("M2 forensic disconnect pauses night and restores timers on resume", async 
       (p) => p.view!.game!.private.myRole === "forensic",
     )!;
     const oldDeadline = forensic.view!.game!.timer.deadline!;
+    const oldCrimeEndsAt = forensic.view!.game!.crimeEndsAt!;
     forensic.socket.disconnect();
     await h.flush();
     const observer = players.find((p) => p !== forensic)!;
@@ -346,6 +349,7 @@ test("M2 forensic disconnect pauses night and restores timers on resume", async 
     await h.flush();
     assert.equal(resumed.view!.pausedAt, null);
     assert.equal(resumed.view!.game!.timer.deadline, oldDeadline + 30_000);
+    assert.equal(resumed.view!.game!.crimeEndsAt, oldCrimeEndsAt + 30_000);
     resumed.socket.disconnect();
     await h.flush();
     await h.step(60_000);

@@ -17,7 +17,11 @@ export function project(state: GameState, playerId: string): GameView {
       if (accomplice) intel.accompliceId = accomplice;
       if (state.solution) intel.solution = structuredClone(state.solution);
     }
-    if (role === "witness" && elapsed >= NIGHT.introMs + NIGHT.crimeMs)
+    if (
+      role === "witness" &&
+      state.crimeEndsAt !== null &&
+      state.now >= state.crimeEndsAt
+    )
       intel.witnessCandidates = [...state.witnessCandidates];
   }
   const sceneVisible = !["DEAL", "ROLE_REVEAL", "CRIME_NIGHT"].includes(
@@ -40,16 +44,15 @@ export function project(state: GameState, playerId: string): GameView {
     presentationOrder: [...state.presentationOrder],
     timer: { ...state.timer },
     nightStartedAt: state.nightStartedAt,
+    crimeEndsAt: state.crimeEndsAt,
+    presentationConsents: [...state.presentationConsents],
     solveLock: state.solveLock
       ? { expiresAt: state.solveLock.expiresAt }
       : null,
     winner: state.winner,
     reason: state.reason,
-    history: state.history.map((entry) => {
-      if (result) return structuredClone(entry);
-      const { solution: _solution, ...safe } = entry;
-      return { ...safe };
-    }),
+    // History contains public guesses, never the hidden actual solution.
+    history: structuredClone(state.history),
     private: intel,
   };
   if (result) {

@@ -19,7 +19,7 @@ export const NIGHT = {
   witnessMs: 10_000,
   closingMs: 2_000,
 } as const;
-const NIGHT_END = 40_000;
+
 export class RuleError extends Error {
   constructor(public readonly code: string) {
     super(code);
@@ -34,6 +34,8 @@ export function defaultSettings(count: number): Settings {
     cardsPerKind: 4,
     events: false,
     presentationSeconds: 30,
+    discussionSeconds: 10,
+    crimeSeconds: 25,
     accomplice: count >= 6,
     witness: count >= 8,
   };
@@ -164,6 +166,8 @@ export function createGame(input: {
     solution: null,
     witnessCandidates: candidates,
     nightStartedAt: null,
+    crimeEndsAt: null,
+    presentationConsents: [],
     tiles: structuredClone([
       content.tiles.find((t) => t.kind === "location")!,
       content.tiles.find((t) => t.kind === "cause")!,
@@ -217,6 +221,7 @@ export function departPlayer(
     if (state.solveLock?.playerId === playerId) restoreSolve(state);
     if (presenterId(state) === playerId) endPresentation(state);
     if (!state.winner) checkBadges(state);
+    if (state.phase === "EVIDENCE_COLLECTION") checkPresentationConsents(state);
   }
   state.version++;
   return state;
@@ -230,6 +235,24 @@ function startPresentationTimer(state: GameState): void {
     state.roundPresentationSeconds === null
       ? null
       : state.now + state.roundPresentationSeconds * 1000;
+}
+function checkPresentationConsents(state: GameState): void {
+  if (
+    Object.keys(state.markers).length === 6 &&
+    state.players
+      .filter((p) => !p.departed)
+      .every((p) => state.presentationConsents.includes(p.id))
+  )
+    beginPresentations(state);
+}
+function completeCrimeSelection(state: GameState, at: number): void {
+  state.crimeEndsAt = at;
+  if (state.settings.witness) {
+    state.timer.deadline = at + NIGHT.witnessMs + NIGHT.closingMs;
+  } else {
+    state.phase = "SCENE_INTRO";
+    state.timer.deadline = null;
+  }
 }
 function beginPresentations(state: GameState): void {
   state.phase = "PRESENTATION";
@@ -245,6 +268,7 @@ function beginPresentations(state: GameState): void {
 }
 function drawReplacement(state: GameState): void {
   state.phase = "ROUND_TRANSITION";
+  state.presentationConsents = [];
   state.timer.deadline = null;
   state.roundPresentationSeconds = state.settings.presentationSeconds;
   if (state.settings.events && !state.eventsAdded) {
@@ -334,9 +358,15 @@ export function tick(input: GameState, now: number): GameState {
   state.now = now;
   const before = state.phase;
   if (state.phase === "CRIME_NIGHT") {
-    const elapsed = now - state.nightStartedAt!;
-    if (elapsed >= NIGHT.introMs + NIGHT.crimeMs) fallbackSolution(state);
-    if (elapsed >= NIGHT_END) {
+    if (!state.solution && now >= state.crimeEndsAt!) {
+      fallbackSolution(state);
+      completeCrimeSelection(state, state.crimeEndsAt!);
+    }
+    if (
+      state.phase === "CRIME_NIGHT" &&
+      state.timer.deadline !== null &&
+      now >= state.timer.deadline
+    ) {
       state.phase = "SCENE_INTRO";
       state.timer.deadline = null;
     }
@@ -394,7 +424,9 @@ export function applyCommand(
       if (state.confirmed.length === state.players.length) {
         state.phase = "CRIME_NIGHT";
         state.nightStartedAt = now;
-        state.timer.deadline = now + NIGHT_END;
+        state.crimeEndsAt = now + NIGHT.introMs + state.settings.crimeSeconds * 1000;
+        state.timer.deadline = state.crimeEndsAt +
+          (state.settings.witness ? NIGHT.witnessMs + NIGHT.closingMs : 0);
       }
       break;
     case "crimeSelect": {
@@ -404,7 +436,7 @@ export function applyCommand(
       );
       const elapsed = now - state.nightStartedAt!;
       requireRule(
-        elapsed >= NIGHT.introMs && elapsed < NIGHT.introMs + NIGHT.crimeMs,
+        elapsed >= NIGHT.introMs && now < state.crimeEndsAt!,
         "NIGHT_WINDOW",
       );
       requireRule(!state.solution, "SOLUTION_LOCKED");
@@ -422,6 +454,7 @@ export function applyCommand(
         clueId: action.clueId,
         meansId: action.meansId,
       };
+      completeCrimeSelection(state, now);
       break;
     }
     case "chooseLocation": {
@@ -459,17 +492,21 @@ export function applyCommand(
         option: action.option,
       });
       if (Object.keys(state.markers).length === 6)
-        state.timer.deadline = now + 10_000;
+        state.timer.deadline = state.settings.discussionSeconds === null
+          ? null
+          : now + state.settings.discussionSeconds * 1000;
       break;
     }
     case "beginPresentations":
       requireRule(
-        (forensic || server) &&
+        player &&
           state.phase === "EVIDENCE_COLLECTION" &&
           Object.keys(state.markers).length === 6,
         "INVALID_PHASE",
       );
-      beginPresentations(state);
+      if (!state.presentationConsents.includes(actorId))
+        state.presentationConsents.push(actorId);
+      checkPresentationConsents(state);
       break;
     case "endPresentation":
       requireRule(
@@ -596,11 +633,8 @@ export function applyCommand(
       break;
   }
   state.processedCommands.push(receipt);
-  // Private confirmations/selections must not produce public version signals.
-  if (
-    action.type !== "crimeSelect" &&
-    (action.type !== "confirmRole" || state.phase === "CRIME_NIGHT")
-  )
+  // Role acknowledgements stay private; selection advances the shared night timeline.
+  if (action.type !== "confirmRole" || state.phase === "CRIME_NIGHT")
     state.version++;
   return state;
 }

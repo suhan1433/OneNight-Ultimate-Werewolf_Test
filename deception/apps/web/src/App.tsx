@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import QRCode from "qrcode";
-import { content, type Card, type GameView, type RoomView, type Settings } from "@deception/shared";
+import { content, NIGHT, type Card, type GameView, type RoomView, type Settings } from "@deception/shared";
 import { command, enter, leave, request, run, useRoom } from "./store";
 import { FeedbackSettings, unlockAudio, useGameFeedback } from "./feedback";
 import { CardArt, CardFace } from "./CardArt";
@@ -36,6 +36,27 @@ function useNow() {
     return () => clearInterval(id);
   }, []);
   return time + offset;
+}
+// Mobile keyboards resize the visual viewport without consistently resizing 100dvh.
+function useVisualViewport() {
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const update = () => {
+      const height = viewport?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty("--app-height", `${height}px`);
+      document.documentElement.style.setProperty("--app-top", `${viewport?.offsetTop ?? 0}px`);
+      document.documentElement.dataset.keyboard = String(height < window.innerHeight - 120);
+    };
+    update();
+    viewport?.addEventListener("resize", update);
+    viewport?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      viewport?.removeEventListener("resize", update);
+      viewport?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
 }
 function seconds(deadline: number | null, now: number) {
   return deadline === null
@@ -183,8 +204,7 @@ function Help() {
           확인하세요.
         </li>
         <li>
-          밤에 범인은 자기 카드 중 정답 두 장을 고릅니다. 밤은 누구에게나 같은
-          시간 동안 진행됩니다.
+          밤에 범인은 모두의 공개 카드를 비교하고 자기 카드 중 정답 두 장을 고릅니다. 확정하면 즉시 다음 절차로 넘어갑니다.
         </li>
         <li>
           법의학자는 타일 6장에 마커로만 힌트를 줍니다. 첫 마커부터 자유롭게
@@ -202,6 +222,11 @@ function Help() {
           수사는 3라운드입니다. 마지막 발표가 끝나면 남은 배지도 소멸합니다.
         </li>
       </ol>
+      <h3>힌트와 카드를 함께 비교하려면</h3>
+      <p>수사 화면의 ⇄ 힌트·카드 비교를 누르세요. 모바일은 위에 힌트, 아래에 카드를 표시하고 PC는 좌우로 나란히 보여 줍니다. 카드는 최대 두 사람까지 비교할 수 있으며 힌트와 별도로 스크롤합니다. 힌트를 누르면 전체 항목을, 카드를 누르면 큰 그림을 볼 수 있습니다.</p>
+      <p>법의학자는 수사 시작 시 비교 화면이 열립니다. 비밀 정답 두 장을 고정해 참고하면서 마커를 놓을 수 있습니다. 확정하면 다음 미배치 힌트로 이동하며, 정답은 가리기 버튼으로 숨길 수 있습니다. 비교 닫기를 누르면 기존 수사 화면으로 돌아갑니다.</p>
+      <p>비교 중에도 채팅 열기로 의견을 읽고 작성할 수 있습니다. 법의학자는 읽기만 가능하고, 발표 중에는 현재 발표자만 작성합니다. 카드 아래 메모는 유력·보류·제외로 바뀌며 이 기기에만 저장됩니다. 다른 사람의 단서와 수단을 후보로 고르면 선택한 두 장으로 해결 버튼에서 최종 확인으로 이어집니다. 배지는 마지막 꾹 누르기에서만 사용합니다.</p>
+      <p>범인·공범은 비밀 정보 보기를 눌러 자기 팀과 정답을 참고할 수 있습니다. 목격자는 같은 위치에서 밤에 본 두 사람을 한 번에 비교할 수 있습니다. 힌트 6개 펼치기는 법의학자를 포함한 모든 역할이 사용할 수 있습니다.</p>
       <h3>목격자가 있다면</h3>
       <p>
         정답이 나와도 범인이 60초 안에 목격자를 찾아내면 범인팀이 역전합니다.
@@ -209,7 +234,7 @@ function Help() {
       </p>
       <h3>선택 규칙과 온라인 진행</h3>
       <p>공범과 목격자는 6인 이상에서 선택할 수 있습니다. 기본 구성은 6인부터 공범, 8인부터 목격자를 추가합니다. 법의학자는 장소를 직접 선택하고, 2·3라운드에는 장소·사인을 제외한 타일 한 장을 교체합니다. 교체 중에도 자유 토론할 수 있습니다.</p>
-      <p>밤 40초, 마지막 마커 뒤 토론 10초, 해결 카드 선택 20초, 반전 60초는 온라인 진행을 위한 시간 제한입니다. 이벤트 타일은 이 게임의 오리지널 효과이며 설정에서 켤 수 있습니다.</p>
+      <p>범행 선택 시간과 마지막 마커 뒤 자유 토론 시간은 방 설정에서 바꿀 수 있습니다. 전원(법의학자 포함)이 발표 시작에 동의하면 남은 토론 시간과 관계없이 발표로 넘어갑니다. 해결 시도에서 고른 두 장과 결과는 모두에게 공개되며 일부 정답 여부는 알려주지 않습니다. 해결 카드 선택 20초, 반전 60초는 온라인 진행을 위한 시간 제한입니다. 이벤트 타일은 이 게임의 오리지널 효과이며 설정에서 켤 수 있습니다.</p>
       <h3>연결이 끊겼나요?</h3>
       <p>
         같은 브라우저로 다시 열면 자동 복귀합니다. 법의학자가 끊기면 게임이
@@ -324,16 +349,27 @@ function Home({ onHelp }: { onHelp: () => void }) {
   );
 }
 
+interface ChatDraft {
+  text: string;
+  setText: React.Dispatch<React.SetStateAction<string>>;
+}
 function Chat({
   room,
   compact = false,
+  draft,
+  readOnly = false,
 }: {
   room: RoomView;
   compact?: boolean;
+  draft?: ChatDraft;
+  readOnly?: boolean;
 }) {
-  const [text, setText] = useState("");
+  const [localText, setLocalText] = useState("");
+  const text = draft?.text ?? localText;
+  const setText = draft?.setText ?? setLocalText;
   const [sending, setSending] = useState(false);
-  const end = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
   const input = useRef<HTMLInputElement>(null);
   const inFlight = useRef(false);
   const game = room.game;
@@ -353,9 +389,23 @@ function Chat({
             game.presenterId === room.selfId))) ||
       criminal);
   const messages = room.chat.filter((m) => m.channel === channel);
+  const lastMessage = messages.at(-1);
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
-  }, [messages.length]);
+    const node = log.current;
+    if (node && (atBottom.current || lastMessage?.playerId === room.selfId)) {
+      node.scrollTop = node.scrollHeight;
+      atBottom.current = true;
+    }
+  }, [lastMessage?.id, room.selfId]);
+  useEffect(() => {
+    const node = log.current;
+    if (!node) return;
+    const observer = new ResizeObserver(() => {
+      if (atBottom.current) node.scrollTop = node.scrollHeight;
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   let placeholder = "수사 의견을 남겨 주세요";
   if (!allowed)
     placeholder =
@@ -390,9 +440,13 @@ function Chat({
     >
       <div className="section-label">
         <span>{criminal ? "◉ 범인팀 비밀 채팅" : "⌁ 수사 채팅"}</span>
-        <span>{allowed ? "발언 가능" : "발언 대기"}</span>
+        <span>{readOnly ? "읽기 전용" : allowed ? "발언 가능" : "발언 대기"}</span>
       </div>
-      <div className="chat-log" role="log" aria-live="polite">
+      <div ref={log} className="chat-log" role="log" aria-live="polite"
+        onScroll={(e) => {
+          const node = e.currentTarget;
+          atBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
+        }}>
         {messages.length === 0 && (
           <div className="empty-chat">
             <span>⌁</span>
@@ -416,9 +470,8 @@ function Chat({
             <p>{m.text}</p>
           </div>
         ))}
-        <div ref={end} />
       </div>
-      <form
+      {!readOnly && <form
         className="chat-input"
         onSubmit={(e) => {
           run(send(e));
@@ -447,7 +500,7 @@ function Chat({
         >
           ↑
         </button>
-      </form>
+      </form>}
     </section>
   );
 }
@@ -498,6 +551,23 @@ function SettingsEditor({
             <option value={0}>무제한</option>
           </select>
         </label>
+        <label>
+          다같이 토론하는 시간
+          <select value={settings.discussionSeconds ?? 0}
+            onChange={(e) => patch({ discussionSeconds: Number(e.target.value) || null })}>
+            {[10, 30, 60, 120, 180, 300, 600].map((n) => <option key={n} value={n}>{n}초</option>)}
+            <option value={0}>무제한 · 전원 동의로 발표 시작</option>
+          </select>
+        </label>
+        <p className="muted">마지막 마커가 놓인 뒤부터 계산합니다. 법의학자를 포함해 전원이 동의하면 즉시 발표로 넘어갑니다.</p>
+        <label>
+          범인의 카드 선택 시간
+          <select value={settings.crimeSeconds}
+            onChange={(e) => patch({ crimeSeconds: Number(e.target.value) })}>
+            {[15, 25, 30, 45, 60, 90, 120, 180, 300].map((n) => <option key={n} value={n}>{n}초</option>)}
+          </select>
+        </label>
+        <p className="muted">범인이 확정하면 바로 다음 절차로 이동합니다. 시간 초과 시 자기 카드에서 자동 선택합니다.</p>
         <label>
           법의학자 배정
           <select value={choice} onChange={(e) => setChoice(e.target.value)}>
@@ -684,7 +754,7 @@ function Lobby({ room }: { room: RoomView }) {
             {room.settings.witness && " · 목격자 1"} · 나머지 수사관
           </p>
           <small>
-            카드 {room.settings.cardsPerKind}장씩 · 발표{" "}
+            카드 {room.settings.cardsPerKind}장씩 · 토론 {room.settings.discussionSeconds === null ? "무제한" : `${room.settings.discussionSeconds}초`} · 범행 선택 {room.settings.crimeSeconds}초 · 발표{" "}
             {room.settings.presentationSeconds
               ? `${room.settings.presentationSeconds}초`
               : "무제한"}{" "}
@@ -878,19 +948,21 @@ function RoleCard({ room, onClose }: { room: RoomView; onClose?: () => void }) {
 }
 function Night({ room }: { room: RoomView }) {
   const game = room.game!;
-  const now = useNow();
+  const clockNow = useNow();
+  const now = room.pausedAt ?? clockNow;
   const elapsed = now - game.nightStartedAt!;
   const role = game.private.myRole;
   const [clueId, setClue] = useState("");
   const [meansId, setMeans] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const crime = elapsed >= 3_000 && elapsed < 28_000;
-  const witness = elapsed >= 28_000 && elapsed < 38_000;
+  const crime = elapsed >= NIGHT.introMs && now < game.crimeEndsAt!;
+  const witness = game.settings.witness && now >= game.crimeEndsAt! && now < game.crimeEndsAt! + NIGHT.witnessMs;
+  const [compare, setCompare] = useState(false);
   const me = game.players.find((p) => p.id === room.selfId)!;
-  const entitled = crime && role === "murderer";
+  const entitled = crime && role === "murderer" && !!game.private.murdererId;
   return (
     <div className="night scene scroll">
-      <div className="night-orb" style={{ "--p": Math.min(1, elapsed / 38000) } as React.CSSProperties} aria-hidden="true">◉</div>
+      <div className="night-orb" style={{ "--p": Math.min(1, elapsed / Math.max(1, game.timer.deadline! - game.nightStartedAt!)) } as React.CSSProperties} aria-hidden="true">◉</div>
       <p className="eyebrow">HARBOR / AFTER DARK</p>
       <h2>
         {elapsed < 3_000
@@ -901,8 +973,8 @@ function Night({ room }: { room: RoomView }) {
               ? "밤에 본 두 사람"
               : "항구의 밤이 흐릅니다"}
       </h2>
-      <p className="muted">모든 수사관은 같은 시간 동안 기다립니다.</p>
-      <span className="night-time">{seconds(game.timer.deadline, now)}</span>
+      <p className="muted">범행 선택이 끝나면 다음 절차로 넘어갑니다.</p>
+      <span className="night-time">{seconds(crime ? game.crimeEndsAt : game.timer.deadline, room.pausedAt ?? now)}</span>
       {entitled &&
         (submitted || game.private.solution ? (
           <div className="notice">
@@ -910,6 +982,10 @@ function Night({ room }: { room: RoomView }) {
           </div>
         ) : (
           <>
+            <p className="notice">{game.private.accompliceId
+              ? `공범: ${game.players.find((p) => p.id === game.private.accompliceId)?.name} · 아래 공개 카드에서 공범의 카드도 비교할 수 있습니다.`
+              : "공범이 없습니다. 모두의 공개 카드를 참고해 자신의 카드 두 장을 고르세요."}</p>
+            <button className="secondary full" onClick={() => setCompare(true)}>다른 사람 공개 카드 보기</button>
             <div className="night-cards">
               <div>
                 <h3 className="pink">⌕ 핵심 단서</h3>
@@ -966,8 +1042,7 @@ function Night({ room }: { room: RoomView }) {
           <p>누가 범인이고 공범인지는 모릅니다.</p>
         </div>
       )}
-      {((crime && ["forensic", "accomplice"].includes(role)) ||
-        (witness && role === "forensic")) && (
+      {elapsed >= NIGHT.introMs && ["forensic", "accomplice"].includes(role) && (
         <div className="notice">
           {game.private.murdererId &&
             `범인: ${game.players.find((p) => p.id === game.private.murdererId)?.name}`}
@@ -990,6 +1065,27 @@ function Night({ room }: { room: RoomView }) {
           )}
         </div>
       )}
+      {compare && entitled && <Sheet title="범행 선택 · 공개 카드 비교" onClose={() => setCompare(false)}>
+        <div className="night-selection-reference" aria-label="비교 중인 나의 범행 선택">
+          <strong>내가 고르는 두 장 · {seconds(game.crimeEndsAt, now)}</strong>
+          <div className="reference-cards">
+            <label>핵심 단서<select aria-label="비교 중 핵심 단서" value={clueId} onChange={(e) => setClue(e.target.value)}>
+              <option value="">단서를 고르세요</option>{me.cards.filter((c) => c.kind === "clue").map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select></label>
+            <label>범행 수단<select aria-label="비교 중 범행 수단" value={meansId} onChange={(e) => setMeans(e.target.value)}>
+              <option value="">수단을 고르세요</option>{me.cards.filter((c) => c.kind === "means").map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select></label>
+          </div>
+          <button className="primary" disabled={!clueId || !meansId || submitted} onClick={() => run(command({ type: "crimeSelect", clueId, meansId }).then(() => setSubmitted(true)))}>확정하고 다음 단계</button>
+        </div>
+        <p className="muted">모든 단서·수단 카드는 공개 정보입니다. 정답은 자신의 카드에서만 고릅니다.</p>
+        <div className="matrix">
+          {game.players.filter((p) => p.id !== game.forensicId).map((p) => <div key={p.id}>
+            <strong>{p.name}{p.id === room.selfId ? " · 나" : p.id === game.private.accompliceId ? " · 공범" : ""}</strong>
+            <div>{p.cards.map((c) => <div key={c.id} className={`comparison-card ${c.kind}`}><CardFace card={c} /></div>)}</div>
+          </div>)}
+        </div>
+      </Sheet>}
     </div>
   );
 }
@@ -997,14 +1093,16 @@ function Night({ room }: { room: RoomView }) {
 function TileBoard({
   game,
   interactive = false,
+  tileId,
 }: {
   game: GameView;
   interactive?: boolean;
+  tileId?: string;
 }) {
   const [choice, setChoice] = useState<Record<string, number>>({});
   return (
     <div className="tile-board">
-      {game.tiles.map((tile) => {
+      {game.tiles.filter((tile) => !tileId || tile.id === tileId).map((tile) => {
         const marker = game.markers[tile.id];
         const selected = choice[tile.id];
         return (
@@ -1057,13 +1155,208 @@ function TileBoard({
     </div>
   );
 }
-function SolveWizard({ room }: { room: RoomView }) {
+interface SolveDraft { targetId: string; clueId: string; meansId: string }
+interface ComparisonMemory {
+  primary?: string;
+  secondary?: string;
+  tileId?: string;
+  showOptions?: boolean;
+  showSolution?: boolean;
+  showSummary?: boolean;
+  chatOpen?: boolean;
+  candidate?: SolveDraft;
+  scroll: Record<string, number>;
+}
+const noteLabels = ["메모 없음", "유력", "보류", "제외"];
+
+function ComparisonDesk({
+  room, initialPlayerId, onClose, onExpand, memory, notes, onNote, onSolve, chatDraft,
+}: {
+  room: RoomView;
+  initialPlayerId: string;
+  onClose: () => void;
+  onExpand: (card: Card) => void;
+  memory: ComparisonMemory;
+  notes: Record<string, number>;
+  onNote: (id: string) => void;
+  onSolve: (draft?: SolveDraft) => void;
+  chatDraft: ChatDraft;
+}) {
   const game = room.game!;
   const now = useNow();
-  const [targetId, setTarget] = useState("");
-  const [clueId, setClue] = useState("");
-  const [meansId, setMeans] = useState("");
-  const [stage, setStage] = useState(0);
+  const role = game.private.myRole;
+  const forensic = role === "forensic";
+  const criminal = role === "murderer" || role === "accomplice";
+  // Only the authenticated viewer's projection supplies private role information.
+  const solution = forensic || criminal ? game.private.solution : undefined;
+  const suspects = game.players.filter((p) => p.id !== game.forensicId);
+  const [primary, setPrimary] = useState(memory.primary ?? solution?.murdererId ?? initialPlayerId);
+  const [secondary, setSecondary] = useState(memory.secondary ?? "");
+  const [tileId, setTileId] = useState(memory.tileId ?? game.tiles.find((t) => game.markers[t.id] === undefined)?.id ?? game.tiles[0]!.id);
+  const [showOptions, setShowOptions] = useState(memory.showOptions ?? forensic);
+  const [showSolution, setShowSolution] = useState(memory.showSolution ?? forensic);
+  const [showSummary, setShowSummary] = useState(memory.showSummary ?? !forensic);
+  const [chatOpen, setChatOpen] = useState(memory.chatOpen ?? false);
+  const [candidate, setCandidate] = useState<SolveDraft>(memory.candidate ?? { targetId: "", clueId: "", meansId: "" });
+  const previousMarkers = useRef(game.markers);
+  const previousPhase = useRef(game.phase);
+  const close = useRef<HTMLButtonElement>(null);
+  const desk = useRef<HTMLElement>(null);
+  const scrollRestorers = useRef<Record<string, React.RefCallback<HTMLDivElement>>>({});
+  function restoreScroll(key: string) {
+    return scrollRestorers.current[key] ??= (node) => { if (node) node.scrollTop = memory.scroll[key] ?? 0; };
+  }
+  const tile = game.tiles.find((t) => t.id === tileId) ?? game.tiles[0]!;
+  const interactive = forensic && game.phase === "EVIDENCE_COLLECTION" && room.pausedAt === null;
+  const solutionOwner = suspects.find((p) => p.id === solution?.murdererId);
+  const name = (id?: string) => game.players.find((p) => p.id === id)?.name ?? "—";
+  const label = (id?: string) => game.players.flatMap((p) => p.cards).find((c) => c.id === id)?.label ?? "미선택";
+  const me = game.players.find((p) => p.id === room.selfId)!;
+  const canSolve = !forensic && me.hasBadge && room.pausedAt === null && ["EVIDENCE_COLLECTION", "PRESENTATION", "ROUND_TRANSITION"].includes(game.phase);
+  const hasPair = !!candidate.targetId && !!candidate.clueId && !!candidate.meansId;
+  const readyForPresentation = game.phase === "EVIDENCE_COLLECTION" && Object.keys(game.markers).length === 6;
+  const latestMessage = room.chat.filter((m) => m.channel === "public").at(-1);
+  useEffect(() => {
+    Object.assign(memory, { primary, secondary, tileId, showOptions, showSolution, showSummary, chatOpen, candidate });
+  }, [memory, primary, secondary, tileId, showOptions, showSolution, showSummary, chatOpen, candidate]);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    close.current?.focus({ preventScroll: true });
+    return () => previous?.focus({ preventScroll: true });
+  }, []);
+  useEffect(() => {
+    if ((forensic && previousPhase.current === "ROUND_TRANSITION" && game.phase === "EVIDENCE_COLLECTION") || !game.tiles.some((t) => t.id === tileId)) {
+      setTileId(game.tiles.find((t) => game.markers[t.id] === undefined)?.id ?? game.tiles[0]!.id);
+    }
+    if (forensic && previousMarkers.current[tile.id] === undefined && game.markers[tile.id] !== undefined) {
+      const next = game.tiles.find((t) => game.markers[t.id] === undefined);
+      if (next) setTileId(next.id);
+    }
+    previousMarkers.current = game.markers;
+    previousPhase.current = game.phase;
+  }, [forensic, game.phase, game.markers, game.tiles, tile.id, tileId]);
+  function chooseCard(playerId: string, card: Card) {
+    setCandidate((old) => {
+      const next = old.targetId === playerId ? { ...old } : { targetId: playerId, clueId: "", meansId: "" };
+      const field = card.kind === "clue" ? "clueId" : "meansId";
+      next[field] = next[field] === card.id ? "" : card.id;
+      return next;
+    });
+  }
+  return (
+    <section ref={desk} className={`comparison-desk ${forensic ? "forensic-desk" : "public-desk"} ${chatOpen ? "with-chat" : ""}`}
+      role="dialog" aria-modal="true" aria-label="힌트와 카드 비교"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") { event.stopPropagation(); onClose(); }
+        if (event.key === "Tab") {
+          const items = desk.current?.querySelectorAll<HTMLElement>("button:not(:disabled), select:not(:disabled), input:not(:disabled)");
+          const first = items?.[0];
+          const last = items?.[items.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        }
+      }}>
+      <header className="comparison-toolbar">
+        <div><h2>힌트 · 카드 비교</h2><span>R{game.round} · {seconds(game.timer.deadline, room.pausedAt ?? now)}</span></div>
+        <button ref={close} className="secondary" onClick={onClose}>비교 닫기</button>
+      </header>
+      <div className={`comparison-turn ${game.presenterId === room.selfId ? "my-turn" : ""}`} role="status">
+        <strong>{game.phase === "PRESENTATION" ? `${name(game.presenterId ?? undefined)}의 발표${game.presenterId === room.selfId ? " · 내 차례" : ""}` : game.phase === "ROUND_TRANSITION" ? "새 힌트를 교체하는 중" : "자유 토론 · 증거 수집"}</strong>
+        {game.phase === "PRESENTATION" && game.presenterId === room.selfId && <button className="secondary" onPointerDown={(e) => e.preventDefault()} onClick={() => run(command({ type: "endPresentation" }))}>발표 마침 →</button>}
+      </div>
+      <div className="comparison-body">
+      <div className="comparison-workspace">
+        <aside className="comparison-hints" aria-label={forensic ? "정답 참고와 마커 배치" : "공개 힌트 비교"}>
+          {(solution || (role === "witness" && game.private.witnessCandidates)) && <div className="solution-reference" aria-label={forensic ? "법의학자 전용 정답 참고" : "나만 보는 역할 정보"}>
+            <div className="reference-heading"><strong>{showSolution ? forensic ? `비밀 정답 · ${solutionOwner?.name}` : role === "witness" ? "밤에 본 두 사람" : `범인 · ${name(game.private.murdererId)}` : "비밀 정보 가림"}</strong>
+              <button className="text-btn" aria-expanded={showSolution} onClick={() => setShowSolution((v) => !v)}>{showSolution ? "가리기" : forensic ? "정답 보기" : "비밀 정보 보기"}</button>
+            </div>
+            {showSolution && <>
+              {criminal && <p className="private-allies">범인: {name(game.private.murdererId)} · 공범: {game.private.accompliceId ? name(game.private.accompliceId) : "없음"}</p>}
+              {solution && <div className="reference-cards">{[solution.clueId, solution.meansId].map((id) => {
+                const card = solutionOwner?.cards.find((c) => c.id === id);
+                return card && <button key={id} className={`reference-card ${card.kind}`} onClick={() => onExpand(card)}><CardFace card={card} /></button>;
+              })}</div>}
+              {role === "witness" && <div className="witness-reference"><span>{game.private.witnessCandidates!.map(name).join(" / ")}</span>
+                <button className="secondary" onClick={() => { setPrimary(game.private.witnessCandidates![0]!); setSecondary(game.private.witnessCandidates![1]!); }}>밤에 본 두 사람 비교</button>
+              </div>}
+            </>}
+          </div>}
+          <div className="comparison-hint-tools scroll" ref={restoreScroll("hints")} onScroll={(e) => { memory.scroll.hints = e.currentTarget.scrollTop; }}>
+          <button className="summary-toggle" aria-expanded={showSummary} onClick={() => setShowSummary((v) => !v)}>{showSummary ? "힌트 6개 접기" : "힌트 6개 펼치기"}</button>
+          {showSummary && <div className="comparison-hint-summary" aria-label="전체 공개 힌트">
+            {game.tiles.map((hint) => <button key={hint.id} aria-pressed={showOptions && tile.id === hint.id} onClick={() => { setTileId(hint.id); setShowOptions(true); }}>
+              <small>{hint.title}</small><strong>{game.markers[hint.id] === undefined ? "아직 미정" : hint.options[game.markers[hint.id]]}</strong>
+            </button>)}
+          </div>}
+          <div className="comparison-hint-controls">
+            <label className="sr-only" htmlFor="comparison-hint">비교할 힌트</label>
+            <select id="comparison-hint" value={tile.id} onChange={(e) => { setTileId(e.target.value); setShowOptions(true); }}>
+              {game.tiles.map((hint) => <option key={hint.id} value={hint.id}>{game.markers[hint.id] === undefined ? "○" : "●"} {hint.title}{game.markers[hint.id] === undefined ? "" : ` · ${hint.options[game.markers[hint.id]]}`}</option>)}
+            </select>
+            {!forensic && <button className="text-btn" aria-expanded={showOptions} onClick={() => setShowOptions((v) => !v)}>{showOptions ? "항목 접기" : "전체 항목"}</button>}
+            {forensic && <span className="marker-count">{Object.keys(game.markers).length}/6</span>}
+          </div>
+          {showOptions && !(forensic && game.phase === "ROUND_TRANSITION") && <div className="comparison-hint-detail">
+            <TileBoard game={game} tileId={tile.id} interactive={interactive} />
+          </div>}
+          {game.phase === "ROUND_TRANSITION" && forensic && <div className="comparison-replacement scroll">
+            <p>{game.pendingTile?.title} 타일로 교체할 힌트를 고르세요.</p>
+            {game.tiles.filter((t) => t.kind === "hint").map((hint) => <button key={hint.id} className="secondary" disabled={room.pausedAt !== null} onClick={() => run(command({ type: "replaceTile", tileId: hint.id }))}>{hint.title} 교체 →</button>)}
+          </div>}
+          </div>
+        </aside>
+        <div className="comparison-evidence" aria-label="플레이어 카드 비교">
+          <div className="comparison-player-controls">
+            <label>카드 비교 대상<select aria-label="카드 비교 대상" value={primary} onChange={(e) => { setPrimary(e.target.value); if (secondary === e.target.value) setSecondary(""); }}>{suspects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            <label>함께 비교할 사람<select aria-label="함께 비교할 사람" value={secondary} onChange={(e) => setSecondary(e.target.value)}><option value="">한 사람만 보기</option>{suspects.filter((p) => p.id !== primary).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          </div>
+          <div className={`comparison-suspects ${secondary ? "two-suspects" : ""}`}>
+            {[primary, secondary].filter(Boolean).map((id) => {
+              const player = suspects.find((p) => p.id === id)!;
+              return <section key={id} className="comparison-suspect" aria-label={`${player.name}의 공개 카드`}>
+                <div className="comparison-owner"><strong>{player.name}</strong><small>{player.hasBadge ? "◈ 배지" : "○ 배지 소진"}</small></div>
+                <div className="comparison-kind-labels"><span className="pink">단서</span><span className="cyan">수단</span></div>
+                <div className="comparison-card-list scroll" ref={restoreScroll(id)} onScroll={(e) => { memory.scroll[id] = e.currentTarget.scrollTop; }}>
+                  {Array.from({ length: game.settings.cardsPerKind }, (_, i) => ["clue", "means"].map((kind) => player.cards.filter((c) => c.kind === kind)[i]!)).flat().map((card) => {
+                    const selected = candidate.targetId === id && (candidate.clueId === card.id || candidate.meansId === card.id);
+                    const note = notes[card.id] ?? 0;
+                    return <div key={card.id} className={`comparison-card-item ${selected ? "candidate-selected" : ""}`}>
+                      <button className={`evidence-card ${card.kind} note-${note}`} onClick={() => onExpand(card)} aria-label={`${player.name} ${card.kind === "clue" ? "단서" : "수단"} ${card.label} 확대`}><CardFace card={card} /></button>
+                      <div className="comparison-card-actions">
+                        {!forensic && id !== room.selfId && <button aria-label={`${player.name} ${card.label} 지목 후보`} aria-pressed={selected} onClick={() => chooseCard(id, card)}>{selected ? "✓ 선택" : "후보 선택"}</button>}
+                        <button aria-label={`${card.label} 메모: ${noteLabels[note]}`} onClick={() => onNote(card.id)}>{["메모", "◯ 유력", "△ 보류", "✕ 제외"][note]}</button>
+                      </div>
+                    </div>;
+                  })}
+                </div>
+              </section>;
+            })}
+          </div>
+        </div>
+      </div>
+      {chatOpen && <div className={`comparison-chat ${forensic ? "scientist-chat" : ""}`}><Chat room={room} draft={chatDraft} readOnly={forensic} /></div>}
+      </div>
+      {!chatOpen && latestMessage && <div className="comparison-chat-preview" aria-label="최근 공개 채팅">{latestMessage.name}: {latestMessage.text}</div>}
+      {candidate.targetId && <div className="comparison-candidate" aria-label="선택한 지목 후보">{name(candidate.targetId)} · {label(candidate.clueId)} / {label(candidate.meansId)}</div>}
+      <div className="comparison-actions">
+        <button className="secondary" onPointerDown={(e) => e.preventDefault()} onClick={() => setChatOpen((v) => !v)}>{chatOpen ? "채팅 접기" : "채팅 열기"}</button>
+        {!forensic && <button className="primary" disabled={!canSolve} onClick={() => onSolve(hasPair ? candidate : undefined)}>{hasPair ? "선택한 두 장으로 해결" : me.hasBadge ? "해결 시도" : "배지 소진"}</button>}
+        {readyForPresentation && <button className="secondary" disabled={game.presentationConsents.includes(room.selfId) || room.pausedAt !== null} onPointerDown={(e) => e.preventDefault()} onClick={() => run(command({ type: "beginPresentations" }))}>
+          {game.presentationConsents.includes(room.selfId) ? "동의 완료" : "발표 하기"} · {game.presentationConsents.filter((id) => game.players.some((p) => p.id === id && !p.departed)).length}/{game.players.filter((p) => !p.departed).length}
+        </button>}
+      </div>
+    </section>
+  );
+}
+
+function SolveWizard({ room, initial }: { room: RoomView; initial?: SolveDraft | null }) {
+  const game = room.game!;
+  const now = useNow();
+  const [targetId, setTarget] = useState(initial?.targetId ?? "");
+  const [clueId, setClue] = useState(initial?.clueId ?? "");
+  const [meansId, setMeans] = useState(initial?.meansId ?? "");
+  const [stage, setStage] = useState(initial ? 3 : 0);
   const target = game.players.find((p) => p.id === targetId);
   const cancel = () => run(command({ type: "cancelSolve" }));
   return (
@@ -1113,6 +1406,8 @@ function SolveWizard({ room }: { room: RoomView }) {
                   key={p.id}
                   onClick={() => {
                     setTarget(p.id);
+                    setClue("");
+                    setMeans("");
                     setStage(1);
                   }}
                 >
@@ -1185,13 +1480,22 @@ function Investigation({ room }: { room: RoomView }) {
   const game = room.game!;
   const now = useNow();
   const { t } = useTranslation();
-  const [tab, setTab] = useState<"chat" | "cards" | "board">("chat");
+  const [tab, setTab] = useState<"chat" | "cards" | "board">(
+    game.private.myRole === "forensic" ? "board" : "chat",
+  );
   const [suspect, setSuspect] = useState(
     game.players.find((p) => p.id !== game.forensicId)!.id,
   );
   const [info, setInfo] = useState(false);
   const [board, setBoard] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(game.private.myRole === "forensic");
+  const comparisonMemory = useRef<ComparisonMemory>({ scroll: {} });
+  const [chatText, setChatText] = useState("");
+  const chatDraft = { text: chatText, setText: setChatText };
+  const [solveDraft, setSolveDraft] = useState<SolveDraft | null>(null);
+  const startSolve = (draft?: SolveDraft) => { setSolveDraft(draft ?? null); run(command({ type: "startSolve" })); };
   const [matrix, setMatrix] = useState(false);
+  const [solveHistory, setSolveHistory] = useState(false);
   const [menu, setMenu] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [expanded, setExpanded] = useState<Card | null>(null);
@@ -1285,6 +1589,7 @@ function Investigation({ room }: { room: RoomView }) {
           {game.presenterId === room.selfId && (
             <button
               className="text-btn"
+              onPointerDown={(e) => e.preventDefault()}
               onClick={() => run(command({ type: "endPresentation" }))}
             >
               발표 마침 →
@@ -1293,11 +1598,9 @@ function Investigation({ room }: { room: RoomView }) {
         </div>
       )}
       {latestSolve && latestSolve.correct === false && (
-        <div className="solve-verdict" key={latestSolve.at}>
-          아니오 ·{" "}
-          {game.players.find((p) => p.id === latestSolve.playerId)?.name}의 배지
-          소진
-        </div>
+        <button className="solve-verdict" key={latestSolve.at} onClick={() => setSolveHistory(true)}>
+          아니오 · {game.players.find((p) => p.id === latestSolve.playerId)?.name}의 시도 · 카드 기록 보기 ↗
+        </button>
       )}
       <div className="view-tabs" role="tablist" aria-label="수사 보기">
         <button
@@ -1321,7 +1624,15 @@ function Investigation({ room }: { room: RoomView }) {
         >
           ◉ {fs ? "마커 배치" : "증거 보드"}
         </button>
+        <button className="compare-tab" onClick={() => setComparisonOpen(true)}>⇄ 힌트·카드 비교</button>
       </div>
+      {evidence && tab !== "cards" && Object.keys(game.markers).length === 6 && <div className="discussion-consent">
+        <button className="secondary full" disabled={game.presentationConsents.includes(room.selfId) || room.pausedAt !== null}
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={() => run(command({ type: "beginPresentations" }))}>
+          {game.presentationConsents.includes(room.selfId) ? "발표 시작 동의 완료" : "발표 하기"} · {game.presentationConsents.filter((id) => game.players.some((p) => p.id === id && !p.departed)).length}/{game.players.filter((p) => !p.departed).length}
+        </button>
+      </div>}
       <div className="investigation-content">
         {game.phase === "ROUND_TRANSITION" ? (
           <div className="scroll transition-panel">
@@ -1351,7 +1662,7 @@ function Investigation({ room }: { room: RoomView }) {
                 법의학자가 새로운 타일을 선택하고 있습니다.
               </p>
             )}
-            {!fs && <Chat room={room} compact />}
+            {!fs && !comparisonOpen && <Chat room={room} compact draft={chatDraft} />}
             {game.history
               .filter((e) => e.type === "event" && e.round === game.round)
               .map((e, i) => (
@@ -1361,7 +1672,7 @@ function Investigation({ room }: { room: RoomView }) {
               ))}
           </div>
         ) : tab === "chat" ? (
-          <Chat room={room} />
+          !comparisonOpen && <Chat room={room} draft={chatDraft} />
         ) : tab === "board" ? (
           <div className="scroll board-wrap">
             {fs && evidence && (
@@ -1371,14 +1682,7 @@ function Investigation({ room }: { room: RoomView }) {
               </p>
             )}
             <TileBoard game={game} interactive={fs && evidence} />
-            {fs && evidence && Object.keys(game.markers).length === 6 && (
-              <button
-                className="primary"
-                onClick={() => run(command({ type: "beginPresentations" }))}
-              >
-                토론 마치고 발표 시작
-              </button>
-            )}
+
           </div>
         ) : (
           <div className="cards-view">
@@ -1443,8 +1747,8 @@ function Investigation({ room }: { room: RoomView }) {
                   </button>
                 ))}
             </div>
-            <button className="matrix-link" onClick={() => setMatrix(true)}>
-              전체 카드 비교 ↗ · 그림 탭: 확대 / 이름 탭: 메모
+            <button className="matrix-link" onClick={() => setComparisonOpen(true)}>
+              ⇄ 힌트와 카드 함께 비교 · 최대 두 사람
             </button>
           </div>
         )}
@@ -1459,7 +1763,7 @@ function Investigation({ room }: { room: RoomView }) {
         <button
           className="solve-action"
           disabled={!canSolve}
-          onClick={() => run(command({ type: "startSolve" }))}
+          onClick={() => startSolve()}
         >
           ⌕<span>{me.hasBadge ? "해결 시도" : "배지 소진"}</span>
         </button>
@@ -1481,6 +1785,7 @@ function Investigation({ room }: { room: RoomView }) {
               {["수사 채팅", "공개 카드", "증거 보드"][i]}
             </button>
           ))}
+          <button className="secondary full" onClick={() => { setComparisonOpen(true); setMenu(false); }}>힌트와 카드 함께 비교</button>
           <button
             className="secondary full"
             onClick={() => {
@@ -1490,6 +1795,7 @@ function Investigation({ room }: { room: RoomView }) {
           >
             전체 카드 비교
           </button>
+          <button className="secondary full" onClick={() => { setSolveHistory(true); setMenu(false); }}>해결 시도 기록 · {game.history.filter((e) => e.type === "solve").length}건</button>
           <details className="timeline">
             <summary>도움말</summary>
             <Help />
@@ -1499,6 +1805,22 @@ function Investigation({ room }: { room: RoomView }) {
           </button>
         </Sheet>
       )}
+      {solveHistory && <Sheet title="공개 해결 시도 기록" onClose={() => setSolveHistory(false)}>
+        <p className="muted">확정한 시도만 공개합니다. 오답이면 두 장 중 어느 것이 맞는지는 알 수 없습니다.</p>
+        {game.history.filter((e) => e.type === "solve").length === 0 && <p>아직 해결 시도가 없습니다.</p>}
+        <div className="solve-history">
+          {game.history.filter((e) => e.type === "solve").map((entry, i) => {
+            const guess = entry.solution;
+            const target = game.players.find((p) => p.id === guess?.murdererId);
+            return <article key={i} className="solve-history-entry">
+              <strong>R{entry.round} · {game.players.find((p) => p.id === entry.playerId)?.name} → {target?.name}</strong>
+              <span>{entry.correct ? "정답" : "아니오 · 배지 소진"}</span>
+              {target?.cards.filter((c) => c.id === guess?.clueId || c.id === guess?.meansId).map((c) =>
+                <div key={c.id} className={`evidence-card ${c.kind}`}><CardFace card={c} /></div>)}
+            </article>;
+          })}
+        </div>
+      </Sheet>}
       {info && (
         <Sheet title="비밀 파일" onClose={() => setInfo(false)}>
           <RoleCard room={room} onClose={() => setInfo(false)} />
@@ -1548,6 +1870,8 @@ function Investigation({ room }: { room: RoomView }) {
           </div>
         </Sheet>
       )}
+      {comparisonOpen && <ComparisonDesk room={room} initialPlayerId={suspect} onClose={() => setComparisonOpen(false)} onExpand={setExpanded}
+        memory={comparisonMemory.current} notes={notes} onNote={(id) => setNotes((old) => ({ ...old, [id]: ((old[id] ?? 0) + 1) % 4 }))} onSolve={startSolve} chatDraft={chatDraft} />}
       {expanded && (
         <Sheet title="증거 확대" onClose={() => setExpanded(null)}>
           <div className={`expanded-card ${expanded.kind}`}>
@@ -1564,7 +1888,7 @@ function Investigation({ room }: { room: RoomView }) {
       )}
       {game.phase === "SOLVING" &&
         (game.private.isSolving ? (
-          <SolveWizard room={room} />
+          <SolveWizard room={room} initial={solveDraft} />
         ) : (
           <div className="waiting-overlay" role="status">
             <span className="pulse-ring">⌕</span>
@@ -1583,69 +1907,38 @@ function Investigation({ room }: { room: RoomView }) {
 
 function Reversal({ room }: { room: RoomView }) {
   const game = room.game!;
-  const now = useNow();
+  const clockNow = useNow();
+  const now = room.pausedAt ?? clockNow;
   const role = game.private.myRole;
   const criminal = role === "murderer" || role === "accomplice";
   const [target, setTarget] = useState("");
+  const [sharing, setSharing] = useState(false);
+  const name = game.players.find((p) => p.id === target)?.name;
+  async function shareCandidate() {
+    if (!name || sharing) return;
+    setSharing(true);
+    try { await request("chat", { channel: "criminals", text: `[목격자 후보] ${name}` }); }
+    finally { setSharing(false); }
+  }
   return (
     <div className="reversal scene">
-      <div className="reversal-main scroll">
-        <p className="eyebrow pink">CASE SOLVED / ONE LAST MOVE</p>
-        <h1>
-          마지막
-          <br />
-          <em>반전</em>
-        </h1>
-        <p>
-          {criminal
-            ? "목격자를 찾아내면 사건의 결말이 뒤집힙니다."
-            : "범인이 재판 전 마지막 수를 두는 중입니다."}
-        </p>
-        <strong className="reversal-time">
-          {seconds(game.timer.deadline, now)}
-        </strong>
-        {role === "murderer" && (
-          <>
-            <p className="muted">공범과 상의한 뒤 한 명을 지목하세요.</p>
-            <div className="target-list">
-              {game.players
-                .filter(
-                  (p) =>
-                    ![
-                      game.forensicId,
-                      game.private.murdererId,
-                      game.private.accompliceId,
-                    ].includes(p.id),
-                )
-                .map((p) => (
-                  <button
-                    className={`target-option ${target === p.id ? "selected" : ""}`}
-                    key={p.id}
-                    onClick={() => setTarget(p.id)}
-                  >
-                    <Avatar name={p.name} index={p.seat} />
-                    {p.name}
-                  </button>
-                ))}
-            </div>
-            <HoldButton
-              disabled={!target}
-              ms={1200}
-              onConfirm={() =>
-                run(command({ type: "reversalPick", targetId: target }))
-              }
-            >
-              꾹 눌러 목격자 지목
-            </HoldButton>
-          </>
-        )}
-        {role === "accomplice" && (
-          <p className="notice">
-            비밀 채팅으로 의견을 전달하세요. 최종 지목은 범인만 할 수 있습니다.
-          </p>
-        )}
-      </div>
-      {criminal && <Chat room={room} compact />}
+      <header className="reversal-heading"><h1>마지막 <em>반전</em></h1><strong className="reversal-time">{seconds(game.timer.deadline, now)}</strong></header>
+      <p className="muted">{criminal ? "후보를 비교하고 비밀 채팅으로 상의하세요. 최종 지목은 범인이 확정합니다." : "범인이 재판 전 마지막 수를 두는 중입니다."}</p>
+      {criminal && <>
+        <div className="reversal-workspace">
+          <div className="reversal-main scroll">
+            <div className="target-list">{game.players.filter((p) => ![game.forensicId, game.private.murdererId, game.private.accompliceId].includes(p.id)).map((p) =>
+              <button key={p.id} className={`target-option ${target === p.id ? "selected" : ""}`} aria-pressed={target === p.id} onClick={() => setTarget(p.id)}><Avatar name={p.name} index={p.seat} />{p.name}</button>,
+            )}</div>
+          </div>
+          <div className="reversal-chat"><Chat room={room} /></div>
+        </div>
+        <div className="reversal-choicebar">
+          <strong aria-live="polite">검토 중인 후보: {name ?? "아직 선택하지 않음"}</strong>
+          <button className="secondary" disabled={!target || sharing || room.pausedAt !== null} onPointerDown={(e) => e.preventDefault()} onClick={() => run(shareCandidate())}>후보 의견 보내기</button>
+          {role === "murderer" && <HoldButton disabled={!target || room.pausedAt !== null} ms={1200} onConfirm={() => run(command({ type: "reversalPick", targetId: target }))}>꾹 눌러 목격자 지목</HoldButton>}
+        </div>
+      </>}
     </div>
   );
 }
@@ -1737,6 +2030,7 @@ function Result({ room }: { room: RoomView }) {
   );
 }
 export function App() {
+  useVisualViewport();
   const room = useRoom((s) => s.room);
   const connected = useRoom((s) => s.connected);
   const error = useRoom((s) => s.error);
