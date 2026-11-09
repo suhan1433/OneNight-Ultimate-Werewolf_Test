@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import QRCode from "qrcode";
@@ -207,6 +207,9 @@ function Help() {
           밤에 범인은 모두의 공개 카드를 비교하고 자기 카드 중 정답 두 장을 고릅니다. 확정하면 즉시 다음 절차로 넘어갑니다.
         </li>
         <li>
+          법의학자는 비밀 정답과 모두의 카드를 보면서 범행 장소 타일을 고릅니다. 나머지 수사팀도 이 시간에 공개 카드를 미리 훑어볼 수 있습니다.
+        </li>
+        <li>
           법의학자는 타일 6장에 마커로만 힌트를 줍니다. 첫 마커부터 자유롭게
           채팅하세요.
         </li>
@@ -222,9 +225,10 @@ function Help() {
           수사는 3라운드입니다. 마지막 발표가 끝나면 남은 배지도 소멸합니다.
         </li>
       </ol>
-      <h3>힌트와 카드를 함께 비교하려면</h3>
-      <p>수사 화면의 ⇄ 힌트·카드 비교를 누르세요. 모바일은 위에 힌트, 아래에 카드를 표시하고 PC는 좌우로 나란히 보여 줍니다. 카드는 최대 두 사람까지 비교할 수 있으며 힌트와 별도로 스크롤합니다. 힌트를 누르면 전체 항목을, 카드를 누르면 큰 그림을 볼 수 있습니다.</p>
-      <p>법의학자는 수사 시작 시 비교 화면이 열립니다. 비밀 정답 두 장을 고정해 참고하면서 마커를 놓을 수 있습니다. 확정하면 다음 미배치 힌트로 이동하며, 정답은 가리기 버튼으로 숨길 수 있습니다. 비교 닫기를 누르면 기존 수사 화면으로 돌아갑니다.</p>
+      <h3>힌트와 카드 보기</h3>
+      <p>수사 화면 위쪽 힌트 칸에서 6개 힌트를 한눈에 볼 수 있습니다. 칸을 누르면 그 타일의 전체 항목이 열립니다. 공개 카드 탭에서는 한 사람씩 보거나 ‘전체’로 모든 사람의 카드를 한 화면에서 훑어볼 수 있습니다. 좌우로 밀면 다음 사람으로 넘어가고, 카드를 누르면 ◯·△·✕ 메모, 그림을 누르거나 길게 누르면 크게 볼 수 있습니다.</p>
+      <p>두 사람의 카드를 힌트와 나란히 놓고 비교하려면 ⇄ 힌트·카드 비교를 누르세요. 모바일은 위에 힌트, 아래에 카드를 표시하고 PC는 좌우로 나란히 보여 줍니다. 카드는 최대 두 사람까지 비교할 수 있고, 비교 대상에서 ‘전체’를 고르면 모든 사람의 카드를 볼 수 있습니다.</p>
+      <p>법의학자는 범행 장소를 고를 때부터 마커를 놓는 내내 비밀 정답과 모든 카드를 볼 수 있습니다. 정답 두 장은 화면 위쪽에 고정되며 가리기 버튼으로 숨길 수 있습니다. 마커는 화면 아래 패널에서 항목을 고르고 꾹 눌러 확정하면 다음 미배치 힌트로 자동 이동합니다.</p>
       <p>비교 중에도 채팅 열기로 의견을 읽고 작성할 수 있습니다. 법의학자는 읽기만 가능하고, 발표 중에는 현재 발표자만 작성합니다. 카드 아래 메모는 유력·보류·제외로 바뀌며 이 기기에만 저장됩니다. 다른 사람의 단서와 수단을 후보로 고르면 선택한 두 장으로 해결 버튼에서 최종 확인으로 이어집니다. 배지는 마지막 꾹 누르기에서만 사용합니다.</p>
       <p>범인·공범은 비밀 정보 보기를 눌러 자기 팀과 정답을 참고할 수 있습니다. 목격자는 같은 위치에서 밤에 본 두 사람을 한 번에 비교할 수 있습니다. 힌트 6개 펼치기는 법의학자를 포함한 모든 역할이 사용할 수 있습니다.</p>
       <h3>목격자가 있다면</h3>
@@ -958,8 +962,11 @@ function Night({ room }: { room: RoomView }) {
   const crime = elapsed >= NIGHT.introMs && now < game.crimeEndsAt!;
   const witness = game.settings.witness && now >= game.crimeEndsAt! && now < game.crimeEndsAt! + NIGHT.witnessMs;
   const [compare, setCompare] = useState(false);
+  const [peek, setPeek] = useState(false);
+  const [expanded, setExpanded] = useState<Card | null>(null);
   const me = game.players.find((p) => p.id === room.selfId)!;
   const entitled = crime && role === "murderer" && !!game.private.murdererId;
+  const choosing = entitled && !(submitted || game.private.solution);
   return (
     <div className="night scene scroll">
       <div className="night-orb" style={{ "--p": Math.min(1, elapsed / Math.max(1, game.timer.deadline! - game.nightStartedAt!)) } as React.CSSProperties} aria-hidden="true">◉</div>
@@ -1065,6 +1072,16 @@ function Night({ room }: { room: RoomView }) {
           )}
         </div>
       )}
+      {elapsed >= NIGHT.introMs && !choosing && (
+        <button className="secondary full" onClick={() => setPeek(true)}>
+          공개 카드 미리 보기
+        </button>
+      )}
+      {peek && (
+        <Sheet title="공개 카드 미리 보기" onClose={() => setPeek(false)}>
+          <CaseOverview game={game} selfId={room.selfId} highlight={secretHighlight(game)} onExpand={setExpanded} />
+        </Sheet>
+      )}
       {compare && entitled && <Sheet title="범행 선택 · 공개 카드 비교" onClose={() => setCompare(false)}>
         <div className="night-selection-reference" aria-label="비교 중인 나의 범행 선택">
           <strong>내가 고르는 두 장 · {seconds(game.crimeEndsAt, now)}</strong>
@@ -1079,13 +1096,16 @@ function Night({ room }: { room: RoomView }) {
           <button className="primary" disabled={!clueId || !meansId || submitted} onClick={() => run(command({ type: "crimeSelect", clueId, meansId }).then(() => setSubmitted(true)))}>확정하고 다음 단계</button>
         </div>
         <p className="muted">모든 단서·수단 카드는 공개 정보입니다. 정답은 자신의 카드에서만 고릅니다.</p>
-        <div className="matrix">
-          {game.players.filter((p) => p.id !== game.forensicId).map((p) => <div key={p.id}>
-            <strong>{p.name}{p.id === room.selfId ? " · 나" : p.id === game.private.accompliceId ? " · 공범" : ""}</strong>
-            <div>{p.cards.map((c) => <div key={c.id} className={`comparison-card ${c.kind}`}><CardFace card={c} /></div>)}</div>
-          </div>)}
-        </div>
+        <CaseOverview
+          game={game}
+          selfId={room.selfId}
+          jump={false}
+          highlight={{ clueId, meansId, ownerId: room.selfId, flag: "★", flagLabel: "내가 고른 카드", ownerLabel: "내 선택" }}
+          tags={game.private.accompliceId ? { [game.private.accompliceId]: "공범" } : undefined}
+          onExpand={setExpanded}
+        />
       </Sheet>}
+      {expanded && <ExpandedCardSheet card={expanded} onClose={() => setExpanded(null)} />}
     </div>
   );
 }
@@ -1190,7 +1210,7 @@ function ComparisonDesk({
   // Only the authenticated viewer's projection supplies private role information.
   const solution = forensic || criminal ? game.private.solution : undefined;
   const suspects = game.players.filter((p) => p.id !== game.forensicId);
-  const [primary, setPrimary] = useState(memory.primary ?? solution?.murdererId ?? initialPlayerId);
+  const [primary, setPrimary] = useState(memory.primary ?? (forensic ? ALL : (solution?.murdererId ?? initialPlayerId)));
   const [secondary, setSecondary] = useState(memory.secondary ?? "");
   const [tileId, setTileId] = useState(memory.tileId ?? game.tiles.find((t) => game.markers[t.id] === undefined)?.id ?? game.tiles[0]!.id);
   const [showOptions, setShowOptions] = useState(memory.showOptions ?? forensic);
@@ -1215,6 +1235,7 @@ function ComparisonDesk({
   const canSolve = !forensic && me.hasBadge && room.pausedAt === null && ["EVIDENCE_COLLECTION", "PRESENTATION", "ROUND_TRANSITION"].includes(game.phase);
   const hasPair = !!candidate.targetId && !!candidate.clueId && !!candidate.meansId;
   const readyForPresentation = game.phase === "EVIDENCE_COLLECTION" && Object.keys(game.markers).length === 6;
+  const showAll = primary === ALL;
   const latestMessage = room.chat.filter((m) => m.channel === "public").at(-1);
   useEffect(() => {
     Object.assign(memory, { primary, secondary, tileId, showOptions, showSolution, showSummary, chatOpen, candidate });
@@ -1308,9 +1329,14 @@ function ComparisonDesk({
         </aside>
         <div className="comparison-evidence" aria-label="플레이어 카드 비교">
           <div className="comparison-player-controls">
-            <label>카드 비교 대상<select aria-label="카드 비교 대상" value={primary} onChange={(e) => { setPrimary(e.target.value); if (secondary === e.target.value) setSecondary(""); }}>{suspects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-            <label>함께 비교할 사람<select aria-label="함께 비교할 사람" value={secondary} onChange={(e) => setSecondary(e.target.value)}><option value="">한 사람만 보기</option>{suspects.filter((p) => p.id !== primary).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            <label>카드 비교 대상<select aria-label="카드 비교 대상" value={primary} onChange={(e) => { setPrimary(e.target.value); if (e.target.value === ALL || secondary === e.target.value) setSecondary(""); }}><option value={ALL}>전체 한눈에 보기</option>{suspects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            <label>함께 비교할 사람<select aria-label="함께 비교할 사람" value={secondary} disabled={showAll} onChange={(e) => setSecondary(e.target.value)}><option value="">{showAll ? "전체 보기 중" : "한 사람만 보기"}</option>{suspects.filter((p) => p.id !== primary).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
           </div>
+          {showAll ? (
+            <div className="comparison-overview scroll" ref={restoreScroll("overview")} onScroll={(e) => { memory.scroll.overview = e.currentTarget.scrollTop; }}>
+              <CaseOverview game={game} selfId={room.selfId} highlight={showSolution ? secretHighlight(game) : undefined} notes={notes} onTap={(card) => onNote(card.id)} onExpand={onExpand} />
+            </div>
+          ) : (
           <div className={`comparison-suspects ${secondary ? "two-suspects" : ""}`}>
             {[primary, secondary].filter(Boolean).map((id) => {
               const player = suspects.find((p) => p.id === id)!;
@@ -1333,6 +1359,7 @@ function ComparisonDesk({
               </section>;
             })}
           </div>
+          )}
         </div>
       </div>
       {chatOpen && <div className={`comparison-chat ${forensic ? "scientist-chat" : ""}`}><Chat room={room} draft={chatDraft} readOnly={forensic} /></div>}
@@ -1480,15 +1507,21 @@ function Investigation({ room }: { room: RoomView }) {
   const game = room.game!;
   const now = useNow();
   const { t } = useTranslation();
+  // 법의학자는 '전체 카드'를 보면서 시작하고, 마커는 화면 아래 패널에서 놓습니다.
   const [tab, setTab] = useState<"chat" | "cards" | "board">(
-    game.private.myRole === "forensic" ? "board" : "chat",
+    game.private.myRole === "forensic" ? "cards" : "chat",
   );
+  const suspects = game.players.filter((p) => p.id !== game.forensicId);
   const [suspect, setSuspect] = useState(
-    game.players.find((p) => p.id !== game.forensicId)!.id,
+    game.private.myRole === "forensic" ? ALL : suspects[0]!.id,
   );
   const [info, setInfo] = useState(false);
   const [board, setBoard] = useState(false);
-  const [comparisonOpen, setComparisonOpen] = useState(game.private.myRole === "forensic");
+  const [hintsOpen, setHintsOpen] = useState(game.private.myRole !== "forensic");
+  const [hintId, setHintId] = useState<string | null>(null);
+  const [activeTile, setActiveTile] = useState<string | null>(null);
+  const [dockOpen, setDockOpen] = useState(true);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
   const comparisonMemory = useRef<ComparisonMemory>({ scroll: {} });
   const [chatText, setChatText] = useState("");
   const chatDraft = { text: chatText, setText: setChatText };
@@ -1515,8 +1548,18 @@ function Investigation({ room }: { room: RoomView }) {
   const target = game.players.find((p) => p.id === suspect)!;
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longFired = useRef(false);
+  const strip = useRef<HTMLDivElement>(null);
+  const swipe = useRef<{ x: number; y: number } | null>(null);
   const evidence = game.phase === "EVIDENCE_COLLECTION";
   const presentation = game.phase === "PRESENTATION";
+  const pendingTiles = game.tiles.filter((t) => game.markers[t.id] === undefined);
+  const dockTile = fs && evidence ? (pendingTiles.find((t) => t.id === activeTile) ?? pendingTiles[0]) : undefined;
+  const cycleNote = (card: Card) => setNotes((n) => ({ ...n, [card.id]: ((n[card.id] || 0) + 1) % 4 }));
+  function stepSuspect(dir: 1 | -1) {
+    const index = suspects.findIndex((p) => p.id === suspect);
+    const next = suspects[(index + dir + suspects.length) % suspects.length];
+    if (next) setSuspect(next.id);
+  }
   const canSolve =
     me.hasBadge &&
     !fs &&
@@ -1526,6 +1569,12 @@ function Investigation({ room }: { room: RoomView }) {
   useEffect(() => {
     localStorage.setItem(noteKey, JSON.stringify(notes));
   }, [notes, noteKey]);
+  // 선택한 사람이 가로 줄 가운데 오도록 스크롤합니다(바깥 컨테이너는 건드리지 않습니다).
+  useEffect(() => {
+    const box = strip.current;
+    const active = box?.querySelector<HTMLElement>(".active");
+    if (box && active) box.scrollTo({ left: active.offsetLeft - (box.clientWidth - active.offsetWidth) / 2, behavior: "smooth" });
+  }, [suspect, tab]);
   useEffect(() => {
     localStorage.setItem(`${noteKey}.text`, memo);
   }, [memo, noteKey]);
@@ -1553,23 +1602,18 @@ function Investigation({ room }: { room: RoomView }) {
         </button>
         <span>{seconds(game.timer.deadline, room.pausedAt ?? now)}</span>
       </div>
-      <div className="evidence-ribbon" aria-label="공개 증거 리본">
-        {game.tiles.map((tile, idx) => (
-          <button
-            key={`${tile.id}:${game.markers[tile.id] ?? "x"}`}
-            className={game.markers[tile.id] === undefined ? "pending" : "placed"}
-            style={{ "--i": idx } as React.CSSProperties}
-            onClick={() => setBoard(true)}
-          >
-            <small>{tile.title}</small>
-            <strong>
-              {game.markers[tile.id] === undefined
-                ? "아직 미정"
-                : tile.options[game.markers[tile.id]]}
-            </strong>
-          </button>
-        ))}
-      </div>
+      {!(fs && dockTile) && <HintGrid
+        game={game}
+        activeId={dockTile?.id}
+        open={hintsOpen}
+        onToggle={() => setHintsOpen((v) => !v)}
+        onBoard={() => setBoard(true)}
+        onSelect={(id) => {
+          if (fs && evidence && game.markers[id] === undefined) setActiveTile(id);
+          else setHintId(id);
+        }}
+      />}
+      {fs && <SecretBrief game={game} compact onExpand={setExpanded} />}
       {presentation && (
         <div
           key={game.presenterId ?? 0}
@@ -1626,7 +1670,7 @@ function Investigation({ room }: { room: RoomView }) {
         </button>
         <button className="compare-tab" onClick={() => setComparisonOpen(true)}>⇄ 힌트·카드 비교</button>
       </div>
-      {evidence && tab !== "cards" && Object.keys(game.markers).length === 6 && <div className="discussion-consent">
+      {evidence && (tab !== "cards" || fs) && Object.keys(game.markers).length === 6 && <div className="discussion-consent">
         <button className="secondary full" disabled={game.presentationConsents.includes(room.selfId) || room.pausedAt !== null}
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => run(command({ type: "beginPresentations" }))}>
@@ -1672,7 +1716,7 @@ function Investigation({ room }: { room: RoomView }) {
               ))}
           </div>
         ) : tab === "chat" ? (
-          !comparisonOpen && <Chat room={room} draft={chatDraft} />
+          !comparisonOpen && <Chat room={room} draft={chatDraft} readOnly={fs} />
         ) : tab === "board" ? (
           <div className="scroll board-wrap">
             {fs && evidence && (
@@ -1684,11 +1728,29 @@ function Investigation({ room }: { room: RoomView }) {
             <TileBoard game={game} interactive={fs && evidence} />
 
           </div>
+        ) : suspect === ALL ? (
+          <div className="cards-view">
+            <div className="scroll overview-wrap">
+              <CaseOverview
+                game={game}
+                selfId={room.selfId}
+                highlight={secretHighlight(game)}
+                notes={notes}
+                onTap={cycleNote}
+                onExpand={setExpanded}
+                onBack={() => setSuspect(suspects[0]!.id)}
+              />
+            </div>
+          </div>
         ) : (
           <div className="cards-view">
-            <div className="suspect-strip">
-              {game.players
-                .filter((p) => p.id !== game.forensicId)
+            <div className="suspect-strip" ref={strip}>
+              <button onClick={() => setSuspect(ALL)}>
+                <span className="avatar all-avatar" aria-hidden="true"><small>∗</small></span>
+                <span>전체</span>
+                <small>한눈에</small>
+              </button>
+              {suspects
                 .map((p) => (
                   <button
                     className={`${p.id === suspect ? "active" : ""} ${game.presenterId === p.id ? "presenting" : ""}`}
@@ -1705,7 +1767,23 @@ function Investigation({ room }: { room: RoomView }) {
               <span className="pink">⌕ 단서 · {target.name}</span>
               <span className="cyan">⚒ 수단</span>
             </div>
-            <div className="card-grid scroll" key={suspect}>
+            <div
+              className="card-grid scroll"
+              key={suspect}
+              onTouchStart={(e) => {
+                const t = e.touches[0]!;
+                swipe.current = { x: t.clientX, y: t.clientY };
+              }}
+              onTouchEnd={(e) => {
+                const start = swipe.current;
+                swipe.current = null;
+                if (!start) return;
+                const t = e.changedTouches[0]!;
+                const dx = t.clientX - start.x;
+                const dy = t.clientY - start.y;
+                if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2) stepSuspect(dx < 0 ? 1 : -1);
+              }}
+            >
               {Array.from({ length: room.settings.cardsPerKind }, (_, index) =>
                 ["clue", "means"].map(
                   (kind) => target.cards.filter((c) => c.kind === kind)[index]!,
@@ -1747,13 +1825,26 @@ function Investigation({ room }: { room: RoomView }) {
                   </button>
                 ))}
             </div>
+            <p className="card-tip">탭: ◯△✕ 메모 · 그림 탭/길게 누르기: 크게 보기 · 좌우로 밀면 다음 사람</p>
             <button className="matrix-link" onClick={() => setComparisonOpen(true)}>
               ⇄ 힌트와 카드 함께 비교 · 최대 두 사람
             </button>
           </div>
         )}
       </div>
-      <div className="game-dock">
+      {dockTile && (
+        <MarkerDock
+          key={dockTile.id}
+          game={game}
+          tile={dockTile}
+          pending={pendingTiles}
+          paused={room.pausedAt !== null}
+          open={dockOpen}
+          onToggle={() => setDockOpen((v) => !v)}
+          onSelectTile={setActiveTile}
+        />
+      )}
+      {!fs && <div className="game-dock">
         <button onClick={() => setNoteOpen(true)}>
           ▤<span>메모</span>
         </button>
@@ -1767,7 +1858,7 @@ function Investigation({ room }: { room: RoomView }) {
         >
           ⌕<span>{me.hasBadge ? "해결 시도" : "배지 소진"}</span>
         </button>
-      </div>
+      </div>}
       {menu && (
         <Sheet
           title={`수사 메뉴 · ${room.code}`}
@@ -1831,6 +1922,12 @@ function Investigation({ room }: { room: RoomView }) {
           <TileBoard game={game} />
         </Sheet>
       )}
+      {hintId && game.tiles.some((t) => t.id === hintId) && (
+        <Sheet title={game.tiles.find((t) => t.id === hintId)!.title} onClose={() => setHintId(null)}>
+          <p className="muted">표시된 항목이 법의학자가 고른 힌트입니다.</p>
+          <TileBoard game={game} tileId={hintId} />
+        </Sheet>
+      )}
       {noteOpen && (
         <Sheet title="나만의 수사 메모" onClose={() => setNoteOpen(false)}>
           <p className="muted">
@@ -1847,45 +1944,19 @@ function Investigation({ room }: { room: RoomView }) {
       )}
       {matrix && (
         <Sheet title="전체 카드 비교" onClose={() => setMatrix(false)}>
-          <div className="matrix">
-            {game.players
-              .filter((p) => p.id !== game.forensicId)
-              .map((p) => (
-                <div key={p.id}>
-                  <strong>{p.name}</strong>
-                  <div>
-                    {p.cards.map((c) => (
-                      <button
-                        key={c.id}
-                        className={c.kind}
-                        onClick={() => setExpanded(c)}
-                      >
-                        <CardFace card={c} />
-                        <small>{["", "◯", "△", "✕"][notes[c.id] || 0]}</small>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-          </div>
+          <CaseOverview
+            game={game}
+            selfId={room.selfId}
+            highlight={secretHighlight(game)}
+            notes={notes}
+            onTap={cycleNote}
+            onExpand={setExpanded}
+          />
         </Sheet>
       )}
       {comparisonOpen && <ComparisonDesk room={room} initialPlayerId={suspect} onClose={() => setComparisonOpen(false)} onExpand={setExpanded}
         memory={comparisonMemory.current} notes={notes} onNote={(id) => setNotes((old) => ({ ...old, [id]: ((old[id] ?? 0) + 1) % 4 }))} onSolve={startSolve} chatDraft={chatDraft} />}
-      {expanded && (
-        <Sheet title="증거 확대" onClose={() => setExpanded(null)}>
-          <div className={`expanded-card ${expanded.kind}`}>
-            <span>
-              {expanded.kind === "clue"
-                ? "⌕ 핵심 단서 후보"
-                : "⚒ 범행 수단 후보"}
-            </span>
-            <CardArt card={expanded} />
-            <h2>{expanded.label}</h2>
-            <p>그림보다 문구를 기준으로 추리하세요.</p>
-          </div>
-        </Sheet>
-      )}
+      {expanded && <ExpandedCardSheet card={expanded} onClose={() => setExpanded(null)} />}
       {game.phase === "SOLVING" &&
         (game.private.isSolving ? (
           <SolveWizard room={room} initial={solveDraft} />
@@ -2227,32 +2298,490 @@ export function App() {
     </MotionConfig>
   );
 }
-function SceneIntro({ room }: { room: RoomView }) {
+/* ------------------------------------------------------------------ */
+/*  공용: 카드 전체 보기 · 비밀 정답 줄 · 힌트 칸 · 마커 패널            */
+/* ------------------------------------------------------------------ */
+
+const ALL = "__all";
+const noteMarks = ["", "◯", "△", "✕"];
+const SECRET_ROLES = ["forensic", "murderer", "accomplice"];
+
+interface Highlight {
+  clueId?: string;
+  meansId?: string;
+  ownerId?: string;
+  flag: string;
+  flagLabel: string;
+  ownerLabel: string;
+}
+
+/** 서버가 내려준 "내 비밀 정답"만 사용합니다. 역할이 없으면 아무것도 강조하지 않습니다. */
+function secretHighlight(game: GameView): Highlight | undefined {
+  const solution = game.private.solution;
+  if (!solution || !SECRET_ROLES.includes(game.private.myRole)) return undefined;
+  return {
+    clueId: solution.clueId,
+    meansId: solution.meansId,
+    ownerId: solution.murdererId,
+    flag: "★",
+    flagLabel: "정답 카드",
+    ownerLabel: game.private.myRole === "forensic" ? "정답 주인" : "범인",
+  };
+}
+
+function ExpandedCardSheet({ card, onClose }: { card: Card; onClose: () => void }) {
   return (
-    <div className="interlude scene-intro">
-      <p className="eyebrow">ARRIVING AT THE SCENE</p>
-      <h1>
-        비 내리는 항구,
-        <br />
-        사건이 시작됩니다.
-      </h1>
-      {room.game!.private.myRole === "forensic" && (
-        <div>
-          <p>범행 장소 타일을 선택하면 수사를 시작합니다.</p>
-          {content.tiles.filter((tile) => tile.kind === "location").map(({ id, title, options }) => (
-            <button
-              className="secondary full"
-              key={id}
-              onClick={() =>
-                run(command({ type: "chooseLocation", tileId: id }))
-              }
-            >
-              {title} · {options.join(" / ")}
+    <Sheet title="증거 확대" onClose={onClose}>
+      <div className={`expanded-card ${card.kind}`}>
+        <span>{card.kind === "clue" ? "⌕ 핵심 단서 후보" : "⚒ 범행 수단 후보"}</span>
+        <CardArt card={card} />
+        <h2>{card.label}</h2>
+        <p>그림보다 문구를 기준으로 추리하세요.</p>
+      </div>
+    </Sheet>
+  );
+}
+
+/** 탭 = 메모(또는 확대), 그림 탭·길게 누르기 = 확대. */
+function CardChip({
+  card,
+  flag,
+  flagLabel,
+  note = 0,
+  onTap,
+  onExpand,
+}: {
+  card: Card;
+  flag?: string;
+  flagLabel?: string;
+  note?: number;
+  onTap?: (card: Card) => void;
+  onExpand: (card: Card) => void;
+}) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fired = useRef(false);
+  const clear = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  useEffect(() => () => clear(), []);
+  return (
+    <button
+      className={`ov-card ${card.kind} ${flag ? "mark" : ""} note-${note}`}
+      aria-label={`${card.kind === "clue" ? "단서" : "수단"} ${card.label}${flag ? ` · ${flagLabel ?? "강조"}` : ""}${note ? ` · 메모 ${noteLabels[note]}` : ""}`}
+      onPointerDown={() => {
+        fired.current = false;
+        clear();
+        timer.current = setTimeout(() => {
+          fired.current = true;
+          onExpand(card);
+        }, 600);
+      }}
+      onPointerUp={clear}
+      onPointerCancel={clear}
+      onPointerLeave={clear}
+      onClick={(event) => {
+        if (fired.current) {
+          fired.current = false;
+          return;
+        }
+        if (!onTap || (event.target as HTMLElement).closest(".card-art")) onExpand(card);
+        else onTap(card);
+      }}
+    >
+      <CardFace card={card} />
+      {flag && <i className="ov-flag" aria-hidden="true">{flag}</i>}
+      {note > 0 && <small className="ov-note" aria-hidden="true">{noteMarks[note]}</small>}
+    </button>
+  );
+}
+
+/**
+ * 모든 수사 대상의 공개 카드를 한 화면에 세로로 나열합니다.
+ * 보드게임에서 모두의 카드가 테이블 위에 펼쳐져 있는 상태와 같은 정보량입니다.
+ * 위쪽 이동 줄로 사람별 위치로 바로 점프할 수 있습니다.
+ */
+function CaseOverview({
+  game,
+  selfId,
+  highlight,
+  tags,
+  notes,
+  jump = true,
+  onTap,
+  onExpand,
+  onBack,
+}: {
+  game: GameView;
+  selfId: string;
+  highlight?: Highlight;
+  tags?: Record<string, string>;
+  notes?: Record<string, number>;
+  jump?: boolean;
+  onTap?: (card: Card) => void;
+  onExpand: (card: Card) => void;
+  onBack?: () => void;
+}) {
+  const refs = useRef<Record<string, HTMLElement | null>>({});
+  const suspects = game.players
+    .filter((p) => p.id !== game.forensicId)
+    .sort((a, b) => Number(b.id === highlight?.ownerId) - Number(a.id === highlight?.ownerId));
+  function jumpTo(id: string) {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    refs.current[id]?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+  }
+  return (
+    <div className="overview">
+      {jump && (
+        <nav className="ov-jump" aria-label="사람별로 이동">
+          {onBack && (
+            <button className="ov-back" onClick={onBack}>
+              ← 한 명씩
+            </button>
+          )}
+          {suspects.map((p) => (
+            <button key={p.id} onClick={() => jumpTo(p.id)}>
+              <Avatar name={p.name} index={p.seat} />
+              <span>{p.name}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+      <p className="ov-legend">
+        <span className="pink">⌕ 핵심 단서</span>
+        <span className="cyan">⚒ 범행 수단</span>
+      </p>
+      {suspects.map((p) => {
+        const owner = p.id === highlight?.ownerId;
+        const clues = p.cards.filter((c) => c.kind === "clue");
+        const means = p.cards.filter((c) => c.kind === "means");
+        const rows = Math.max(clues.length, means.length);
+        const chip = (card: Card | undefined) =>
+          card ? (
+            <CardChip
+              card={card}
+              flag={card.id === highlight?.clueId || card.id === highlight?.meansId ? highlight?.flag : undefined}
+              flagLabel={highlight?.flagLabel}
+              note={notes?.[card.id] ?? 0}
+              onTap={onTap}
+              onExpand={onExpand}
+            />
+          ) : (
+            <span />
+          );
+        return (
+          <section
+            key={p.id}
+            ref={(node) => {
+              refs.current[p.id] = node;
+            }}
+            className={`ov-player ${owner ? "owner" : ""}`}
+            aria-label={`${p.name}의 공개 카드`}
+          >
+            <header className="ov-head">
+              <Avatar name={p.name} index={p.seat} />
+              <strong>
+                {p.name}
+                {p.id === selfId && <small>나</small>}
+                {tags?.[p.id] && <small>{tags[p.id]}</small>}
+              </strong>
+              {owner && highlight && <span className="ov-owner">{highlight.ownerLabel}</span>}
+              <small>{p.hasBadge ? "◈ 배지" : "○ 소진"}</small>
+            </header>
+            <div className="ov-grid">
+              {Array.from({ length: rows }, (_, i) => (
+                <React.Fragment key={i}>
+                  {chip(clues[i])}
+                  {chip(means[i])}
+                </React.Fragment>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 법의학자·범인팀 전용: 정답 두 장을 항상 위쪽에 고정해 보여 줍니다. */
+function SecretBrief({
+  game,
+  initial = "card",
+  compact = false,
+  onExpand,
+}: {
+  game: GameView;
+  initial?: "card" | "hidden";
+  compact?: boolean;
+  onExpand: (card: Card) => void;
+}) {
+  const [mode, setMode] = useState<"card" | "hidden">(initial);
+  const solution = game.private.solution;
+  if (!solution || !SECRET_ROLES.includes(game.private.myRole)) return null;
+  const forensic = game.private.myRole === "forensic";
+  const owner = game.players.find((p) => p.id === solution.murdererId);
+  const cards = [solution.clueId, solution.meansId].map((id) => owner?.cards.find((c) => c.id === id));
+  return (
+    <section className={`secret-brief ${compact ? "compact" : ""}`} aria-label={forensic ? "법의학자 전용 정답" : "범인팀 정답"}>
+      <div className="secret-head">
+        <strong>
+          {forensic ? "비밀 정답" : "범인팀 정답"}
+          <small className="secret-owner">{mode === "card" ? `${owner?.name ?? "—"}의 카드` : "가림"}</small>
+        </strong>
+        <button onClick={() => setMode(mode === "card" ? "hidden" : "card")} aria-expanded={mode === "card"}>
+          {mode === "card" ? "가리기" : "보기"}
+        </button>
+      </div>
+      {mode === "card" && (
+        <div className="reference-cards">
+          {cards.map(
+            (card) =>
+              card && (
+                <button key={card.id} className={`reference-card ${card.kind}`} onClick={() => onExpand(card)}>
+                  <CardFace card={card} />
+                </button>
+              ),
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** 힌트 6개를 가로 스크롤 없이 한눈에. 누르면 해당 타일의 전체 항목을 엽니다. */
+function HintGrid({
+  game,
+  activeId,
+  open,
+  onToggle,
+  onSelect,
+  onBoard,
+}: {
+  game: GameView;
+  activeId?: string;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (tileId: string) => void;
+  onBoard: () => void;
+}) {
+  const placed = Object.keys(game.markers).length;
+  return (
+    <section className="hint-grid" aria-label="공개 힌트">
+      <div className="hint-grid-head">
+        <button aria-expanded={open} onClick={onToggle}>
+          힌트 {placed}/{game.tiles.length} {open ? "▴" : "▾"}
+        </button>
+        <button className="text-btn" onClick={onBoard}>
+          전체 항목 ↗
+        </button>
+      </div>
+      {open && (
+        <div className="hint-cells">
+          {game.tiles.map((tile, idx) => {
+            const marker = game.markers[tile.id];
+            return (
+              <button
+                key={`${tile.id}:${marker ?? "x"}`}
+                className={`hint-cell ${marker === undefined ? "pending" : "placed"} ${activeId === tile.id ? "active" : ""}`}
+                style={{ "--i": idx } as React.CSSProperties}
+                onClick={() => onSelect(tile.id)}
+              >
+                <small>{tile.title}</small>
+                <strong>{marker === undefined ? "아직 미정" : tile.options[marker]}</strong>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** 법의학자 전용: 화면 아래(엄지 영역)에서 항목 선택 → 꾹 눌러 확정 → 다음 힌트로 자동 이동. */
+function MarkerDock({
+  game,
+  tile,
+  pending,
+  paused,
+  open,
+  onToggle,
+  onSelectTile,
+}: {
+  game: GameView;
+  tile: GameView["tiles"][number];
+  pending: GameView["tiles"];
+  paused: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onSelectTile: (tileId: string) => void;
+}) {
+  const [option, setOption] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const index = pending.findIndex((t) => t.id === tile.id);
+  const step = (dir: 1 | -1) => {
+    const next = pending[(index + dir + pending.length) % pending.length];
+    if (next) onSelectTile(next.id);
+  };
+  const placed = Object.keys(game.markers).length;
+  return (
+    <section className="marker-dock" aria-label="마커 배치">
+      <div className="marker-dock-head">
+        <button className="step" aria-label="이전 힌트" disabled={pending.length < 2} onClick={() => step(-1)}>
+          ‹
+        </button>
+        <button className="title" aria-expanded={open} onClick={onToggle}>
+          {tile.title}
+          <small>
+            마커 {placed}/{game.tiles.length} · {open ? "접기 ▾" : "펼치기 ▴"}
+          </small>
+        </button>
+        <button className="step" aria-label="다음 힌트" disabled={pending.length < 2} onClick={() => step(1)}>
+          ›
+        </button>
+        {open && (
+          <HoldButton
+            disabled={option === null || paused || busy}
+            onConfirm={() => {
+              setBusy(true);
+              run(
+                command({ type: "placeMarker", tileId: tile.id, option: option! }).catch((error) => {
+                  setBusy(false);
+                  throw error;
+                }),
+              );
+            }}
+          >
+            꾹 눌러 확정
+          </HoldButton>
+        )}
+      </div>
+      {open && (
+        <div className="marker-options" role="radiogroup" aria-label={`${tile.title} 항목`}>
+          {tile.options.map((label, i) => (
+            <button key={label} role="radio" aria-checked={option === i} onClick={() => setOption(i)}>
+              {label}
             </button>
           ))}
         </div>
       )}
-      {room.game!.private.myRole !== "forensic" && <p>법의학자가 범행 장소를 선택하고 있습니다.</p>}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  현장 도착: 법의학자의 범행 장소 선택                                 */
+/* ------------------------------------------------------------------ */
+
+function SceneIntro({ room }: { room: RoomView }) {
+  const game = room.game!;
+  const now = useNow();
+  const forensic = game.private.myRole === "forensic";
+  const [tab, setTab] = useState<"cards" | "place">("cards");
+  const [choice, setChoice] = useState("");
+  const [sent, setSent] = useState(false);
+  const [expanded, setExpanded] = useState<Card | null>(null);
+  const top = useRef(0);
+  const restore = useCallback((node: HTMLDivElement | null) => {
+    if (node) node.scrollTop = top.current;
+  }, []);
+  const locations = content.tiles.filter((tile) => tile.kind === "location");
+  const picked = locations.find((tile) => tile.id === choice);
+  const deadline = game.timer?.deadline ?? null;
+  return (
+    <div className="scene-brief">
+      <header className="brief-head">
+        <div>
+          <h1>{forensic ? "범행 장소를 고르세요" : "비 내리는 항구, 사건이 시작됩니다."}</h1>
+          <p className="muted">
+            {forensic
+              ? "정답과 모두의 카드를 보고, 힌트를 줄 수 있는 장소 타일을 하나 고르세요."
+              : "법의학자가 범행 장소를 선택하고 있습니다. 그동안 모두의 카드를 훑어보세요."}
+          </p>
+        </div>
+        {deadline !== null && <strong className="brief-time">{seconds(deadline, room.pausedAt ?? now)}</strong>}
+      </header>
+      <SecretBrief game={game} onExpand={setExpanded} />
+      {forensic && (
+        <div className="brief-tabs" role="tablist" aria-label="범행 장소 선택 단계">
+          <button role="tab" aria-selected={tab === "cards"} onClick={() => setTab("cards")}>
+            ① 수사팀 카드
+          </button>
+          <button role="tab" aria-selected={tab === "place"} onClick={() => setTab("place")}>
+            ② 장소 타일{picked ? " ✓" : ""}
+          </button>
+        </div>
+      )}
+      <div className="brief-body">
+        {forensic && tab === "place" ? (
+          <div className="scroll brief-scroll">
+            <div className="loc-compare" role="radiogroup" aria-label="범행 장소 타일" style={{ "--cols": locations.length } as React.CSSProperties}>
+              {locations.map((tile, i) => (
+                <button
+                  key={tile.id}
+                  role="radio"
+                  aria-checked={choice === tile.id}
+                  className={`loc-col ${choice === tile.id ? "selected" : ""}`}
+                  onClick={() => setChoice(tile.id)}
+                >
+                  <span className="loc-head">
+                    <b>{"ABCDEF"[i]}</b>
+                    {tile.title}
+                  </span>
+                  {tile.options.map((option) => (
+                    <span key={option} className="loc-opt">
+                      {option}
+                    </span>
+                  ))}
+                  <span className="loc-pick">{choice === tile.id ? "✓ 선택됨" : "선택"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div
+            className="scroll brief-scroll"
+            ref={restore}
+            onScroll={(e) => {
+              top.current = e.currentTarget.scrollTop;
+            }}
+          >
+            <CaseOverview game={game} selfId={room.selfId} highlight={secretHighlight(game)} onExpand={setExpanded} />
+          </div>
+        )}
+      </div>
+      {forensic && (
+        <div className="brief-action">
+          {picked ? (
+            <>
+              <span className="brief-picked">
+                선택한 타일
+                <br />
+                <b>{picked.title}</b>
+              </span>
+              <HoldButton
+                ms={800}
+                disabled={sent || room.pausedAt !== null}
+                onConfirm={() => {
+                  setSent(true);
+                  run(
+                    command({ type: "chooseLocation", tileId: picked.id }).catch((error) => {
+                      setSent(false);
+                      throw error;
+                    }),
+                  );
+                }}
+              >
+                꾹 눌러 이 장소로 시작
+              </HoldButton>
+            </>
+          ) : (
+            <button className="primary" disabled={tab === "place"} onClick={() => setTab("place")}>
+              {tab === "cards" ? "장소 타일 고르러 가기 →" : "위에서 타일을 하나 고르세요"}
+            </button>
+          )}
+        </div>
+      )}
+      {expanded && <ExpandedCardSheet card={expanded} onClose={() => setExpanded(null)} />}
     </div>
   );
 }

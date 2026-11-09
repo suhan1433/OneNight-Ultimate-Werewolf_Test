@@ -520,3 +520,131 @@ html[data-keyboard=true] .comparison-desk.with-chat .comparison-chat{flex:1;heig
   .comparison-chat.scientist-chat{height:96px;min-height:80px}
   .comparison-desk.with-chat.forensic-desk .comparison-hints{max-height:65%}
 }
+
+/* ===== v3: 정보 완비 · 모바일 밀도 · 엄지 영역 ===================================
+   - 법의학자: 범행 장소 선택 / 마커 배치 중 정답과 모든 카드를 항상 볼 수 있게
+   - 힌트 6개는 가로 스크롤 없이 한눈에, 카드는 한 사람씩/전체로
+   - 수사 화면에서는 상단 앱 헤더를 숨겨 세로 공간을 확보(도움말·나가기는 수사 메뉴에 있음)
+============================================================================== */
+.app-frame:has(.investigation)>.app-header{display:none}
+
+/* ---- 카드 전체 보기 ---- */
+.overview{position:relative;display:flex;flex-direction:column;gap:10px;padding:0 12px 16px}
+.ov-jump{position:sticky;top:0;z-index:3;display:flex;gap:6px;overflow-x:auto;margin:0 -12px;padding:8px 12px 6px;background:var(--ink);border-bottom:1px solid var(--line);scrollbar-width:none}
+.ov-jump::-webkit-scrollbar{display:none}
+.ov-jump button{flex:none;display:flex;align-items:center;gap:6px;min-height:44px;padding:0 12px 0 6px;border-radius:99px;background:var(--pave2);font-size:13px;font-weight:600;white-space:nowrap}
+.ov-jump .avatar{width:28px;height:28px}
+.ov-jump .avatar small{font-size:12px}
+.ov-jump .ov-back{padding:0 12px;color:var(--brass);border:1.5px solid var(--brass);background:none}
+.ov-legend{display:flex;justify-content:space-between;padding:0 2px;font-size:12px;font-weight:700}
+.ov-player{scroll-margin-top:64px;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:10px;background:var(--pave);border:1px solid var(--line)}
+.ov-player.owner{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass)}
+.ov-head{display:flex;align-items:center;gap:8px;min-width:0}
+.ov-head .avatar{width:28px;height:28px}
+.ov-head .avatar small{font-size:12px}
+.ov-head strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov-head strong small{margin-left:6px;color:var(--brass);font-size:12px}
+.ov-head>small{flex:none;color:var(--mute);font-size:12px}
+.ov-owner{flex:none;padding:1px 8px;border-radius:99px;background:var(--brass);color:#1b1a16;font-size:12px;font-weight:700}
+.ov-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.ov-card{position:relative;display:flex;align-items:center;gap:6px;min-width:0;min-height:48px;padding:4px 18px 4px 8px;border-radius:6px;border-left:6px solid var(--c,var(--red));background:var(--manila) var(--grain);color:#1b1a16;text-align:left;font-size:13px;font-weight:600;line-height:1.25;word-break:keep-all;touch-action:manipulation;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+.ov-card.means{--c:var(--blue)}
+.ov-card .card-art{width:30px;height:30px;border-radius:6px}
+.ov-card .card-label{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:700}
+.ov-card.mark{outline:3px solid var(--brass);outline-offset:1px}
+.ov-flag{position:absolute;right:4px;top:1px;font-style:normal;font-size:13px;color:var(--red)}
+.ov-note{position:absolute;right:5px;bottom:2px;font-size:12px;font-weight:700}
+.overview-wrap,.comparison-overview{flex:1;min-height:0;overscroll-behavior:contain}
+
+/* ---- 비밀 정답 줄 (법의학자·범인팀) ---- */
+.secret-brief{flex:none;margin:0 12px 6px;padding:2px 10px 8px;border-radius:8px;background:var(--pave2);border-left:5px solid var(--brass)}
+.secret-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px}
+.secret-head strong{min-width:0;color:var(--brass);overflow-wrap:anywhere}
+.secret-head button{flex:none;min-height:36px;padding:0 8px;font-size:12px;color:var(--mute)}
+.secret-brief .reference-cards{margin:0}
+
+/* ---- 힌트 칸 (가로 스크롤 없는 3×2) ---- */
+.hint-grid{flex:none;padding:2px 12px 8px;border-bottom:1px solid var(--line)}
+.hint-grid-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hint-grid-head>button{min-height:38px;font-size:13px;font-weight:700;color:var(--manila)}
+.hint-grid-head .text-btn{padding:0 4px;font-weight:500;color:var(--mute)}
+.hint-cells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.hint-cell{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;min-width:0;min-height:50px;padding:5px 8px;border-radius:6px;border-top:4px solid var(--brass);background:var(--manila) var(--grain);color:#1b1a16;text-align:left;animation:pin .45s cubic-bezier(.3,1.4,.5,1) backwards;animation-delay:calc(var(--i,0)*30ms)}
+.hint-cell small{font-size:11px;line-height:1.2;opacity:.65}
+.hint-cell strong{font-size:13px;line-height:1.25;overflow-wrap:anywhere;word-break:keep-all}
+.hint-cell.placed::after{content:"";position:absolute;right:8px;top:-9px;width:8px;height:18px;border-radius:4px 4px 1px 1px;background:linear-gradient(90deg,#8a6420,var(--brass),#8a6420)}
+.hint-cell.pending{border:1.5px dashed var(--line);border-top:4px dashed var(--line);background:none;color:var(--mute)}
+.hint-cell.active{outline:2px solid var(--brass);outline-offset:1px}
+
+/* ---- 법의학자 마커 패널 (화면 아래, 엄지 영역) ---- */
+.marker-dock{flex:none;display:flex;flex-direction:column;gap:6px;padding:6px 12px 8px;border-top:2px solid var(--brass);background:var(--pave)}
+.marker-dock-head{display:flex;align-items:center;gap:6px}
+.marker-dock-head .step{flex:none;width:44px;min-height:44px;border-radius:8px;background:var(--pave2);font-size:22px;line-height:1}
+.marker-dock-head .step:disabled{opacity:.35}
+.marker-dock-head .title{flex:1;min-width:0;min-height:44px;text-align:center;font-weight:700;font-size:15px;line-height:1.2}
+.marker-dock-head .title small{display:block;font-size:12px;font-weight:500;color:var(--mute)}
+.marker-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.marker-options button{min-height:42px;padding:4px 6px;border-radius:6px;border:1.5px solid var(--line);background:var(--ink);color:var(--mute);font-size:13px;line-height:1.25;word-break:keep-all;overflow-wrap:anywhere}
+.marker-options button[aria-checked=true]{border-color:var(--brass);background:#e3a63a1f;color:var(--text);font-weight:700}
+.marker-dock .primary{min-height:46px;font-size:15px}
+
+/* ---- 카드 탭 보조 ---- */
+.suspect-strip{position:relative}
+.all-avatar{background:var(--brass)}
+.card-grid{touch-action:pan-y}
+.card-tip{flex:none;padding:2px 12px;text-align:center;font-size:12px;color:var(--mute)}
+
+/* ---- 현장 도착: 법의학자 범행 장소 선택 ---- */
+.scene-brief{flex:1;min-height:0;display:flex;flex-direction:column}
+.brief-head{flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:12px 14px 8px}
+.brief-head h1{font-size:22px}
+.brief-head .muted{margin-top:2px}
+.brief-time{flex:none;font:400 28px var(--disp);color:var(--brass);font-variant-numeric:tabular-nums}
+.brief-tabs{flex:none;display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line)}
+.brief-tabs button{min-height:44px;color:var(--mute);font-weight:600;border-bottom:3px solid transparent}
+.brief-tabs button[aria-selected=true]{color:var(--manila);border-bottom-color:var(--brass)}
+.brief-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.brief-scroll{flex:1;min-height:0;overscroll-behavior:contain}
+.brief-action{flex:none;display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid var(--line);background:var(--pave)}
+.brief-action>.primary,.brief-action>.hold{flex:1;min-width:0}
+.brief-picked{flex:none;max-width:38%;font-size:12px;line-height:1.3;color:var(--mute)}
+.brief-picked b{color:var(--text);font-size:14px;overflow-wrap:anywhere}
+.loc-compare{display:grid;grid-template-columns:repeat(var(--cols,3),minmax(0,1fr));gap:6px;padding:10px 10px 14px}
+.loc-col{display:flex;flex-direction:column;gap:5px;min-width:0;padding:8px 6px;border-radius:10px;border:2px solid var(--line);background:var(--pave2);text-align:left}
+.loc-col.selected{border-color:var(--brass);background:#e3a63a14}
+.loc-head{display:flex;flex-direction:column;align-items:flex-start;gap:4px;font:400 15px var(--disp);color:var(--manila);word-break:keep-all}
+.loc-head b{flex:none;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--manila);color:#1b1a16;font:400 13px var(--disp)}
+.loc-opt{display:block;padding:6px 6px;border-radius:5px;background:var(--ink);font-size:12.5px;line-height:1.3;word-break:keep-all;overflow-wrap:anywhere}
+.loc-pick{margin-top:auto;padding-top:2px;font-size:12px;font-weight:700;color:var(--mute)}
+.loc-col.selected .loc-pick{color:var(--brass)}
+
+/* ---- 키보드가 올라온 채팅 화면에서는 보조 패널을 접습니다 ---- */
+html[data-keyboard=true] .hint-grid,
+html[data-keyboard=true] .investigation .secret-brief,
+html[data-keyboard=true] .marker-dock{display:none}
+
+/* ---- 낮은 화면(작은 폰) ---- */
+@media(max-height:700px){
+  .card-tip{display:none}
+  .hint-cell{min-height:44px;padding:3px 7px}
+  .marker-options button{min-height:38px}
+  .marker-dock .primary{min-height:44px}
+  .brief-head .muted{display:none}
+  .brief-head h1{font-size:19px}
+}
+
+/* ---- v3.1: 작은 폰에서 카드 영역을 확보하기 위한 압축 ---- */
+.secret-owner{margin-left:6px;font-weight:500;color:var(--text)}
+.secret-brief.compact{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:6px;padding:4px 6px 4px 10px}
+.secret-brief.compact .secret-head{display:contents}
+.secret-brief.compact .secret-head strong{grid-column:1;grid-row:1;font-size:12px;line-height:1.25}
+.secret-brief.compact .secret-owner{display:block;margin:0}
+.secret-brief.compact .secret-head button{grid-column:3;grid-row:1;padding:0 4px}
+.secret-brief.compact .reference-cards{grid-column:2;grid-row:1}
+.secret-brief.compact .card-art{display:none}
+.secret-brief.compact .reference-card{min-height:44px;padding:3px 6px;font-size:12.5px;line-height:1.25}
+.marker-dock{gap:6px;padding:6px 12px 8px}
+.marker-dock-head .step{width:40px;min-height:44px}
+.marker-dock-head .title{font-size:14px}
+.marker-dock .hold{flex:none;width:112px;min-height:44px;padding:0 6px;font-size:14px}
+.overview{text-align:left}

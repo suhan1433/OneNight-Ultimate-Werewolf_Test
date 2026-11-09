@@ -3,9 +3,7 @@
     "argv": [
       "/usr/local/bin/node",
       "/Users/okestro/Desktop/board/OneNight-Ultimate-Werewolf_Test/deception/apps/web/node_modules/@playwright/test/cli.js",
-      "test",
-      "--grep",
-      "all roles keep|hint and card workspace|12 independent"
+      "test"
     ],
     "configFile": "/Users/okestro/Desktop/board/OneNight-Ultimate-Werewolf_Test/deception/apps/web/playwright.config.ts",
     "rootDir": "/Users/okestro/Desktop/board/OneNight-Ultimate-Werewolf_Test/deception/apps/web/e2e",
@@ -109,6 +107,108 @@
       "line": 0,
       "specs": [
         {
+          "title": "6 users complete all three rounds without solving",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 27680,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-08T14:23:23.412Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-67197d690b840c4a505e",
+          "file": "game.spec.ts",
+          "line": 57,
+          "column": 1
+        },
+        {
+          "title": "mobile home, help, invite QR, lobby chat, ready, kick and leave",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4442,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-08T14:23:51.437Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-b0df234b34743282efc7",
+          "file": "game.spec.ts",
+          "line": 225,
+          "column": 1
+        },
+        {
+          "title": "6 independent users complete a case",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 23660,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-08T14:23:55.892Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-25d9604043da3e2772ca",
+          "file": "game.spec.ts",
+          "line": 270,
+          "column": 3
+        },
+        {
           "title": "12 independent users complete a case with witness reversal",
           "ok": true,
           "tags": [],
@@ -124,12 +224,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 46856,
+                  "duration": 46177,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-08T14:19:25.750Z",
+                  "startTime": "2026-11-08T14:24:19.570Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -141,6 +241,176 @@
           "file": "game.spec.ts",
           "line": 270,
           "column": 3
+        },
+        {
+          "title": "mobile chat keeps focus while sending and preserves the next draft",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3725,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-08T14:25:05.763Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-c59b8e695c5c89e2b374",
+          "file": "game.spec.ts",
+          "line": 381,
+          "column": 1
+        },
+        {
+          "title": "invite sharing copies or opens native share and guests join from the link",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1856,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-08T14:25:09.497Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-acd7e1012b25371384a7",
+          "file": "game.spec.ts",
+          "line": 416,
+          "column": 1
+        },
+        {
+          "title": "lobby test bots stay ready after settings and allow solo game start",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5563,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-08T14:25:11.363Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-f44930574df3fa5e0e6c",
+          "file": "game.spec.ts",
+          "line": 454,
+          "column": 1
+        },
+        {
+          "title": "all 120 card illustrations are local, distinct SVG assets with matching labels",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 329,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-08T14:25:16.936Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-33fdb992395bc9400789",
+          "file": "game.spec.ts",
+          "line": 476,
+          "column": 1
+        },
+        {
+          "title": "discussion settings, public guesses, unanimous start and mobile keyboard layout",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 22884,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-08T14:25:17.271Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8b1bb1493a64c9fc3ab6-6c9724f089e1fcb4aaf5",
+          "file": "game.spec.ts",
+          "line": 491,
+          "column": 1
         },
         {
           "title": "hint and card workspace keeps forensic answers and public comparisons visible on mobile and desktop",
@@ -158,12 +428,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 23889,
+                  "duration": 23631,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-08T14:20:12.931Z",
+                  "startTime": "2026-11-08T14:25:40.167Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -192,12 +462,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 38184,
+                  "duration": 37330,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-08T14:20:36.837Z",
+                  "startTime": "2026-11-08T14:26:03.811Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -207,7 +477,7 @@
           ],
           "id": "8b1bb1493a64c9fc3ab6-3e4dfd4b765366b089d4",
           "file": "game.spec.ts",
-          "line": 668,
+          "line": 674,
           "column": 1
         }
       ]
@@ -215,9 +485,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-08T14:19:24.039Z",
-    "duration": 111689.273,
-    "expected": 3,
+    "startTime": "2026-11-08T14:23:21.697Z",
+    "duration": 200719.509,
+    "expected": 11,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0
