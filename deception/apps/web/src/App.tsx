@@ -279,28 +279,31 @@ function Home({ onHelp }: { onHelp: () => void }) {
       <div className="home-top">
         <span className="wordmark">N / C</span>
         <button className="text-btn" onClick={onHelp}>
-          {t("help")} ↗
+          {t("help")}
         </button>
       </div>
-      <div className="home-art" aria-hidden="true">
-        <span className="tag tag-clue">단서</span>
-        <span className="tag tag-means">수단</span>
-        <span className="bullet" />
+      <div className="poster">
+        <span className="poster-glyph" aria-hidden="true">殺</span>
+        <div className="home-art" aria-hidden="true">
+          <span className="tag tag-clue">단서</span>
+          <span className="tag tag-means">수단</span>
+        </div>
+        <h1 className="neon-title">
+          <span>네온</span>
+          <span>사건파일</span>
+        </h1>
       </div>
-      <h1 className="neon-title">
-        <span>네온</span>
-        <span>사건파일</span>
-      </h1>
       <p className="home-sub">
         불빛 아래, 진실을 숨긴 한 사람.
         <br />
         단서를 연결하고 완벽한 범행을 깨뜨리세요.
       </p>
-      <div className="meta-row">
-        <span>◈ 4–12명</span>
-        <span>◷ 약 20분</span>
-        <span>⌁ 실시간 채팅</span>
-      </div>
+      <dl className="billing">
+        <dt>출연</dt>
+        <dd>4–12명의 수사관</dd>
+        <dt>상영</dt>
+        <dd>약 20분 · 실시간 채팅</dd>
+      </dl>
       <form
         className="entry-form"
         onSubmit={(e) => {
@@ -322,7 +325,7 @@ function Home({ onHelp }: { onHelp: () => void }) {
           className="primary"
           disabled={!name.trim() || busy || !connected}
         >
-          {busy ? "입장 중…" : `${t("create")} ↗`}
+          {busy ? "입장 중…" : t("create")}
         </button>
         <div className="divider">
           <span>초대받았다면</span>
@@ -357,6 +360,18 @@ interface ChatDraft {
   text: string;
   setText: React.Dispatch<React.SetStateAction<string>>;
 }
+/** 「…」로 감싼 부분은 카드·힌트 인용으로 강조해서 보여 줍니다. */
+function renderCites(text: string) {
+  return text.split(/(「[^」]{1,60}」)/g).map((part, i) =>
+    part.length > 2 && part.startsWith("「") && part.endsWith("」") ? (
+      <mark key={i} className="cite">
+        {part.slice(1, -1)}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
 function Chat({
   room,
   compact = false,
@@ -372,6 +387,8 @@ function Chat({
   const text = draft?.text ?? localText;
   const setText = draft?.setText ?? setLocalText;
   const [sending, setSending] = useState(false);
+  const [unseen, setUnseen] = useState(0);
+  const [citing, setCiting] = useState(false);
   const log = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const input = useRef<HTMLInputElement>(null);
@@ -394,12 +411,17 @@ function Chat({
       criminal);
   const messages = room.chat.filter((m) => m.channel === channel);
   const lastMessage = messages.at(-1);
-  useEffect(() => {
+  function jumpToBottom() {
     const node = log.current;
-    if (node && (atBottom.current || lastMessage?.playerId === room.selfId)) {
-      node.scrollTop = node.scrollHeight;
-      atBottom.current = true;
-    }
+    if (node) node.scrollTop = node.scrollHeight;
+    atBottom.current = true;
+    setUnseen(0);
+  }
+  // 맨 아래를 보고 있거나 내가 보낸 메시지면 따라가고, 위를 읽는 중이면 "새 메시지" 알림만 띄웁니다.
+  useEffect(() => {
+    if (!lastMessage) return;
+    if (atBottom.current || lastMessage.playerId === room.selfId) jumpToBottom();
+    else setUnseen((n) => n + 1);
   }, [lastMessage?.id, room.selfId]);
   useEffect(() => {
     const node = log.current;
@@ -410,14 +432,15 @@ function Chat({
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
-  let placeholder = "수사 의견을 남겨 주세요";
-  if (!allowed)
-    placeholder =
-      game?.private.myRole === "forensic"
-        ? "법의학자는 마커로만 단서를 전합니다"
-        : game?.phase === "PRESENTATION"
-          ? "현재 발표자의 발언 시간입니다"
-          : "아직 채팅할 수 없는 단계입니다";
+  let blocked = "";
+  if (!allowed) {
+    const presenter = game?.players.find((p) => p.id === game.presenterId)?.name;
+    if (room.pausedAt !== null) blocked = "법의학자 연결을 기다리는 중입니다";
+    else if (game?.private.myRole === "forensic") blocked = "법의학자는 마커로만 단서를 전합니다";
+    else if (game?.phase === "PRESENTATION") blocked = `${presenter ?? "발표자"}의 발표 시간 · 발표자만 채팅할 수 있어요`;
+    else if (game?.phase === "EVIDENCE_COLLECTION") blocked = "법의학자가 첫 마커를 놓으면 채팅이 열립니다";
+    else blocked = "아직 채팅할 수 없는 단계입니다";
+  }
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim() || inFlight.current || !allowed) return;
@@ -437,74 +460,148 @@ function Chat({
       setSending(false);
     }
   }
+  // 카드·힌트 이름을 눌러 메시지에 넣습니다(폰에서 긴 이름을 타자 치지 않도록).
+  function cite(label: string) {
+    setText((old) => {
+      const next = `${old}${old && !old.endsWith(" ") ? " " : ""}「${label}」 `;
+      return next.length <= 300 ? next : old;
+    });
+  }
+  const pickCard = (card: Card) => {
+    const owner = game?.players.find((p) => p.cards.some((c) => c.id === card.id));
+    cite(`${owner?.name ?? ""} · ${card.label}`);
+  };
   return (
     <section
       className={`chat ${compact ? "compact-chat" : ""}`}
       aria-label={criminal ? "범인팀 비밀 채팅" : "공개 채팅"}
     >
-      <div className="section-label">
-        <span>{criminal ? "◉ 범인팀 비밀 채팅" : "⌁ 수사 채팅"}</span>
-        <span>{readOnly ? "읽기 전용" : allowed ? "발언 가능" : "발언 대기"}</span>
-      </div>
-      <div ref={log} className="chat-log" role="log" aria-live="polite"
-        onScroll={(e) => {
-          const node = e.currentTarget;
-          atBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
-        }}>
-        {messages.length === 0 && (
-          <div className="empty-chat">
-            <span>⌁</span>
-            <p>
-              {game
-                ? "단서를 함께 연결해 보세요."
-                : "수사팀이 모이는 중입니다."}
-            </p>
-            <small>이곳에서 채팅으로 대화합니다.</small>
-          </div>
-        )}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`bubble-row ${m.playerId === room.selfId ? "mine" : ""}`}
-          >
-            <span className="bubble-name">
-              {m.name}
-              {m.channel === "criminals" && " · 비밀"}
-            </span>
-            <p>{m.text}</p>
-          </div>
-        ))}
-      </div>
-      {!readOnly && <form
-        className="chat-input"
-        onSubmit={(e) => {
-          run(send(e));
-        }}
-      >
-        <input
-          ref={input}
-          aria-label="채팅 메시지"
-          enterKeyHint="send"
-          autoComplete="off"
-          value={text}
-          disabled={!allowed}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault();
+      {(criminal || readOnly) && (
+        <div className="section-label">
+          <span>{criminal ? "◉ 범인팀 비밀 채팅" : "⌁ 수사 채팅"}</span>
+          <span>{readOnly ? "읽기 전용" : allowed ? "발언 가능" : "발언 대기"}</span>
+        </div>
+      )}
+      <div className="chat-log-wrap">
+        <div
+          ref={log}
+          className="chat-log"
+          role="log"
+          aria-live="polite"
+          onScroll={(e) => {
+            const node = e.currentTarget;
+            atBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
+            if (atBottom.current) setUnseen(0);
           }}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={300}
-          placeholder={placeholder}
-        />
-        <button
-          type="submit"
-          aria-label="메시지 보내기"
-          onPointerDown={(e) => e.preventDefault()}
-          onMouseDown={(e) => e.preventDefault()}
-          disabled={!allowed || !text.trim() || sending}
         >
-          ↑
-        </button>
-      </form>}
+          {messages.length === 0 && (
+            <div className="empty-chat">
+              <span>⌁</span>
+              <p>
+                {game
+                  ? "단서를 함께 연결해 보세요."
+                  : "수사팀이 모이는 중입니다."}
+              </p>
+              <small>이곳에서 채팅으로 대화합니다.</small>
+            </div>
+          )}
+          {messages.map((m, i) => {
+            const mine = m.playerId === room.selfId;
+            const first = messages[i - 1]?.playerId !== m.playerId;
+            return (
+              <div
+                key={m.id}
+                className={`bubble-row ${mine ? "mine" : ""} ${first ? "first" : "cont"}`}
+              >
+                {!mine && first && (
+                  <span className="bubble-name">
+                    {m.name}
+                    {m.channel === "criminals" && " · 비밀"}
+                  </span>
+                )}
+                <p>{renderCites(m.text)}</p>
+              </div>
+            );
+          })}
+        </div>
+        {unseen > 0 && (
+          <button className="chat-new" onClick={jumpToBottom}>
+            새 메시지 {unseen}개 ↓
+          </button>
+        )}
+      </div>
+      {!readOnly && !allowed && (
+        <div className="chat-blocked" role="status">
+          {blocked}
+        </div>
+      )}
+      {!readOnly && allowed && (
+        <form
+          className="chat-input"
+          onSubmit={(e) => {
+            run(send(e));
+          }}
+        >
+          {game && (
+            <button
+              type="button"
+              className="chat-cite"
+              aria-label="카드·힌트 인용"
+              onPointerDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setCiting(true)}
+            >
+              ＋
+            </button>
+          )}
+          <input
+            ref={input}
+            aria-label="채팅 메시지"
+            enterKeyHint="send"
+            autoComplete="off"
+            value={text}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault();
+            }}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={300}
+            placeholder="수사 의견을 남겨 주세요"
+          />
+          <button
+            type="submit"
+            aria-label="메시지 보내기"
+            onPointerDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
+            disabled={!text.trim() || sending}
+          >
+            ↑
+          </button>
+          {text.length >= 260 && <small className="chat-count">{text.length}/300</small>}
+        </form>
+      )}
+      {citing && game && (
+        <Sheet title="카드·힌트 인용" onClose={() => setCiting(false)}>
+          <div className="cite-bar">
+            <span>{text.trim() || "카드나 힌트를 누르면 메시지에 들어갑니다"}</span>
+            <button className="primary" onClick={() => setCiting(false)}>
+              완료
+            </button>
+          </div>
+          {Object.keys(game.markers).length > 0 && (
+            <div className="cite-hints" aria-label="공개된 힌트">
+              {game.tiles
+                .filter((t) => game.markers[t.id] !== undefined)
+                .map((t) => (
+                  <button key={t.id} onClick={() => cite(`${t.title} · ${t.options[game.markers[t.id]!]}`)}>
+                    <small>{t.title}</small>
+                    <strong>{t.options[game.markers[t.id]!]}</strong>
+                  </button>
+                ))}
+            </div>
+          )}
+          <CaseOverview game={game} selfId={room.selfId} jump={false} onTap={pickCard} onExpand={pickCard} />
+        </Sheet>
+      )}
     </section>
   );
 }
@@ -694,10 +791,10 @@ function Lobby({ room }: { room: RoomView }) {
         </div>
         <button className="invite-card" onClick={() => setInvite(true)}>
           <div>
-            <span className="eyebrow">INVITATION CODE</span>
+            <span className="eyebrow">초대 코드</span>
             <strong>{room.code}</strong>
           </div>
-          <span>초대 링크 · QR ↗</span>
+          <span>링크 · QR</span>
         </button>
         <button type="button" className="secondary full invite-share" onClick={() => run(shareInvite())}>
           {linkCopied ? "✓ 초대 링크 복사됨" : "🔗 초대 링크 보내기"}
@@ -798,7 +895,7 @@ function Lobby({ room }: { room: RoomView }) {
             }
             onClick={() => run(request("start"))}
           >
-            사건 시작 ↗
+            사건 시작
           </button>
         )}
       </div>
@@ -1283,7 +1380,7 @@ function ComparisonDesk({
       </header>
       <div className={`comparison-turn ${game.presenterId === room.selfId ? "my-turn" : ""}`} role="status">
         <strong>{game.phase === "PRESENTATION" ? `${name(game.presenterId ?? undefined)}의 발표${game.presenterId === room.selfId ? " · 내 차례" : ""}` : game.phase === "ROUND_TRANSITION" ? "새 힌트를 교체하는 중" : "자유 토론 · 증거 수집"}</strong>
-        {game.phase === "PRESENTATION" && game.presenterId === room.selfId && <button className="secondary" onPointerDown={(e) => e.preventDefault()} onClick={() => run(command({ type: "endPresentation" }))}>발표 마침 →</button>}
+        {game.phase === "PRESENTATION" && game.presenterId === room.selfId && <button className="secondary" onPointerDown={(e) => e.preventDefault()} onClick={() => run(command({ type: "endPresentation" }))}>발표 마침</button>}
       </div>
       <div className="comparison-body">
       <div className="comparison-workspace">
@@ -1323,7 +1420,7 @@ function ComparisonDesk({
           </div>}
           {game.phase === "ROUND_TRANSITION" && forensic && <div className="comparison-replacement scroll">
             <p>{game.pendingTile?.title} 타일로 교체할 힌트를 고르세요.</p>
-            {game.tiles.filter((t) => t.kind === "hint").map((hint) => <button key={hint.id} className="secondary" disabled={room.pausedAt !== null} onClick={() => run(command({ type: "replaceTile", tileId: hint.id }))}>{hint.title} 교체 →</button>)}
+            {game.tiles.filter((t) => t.kind === "hint").map((hint) => <button key={hint.id} className="secondary" disabled={room.pausedAt !== null} onClick={() => run(command({ type: "replaceTile", tileId: hint.id }))}>{hint.title} 교체</button>)}
           </div>}
           </div>
         </aside>
@@ -1440,7 +1537,7 @@ function SolveWizard({ room, initial }: { room: RoomView; initial?: SolveDraft |
                 >
                   <Avatar name={p.name} index={p.seat} />
                   <strong>{p.name}</strong>
-                  <span>선택 →</span>
+                  <span>선택</span>
                 </button>
               ))}
           </div>
@@ -1517,7 +1614,12 @@ function Investigation({ room }: { room: RoomView }) {
   );
   const [info, setInfo] = useState(false);
   const [board, setBoard] = useState(false);
-  const [hintsOpen, setHintsOpen] = useState(game.private.myRole !== "forensic");
+  // 힌트 칸: 채팅 탭에서는 한 줄로 접어 메시지 공간을 넓히고, 카드·보드 탭에서는 3×2로 펼쳐 둡니다.
+  const [hintsOpenBy, setHintsOpenBy] = useState<Record<"chat" | "cards" | "board", boolean>>({
+    chat: false,
+    cards: game.private.myRole !== "forensic",
+    board: game.private.myRole !== "forensic",
+  });
   const [hintId, setHintId] = useState<string | null>(null);
   const [activeTile, setActiveTile] = useState<string | null>(null);
   const [dockOpen, setDockOpen] = useState(true);
@@ -1566,6 +1668,14 @@ function Investigation({ room }: { room: RoomView }) {
     ["EVIDENCE_COLLECTION", "PRESENTATION", "ROUND_TRANSITION"].includes(
       game.phase,
     );
+  // 다른 탭·비교 화면을 보는 동안 도착한 남의 채팅을 '채팅' 탭에 배지로 알립니다.
+  const othersCount = room.chat.filter((m) => m.channel === "public" && m.playerId !== room.selfId).length;
+  const [seenCount, setSeenCount] = useState(othersCount);
+  const chatVisible = (tab === "chat" || game.phase === "ROUND_TRANSITION") && !comparisonOpen;
+  useEffect(() => {
+    if (chatVisible) setSeenCount(othersCount);
+  }, [chatVisible, othersCount]);
+  const unread = Math.max(0, othersCount - seenCount);
   useEffect(() => {
     localStorage.setItem(noteKey, JSON.stringify(notes));
   }, [notes, noteKey]);
@@ -1605,8 +1715,8 @@ function Investigation({ room }: { room: RoomView }) {
       {!(fs && dockTile) && <HintGrid
         game={game}
         activeId={dockTile?.id}
-        open={hintsOpen}
-        onToggle={() => setHintsOpen((v) => !v)}
+        open={hintsOpenBy[tab]}
+        onToggle={() => setHintsOpenBy((v) => ({ ...v, [tab]: !v[tab] }))}
         onBoard={() => setBoard(true)}
         onSelect={(id) => {
           if (fs && evidence && game.markers[id] === undefined) setActiveTile(id);
@@ -1624,11 +1734,7 @@ function Investigation({ room }: { room: RoomView }) {
             <strong>
               {game.players.find((p) => p.id === game.presenterId)?.name}의 발표
             </strong>
-            <small>
-              {game.round === 3
-                ? "마지막 기회 · 마지막 발표 종료 즉시 배지 소멸"
-                : "현재 발표자만 채팅할 수 있습니다"}
-            </small>
+            {game.round === 3 && <small>마지막 기회 · 마지막 발표 종료 즉시 배지 소멸</small>}
           </div>
           {game.presenterId === room.selfId && (
             <button
@@ -1636,14 +1742,14 @@ function Investigation({ room }: { room: RoomView }) {
               onPointerDown={(e) => e.preventDefault()}
               onClick={() => run(command({ type: "endPresentation" }))}
             >
-              발표 마침 →
+              발표 마침
             </button>
           )}
         </div>
       )}
       {latestSolve && latestSolve.correct === false && (
         <button className="solve-verdict" key={latestSolve.at} onClick={() => setSolveHistory(true)}>
-          아니오 · {game.players.find((p) => p.id === latestSolve.playerId)?.name}의 시도 · 카드 기록 보기 ↗
+          아니오 · {game.players.find((p) => p.id === latestSolve.playerId)?.name}의 시도 · 카드 기록 보기
         </button>
       )}
       <div className="view-tabs" role="tablist" aria-label="수사 보기">
@@ -1653,6 +1759,7 @@ function Investigation({ room }: { room: RoomView }) {
           onClick={() => setTab("chat")}
         >
           ⌁ 채팅
+          {unread > 0 && <i className="tab-badge" aria-label={`읽지 않은 메시지 ${unread}개`}>{unread > 9 ? "9+" : unread}</i>}
         </button>
         <button
           role="tab"
@@ -1697,7 +1804,7 @@ function Investigation({ room }: { room: RoomView }) {
                         run(command({ type: "replaceTile", tileId: tile.id }))
                       }
                     >
-                      {tile.title} 교체 →
+                      {tile.title} 교체
                     </button>
                   ))}
               </>
@@ -2024,7 +2131,7 @@ function Result({ room }: { room: RoomView }) {
       <div
         className={`result-stamp ${game.winner === "criminals" ? "criminals" : ""}`}
       >
-        {game.winner === "investigators" ? "CASE CLOSED" : "CASE UNSOLVED"}
+        {game.winner === "investigators" ? "사건 종결" : "미제 사건"}
       </div>
       <h1>{game.winner === "investigators" ? "수사팀 승리" : "범인팀 승리"}</h1>
       <p className="muted">
@@ -2051,12 +2158,13 @@ function Result({ room }: { room: RoomView }) {
           <CardFace card={murderer.cards.find((c) => c.id === solution.meansId)} />
         </div>
       </div>
-      <h2>드러난 신분</h2>
+      <h2 className="credits-title">출연</h2>
       <div className="reveal-list">
         {game.players.map((p) => (
           <div key={p.id}>
             <Avatar name={p.name} index={p.seat} />
             <strong>{p.name}</strong>
+            <i className="leader" aria-hidden="true" />
             <span
               className={
                 ["murderer", "accomplice"].includes(game.revealedRoles![p.id])
@@ -2092,7 +2200,7 @@ function Result({ room }: { room: RoomView }) {
       </details>
       {room.hostId === room.selfId ? (
         <button className="primary" onClick={() => run(request("rematch"))}>
-          법의학자 교대 · 다시 수사하기 ↗
+          법의학자 교대 · 다시 수사하기
         </button>
       ) : (
         <p className="notice">방장이 다음 사건을 준비하고 있습니다.</p>
@@ -2100,6 +2208,89 @@ function Result({ room }: { room: RoomView }) {
     </div>
   );
 }
+/* 한자 한 글자가 단계의 분위기를 담는 장식 문자입니다(의미는 한글 제목이 전달). */
+const CHAPTER_GLYPH: Record<string, string> = {
+  SCENE_INTRO: "現",
+  EVIDENCE_COLLECTION: "證",
+  PRESENTATION: "言",
+  ROUND_TRANSITION: "新",
+  REVERSAL: "逆",
+  RESULT: "終",
+};
+
+/** 밤 장면의 도시 실루엣: 결정적 난수로 만든 건물·창문·네온 간판. */
+const SKY = (() => {
+  let seed = 11;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const blocks: { x: number; w: number; h: number }[] = [];
+  for (let x = -6; x < 486; ) {
+    const w = 22 + Math.floor(rnd() * 30);
+    blocks.push({ x, w, h: 38 + Math.floor(rnd() * 84) });
+    x += w + 2;
+  }
+  const wins: { x: number; y: number; c: number; tw: boolean; d: number }[] = [];
+  for (const b of blocks)
+    for (let wx = b.x + 5; wx < b.x + b.w - 5; wx += 8)
+      for (let wy = 150 - b.h + 8; wy < 144; wy += 11)
+        if (rnd() < 0.26) wins.push({ x: wx, y: wy, c: rnd() < 0.7 ? 0 : 1, tw: rnd() < 0.12, d: rnd() * 5 });
+  const colors = ["#ff4b3e", "#7ff2d6", "#f4a63a"];
+  const signs = [3, 7, 10].map((i, n) => {
+    const b = blocks[i % blocks.length]!;
+    return { x: b.x + b.w - 3, y: 150 - b.h + 6, h: 24 + n * 6, c: colors[n]! };
+  });
+  return { blocks, wins, signs };
+})();
+
+function Skyline() {
+  return (
+    <svg className="skyline" viewBox="0 0 480 150" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      {SKY.blocks.map((b, i) => (
+        <rect key={i} x={b.x} y={150 - b.h} width={b.w} height={b.h} fill="#020708" />
+      ))}
+      {SKY.wins.map((w, i) => (
+        <rect
+          key={i}
+          className={`win ${w.tw ? "tw" : ""}`}
+          x={w.x}
+          y={w.y}
+          width="3"
+          height="4"
+          fill={w.c ? "#7ff2d6" : "#f4a63a"}
+          style={w.tw ? { animationDelay: `${w.d}s` } : undefined}
+        />
+      ))}
+      {SKY.signs.map((s, i) => (
+        <rect
+          key={i}
+          className="neon"
+          x={s.x}
+          y={s.y}
+          width="4"
+          height={s.h}
+          rx="2"
+          fill={s.c}
+          style={{ color: s.c, animationDelay: `${i * 1.3}s` }}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/** 모든 화면 뒤에 깔리는 필름 레이어: 비, 네온 번짐, (밤에는) 도시. */
+function Film({ night }: { night: boolean }) {
+  return (
+    <div className="film" aria-hidden="true">
+      <i className="film-haze" />
+      <i className="film-bokeh b1" />
+      <i className="film-bokeh b2" />
+      <i className="film-bokeh b3" />
+      <i className="film-rain" />
+      <i className="film-rain far" />
+      {night && <Skyline />}
+    </div>
+  );
+}
+
 export function App() {
   useVisualViewport();
   const room = useRoom((s) => s.room);
@@ -2112,26 +2303,33 @@ export function App() {
   const { t } = useTranslation();
   const game = room?.game;
   useGameFeedback(game);
-  const [banner, setBanner] = useState("");
+  // 단계가 바뀔 때마다 영화의 챕터 타이틀처럼 레터박스가 닫히며 제목이 뜹니다(조작은 막지 않음).
+  const [card, setCard] = useState<{ key: string; glyph: string; title: string; sub?: string } | null>(null);
   const phase = game?.phase;
   const round = game?.round;
+  // t는 렌더마다 바뀔 수 있으므로 ref로 읽어, 단계·라운드가 바뀔 때만 카드를 띄웁니다.
+  const tRef = useRef(t);
+  tRef.current = t;
   useEffect(() => {
     if (!phase || ["DEAL", "ROLE_REVEAL", "CRIME_NIGHT", "SOLVING"].includes(phase)) return;
-    setBanner(
-      phase === "EVIDENCE_COLLECTION" || phase === "PRESENTATION"
-        ? `${round}라운드 ${t(phase)}`
-        : t(phase),
-    );
-    const id = setTimeout(() => setBanner(""), 1500);
+    setCard({
+      key: `${phase}:${round}`,
+      glyph: CHAPTER_GLYPH[phase] ?? "案",
+      title: tRef.current(phase),
+      sub: phase === "EVIDENCE_COLLECTION" || phase === "PRESENTATION" ? `${round}라운드` : undefined,
+    });
+    const id = setTimeout(() => setCard(null), 2100);
     return () => clearTimeout(id);
-  }, [phase, round, t]);
+  }, [phase, round]);
   return (
     <MotionConfig reducedMotion="user">
       <div
         onPointerDown={unlockAudio}
-        className={`app-frame ${game?.phase === "CRIME_NIGHT" ? "night-frame" : ""}`}
+        className="app-frame"
+        data-phase={game?.phase ?? (room ? "LOBBY" : "HOME")}
+        data-winner={game?.winner ?? undefined}
       >
-        <div className="rain" aria-hidden="true" />
+        <Film night={game?.phase === "CRIME_NIGHT"} />
         {room && (
           <header className="app-header">
             <a
@@ -2181,10 +2379,10 @@ export function App() {
                       ? "investigation"
                       : game.phase
             }
-            initial={{ opacity: 0, y: 14 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.28, ease: "easeOut" }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
           >
             {!room ? (
               <Home onHelp={() => setHelp(true)} />
@@ -2220,17 +2418,21 @@ export function App() {
           </motion.div>
         </AnimatePresence>
         <AnimatePresence>
-          {banner && (
+          {card && (
             <motion.div
-              key={banner}
-              className="phase-banner"
+              key={card.key}
+              className="title-card"
               aria-hidden="true"
-              initial={{ opacity: 0, scaleX: 0.6 }}
-              animate={{ opacity: 1, scaleX: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
+              exit={{ opacity: 0, transition: { duration: 0.3 } }}
             >
-              <span>{banner}</span>
+              <i className="tc-wash" />
+              <i className="tc-bar top" />
+              <i className="tc-bar bottom" />
+              <span className="tc-glyph">{card.glyph}</span>
+              <div className="tc-copy">
+                <strong className="tc-title">{card.title}</strong>
+                {card.sub && <span className="tc-sub">{card.sub}</span>}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -2294,6 +2496,7 @@ export function App() {
             </button>
           </div>
         )}
+        <div className="grade" aria-hidden="true" />
       </div>
     </MotionConfig>
   );
@@ -2565,34 +2768,45 @@ function HintGrid({
   onBoard: () => void;
 }) {
   const placed = Object.keys(game.markers).length;
+  const cells = game.tiles.map((tile, idx) => {
+    const marker = game.markers[tile.id];
+    return (
+      <button
+        key={`${tile.id}:${marker ?? "x"}`}
+        className={`hint-cell ${marker === undefined ? "pending" : "placed"} ${activeId === tile.id ? "active" : ""}`}
+        style={{ "--i": idx } as React.CSSProperties}
+        onClick={() => onSelect(tile.id)}
+      >
+        <small>{tile.title}</small>
+        <strong>{marker === undefined ? "아직 미정" : tile.options[marker]}</strong>
+      </button>
+    );
+  });
+  // 접힌 상태에서도 힌트 값은 한 줄로 계속 보이게 합니다(채팅하면서 힌트를 곁눈질할 수 있도록).
+  if (!open)
+    return (
+      <section className="hint-grid collapsed" aria-label="공개 힌트">
+        <div className="hint-strip-wrap">
+          <button className="hint-expand" aria-expanded={false} aria-label="힌트 펼치기" onClick={onToggle}>
+            힌트
+            <br />
+            {placed}/{game.tiles.length} ▾
+          </button>
+          <div className="hint-strip">{cells}</div>
+        </div>
+      </section>
+    );
   return (
     <section className="hint-grid" aria-label="공개 힌트">
       <div className="hint-grid-head">
-        <button aria-expanded={open} onClick={onToggle}>
-          힌트 {placed}/{game.tiles.length} {open ? "▴" : "▾"}
+        <button aria-expanded={true} onClick={onToggle}>
+          힌트 {placed}/{game.tiles.length} ▴
         </button>
         <button className="text-btn" onClick={onBoard}>
-          전체 항목 ↗
+          전체 항목
         </button>
       </div>
-      {open && (
-        <div className="hint-cells">
-          {game.tiles.map((tile, idx) => {
-            const marker = game.markers[tile.id];
-            return (
-              <button
-                key={`${tile.id}:${marker ?? "x"}`}
-                className={`hint-cell ${marker === undefined ? "pending" : "placed"} ${activeId === tile.id ? "active" : ""}`}
-                style={{ "--i": idx } as React.CSSProperties}
-                onClick={() => onSelect(tile.id)}
-              >
-                <small>{tile.title}</small>
-                <strong>{marker === undefined ? "아직 미정" : tile.options[marker]}</strong>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <div className="hint-cells">{cells}</div>
     </section>
   );
 }
@@ -2776,7 +2990,7 @@ function SceneIntro({ room }: { room: RoomView }) {
             </>
           ) : (
             <button className="primary" disabled={tab === "place"} onClick={() => setTab("place")}>
-              {tab === "cards" ? "장소 타일 고르러 가기 →" : "위에서 타일을 하나 고르세요"}
+              {tab === "cards" ? "장소 타일 고르러 가기" : "위에서 타일을 하나 고르세요"}
             </button>
           )}
         </div>
