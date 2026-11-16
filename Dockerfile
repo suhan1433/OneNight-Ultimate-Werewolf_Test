@@ -11,6 +11,7 @@ RUN npm install --global pnpm@10.11.0 \
   && npm --prefix skullking ci --include=dev \
   && npm --prefix spacecrew ci --include=dev \
   && npm --prefix rummikub ci --include=dev \
+  && npm --prefix secret_hitler ci --include=dev \
   && pnpm --dir deception install --frozen-lockfile --prod=false \
   && npm run build:render
 

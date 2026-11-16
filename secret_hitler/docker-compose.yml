@@ -1,0 +1,13 @@
+services:
+  secret-hitler:
+    build: .
+    ports:
+      - "3007:3007"
+    environment:
+      PORT: "3007"
+      DATA_DIR: /data
+    volumes:
+      - secret-hitler-data:/data
+    restart: unless-stopped
+volumes:
+  secret-hitler-data:

@@ -38,6 +38,13 @@ Socket.IO 서버와 분리되어 있다.
 
 디셉션(네온 사건파일)은 `/deception/`과 `/api/deception/socket/`을 사용한다.
 내부 서버 포트는 `3007`이며 `/api/deception/health`로 개별 상태를 확인할 수 있다.
+
+시크릿 히틀러는 `/secret_hitler/`과 `/secret_hitler/socket.io/`를 사용한다.
+통합 배포의 내부 서버 포트는 `3008`이며 `/api/secret_hitler/health`로 상태를 확인한다.
+게임 기록은 기본 `/app/secret_hitler/.data`에 저장된다. Render에서 재배포 후에도
+복구하려면 Persistent Disk를 연결하고 `SECRET_HITLER_DATA_DIR`를 디스크 내 경로로
+설정한다(예: `/var/data/secret_hitler`).
+
 루트 `Dockerfile`과 `apps/server/Dockerfile` 모두 같은 시작 스크립트로 실행한다.
 Render의 Dockerfile Path는 기존 설정을 유지하면 되고, `apps/server/Dockerfile`을
 사용할 때도 Docker Build Context는 저장소 루트로 지정한다. 외부 포트는 Render의
@@ -45,7 +52,9 @@ Render의 Dockerfile Path는 기존 설정을 유지하면 되고, `apps/server/
 
 로컬에서 Render용 전체 빌드를 검증하려면 다른 게임의 npm 의존성과 함께
 `npx pnpm@10.11.0 --dir deception install --frozen-lockfile`을 실행한 후
-`npm run build:render`를 실행한다. 기존 `npm run build`는 종전 빌드 대상을 유지한다.
+`npm --prefix secret_hitler ci --include=dev`도 실행한 뒤 `npm run build:render`를
+실행한다. 이 명령은 시크릿 히틀러 웹 빌드를 `apps/web/dist/secret_hitler`에 포함한다.
+기존 `npm run build`는 종전 빌드 대상을 유지한다.
 
 ## GitHub + Vercel 배포
 

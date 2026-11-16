@@ -1,0 +1,32 @@
+{
+  "roles": {
+    "5": [3, 1, 1],
+    "6": [4, 1, 1],
+    "7": [4, 2, 1],
+    "8": [5, 2, 1],
+    "9": [5, 3, 1],
+    "10": [6, 3, 1]
+  },
+  "powers": {
+    "5-6": [null, null, "peek", "execute", "execute", null],
+    "7-8": [
+      null,
+      "investigate",
+      "special_election",
+      "execute",
+      "execute",
+      null
+    ],
+    "9-10": [
+      "investigate",
+      "investigate",
+      "special_election",
+      "execute",
+      "execute",
+      null
+    ]
+  },
+  "policies": { "liberal": 6, "fascist": 11 },
+  "reshuffle": "After legislative sessions (including approved veto) and chaos, if fewer than 3 tiles remain; also ensure 3 tiles before draw or peek.",
+  "source": "Secret_Hitler_Rules.pdf pages 3-6; policy powers per instruction.md section 4.4"
+}

@@ -40,6 +40,12 @@ COPY deception/packages/shared/package.json deception/packages/shared/package.js
 COPY deception/apps/server/package.json deception/apps/server/package.json
 COPY deception/apps/web/package.json deception/apps/web/package.json
 RUN pnpm --dir deception install --frozen-lockfile --prod=false
+COPY secret_hitler/package*.json secret_hitler/
+COPY secret_hitler/packages/shared-types/package.json secret_hitler/packages/shared-types/package.json
+COPY secret_hitler/packages/rules-engine/package.json secret_hitler/packages/rules-engine/package.json
+COPY secret_hitler/apps/server/package.json secret_hitler/apps/server/package.json
+COPY secret_hitler/apps/client/package.json secret_hitler/apps/client/package.json
+RUN npm --prefix secret_hitler ci --include=dev
 COPY packages/shared packages/shared
 COPY apps/server apps/server
 COPY apps/web apps/web
@@ -51,17 +57,11 @@ COPY skullking skullking
 COPY spacecrew spacecrew
 COPY rummikub rummikub
 COPY deception deception
+COPY secret_hitler secret_hitler
 COPY game-selector game-selector
 COPY game-audio game-audio
 # All browser apps share /app/apps/web/dist.
-RUN npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web \
-  && npm --prefix avalon run build \
-  && npm --prefix skullking run build \
-  && npm --prefix spacecrew run build \
-  && npm --prefix rummikub run build \
-  && npm run build:deception \
-  && cp game-selector/index.html apps/web/dist/index.html \
-  && cp game-selector/launcher.css apps/web/dist/launcher.css
+RUN npm run build:render
 
 # Render exposes one public port. Nginx serves the selector and all web apps,
 # and routes each Socket.IO endpoint to its own internal game server.

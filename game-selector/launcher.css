@@ -69,6 +69,8 @@ h1 em { color: var(--gold); font-weight: 600; font-style: normal; }
 .spacecrew { --accent: #a7b6d8; background: #151b29; }
 .rummikub { --accent: #b7ccac; background: #12201c; }
 .deception { --accent: #9edbd5; background: #181d2b; }
+.secret-hitler { --accent: #dbb48d; background: #261f24; }
+body:has(.secret-hitler:is(:hover, :focus-visible)) { --ambient: #80504455; }
 .scene { position: relative; height: 204px; overflow: hidden; background: #1a2a2c; }
 .wide .scene { height: 225px; }
 .scene::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, #0a141851, transparent 40%), linear-gradient(90deg, #09151b22, transparent 70%); }
