@@ -11,13 +11,13 @@ import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
    [공개 트리거] R  카메라가 수직 시점으로 후퇴 · (shuffled) 코인이 각자 앞으로 놓임 · 촛불만 남기고 암전
                     R = identity 0.85 / shuffled 1.85
    R+1.0       정적 0.5초
-   R+1.5       타격: 리더 다음 좌석부터 시계방향으로 0.35초 간격 · 마지막 한 장은 +지연(득표 상황에 따라 0.25 / 0.6 / 1.0)
+   R+1.5       타격: 리더 다음 좌석부터 시계방향으로 0.22초 간격 · 마지막 한 장은 +지연(득표 상황에 따라 0.25 / 0.6 / 1.0)
    S           결과: 가결(금빛 확정 · 코인 쓸림 · 따뜻한 확장) / 부결(붉게 갈라짐 · 왕관 굴러감 · 차가운 수축)
    S+1.2       여운: '찬성 n / 반대 n' 만 각인 · 조도 복귀
 
    익명성: identity 흐름에서만 개인별 투표를 읽는다(readVotes). 옵션이 꺼져 있으면 개별 투표(revealedVotes, record.votes)는
    읽지 않으며, 집계(approve, reject)와 공개 정보(방 코드·라운드·제안된 원정대·리더 위치)만 쓴다. */
-export const VT={drop:.35,tremble:.5,shuffle:1.0,retreat:1.0,still:.5,strike:1.5,gap:.35,afterLast:.9,summary:1.2,cont:2.0} as const;
+export const VT={drop:.35,tremble:.5,shuffle:1.0,retreat:1.0,still:.5,strike:1.5,gap:.22,afterLast:.65,summary:1.2,cont:2.0} as const;
 export const PRELUDE=VT.drop+VT.tremble+VT.shuffle;                 // = 1.85 : shuffled 의 공개 트리거 R
 export const PRELUDE_IDENTITY=VT.drop+VT.tremble;                   // = 0.85 : identity 의 공개 트리거 R
 

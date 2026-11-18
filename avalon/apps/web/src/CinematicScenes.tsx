@@ -3,6 +3,8 @@ import {ROLE_DEFINITIONS,type ClientGameState} from '@werewolf/shared';
 import {emit,socket,getAssassinAim,getTeamSelection,type AssassinAimState,type TeamSelectionState} from './socket';
 import {useGame} from './store';
 import {PlayerAvatar,useCharacterResolver} from './profile';
+import {HouseCrest} from './HouseCrest';
+import {RoundTable} from './RoundTable';
 import {roleArtFor} from './role-art';
 import {useEndingAudio} from './use-recorded-audio';
 
@@ -52,25 +54,6 @@ function SceneCaption({eyebrow,title,body}:{eyebrow:string;title:string;body:str
 
 /* ---------- 놋쇠 인레이 원탁 (장면 전용) ----------
    벨벳 위 놋쇠 링·눈금, 중앙은 비워 둔다(수치·문양이 올라간다). 좌석 링(점선)이 둘레를 감싼다. */
-function RoundTable(){
-  const ticks=useMemo(()=>Array.from({length:60},(_,j)=>{const a=j*6*Math.PI/180,L=j%5===0?9:5;return{j,x1:200+112*Math.sin(a),y1:200-112*Math.cos(a),x2:200+(112+L)*Math.sin(a),y2:200-(112+L)*Math.cos(a)};}),[]);
-  return <svg className="cs-tablesvg" viewBox="0 0 400 400" aria-hidden="true">
-    <defs>
-      <linearGradient id="cs-t-brass" gradientUnits="userSpaceOnUse" x1="60" y1="60" x2="340" y2="340"><stop offset="0" stopColor="#fde9b4"/><stop offset=".45" stopColor="#dcb262"/><stop offset="1" stopColor="#7a5726"/></linearGradient>
-      <radialGradient id="cs-t-felt" cx="50%" cy="42%" r="62%"><stop offset="0" stopColor="#2f6e7a"/><stop offset=".55" stopColor="#17414a"/><stop offset="1" stopColor="#09191f"/></radialGradient>
-      <radialGradient id="cs-t-oak" cx="50%" cy="40%" r="60%"><stop offset="0" stopColor="#5a4129"/><stop offset="1" stopColor="#241810"/></radialGradient>
-    </defs>
-    <circle className="cs-seatring" cx="200" cy="200" r="172" fill="none" stroke="url(#cs-t-brass)" strokeWidth=".6" strokeDasharray="1.5 5" opacity=".35"/>
-    <circle cx="200" cy="200" r="137" fill="url(#cs-t-oak)"/>
-    <circle cx="200" cy="200" r="136" fill="none" stroke="#7a5a35" strokeWidth=".8" opacity=".7"/>
-    <circle cx="200" cy="200" r="127" fill="url(#cs-t-felt)"/>
-    <circle cx="200" cy="200" r="129" fill="none" stroke="url(#cs-t-brass)" strokeWidth="2.6"/>
-    <circle cx="200" cy="200" r="123" fill="none" stroke="url(#cs-t-brass)" strokeWidth=".6" strokeDasharray="2 3" opacity=".65"/>
-    <g stroke="url(#cs-t-brass)" strokeWidth=".8" opacity=".85">{ticks.map(t=><line key={t.j} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}/>)}</g>
-    <circle cx="200" cy="200" r="64" fill="rgba(4,12,16,.35)" stroke="url(#cs-t-brass)" strokeWidth="1.1"/>
-    <circle cx="200" cy="200" r="58" fill="none" stroke="url(#cs-t-brass)" strokeWidth=".5" opacity=".55"/>
-  </svg>;
-}
 /** 균열: 틈(어둠) · 열(붉은 용융) · 심(백열) 3겹. 가는 선 하나가 아니라 '갈라져서 안에서 빛이 새는' 깊이를 만든다 */
 function Fissure({paths,className=''}:{paths:string[];className?:string}){
   return <svg className={`cs-fissure ${className}`} viewBox={className.includes('altar')?'0 0 300 200':'0 0 400 400'} aria-hidden="true">
@@ -81,8 +64,8 @@ const ALTAR_CRACK=['M14 112 L44 103 L64 115 L90 97 L108 109 L131 90 L150 101 L17
 const END_CRACK=['M58 232 L104 214 L132 236 L170 196 L196 214 L226 184 L254 210 L290 196 L342 226','M170 196 L162 150 L186 118 L176 78','M254 210 L270 252 L252 290 L268 330','M132 236 L118 272 L132 306 L124 338','M226 184 L232 140 L216 108','M104 214 L84 188 L88 160'];
 const DEBRIS=Array.from({length:14},(_,i)=>({x:22+((i*47)%56),dx:((i*29)%70)-35,h:46+((i*37)%70),s:3+(i%3),d:(i%7)*.09}));
 /* 기존 .cs-avatar(링·호버·선택 연출)는 그대로 두고, 글자 대신 프로필 캐릭터를 넣는다 */
-function Avatar({playerId}:{playerId:string}){const ch=useCharacterResolver()(playerId);return <span className="cs-avatar has-char" style={vars({'--pf-bg':ch.bg})} aria-hidden="true">{ch.emoji}</span>;}
-function SeatEmoji({playerId}:{playerId:string}){return <>{useCharacterResolver()(playerId).emoji}</>;}
+function Avatar({playerId}:{playerId:string}){const ch=useCharacterResolver()(playerId);return <span className="cs-avatar has-char" style={vars({'--pf-bg':ch.bg})} aria-hidden="true"><HouseCrest id={ch.id}/></span>;}
+function SeatEmoji({playerId}:{playerId:string}){const c=useCharacterResolver()(playerId);return <HouseCrest id={c.id}/>;}
 
 /* =========================================================
    4. 팀 구성 — 일부러 절제한다. 5번(투표 공개)과 대비되는 구간
@@ -183,7 +166,13 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
     {reveal&&!resolved&&!clock.final&&<><i className="cs-letterbox top" aria-hidden="true"/><i className="cs-letterbox bottom" aria-hidden="true"/></>}
     {resolved&&!clock.final&&<><i className="cs-verdict-flash" aria-hidden="true"/><i className="cs-verdict-wave" aria-hidden="true"/></>}
     <SceneCaption eyebrow={`QUEST ${game.round+1} · THE ALTAR`} title={reveal?'원정의 진실':'중앙 제단에 카드를 봉인합니다'} body={reveal?'카드를 섞어 한 장씩 공개합니다. 누가 제출했는지는 공개되지 않습니다.':`봉인된 카드 ${count} / ${total}장 · 원정대원만 카드를 제출할 수 있습니다.`}/>
-    <div className="cs-altar-camera"><div className="cs-altar-quake" style={reveal&&failTimes.length?{animation:[...failTimes.map(x=>`csQuake .5s ease ${(x+.08).toFixed(2)}s both`),`csQuakeBig .9s ease ${resultAt.toFixed(2)}s both`].join(',')}:undefined}><div className="cs-altar" ref={altar}>
+    <div className="cs-altar-camera">
+      <RoundTable className="council-table-art"/>
+      <div className="quest-witnesses" aria-label="원탁의 기사들">{game.players.map((player,index)=>{const p=position(index,game.players.length);const member=game.proposedTeam.includes(player.id);return <div className={`quest-witness${member?' on-quest':''}${player.id===game.leaderId?' leader':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
+        {player.id===game.leaderId&&<span className="witness-crown"><Sigil kind="crown" size={17}/></span>}
+        <PlayerAvatar playerId={player.id} size={36}/><span className="witness-name">{player.nickname}</span>{member&&<i className="expedition-mark" title="원정대원"/>}
+      </div>;})}</div>
+      <div className="cs-altar-quake" style={reveal&&failTimes.length?{animation:[...failTimes.map(x=>`csQuake .5s ease ${(x+.08).toFixed(2)}s both`),`csQuakeBig .9s ease ${resultAt.toFixed(2)}s both`].join(',')}:undefined}><div className="cs-altar" ref={altar}>
       <AltarFace/><div className="cs-altar-glow"/><div className="cs-altar-seal"><Sigil size={150}/></div>
       {[15,50,85].map((left,k)=><Flame key={left} x={left} y={k===1?25:30} s={1.35} cls="lamp" style={{...vars({'--lk':k}),...(reveal?anim('csLampDip',1.1,.04):{})}}>{fails>0&&<Smoke/>}</Flame>)}
       <div className="cs-failflash" style={reveal?anim('csFailLight',.8,0):undefined} aria-hidden="true"/>

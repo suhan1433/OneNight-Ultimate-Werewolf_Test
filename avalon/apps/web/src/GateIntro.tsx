@@ -16,7 +16,7 @@ export type IntroState={
 export function useGateIntro():IntroState{
   const reduced=useMemo(()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches,[]);
   const returning=useMemo(()=>{try{return localStorage.getItem(SEEN)==='1';}catch{return false;}},[]);
-  const[mode,setMode]=useState<IntroMode>(()=>playedThisPage||reduced?'static':'full');
+  const[mode,setMode]=useState<IntroMode>(()=>playedThisPage||reduced||returning?'static':'full');
   const[overlay,setOverlay]=useState(mode!=='static');
   const scale=mode==='quick'?.25:1;
 

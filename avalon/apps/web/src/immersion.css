@@ -1,81 +1,243 @@
-/* Avalon immersion layer v2 — main.tsx 에서 profile.css 다음, 맨 마지막에 import.
-   기존 파일은 수정하지 않고 덮어쓰기만 합니다. (v1 의 .app>* / button 전역 position / 카드 transform 덮어쓰기는
-   고정 위치 UI·카드 뒤집기 연출을 깨뜨릴 수 있어 제거했습니다) */
-:root{--im-ease:cubic-bezier(.2,.8,.2,1)}
-
-/* 1. 방이 숨 쉰다 */
-.ambient::before{background:
-  radial-gradient(520px circle at var(--mx,50%) var(--my,30%),rgba(255,212,140,.2),transparent 70%),
-  radial-gradient(ellipse 85% 55% at 50% -10%,rgba(48,118,126,.55),transparent 70%),
-  radial-gradient(ellipse 70% 50% at 50% 115%,rgba(28,48,92,.5),transparent 70%);
-  animation:flicker 7s linear infinite,imBreath 6s ease-in-out infinite}
-@keyframes imBreath{50%{filter:brightness(1.12)}}
-.ambient::after{animation:grain 1.2s steps(1) infinite}
-/* 불씨: 화면 고정, 클릭은 통과 */
-html::before,html::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:1;mix-blend-mode:screen;opacity:.4;background-repeat:repeat}
-html::before{background-image:radial-gradient(1.6px 1.6px at 12% 80%,#ffc87a,transparent),radial-gradient(1.2px 1.2px at 38% 60%,#ffd9a0,transparent),radial-gradient(1.8px 1.8px at 64% 90%,#ffb35c,transparent),radial-gradient(1.2px 1.2px at 86% 70%,#ffe2b0,transparent);background-size:420px 520px;animation:imEmber 22s linear infinite}
-html::after{background-image:radial-gradient(1px 1px at 22% 40%,#ffe9c4,transparent),radial-gradient(1.4px 1.4px at 52% 75%,#ffbf70,transparent);background-size:560px 640px;opacity:.28;animation:imEmber 34s linear infinite reverse}
-@keyframes imEmber{to{background-position:-60px -520px,40px -520px,-30px -520px,70px -520px}}
-:root[data-vt-still]::before,:root[data-vt-still]::after,:root[data-rv-still]::before,:root[data-rv-still]::after{animation-play-state:paused}
-
-/* 2. 장면 전환 — opacity/translate 만 사용(고정 위치 자식을 깨지 않도록 filter 금지) */
-.board,.home,.gate-card{animation:imScene .7s var(--im-ease) backwards}
-@keyframes imScene{from{opacity:0;translate:0 20px}}
-.board>*{animation:imRise .65s var(--im-ease) backwards}
-.board>:nth-child(2){animation-delay:.1s}.board>:nth-child(3){animation-delay:.2s}.board>:nth-child(n+4){animation-delay:.3s}
-@keyframes imRise{from{opacity:0;translate:0 22px}}
-
-/* 3. 내 차례를 '화면 전체'가 알려준다 — 프레임이 금빛으로 맥동, 리본은 빛이 훑음 */
-body:has(.turn-pill):before{border-color:rgba(240,209,138,.5);animation:imTurn 2.4s ease-in-out infinite}
-@keyframes imTurn{50%{box-shadow:inset 0 0 0 6px rgba(240,209,138,.05),inset 0 0 160px rgba(240,209,138,.16)}}
-.turn-pill{position:relative;animation:imPill 1.8s ease-in-out infinite}
-@keyframes imPill{0%,100%{box-shadow:0 0 0 0 rgba(240,209,138,.55)}50%{box-shadow:0 0 0 9px rgba(240,209,138,0)}}
-.phase-ribbon{position:relative;overflow:hidden;animation:imScene .6s var(--im-ease) backwards}
-.phase-ribbon::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 35%,rgba(255,236,190,.34) 50%,transparent 65%);transform:translateX(-130%);animation:imSweep 1.2s ease-out .25s both}
-@keyframes imSweep{to{transform:translateX(130%)}}
-.ribbon-kicker{letter-spacing:.3em;text-shadow:0 0 14px rgba(240,209,138,.6)}
-
-/* 4. 원탁 */
-.table:after{animation:imHeart 5s ease-in-out infinite}
-@keyframes imHeart{50%{opacity:.55;transform:scale(1.08)}}
-.table-center{text-shadow:0 0 22px rgba(255,214,150,.5)}
-.seat .avatar{animation:imFloat 5.5s ease-in-out infinite}
-.seat:nth-child(even) .avatar{animation-delay:-2.4s}.seat:nth-child(3n) .avatar{animation-delay:-4s}
-@keyframes imFloat{50%{translate:0 -3px}}
-.seat button.selected .avatar{position:relative}
-.seat button.selected .avatar::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--brass-hi);pointer-events:none;animation:imPulse 1.8s ease-out infinite}
-@keyframes imPulse{from{opacity:.85;transform:scale(.95)}to{opacity:0;transform:scale(1.55)}}
-.leader-crown{animation:imCrown 3.2s ease-in-out infinite;filter:drop-shadow(0 0 10px rgba(255,214,120,.85))}
-@keyframes imCrown{50%{translate:0 -4px;rotate:4deg}}
-.quest-slot.active,.quest-slot.on{animation:imSlot 2.4s ease-in-out infinite}
-@keyframes imSlot{50%{box-shadow:0 0 28px 2px rgba(240,209,138,.4)}}
-
-/* 5. 투표 장면 */
-.vt-note{animation:imRise 1s var(--im-ease) .4s backwards;letter-spacing:.04em}
-.vt-voted{animation:imStamp .5s var(--ease-spring,var(--im-ease)) backwards}
-@keyframes imStamp{from{opacity:0;scale:2.2;rotate:-12deg}}
-.vt-summary b{font-family:var(--numeral);font-size:1.5em;text-shadow:0 0 22px currentColor}
-.vt-summary .a{color:var(--good-300)}.vt-summary .r{color:var(--evil-300)}
-.vt-continue .primary:not(:disabled){animation:imCta 2.8s ease-in-out infinite}
-
-/* 6. 손맛 */
-.primary{position:relative;overflow:hidden;isolation:isolate}
-.primary:not(:disabled)::after{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(110deg,transparent 38%,rgba(255,255,255,.5) 50%,transparent 62%);transform:translateX(-140%);animation:imGleam 4.2s ease-in-out 1.2s infinite}
-@keyframes imGleam{0%,60%{transform:translateX(-140%)}100%{transform:translateX(140%)}}
-@keyframes imCta{50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 3px 0 #74501b,0 18px 40px -8px rgba(220,178,98,.95)}}
-.im-ripple{position:absolute;border-radius:50%;pointer-events:none;width:12px;height:12px;margin:-6px 0 0 -6px;background:radial-gradient(circle,rgba(255,236,190,.75),transparent 70%);animation:imRipple .65s ease-out forwards}
-@keyframes imRipple{to{transform:scale(22);opacity:0}}
-.round-history-item>button,.plate,.roster>div{transition:transform .3s var(--im-ease),border-color .3s,box-shadow .3s}
-.round-history-item>button:hover,.plate:hover,.roster>div:hover{transform:translateY(-2px);border-color:var(--hair-strong);box-shadow:0 14px 26px -14px #000,0 0 22px -8px rgba(255,206,130,.5)}
-.toast{animation:imToast .5s var(--ease-spring,var(--im-ease)) both}
-@keyframes imToast{from{opacity:0;translate:0 -18px;scale:.94}}
-.help-modal,.role-dossier,.confirm-modal,.round-detail,.role-detail{animation:imModal .45s var(--im-ease) backwards}
-@keyframes imModal{from{opacity:0;translate:0 26px;scale:.96}}
-.result-stage h1,.cs-ending-title{animation:imTitle 1.4s var(--im-ease) backwards}
-@keyframes imTitle{from{opacity:0;letter-spacing:.4em}}
-
-@media(prefers-reduced-motion:reduce){
-  html::before,html::after,.board,.board>*,.home,.gate-card,.phase-ribbon,.phase-ribbon::after,.turn-pill,body:before,.table:after,.seat .avatar,.leader-crown,.primary,.primary::after,.quest-slot,.vt-voted,.vt-note,.toast,.help-modal,.role-dossier,.confirm-modal,.round-detail,.role-detail,.result-stage h1,.cs-ending-title{animation:none!important}
-  .im-ripple{display:none}
+/* Candlelit council: shared tokens, materials and layout. Phase timelines stay
+   in their scene stylesheets; ordinary controls do not loop or flash. */
+:root{
+  --ink-950:#070b0c;--ink-900:#0c1416;--ink-800:#172426;--parchment:#e4dfd2;--muted:#a6afa7;
+  --brass-hi:#e8d4a4;--brass:#baa16b;--brass-lo:#705b35;
+  --gold-300:var(--brass-hi);--gold-500:var(--brass);--gold-700:var(--brass-lo);
+  --good-300:#a4c6d4;--good-500:#568699;--evil-300:#dc8c8e;--evil-500:#9c4f56;
+  --hair:rgba(201,182,136,.19);--hair-strong:rgba(222,201,155,.48);
+  --r-s:6px;--r-m:10px;--r-l:16px;--council-size:min(440px,100%);--im-ease:cubic-bezier(.2,.8,.2,1);
+  --material-panel:linear-gradient(150deg,#192526f5,#0b1315f5);
+  --material-metal:linear-gradient(160deg,#414743,#222c2b 52%,#172021);
+  --material-gold:linear-gradient(165deg,#dfcea0,#b79a61 70%,#9b804d);
 }
-@media(max-width:640px){html::after{display:none}.seat .avatar{animation:none}}
+body{background:#070b0c;color:var(--parchment)}
+body::before{inset:12px;border:1px solid var(--hair);border-radius:2px;background:none;mask-image:none;box-shadow:inset 0 0 120px #0006;animation:none}
+body::after{background:radial-gradient(ellipse at 50% 42%,transparent 25%,#020506a8 100%);box-shadow:none}
+html::before,html::after{content:none}
+.ambient::before{background:radial-gradient(420px circle at var(--mx,50%) var(--my,32%),#d0b4770c,transparent 75%),radial-gradient(ellipse at 50% 20%,#35534f50,transparent 64%),repeating-linear-gradient(90deg,transparent 0,transparent calc(20% - 2px),#b5b59605 20%);animation:councilCandle 12s ease-in-out infinite}
+.ambient::after{animation:none;opacity:.035}
+.ambient .mist{opacity:.13;animation-duration:50s}
+.ambient>i{opacity:.18;animation-duration:28s}
+@keyframes councilCandle{0%,100%{opacity:.85}45%{opacity:1}62%{opacity:.91}}
+h1,h2,.pf-dialog h3{font-family:var(--serif);font-weight:600}
+.gate-hero h1{letter-spacing:.17em;text-indent:.17em;font-weight:500}
+.gate .gate-hero p{color:#c3c5b6;letter-spacing:.12em}
+.gate-card,.pf-dialog,.cs-glass,.game-status,.help-modal,.role-dossier,.confirm-modal,.round-detail{background:var(--material-panel);border-color:var(--hair);border-radius:var(--r-l);box-shadow:inset 0 1px #e3d8b90a,0 24px 64px -28px #000b;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.gate-card{border-top:1px solid var(--hair-strong)}
+.gate .role-card.good.on,.gate .role-card.evil.on{box-shadow:inset 0 1px #ffffff0a}
+.gate .role-card.good.on{background:linear-gradient(135deg,#29404988,#10191c)}
+.gate .role-card.evil.on{background:linear-gradient(135deg,#4d303388,#191316)}
+.gate .role-card.on .rc-icon{box-shadow:inset 0 0 0 1px currentColor}
+button{border-radius:var(--r-s);background:var(--material-metal);box-shadow:inset 0 1px #ffffff0b,0 3px 8px #0002}
+button:hover:not(:disabled){box-shadow:inset 0 1px #ffffff14,0 5px 14px #0003;transform:translateY(-1px)}
+button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:4px}
+.primary,.primary:hover:not(:disabled),.pf-dialog .pf-save,.ac-act-go{color:#201c12;background:var(--material-gold);border-color:#dfcea044;box-shadow:inset 0 1px #fff3,0 3px 0 #51452e,0 8px 18px #0005;animation:none}
+.primary::before,.primary::after{content:none}
+.primary:disabled{opacity:.4;box-shadow:none}
+.seal,.faction-seal{animation:none;filter:none}
+.im-ripple{position:absolute;pointer-events:none;width:12px;height:12px;margin:-6px;border-radius:50%;background:#f4e8c633;animation:councilRipple .45s ease-out forwards}
+@keyframes councilRipple{to{transform:scale(14);opacity:0}}
+
+/* Public heraldry never indicates a secret role or allegiance. */
+.house-crest{display:block;width:78%;height:78%;flex:none;overflow:visible;color:#d3c29b;filter:drop-shadow(0 1px 1px #0008)}
+.crest-frame{fill:#0b101033;stroke:#cfb67e99;stroke-width:1}
+.crest-inlay{stroke:#cfb67e40;stroke-width:.6}
+.crest-mark{stroke:#e2cea2}
+.pf-avatar,.avatar.has-char,.lb-avatar.has-char,.cs-avatar.has-char,.ac-avatar.has-char,.cs-impact-seat>span.has-char{display:inline-grid;place-items:center;border-radius:50%;color:var(--brass-hi);font-style:normal;box-shadow:inset 0 0 0 1px #d5c69b40,0 3px 8px #0005}
+.rv-seat{display:grid;place-items:center}
+.rv-seat .house-crest{width:82%;height:82%}
+.pf-dialog{padding:26px 22px 20px;border-top-color:var(--hair-strong)}
+.pf-dialog>small{font-size:10px;letter-spacing:.24em;color:var(--brass)}
+.pf-dialog h3{font-size:23px;margin:8px 0 22px;color:var(--parchment)}
+.pf-sub{line-height:1.8;max-width:280px;margin:16px auto;color:var(--muted)}
+.pf-dialog .pf-option{padding:10px 2px;border-radius:var(--r-s);background:#050a0b55;border:1px solid #ffffff06}
+.pf-dialog .pf-option.on,.pf-dialog .pf-option.on:hover:not(:disabled){background:#b79a6117;border-color:var(--brass)}
+.pf-dialog .pf-actions button{border-radius:var(--r-s)}
+.ac-avatar .house-crest{width:82%;height:82%}
+.chat-peek>.ac-avatar{display:grid}
+.chat-panel .ac-game.mine{animation:none;background:#baa16b12;border-color:var(--hair-strong)}
+.ac-game.mine .ac-game-dot{box-shadow:none}
+.ac-mini-row.mine{background:#1b3031f0;border-color:#a4c6d433}
+
+/* The same table, seat order and insignia in lobby, vote, quest and assassin. */
+.council-table-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;filter:drop-shadow(0 20px 18px #0008);overflow:visible}
+.cs-table,.lb .lb-table,.vt .vt-table{width:var(--council-size);aspect-ratio:1;background:none;border:0;box-shadow:none;border-radius:50%;transform:none}
+.lb .lb-table{margin:0 auto}
+.lb .lb-table::before,.lb .lb-table::after,.vt .vt-table::before,.vt .vt-table::after{content:none}
+.cs-camera{padding-top:12px;padding-bottom:24px;animation:none}
+.lb-table-wrap{width:100%}
+.lb .lb-core{z-index:1}
+.lb .lb-core strong,.cs-core strong{color:var(--brass-hi);text-shadow:0 2px 3px #0006}
+.lb .lb-avatar.has-char{box-shadow:0 0 0 3px #0c1416,0 0 0 4px #baa16b55,0 8px 16px #0006}
+.lb .lb-seat.me .lb-avatar.has-char{outline:1px solid var(--brass);outline-offset:5px}
+.lb .lb-seat.ready .lb-avatar{box-shadow:0 0 0 3px #0c1416,0 0 0 4px #a6beb080,0 8px 16px #0006}
+.lb .lb-avatar{width:44px;height:44px}
+.lb .lb-name{font-size:11px;max-width:80px;background:#0a1113e6;padding:3px 7px;border:1px solid var(--hair);border-radius:4px}
+.lb .lb-profile-hint{margin:8px 0 20px;font-size:11px}
+.lb .lb-invite{border-radius:var(--r-s);color:var(--muted);background:none;border-color:var(--hair)}
+.lb .lb-code{background:var(--material-panel);box-shadow:inset 0 1px #ffffff08;max-width:360px}
+.lb-head h2{color:var(--parchment);letter-spacing:.06em}
+.lb-roles{background:#0b1315aa;border-color:var(--hair);border-radius:var(--r-m)}
+.lb-roles>b{color:var(--muted)}
+.lb .lb-ready:not(.is-ready){background:var(--material-metal);border-color:var(--hair-strong);color:var(--parchment)}
+.vt .vt-wrap{width:var(--council-size)}
+.vt .vt-table{--seat-size:68px;margin:0}
+.vt .vt-seat .plate{padding:5px 2px;gap:5px;border:0;background:none;box-shadow:none;overflow:visible}
+.vt .vt-seat .avatar{width:44px;height:44px;animation:none}
+.vt .seat-name{display:block;max-width:78px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#0a1113ed;padding:3px 7px;border:1px solid var(--hair);border-radius:4px}
+.vt .table-center{padding:0;inset:34%;z-index:1;pointer-events:none;text-shadow:none}
+.vt .selection-core strong{font:600 24px var(--numeral)}
+.vt .selection-core>span{font-size:10px;max-width:95px}
+.vt .selection-core>.faction-seal{width:25px;height:25px;opacity:.7}
+.vt .vt-tilt{transform:none}
+.cs-seat .cs-name{border-radius:4px;font-size:11px;background:#0a1113ed;border-color:var(--hair)}
+.cs-seat.selected .cs-avatar{box-shadow:0 0 0 2px var(--brass),0 0 0 5px #0c1416,0 0 0 6px #baa16b66}
+.cs-team .cs-seat.selected .cs-avatar,.cs-team .cs-seat.leader .cs-crown,.cs-team.is-ready .cs-core strong,.cs-team.is-ready .cs-propose{animation:none}
+.cs-selection>div>span{background:#152021;border-color:var(--hair);border-radius:4px}
+.cs-caption h2{color:var(--parchment);text-shadow:none}
+.cs-caption p{color:var(--muted)}
+.cs-core-mark{opacity:.65}
+.cs-team .cs-seat button:not(:disabled):hover{scale:1;filter:none}
+.cs-team .cs-seat button:not(:disabled):hover .cs-avatar{transform:translateY(-2px);filter:brightness(1.15)}
+.cs-team .cs-seat.selected::after{content:'✓';position:absolute;top:35px;right:17px;width:16px;height:16px;display:grid;place-items:center;background:var(--brass);border:2px solid #0c1416;border-radius:50%;font-size:10px;font-weight:800;color:#171b16;pointer-events:none}
+
+/* Cards are sealed at the centre of the council; members remain in place. */
+.cs-quest .cs-altar-camera{width:var(--council-size);aspect-ratio:1;margin:12px auto 0}
+.cs-quest .cs-altar-quake{position:absolute;inset:25% 13%;z-index:2}
+.cs-quest .cs-altar{width:100%}
+.cs-quest .cs-quest-cards{--card-width:clamp(42px,12vw,70px)}
+.quest-witnesses{position:absolute;inset:0;z-index:3;pointer-events:none}
+.quest-witness{position:absolute;display:flex;flex-direction:column;align-items:center;gap:6px;width:76px;transform:translate(-50%,-23px)}
+.quest-witness:not(.on-quest) .pf-avatar{opacity:.55}
+.witness-name{max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 6px;border:1px solid var(--hair);border-radius:4px;background:#0a1113ed;font-size:10px}
+.on-quest .pf-avatar{outline:1px solid var(--brass);outline-offset:3px}
+.expedition-mark{position:absolute;top:30px;right:18px;width:8px;height:8px;background:var(--brass);border:2px solid #0c1416;border-radius:50%}
+.witness-crown{position:absolute;top:-23px;color:var(--brass)}
+.cs-quest .cs-altar-face{opacity:.75}
+.cs-quest .cs-altar-seal{opacity:.4}
+.cs-quest .cs-altar .lamp{scale:.75}
+.cs-quest .cs-caption{margin-top:6px}
+.cs-quest:not(.is-reveal) .cs-caption h2{font-size:20px}
+.cs-quest:not(.is-reveal) .cs-caption small{display:none}
+
+/* Public progress first, the council next, a clear personal action below. */
+.app:has(.board){justify-content:flex-start;padding-top:76px}
+.game-status{position:relative;top:auto;z-index:7;width:min(640px,100%);padding:17px 22px 16px;margin:0 auto 10px}
+.council-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--hair)}
+.council-wordmark{font:500 22px var(--serif);color:var(--brass-hi);letter-spacing:.14em;display:flex;align-items:center;gap:14px}
+.council-wordmark small{font-size:8px;letter-spacing:.2em;color:var(--muted);font-family:inherit}
+.council-room{display:flex;gap:6px;align-items:center;font-size:10px;color:var(--muted)}
+.council-room b{font-size:11px;letter-spacing:.1em;color:var(--parchment)}
+.game-status .leader-row{display:flex;flex-wrap:wrap;gap:7px;justify-content:flex-start;color:var(--muted);font-size:12px;margin:0 0 14px}
+.leader-row b{color:var(--parchment);font-weight:600}
+.leader-row>.council-distrust{margin-left:auto;display:flex;gap:9px;align-items:center}
+.council-distrust>span{font-size:10px;color:var(--muted)}
+.council-distrust>span b{font-variant-numeric:tabular-nums;font-weight:500;margin-left:3px}
+.council-distrust .reject-track{display:flex;gap:4px;margin:0}
+.reject-track i{width:6px;height:6px;border-radius:1px;border:1px solid #9fa89a55;background:none}
+.reject-track i.used{background:var(--evil-300);box-shadow:none;border-color:var(--evil-300)}
+.leader-row>.reject-label.danger{flex-basis:100%;text-align:right;color:var(--evil-300);font-size:11px}
+.game-status .round-history{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:0;position:relative}
+.round-history::before{content:'';position:absolute;top:24px;left:10%;right:10%;height:1px;background:var(--hair)}
+.round-history-item{min-width:0;z-index:1}
+.round-history-item>button{width:100%;min-height:94px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px;background:#0c1516;border:1px solid transparent;border-radius:var(--r-s);box-shadow:none;color:var(--muted)}
+.round-history-item>button:disabled{opacity:1}
+.round-history-item>button.current{border-color:var(--hair-strong);background:#baa16b0b;color:var(--parchment);animation:none;box-shadow:none}
+.round-history-item>button.success{background:#162526;border-color:#a4c6d433;box-shadow:none}
+.round-history-item>button.fail{background:#291d20;border-color:#dc8c8e33;box-shadow:none}
+.round-history-item>button:hover:not(:disabled){transform:translateY(-1px);background:#baa16b12}
+.round-seal{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--hair);border-radius:50%;font:500 18px var(--numeral);background:#172022;color:#a5aaa0;margin-bottom:3px}
+.current .round-seal{border-color:var(--brass);color:var(--brass-hi);box-shadow:inset 0 0 0 3px #0c1516}
+.success .round-seal{color:var(--good-300);background:#203239;border-color:#a4c6d466}
+.fail .round-seal{color:var(--evil-300);background:#352326;border-color:#dc8c8e66}
+.round-history-item>button .round-label{font-size:10px;letter-spacing:.05em;color:inherit}
+.round-history-item>button .round-meta{font-size:10px;color:var(--muted);white-space:nowrap}
+.board{width:min(640px,100%);animation:none}
+.board>*{animation:none}
+.board .phase-ribbon{position:relative;margin:2px auto 12px;padding:15px 0;display:flex;align-items:center;gap:18px;background:none;border:0;border-bottom:1px solid var(--hair);border-radius:0;box-shadow:none;overflow:visible;animation:none;text-align:left}
+.phase-ribbon::before,.phase-ribbon::after{content:none}
+.phase-ribbon .ribbon-kicker{display:grid;gap:3px;font-size:8px;letter-spacing:.17em;text-shadow:none;line-height:1.2;color:var(--muted);border-right:1px solid var(--hair);padding-right:18px}
+.ribbon-kicker b{font:500 30px var(--numeral);color:var(--brass)}
+.phase-ribbon>div{flex:1;min-width:0}
+.phase-ribbon strong{display:block;font:500 23px var(--serif);letter-spacing:.02em;color:var(--parchment)}
+.phase-ribbon small{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.65}
+.phase-ribbon .turn-pill{flex:none;align-self:flex-start;margin-top:3px;padding:4px 7px;border:1px solid var(--hair-strong);border-radius:4px;background:#baa16b14;color:var(--brass-hi);font-size:10px;font-style:normal;animation:none;box-shadow:none;white-space:nowrap}
+.phase-ribbon[data-action="true"]{border-bottom-color:var(--hair-strong)}
+.round-detail{margin-top:14px;text-align:left}
+.team-chips .chip{border-radius:4px;background:#182525;border-color:var(--hair)}
+
+.vote-tokens .token,.qcard,.leader-crown,.turn-pill,.quest-slot,.cs-ending-world{animation:none}
+.vote-tokens .token:not(.active)::after,.qcard::after,.cs-card-back::after{animation:none}
+.vote-tokens .token{--c1:#829d9f;--c2:#375657;--c3:#172c30}
+.vote-tokens .token.reject{--c1:#ae7d7c;--c2:#674148;--c3:#2d1d24}
+.token.active,.qcard.active{scale:1.04}
+.qcard{box-shadow:0 10px 20px -7px #0009,inset 0 1px #fff2;translate:0 0;rotate:0deg}
+.qcard.active{translate:0 -8px;rotate:0deg;box-shadow:0 0 0 2px var(--brass),0 12px 24px #0006}
+.qcard:hover:not(:disabled){translate:0 -4px;rotate:0deg}
+.qcard.success{background:linear-gradient(155deg,#334e54,#162a30)}
+.qcard.fail{background:linear-gradient(155deg,#623b43,#281a23)}
+body:has(.qcard.fail.active)::after,body:has(.qcard.success.active)::after{box-shadow:none}
+.vt-continue .primary,.cs-quest .cs-score span.now{animation:none}
+.cs-quest-verdict h2{animation:councilVerdict .7s var(--ease-out) both}
+@keyframes councilVerdict{from{opacity:0;translate:0 9px;letter-spacing:.2em}to{opacity:1;translate:0 0}}
+.cs-qcard.turned.success .cs-card-front::after,.quest-failure .cs-quest-verdict::after{animation-iteration-count:1}
+.cs-ending-title h1{text-shadow:0 3px 28px #baa16b40}
+.cs-ending.evil .cs-ending-title h1{text-shadow:0 3px 28px #dc8c8e40}
+.cs-ending .cs-ending-title{animation:fadeIn 1.2s ease both}
+
+@media(min-width:900px){.app:has(.board){padding-top:82px}.board .phase-ribbon{margin-bottom:16px}.cs-team .cs-caption{margin-top:6px}}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  body::before{inset:6px}
+  .app:has(.board){padding-top:64px;padding-left:16px;padding-right:16px}
+  .game-status{padding:13px 12px 12px;margin-bottom:4px}
+  .council-heading{margin-bottom:11px;padding-bottom:9px}
+  .council-wordmark{font-size:19px;gap:10px}.council-wordmark small{display:none}
+  .game-status .leader-row{font-size:11px;margin-bottom:10px}
+  .game-status .round-history{gap:4px}
+  .round-history-item>button{min-height:87px;padding:6px 1px}
+  .round-history-item>button .round-meta{font-size:9px;letter-spacing:-.04em}
+  .round-seal{width:30px;height:30px;font-size:16px}.round-seal svg{width:16px;height:16px}
+  .board .phase-ribbon{gap:12px;padding:12px 0;margin-bottom:8px}
+  .phase-ribbon .ribbon-kicker{padding-right:12px;font-size:7px}.ribbon-kicker b{font-size:26px}
+  .phase-ribbon strong{font-size:21px}.phase-ribbon small{display:block;font-size:11px;line-height:1.55;max-width:30em}
+  .phase-ribbon .turn-pill{font-size:9px;padding:3px 5px}
+  .cs-caption h2{font-size:21px}.cs-caption p{font-size:11px;padding:0 14px}
+  .cs-camera{padding-top:18px;padding-bottom:26px}
+  .cs-seat{width:72px}.cs-avatar,.lb .lb-avatar,.vt .vt-seat .avatar{width:38px;height:38px}
+  .cs-name,.vt .seat-name,.lb .lb-name{max-width:66px;font-size:10px;padding:3px 5px}
+  .cs-team .cs-seat.selected::after{top:30px;right:13px}
+  .vt .vt-table{--seat-size:62px}.vt .vt-wrap{margin-top:22px}
+  .cs-core strong{font-size:31px}.cs-core-mark svg{width:48px;height:48px}
+  .cs-selection{margin-top:0}.lb .lb-table-wrap{margin-top:26px}
+  .cs-quest .cs-altar-camera{margin-top:22px;margin-bottom:15px}
+  .quest-witness{width:62px;gap:5px}.witness-name{max-width:62px;font-size:9px}
+  .quest-witness .pf-avatar{width:30px!important;height:30px!important}
+  .expedition-mark{top:25px;right:12px}
+  .quest-actions{position:fixed;left:16px;right:16px;bottom:0;z-index:10;padding:12px 0 calc(16px + env(safe-area-inset-bottom));background:linear-gradient(transparent,#0b1315 20%);margin:0}
+  .app[data-phase="quest"] .board{padding-bottom:100px}.app[data-phase="assassination"] .board{padding-bottom:32px}
+  .chat-panel .ac-act{background:linear-gradient(#1b2929fa,#111c1cfa);border-color:var(--hair)}
+  aside.chat-panel[data-size="mini"] .ac-compose{background:linear-gradient(#111b1cf7,#091011);border-color:var(--hair)}
+}
+@media(max-width:360px){
+  .app:has(.board){padding-left:12px;padding-right:12px}
+  .council-distrust{gap:5px!important}.council-distrust>span{font-size:9px}.council-distrust .reject-track{gap:3px}
+  .cs-avatar,.lb .lb-avatar,.vt .vt-seat .avatar{width:32px;height:32px}.cs-seat{width:61px}
+  .cs-name,.vt .seat-name,.lb .lb-name{max-width:56px;font-size:9px}.vt .vt-table{--seat-size:56px}
+  .phase-ribbon .ribbon-kicker{display:none}.cs-caption h2{font-size:19px}
+  .cs-team .cs-seat.selected::after{top:25px;right:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .ambient::before,.ambient>i,.ambient .mist,.im-ripple{animation:none!important}.im-ripple{display:none}
+  .cs-quest-verdict h2,.cs-ending .cs-ending-title{animation:none}.quest-failure .cs-quest-verdict::after{display:none}
+}
+
+/* Suppress legacy decorative highlights on resting controls. */
+.vote-tokens .token::after{display:none}
+.vote-tokens .token.active{box-shadow:0 0 0 2px var(--brass-hi),0 0 0 5px #5a4c31,0 12px 24px #0008,inset 0 2px 3px #ffffff33}
+.lb .lb-ready.is-ready{background:var(--material-metal);box-shadow:inset 0 1px #ffffff14;border-color:#a6beb080;color:#c3d1c3}
+.lb .lb-core::before{inset:0;background:conic-gradient(var(--brass) var(--ready),#ffffff0a 0);opacity:.6}
+.lb .lb-glow{opacity:.4}
+.game-status{display:block}
+.cs-team .cs-caption small{display:none}
+.cs-team .cs-caption h2{font-size:22px;margin-top:2px}
