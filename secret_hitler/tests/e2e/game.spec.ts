@@ -112,7 +112,7 @@ test("모바일 390px: 가로 넘침·키보드 접근·규칙·크레딧·PWA",
   ).toBe(true);
   await page.getByRole("button", { name: "규칙 열람", exact: true }).click();
   await expect(page.locator("dialog")).toBeVisible();
-  await expect(page.locator("dialog")).toContainText("공식 재셔플");
+  await expect(page.locator("dialog")).toContainText("정책 카드는 총 17장");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "크레딧 ↗" }).click();
   await expect(page.locator("dialog")).toContainText("CC BY-NC-SA 4.0");

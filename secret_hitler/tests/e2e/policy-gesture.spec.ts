@@ -63,6 +63,7 @@ for (const width of [390, 1440]) test(`입법 카드 ${width}px: 두 번 누르�
   }
   try {
     await open(discard);
+    await expect(page.locator('.phase-help summary')).toContainText('버릴 카드 1장');
     const before = state(discard.code);
     const cards = page.locator('.policy-hand .policy-card');
     await cards.nth(0).click();

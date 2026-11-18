@@ -111,6 +111,7 @@ test("모바일: 공유·고정 좌석·10인 결과 확인·정책 엿보기·�
     await page.screenshot({ path: "test-results/peek-mobile.png", animations: "disabled" });
     await page.getByRole("button", { name: "규칙 열람", exact: true }).click();
     await expect(page.locator(".guide-step")).toHaveCount(11);
+    await page.locator('.guide-step[data-guide-step="peek"] summary').click();
     await expect(page.locator(".guide-step[open]")).toContainText("왼쪽 1번");
     await expect(page.locator(".guide-step[open] .policy-face")).toHaveCount(3);
     await page.screenshot({ path: "test-results/help-mobile.png", animations: "disabled" });

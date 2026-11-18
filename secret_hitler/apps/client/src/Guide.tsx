@@ -38,7 +38,22 @@ export function PhaseHelp({ g, selfId, t }: { g: GameView; selfId: string; t: Co
   const acting = g.phase === "chancellor_enact" ? g.chancellor : g.president;
   const collective = ["night", "voting", "vote_result"].includes(g.phase);
   const label = collective ? (ko ? "모두의 차례" : "Everyone acts") : acting === selfId ? (ko ? "내 차례" : "Your turn") : `${g.players.find((p) => p.id === acting)?.name} · ${t.wait}`;
-  return <details className="phase-help"><summary>{label} · {ko ? "무엇을 하나요?" : "What do I do?"}</summary><p>{ko ? steps[i].how : english[i][2]}</p><p>{ko ? steps[i].next : english[i][4]}</p></details>;
+  const tasks: Record<string, [string, string]> = {
+    night: ['내 비밀 역할을 확인하고 완료를 눌러요', 'Check your secret role, then confirm'],
+    nomination: ['대통령이 수상 후보를 고릅니다', 'The President chooses a Chancellor'],
+    voting: ['이 두 사람에게 맡길지 투표해요', 'Vote on trusting this pair'],
+    vote_result: ['결과를 읽고 확인 버튼을 눌러요', 'Read the results and confirm'],
+    president_discard: ['대통령은 버릴 카드 1장을 골라요', 'President: choose 1 card to discard'],
+    chancellor_enact: ['수상은 통과시킬 카드 1장을 골라요', 'Chancellor: choose 1 card to enact'],
+    investigate: ['한 사람의 정당을 비공개로 확인해요', 'Privately check one player’s party'],
+    peek: ['앞으로 나올 3장을 보기만 해요', 'Look at the top 3 cards without changing them'],
+    special_election: ['다음 선거의 대통령을 지정해요', 'Choose the next President'],
+    execute: ['대상을 신중히 고르고 길게 눌러요', 'Check the target, then hold to execute'],
+    veto: ['대통령이 거부권 승인 여부를 정해요', 'The President accepts or refuses the veto'],
+  };
+  const submitted = g.phase === 'voting' ? g.voted.includes(selfId) : ['night','vote_result'].includes(g.phase) && g.acknowledged.includes(selfId);
+  const task = submitted ? (ko ? '내 확인은 끝났어요. 다른 참가자를 기다려요' : 'You are done. Wait for the others') : tasks[key ?? '']?.[ko ? 0 : 1];
+  return <details className="phase-help"><summary><span>{collective || acting === selfId ? label : `${g.players.find(p => p.id === acting)?.name ?? (ko?'담당자':'Acting player')} · ${ko?'진행 중':'acting'}`}</span><strong>{task}</strong></summary><ol>{(ko ? steps[i].how : english[i][2]).split('. ').map((line,index)=><li key={index}>{line}</li>)}</ol><p><b>{ko?'다음에는: ':'Next: '}</b>{ko ? steps[i].next : english[i][4]}</p></details>;
 }
 
 function Example({ kind, t, ko }: { kind: string; t: Copy; ko: boolean }) {
@@ -58,12 +73,13 @@ function Example({ kind, t, ko }: { kind: string; t: Copy; ko: boolean }) {
 
 export function PlayGuide({ t, ko }: { t: Copy; ko: boolean }) {
   return <section className="play-guide">
-    <h3>{ko ? "처음이라면: 화면을 따라 한 판 배우기" : "Your first game: a screen-by-screen guide"}</h3>
-    <p>{ko ? "대통령·수상은 매번 바뀌는 직책이고, 자유당·파시스트·히틀러는 끝까지 유지되는 비밀 역할이에요. 같은 역할의 편이 승리하는 것이 목표입니다. 토론할 때 거짓말도 할 수 있어요." : "President and Chancellor are rotating offices. Liberal, Fascist and Hitler are secret roles that stay with you. Your goal is your team's victory; lying during discussion is allowed."}</p>
-    <p>{ko ? "흐름: 역할 확인 → 수상 지명 → 전원 투표·결과 확인 → 대통령 폐기 → 수상 제정 → 필요하면 대통령 권한 → 다음 선거. 궁금한 단계를 펼치면 실제 카드 모양의 예시를 볼 수 있어요. 예시 내용은 현재 게임의 비밀 정보와 무관합니다." : "Flow: roles → nomination → vote and confirm → President discards → Chancellor enacts → executive power if needed → next election. Expand a step for a sample screen. Examples never use live secret information."}</p>
-    {steps.map((step, i) => <details key={step.key} className="guide-step" open={step.key === "peek" ? true : undefined}>
+    <h3 tabIndex={-1}>{ko ? "막히는 단계를 눌러 보세요" : "Find the step you need"}</h3>
+    <p>{ko ? "누가 무엇을 해야 하는지, 어떤 버튼을 눌러야 하는지 단계별로 정리했어요. 아래 그림과 카드는 모두 설명용 예시입니다." : "Open a step to see who acts, what to choose and how to use the controls. All illustrations and cards below are examples."}</p>
+    {steps.map((step, i) => <details key={step.key} className="guide-step" data-guide-step={step.key}>
       <summary>{ko ? step.title : `${i + 1}. ${english[i][0]}`}</summary>
-      <dl>{[[ko ? "누가" : "Who", ko ? step.who : english[i][1]], [ko ? "무엇을 · 어떻게" : "How", ko ? step.how : english[i][2]], [ko ? "왜" : "Why", ko ? step.why : english[i][3]], [ko ? "다음에는" : "Next", ko ? step.next : english[i][4]]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      <p className="guide-who">{ko ? step.who : english[i][1]}</p>
+      <ol className="guide-instructions">{(ko ? step.how : english[i][2]).split('. ').map((line,index)=><li key={index}>{line}</li>)}</ol>
+      <dl>{[[ko ? "알아 두세요" : "Keep in mind", ko ? step.why : english[i][3]], [ko ? "끝나면 어떻게 되나요?" : "What happens next?", ko ? step.next : english[i][4]]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       <Example kind={step.key} t={t} ko={ko} />
     </details>)}
   </section>;

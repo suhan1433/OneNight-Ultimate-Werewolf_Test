@@ -595,3 +595,54 @@ body .assembly:has(.private-result) .round-table { min-height: 140px; }
 @keyframes legislation-breathe{50%{opacity:.65}}
 @media(prefers-reduced-motion:reduce){.legislation-progress *{animation:none!important}}
 body[data-reduce="true"] .legislation-progress *,body[data-low="true"] .legislation-progress *{animation:none!important}
+
+/* Rulebook: quick answers first, worked example, then expandable references. */
+.guide-navigation{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 20px}
+.guide-navigation button{min-height:44px;padding:8px;border:1px solid var(--line);border-radius:4px;background:#b5a2790d;font:12px/1.5 var(--font-type);color:var(--cream);white-space:normal}
+.guide-section{padding:0 0 20px;margin:0 0 20px;border-bottom:1px solid var(--line)}
+.rulebook .guide-section h3,.rulebook .play-guide h3{margin:12px 0;font-size:18px;line-height:1.6;color:var(--cream);word-break:keep-all}
+.rulebook h4{margin:20px 0 10px;font:600 15px/1.6 var(--font-serif);color:var(--cream);word-break:keep-all}
+.rulebook .guide-section p{margin:8px 0;line-height:1.85;word-break:keep-all;overflow-wrap:anywhere}
+.guide-basics-grid,.guide-win-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.guide-basics-grid article,.guide-win-grid article{min-width:0;padding:14px;border:1px solid var(--line);border-radius:4px;background:#0c1111}
+.rulebook .guide-basics-grid h4{margin:0 0 6px}
+.guide-win-grid strong{font:600 15px/1.5 var(--font-serif)}
+.guide-win-grid small{display:block;line-height:1.75;color:var(--muted)}
+.guide-win-grid .guide-liberal{border-top:3px solid #73909b}.guide-win-grid .guide-fascist{border-top:3px solid #a25e57}
+.guide-deck{margin:18px 0;padding:14px;background:#b5a2790d;border:1px solid #b5a27970;border-radius:6px}
+.rulebook .guide-deck h4{margin:0 0 10px;color:var(--brass)}
+.guide-deck-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rulebook .guide-deck-counts p{display:grid;gap:4px;margin:0;padding:12px 8px;text-align:center;background:#73909b20;border-radius:4px}
+.rulebook .guide-deck-counts p+p{background:#a25e5720}
+.guide-deck-counts b{font:32px/1.2 var(--font-type);color:var(--cream)}
+.guide-deck-counts span{font:600 12px/1.5 var(--font-serif)}
+.rulebook .guide-important{font-weight:700;color:var(--cream)}
+.guide-round-flow,.guide-instructions{padding-left:22px;margin:12px 0;line-height:1.85}
+.guide-round-flow li,.guide-instructions li{padding-left:4px;margin:8px 0;word-break:keep-all;overflow-wrap:anywhere}
+.guide-round-flow li::marker,.guide-instructions li::marker{color:var(--brass);font-weight:700}
+.guide-legislation-demo{padding:16px;border:1px solid #b5a27970;border-radius:6px;background:#101413}
+.rulebook .guide-example-note{font-size:12px;color:var(--muted)}
+.guide-demo-flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;list-style:none;padding:0;margin:16px 0}
+.guide-demo-flow li{text-align:center;padding:6px 2px;border-bottom:2px solid var(--line);font:12px/1.5 var(--font-type);color:var(--muted)}
+.guide-demo-flow li[aria-current="step"]{border-color:var(--brass);color:var(--cream)}
+.guide-demo-status{line-height:1.7}.guide-demo-status strong{display:block;color:var(--cream)}
+.guide-demo-cards{display:flex;justify-content:center;gap:8px;margin:18px 0;min-width:0}
+.guide-demo-card{flex:0 1 90px;min-width:0;text-align:center}
+.guide-demo-card .policy-face{height:auto;aspect-ratio:5/7;padding:8px 4px;box-sizing:border-box}
+.guide-demo-card .policy-face strong{font-size:11px;letter-spacing:0}
+.guide-demo-card>small{display:block;margin-top:6px;font:11px/1.5 var(--font-type);color:var(--muted)}
+.guide-demo-card.discard-example .policy-face{outline:2px dashed var(--brass);outline-offset:3px}
+.guide-demo-card.enact-example .policy-face{outline:2px solid var(--brass);outline-offset:3px}
+.guide-demo-controls{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;margin-top:14px}
+.guide-demo-controls button{min-height:44px;padding:10px 8px;font:12px/1.5 var(--font-type);white-space:normal}
+.guide-questions>details{margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:4px}
+.guide-questions summary{cursor:pointer;min-height:32px;font-weight:600;color:var(--cream);line-height:1.7;word-break:keep-all}
+.guide-table-wrap{max-width:100%;overflow-x:auto}
+.rulebook .guide-table-wrap table{margin-top:12px;table-layout:fixed}
+.rulebook .guide-table-wrap th,.rulebook .guide-table-wrap td{padding:6px 3px;overflow-wrap:anywhere;line-height:1.6}
+.rulebook .guide-table-wrap caption{font-size:12px;line-height:1.6}
+.guide-who{margin:12px 0 0;font-weight:600;color:var(--cream)}
+.phase-help summary>span{display:block;color:var(--muted);font-size:11px}
+.phase-help summary>strong{font-size:12px;font-weight:600;color:var(--cream);word-break:keep-all}
+.phase-help ol{margin:8px 0;padding-left:20px}.phase-help li{margin:6px 0;word-break:keep-all}
+@media(max-width:480px){.guide-basics-grid,.guide-win-grid{grid-template-columns:1fr}.guide-legislation-demo{padding:12px}.guide-navigation{gap:6px}}

@@ -35,7 +35,8 @@ import { Portrait, Emblem, PolicyFace, ARCHETYPES } from "./Art";
 import { PolicyCard } from "./PolicyCard";
 import { LegislationProgress } from "./LegislationProgress";
 import { Presentation, VoteScene, useScenes, useTyped, playCue } from "./Presentation";
-import { PlayGuide, PhaseHelp } from "./Guide";
+import { PhaseHelp } from "./Guide";
+import { Rulebook } from "./Rulebook";
 import { layoutSeats, slotFor } from "./seatLayout";
 import "./styles.css";
 import "./stage.css";
@@ -1415,143 +1416,6 @@ function Results({ room, t }: { room: RoomView; t: Copy }) {
   );
 }
 
-function Rulebook({ t, lang }: { t: Copy; lang: Language }) {
-  return (
-    <div className="rulebook">
-      <PlayGuide t={t} ko={lang === "ko"} />
-      {lang === "ko" ? (
-        <>
-          <p>
-            5~10인이 자유당과 파시스트(히틀러 포함)로 나뉘어 비밀리에
-            대결합니다. 발언과 거짓말은 자유입니다.
-          </p>
-          <h3>승리</h3>
-          <p>
-            자유당: 자유 정책 5개 또는 히틀러 처형.
-            <br />
-            파시스트: 파시스트 정책 6개 또는 파시스트 정책 3개 이후 히틀러의
-            수상 당선.
-          </p>
-          <h3>선거와 입법</h3>
-          <p>
-            대통령 후보가 본인과 임기 제한자를 제외한 생존자를 수상으로
-            지명합니다. 전원 비밀 투표 후 동시에 공개하며, 과반 찬성만
-            가결됩니다. 직전 당선 수상은 연임 불가이고, 생존 6명 이상이면 직전
-            대통령도 수상이 될 수 없습니다.
-          </p>
-          <p>
-            대통령은 정책 3장 중 1장을 폐기합니다. 수상은 받은 2장 중 1장을
-            제정합니다. 이때 대통령과 수상은 말하거나 신호를 보낼 수 없습니다.
-            버린 정책은 공개하지 않습니다.
-          </p>
-          <h3>혼란과 거부권</h3>
-          <p>
-            부결·거부권 승인 시 선거 트래커가 1 증가합니다. 3이 되면 맨 위
-            정책을 자동 제정하고 임기 제한을 해제합니다. 혼란 정책은 대통령
-            권한을 발동하지 않습니다. 정책이 실제 제정될 때만 트래커가
-            초기화됩니다.
-          </p>
-          <p>
-            파시스트 정책 5개부터 수상은 거부권을 요청할 수 있습니다. 대통령이
-            승인하면 두 장 모두 버리고 트래커 +1. 거절하면 수상은 반드시 정책
-            1장을 제정합니다.
-          </p>
-          <h3>비밀 정보와 대통령 권한</h3>
-          <p>
-            5~6인에서는 파시스트와 히틀러가 서로를 압니다. 7인 이상에서는
-            파시스트만 동료와 히틀러를 알며 히틀러는 아무도 모릅니다.
-          </p>
-          <p>
-            정체 조사는 정당만 공개합니다. 특별 선거 후에는 발동한 대통령의 다음
-            생존자로 복귀합니다. 엿보기는 상위 3장의 순서를 유지합니다. 처형된
-            의원은 발언·투표·출마할 수 없고 히틀러 외에는 역할을 공개하지
-            않습니다.
-          </p>
-          <h3>공식 재셔플 시점</h3>
-          <p>
-            입법 종료 또는 혼란 정책 제정 후 더미가 3장 미만이면 남은 정책과
-            버린 더미를 합쳐 재셔플합니다.
-          </p>
-        </>
-      ) : (
-        <>
-          <p>
-            5–10 players receive secret Liberal, Fascist, or Hitler roles.
-            Players may discuss freely and lie.
-          </p>
-          <h3>Victory</h3>
-          <p>
-            Liberals: enact 5 Liberal Policies or execute Hitler. Fascists:
-            enact 6 Fascist Policies or elect Hitler Chancellor after 3 Fascist
-            Policies.
-          </p>
-          <h3>Elections and legislation</h3>
-          <p>
-            The rotating President nominates an eligible living Chancellor. A
-            strict majority of all living players must vote Ja; ties fail. The
-            last elected Chancellor is term limited. With more than 5 survivors,
-            the last elected President is also ineligible for Chancellor.
-          </p>
-          <p>
-            The President draws 3 policies and discards 1. The Chancellor enacts
-            1 of the remaining 2. These officials cannot communicate during
-            legislation. Discards stay secret.
-          </p>
-          <h3>Chaos and veto</h3>
-          <p>
-            A failed election or approved veto advances the tracker. At 3, enact
-            the top policy, ignore its executive power, clear term limits, and
-            reset the tracker. Any enacted policy resets the tracker. After 5
-            Fascist Policies the Chancellor may request a veto; the President
-            must consent, otherwise a policy must be enacted.
-          </p>
-          <h3>Information and powers</h3>
-          <p>
-            In 5–6 players, Hitler and the Fascist know each other. In 7–10,
-            Fascists know allies and Hitler, but Hitler knows no allies.
-            Investigations show party membership only. A special election
-            returns the rotation to the living player after the President who
-            called it. Policy Peek preserves order. Executed players cannot
-            speak, vote, or hold office; only Hitler is revealed on execution.
-          </p>
-          <h3>Official reshuffle</h3>
-          <p>
-            After a legislative session or chaos enactment, reshuffle the
-            remaining deck with discards if fewer than 3 policies remain.
-          </p>
-        </>
-      )}
-      <table>
-        <caption>{t.executive}</caption>
-        <thead>
-          <tr>
-            <th>F #</th>
-            <th>5–6</th>
-            <th>7–8</th>
-            <th>9–10</th>
-          </tr>
-        </thead>
-        <tbody>
-          {[
-            [1, "—", "—", t.investigate],
-            [2, "—", t.investigate, t.investigate],
-            [3, t.peek, t.special_election, t.special_election],
-            [4, t.execute, t.execute, t.execute],
-            [5, t.execute, t.execute, t.execute],
-            [6, "VICTORY", "VICTORY", "VICTORY"],
-          ].map((row) => (
-            <tr key={row[0]}>
-              {row.map((v, i) => (
-                <td key={i}>{v}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="fine-print">{t.timerNote}</p>
-    </div>
-  );
-}
 function App() {
   const { room, error, connected, resuming, busy } = useApp();
   const [language, setLanguage] = useState<Language>(
