@@ -1,3 +1,4 @@
+import { mountGameSwitch } from '../../game-switch/client';
 import { useState, type CSSProperties } from 'react';
 import type { Game, Send } from './types';
 import { inviteLink } from './lib';
@@ -26,6 +27,7 @@ export function Lobby({ game, send, onLeave, onHelp }: { game: Game; send: Send;
     <section className="bridge-sec" aria-label="관측선 브리지">
       <h2>관측선 브리지 <small>{game.players.length}/{game.maxPlayers}</small></h2>
       <button type="button" className="invite-btn" onClick={share}>{linkCopied ? '✓ 초대 링크 복사됨' : '🔗 초대 링크 보내기'}</button>
+      <div ref={mountGameSwitch} className="club-switch-slot" />
       <div className="bridge" style={{ '--n': game.maxPlayers } as CSSProperties}>
         <ul className="chairs">{seats.map((p, i) => {
           const next = seats[i + 1]; const [st, word] = p ? state(p) : ['empty', '빈 좌석'];

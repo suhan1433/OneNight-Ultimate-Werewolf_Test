@@ -1,3 +1,4 @@
+import { mountGameSwitch } from '../../../../game-switch/client';
 import { gameAudio } from './audio-settings';
 import { Fragment, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -497,6 +498,7 @@ function Lobby(){
     <header className="topbar"><button className="leave" onClick={()=>leaveRoom(game.roomCode)}><Icon name="back"/><span>나가기</span></button><div className="game-tools"><button className="tool sound-toggle" aria-label="음향 설정" title="음향 설정" onClick={gameAudio.openSettings}><Icon name="sound"/></button><button className="help-orb" onClick={()=>setHelp(true)} aria-label="도움말 열기"><Icon name="help"/></button></div></header>
     <div className="harbor-head"><div><h1>선원 모집</h1><p>친구에게 방 코드를 알려 주세요.</p></div>
       <div className="harbor-invite"><button type="button" className="roomcode" onClick={copy} aria-label={'방 코드 '+game.roomCode+' 복사'}><small>방 코드</small><strong>{game.roomCode}</strong><span>{copied?'복사했어요':'눌러서 복사'}</span></button><button type="button" className={'invite-link'+(linkCopied?' done':'')} onClick={share}>{linkCopied?'✓ 링크 복사됨':'🔗 초대 링크 보내기'}</button></div></div>
+    <div ref={mountGameSwitch} className="club-switch-slot" />
     <div className="harbor-chat"><ChatInput roomCode={game.roomCode} meId={game.playerId} wide/></div>
     <div className="harbor-body">
       <ul className="roster" aria-label="선원 목록">{Array.from({length:game.config.maxPlayers},(_,i)=>{const p=game.players[i];

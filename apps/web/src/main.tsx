@@ -1,3 +1,4 @@
+import { mountGameSwitch } from '../../../game-switch/client';
 import { gameAudio } from './audio-settings';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import ReactDOM from "react-dom/client";
@@ -1091,6 +1092,7 @@ function Lobby({ game }: { game: ClientGameState }) {
           {linkCopied ? <CheckIcon /> : "🔗"} {linkCopied ? "링크 복사됨" : "초대 링크 보내기"}
         </button>
       </Panel>
+      <div ref={mountGameSwitch} className="club-switch-slot" />
       <div className="section-title">
         <h3>참가자</h3>
         <span>

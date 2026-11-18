@@ -1,3 +1,4 @@
+import { mountGameSwitch } from '../../../../game-switch/client';
 import { gameAudio } from './audio-settings';
 import { recordedAudio } from './recorded-audio';
 import { useRecordedAudio } from './use-recorded-audio';
@@ -369,6 +370,7 @@ function Lobby({game,starting=false}:{game:ClientGameState;starting?:boolean}){
       <em className={copied?'done':''}>{copied?<><CheckIcon size={13}/> 복사되었습니다</>:'눌러서 초대 코드 복사'}</em>
     </button>
     <button type="button" className={`lb-invite${linkCopied?' done':''}`} onClick={share}>{linkCopied?<><CheckIcon size={13}/> 초대 링크 복사됨</>:'🔗 초대 링크 보내기'}</button>
+    <div ref={mountGameSwitch} className="club-switch-slot" />
     <div className="lb-table-wrap">
       <LobbyGlow ref={glow}/>
       <div ref={tableRef} className={`lb-table lb-t${total}`} style={{'--ready':`${(readyCount/total)*100}%`} as React.CSSProperties}>

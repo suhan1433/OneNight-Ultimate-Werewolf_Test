@@ -1,3 +1,4 @@
+import { mountGameSwitch } from '../../../../game-switch/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { PublicView } from '@rummikub/protocol';
@@ -146,6 +147,7 @@ function Lobby({ view, game, onExit }: { view: PublicView; game: Game; onExit: (
           <Letters text={view.roomId} tilt={false} />
           <small className={copied ? 'done' : ''}>{copied ? '✓ 초대 링크를 보냈어요' : '눌러서 초대 링크 공유'}</small>
         </button>
+        <div ref={mountGameSwitch} className="club-switch-slot" />
       </section>
       <section className="lb-table" aria-label="자리">
         <div className={`lb-center ${allReady ? 'all' : ''}`} aria-live="polite">

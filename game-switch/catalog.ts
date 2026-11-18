@@ -1,3 +1,4 @@
+import { defaultSetup, validateSetup, type SwitchSetup } from './settings';
 export type GameId = 'werewolf' | 'avalon' | 'skullking' | 'spacecrew' | 'rummikub' | 'deception' | 'secret_hitler';
 export type Member = { id: string; name: string };
 export const games: Record<GameId, { label: string; min: number; max: number; port: number; path: string; key: string }> = {
@@ -10,16 +11,25 @@ export const games: Record<GameId, { label: string; min: number; max: number; po
   secret_hitler: { label: '시크릿 히틀러', min: 5, max: 10, port: 3008, path: '/secret_hitler/socket.io', key: 'sh-session' },
 };
 
-export function entry(game: GameId, name: string, count: number, code?: string): [string, object] {
-  const nickname = name;
-  if (game === 'deception') return code ? ['join', { code, name }] : ['create', { name }];
-  if (game === 'secret_hitler') return [code ? 'JOIN_ROOM' : 'CREATE_ROOM', { name, avatar: 0, ...(code ? { code } : {}) }];
-  if (game === 'rummikub') return [code ? 'room:join' : 'room:create', { name, clientSeq: 0, ...(code ? { roomId: code } : { maxPlayers: count }) }];
-  if (code) return ['ROOM_JOIN', { nickname, ...(game === 'spacecrew' ? { code } : { roomCode: code }) }];
-  if (game === 'spacecrew') return ['ROOM_CREATE', { nickname, maxPlayers: count, missionId: 1 }];
-  if (game === 'skullking') return ['ROOM_CREATE', { nickname, config: { maxPlayers: count, roundMode: 'classic' } }];
-  if (game === 'avalon') return ['ROOM_CREATE', { nickname, maxPlayers: count, options: { assassin: true, percival: true } }];
-  const roles = ['werewolf','werewolf','seer','robber','troublemaker','villager','villager','villager','drunk','insomniac','hunter','tanner','minion'];
-  return ['ROOM_CREATE', { nickname, maxPlayers: count, selectedRoles: roles.slice(0, count + 3), actionTimeLimitSeconds: 15, dayTimeLimitSeconds: 300 }];
+export function entry(game: GameId, name: string, count: number, code?: string, setup?: SwitchSetup): [string, object] {
+  if (code) {
+    if (game === 'deception') return ['join', { code, name }];
+    if (game === 'secret_hitler') return ['JOIN_ROOM', { name, avatar: 0, code }];
+    if (game === 'rummikub') return ['room:join', { name, clientSeq: 0, roomId: code }];
+    return ['ROOM_JOIN', { nickname: name, ...(game === 'spacecrew' ? { code } : { roomCode: code }) }];
+  }
+  const config = setup ?? defaultSetup(game, count);
+  const error = validateSetup(game, config, count);
+  if (error) throw Error(error);
+  const { maxPlayers, values } = config;
+  if (game === 'deception') return ['create', { name }];
+  if (game === 'secret_hitler') return ['CREATE_ROOM', { name, avatar: 0, language: values.language }];
+  if (game === 'rummikub') return ['room:create', { name, clientSeq: 0, maxPlayers, config: values }];
+  if (game === 'spacecrew') return ['ROOM_CREATE', { nickname: name, maxPlayers, missionId: values.missionId }];
+  if (game === 'skullking') {
+    const { roundMode, ...cards } = values;
+    return ['ROOM_CREATE', { nickname: name, config: { maxPlayers, roundMode, cards } }];
+  }
+  if (game === 'avalon') return ['ROOM_CREATE', { nickname: name, maxPlayers, options: values }];
+  return ['ROOM_CREATE', { nickname: name, maxPlayers, selectedRoles: config.selectedRoles, ...values }];
 }
-

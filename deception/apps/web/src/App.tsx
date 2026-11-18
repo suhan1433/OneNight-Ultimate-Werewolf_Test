@@ -1,3 +1,4 @@
+import { mountGameSwitch } from '../../../../game-switch/client';
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { useTranslation } from "react-i18next";
@@ -799,6 +800,7 @@ function Lobby({ room }: { room: RoomView }) {
         <button type="button" className="secondary full invite-share" onClick={() => run(shareInvite())}>
           {linkCopied ? "✓ 초대 링크 복사됨" : "🔗 초대 링크 보내기"}
         </button>
+        <div ref={mountGameSwitch} className="club-switch-slot" />
         <div className="section-label">
           <span>시계방향 좌석</span>
           <span>{host ? "길게 끌어 순서 변경" : "방장이 순서를 정합니다"}</span>

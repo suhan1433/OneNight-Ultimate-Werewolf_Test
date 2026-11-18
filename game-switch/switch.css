@@ -1,11 +1,51 @@
+.club-switch-slot{display:flex;justify-content:center;flex:none;position:relative;min-width:0;width:100%;isolation:isolate}
 #club-game-switch[hidden]{display:none!important}
-.club-switch-trigger{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:900;padding:10px 16px;border:1px solid #91acb0;border-radius:24px;background:#17252e;color:#fff;font:600 14px system-ui;box-shadow:0 3px 16px #0005;cursor:pointer}
-.club-switch-dialog{width:min(430px,calc(100vw - 32px));max-height:85dvh;overflow:auto;box-sizing:border-box;padding:24px;border:1px solid #789195;border-radius:18px;background:#14232c;color:#f3f7f8;font:15px/1.6 system-ui;text-align:left}
-.club-switch-dialog::backdrop{background:#000a}
-.club-switch-dialog h2{margin:0 0 12px;font-size:22px;color:inherit}
-.club-switch-dialog p{margin:10px 0;color:#cfdbdf;white-space:normal}
-.club-switch-choices{display:grid;gap:8px;margin:18px 0}
-.club-switch-choices button,.club-switch-close{padding:12px;border:1px solid #617d89;border-radius:9px;background:#223b47;color:#fff;font:inherit;cursor:pointer;min-height:44px}
-.club-switch-choices button:disabled{opacity:.4;cursor:default}
-.club-switch-close{width:100%;background:transparent}
-.club-switch-dialog button:focus-visible,.club-switch-trigger:focus-visible{outline:3px solid #a5e8f5;outline-offset:2px}
+#club-game-switch{
+  --switch-bg:#17252e;--switch-panel:#14232c;--switch-text:#f3f7f8;--switch-muted:#cfdbdf;
+  --switch-line:#789195;--switch-accent:#a5e8f5;--switch-radius:12px;--switch-font:inherit;
+  position:relative;max-width:100%;font-family:var(--switch-font)
+}
+#club-game-switch[data-theme="werewolf"]{--switch-bg:linear-gradient(180deg,#30243c,#1c1728);--switch-panel:#1c1728;--switch-text:#f0e6f7;--switch-muted:#c6b4d3;--switch-line:#776184;--switch-accent:#dbb4f3;--switch-radius:14px}
+#club-game-switch[data-theme="avalon"]{--switch-bg:linear-gradient(180deg,#162a34,#060d13);--switch-panel:#0c1d24;--switch-text:#f3d08e;--switch-muted:#c7c7b9;--switch-line:#a88a50;--switch-accent:#f3d08e;--switch-radius:999px;--switch-font:var(--font-body,inherit)}
+#club-game-switch[data-theme="skullking"]{--switch-bg:linear-gradient(160deg,#3b2919,#21160d);--switch-panel:#21160d;--switch-text:#eadfc4;--switch-muted:#bbae93;--switch-line:#8a7048;--switch-accent:#f1cf7a;--switch-radius:6px;--switch-font:var(--sans,inherit)}
+#club-game-switch[data-theme="spacecrew"]{--switch-bg:#132952;--switch-panel:#0a1630;--switch-text:#e9f0ff;--switch-muted:#93a7ca;--switch-line:#3d5f95;--switch-accent:#5ee6d3;--switch-radius:10px;--switch-font:var(--sans,inherit)}
+#club-game-switch[data-theme="rummikub"]{--switch-bg:linear-gradient(180deg,#fcf7ea,#e4d6b5);--switch-panel:#24160d;--switch-text:#f1e8d6;--switch-muted:#cdbfa6;--switch-line:#8a7b52;--switch-accent:#ffbf6b;--switch-radius:10px;--switch-font:var(--f-ui,inherit)}
+#club-game-switch[data-theme="deception"]{--switch-bg:linear-gradient(135deg,#123438,#0b2225);--switch-panel:#061416;--switch-text:#e8f0ea;--switch-muted:#8fa8a4;--switch-line:#397e70;--switch-accent:#7ff2d6;--switch-radius:6px;--switch-font:var(--sans,inherit)}
+#club-game-switch[data-theme="secret_hitler"]{--switch-bg:#252725;--switch-panel:#1b1d1c;--switch-text:#d2d0bd;--switch-muted:#a6a89d;--switch-line:#81775e;--switch-accent:#b5a279;--switch-radius:2px}
+#club-game-switch .club-switch-trigger{position:static;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;max-width:100%;padding:10px 18px;border:1px solid var(--switch-line);border-radius:var(--switch-radius);background:var(--switch-bg);color:var(--switch-text);font:inherit;font-size:14px;line-height:1.4;font-weight:600;box-shadow:inset 0 1px 0 #ffffff12;cursor:pointer;white-space:normal;letter-spacing:.02em}
+#club-game-switch .club-switch-trigger::before{content:'⇄';font:20px/1 system-ui;color:var(--switch-accent)}
+#club-game-switch[data-theme="rummikub"] .club-switch-trigger{color:#241c14;box-shadow:inset 0 1px 0 #fff,0 3px 0 #8a7b52,0 6px 12px #0005;margin-bottom:3px}
+#club-game-switch[data-theme="rummikub"] .club-switch-trigger::before{color:#725431}
+#club-game-switch .club-switch-dialog{position:fixed;inset:0;width:min(430px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;margin:auto;padding:24px;border:1px solid var(--switch-line);border-radius:16px;background:var(--switch-panel);color:var(--switch-text);font:inherit;font-size:15px;line-height:1.6;text-align:left;box-shadow:0 24px 80px #0008}
+#club-game-switch[data-theme="secret_hitler"] .club-switch-dialog{border-radius:2px}
+#club-game-switch .club-switch-dialog::backdrop{background:#000a}
+#club-game-switch .club-switch-dialog h2{margin:0 0 12px;font-size:22px;line-height:1.4;color:var(--switch-text)}
+#club-game-switch .club-switch-dialog p{margin:10px 0;color:var(--switch-muted);white-space:normal}
+#club-game-switch .club-switch-choices{display:grid;gap:8px;margin:18px 0}
+#club-game-switch .club-switch-choices button,#club-game-switch .club-switch-close{display:block;width:100%;padding:12px;border:1px solid var(--switch-line);border-radius:8px;background:transparent;color:var(--switch-text);font:inherit;cursor:pointer;min-height:44px;white-space:normal;box-shadow:none}
+#club-game-switch button:hover:not(:disabled){border-color:var(--switch-accent);filter:brightness(1.12)}
+#club-game-switch button:disabled{opacity:.4;cursor:default}
+#club-game-switch button:focus-visible{outline:3px solid var(--switch-accent);outline-offset:3px}
+.harbor:has(> .club-switch-slot){grid-template-rows:auto auto auto auto 1fr auto}
+.bridge-sec>.club-switch-slot{margin:12px 0}
+.lobby.content>.club-switch-slot{margin:0 0 20px}
+@media(max-width:480px){#club-game-switch .club-switch-dialog{padding:20px}.club-switch-slot{align-self:center}}
+#club-game-switch .club-switch-choices[hidden]{display:none}
+#club-game-switch .club-switch-settings{display:grid;gap:14px;margin:18px 0}
+#club-game-switch .club-switch-settings h3{margin:0;color:var(--switch-text);font:inherit;font-weight:700;font-size:18px;line-height:1.4}
+#club-game-switch .club-switch-settings fieldset{display:grid;gap:12px;min-width:0;margin:0;padding:14px;border:1px solid var(--switch-line);border-radius:8px}
+#club-game-switch .club-switch-settings legend{padding:0 6px;color:var(--switch-accent);font-size:13px}
+#club-game-switch .club-switch-field{display:grid;gap:6px;font-size:14px;color:var(--switch-text)}
+#club-game-switch .club-switch-check{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;min-height:40px;font-size:14px;color:var(--switch-text);cursor:pointer}
+#club-game-switch .club-switch-settings small{grid-column:1/-1;font-size:12px;color:var(--switch-muted);line-height:1.6}
+#club-game-switch .club-switch-settings select,#club-game-switch .club-switch-settings input[type="number"]{box-sizing:border-box;width:100%;min-width:0;min-height:44px;border:1px solid var(--switch-line);border-radius:6px;padding:8px 10px;background:var(--switch-panel);color:var(--switch-text);font:inherit;appearance:auto}
+#club-game-switch .club-switch-settings input[type="checkbox"]{appearance:auto;width:20px;height:20px;margin:0;accent-color:var(--switch-accent)}
+#club-game-switch .club-switch-settings input:focus-visible,#club-game-switch .club-switch-settings select:focus-visible{outline:2px solid var(--switch-accent);outline-offset:2px}
+#club-game-switch .club-switch-form-actions{display:grid;gap:8px}
+#club-game-switch .club-switch-form-actions button{min-height:44px;width:100%;padding:12px;border:1px solid var(--switch-line);border-radius:8px;background:transparent;color:var(--switch-text);font:inherit;white-space:normal;cursor:pointer}
+#club-game-switch .club-switch-form-actions .club-switch-confirm{border-color:var(--switch-accent);font-weight:700;background:var(--switch-bg)}
+#club-game-switch[data-theme="rummikub"] .club-switch-form-actions .club-switch-confirm{color:#241c14}
+#club-game-switch .club-switch-validation{color:#ffbdac;font-size:13px}
+#club-game-switch .club-switch-deck{display:grid;gap:8px}
+#club-game-switch .club-switch-deck summary{cursor:pointer;color:var(--switch-accent);padding:8px 0}
+#club-game-switch .club-switch-role{display:grid;grid-template-columns:minmax(0,1fr) 70px;gap:8px;align-items:center;margin:8px 0;font-size:14px;color:var(--switch-text)}

@@ -14,6 +14,7 @@
     "test": "npm run test -w @werewolf/server",
     "typecheck": "npm run typecheck -w @werewolf/shared && npm run typecheck -w @werewolf/server && npm run typecheck -w @werewolf/web",
     "test:game-switch": "node --import tsx game-switch/integration.test.mjs",
+    "test:game-switch:settings": "node --import tsx --test game-switch/settings.test.mjs",
     "test:game-switch:browser": "GAME_SWITCH_BROWSER=1 node --import tsx game-switch/integration.test.mjs"
   },
   "devDependencies": {

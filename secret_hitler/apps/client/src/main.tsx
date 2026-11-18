@@ -1,3 +1,4 @@
+import { mountGameSwitch } from '../../../../game-switch/client';
 import React, {
   useEffect,
   useLayoutEffect,
@@ -286,6 +287,7 @@ function Lobby({ room, t }: { room: RoomView; t: Copy }) {
           </label>}
         </div>
       </div>
+      <div ref={mountGameSwitch} className="club-switch-slot" />
       <div className="lobby-layout">
         <section>
           <div className="roster-title">

@@ -22,7 +22,8 @@ export function registerGameSwitch(io, socket, source) {
       if (!actor || actor.id !== room.hostId || (actor.socketId && actor.socketId !== socket.id)) throw Error('방장만 게임을 변경할 수 있습니다.');
       if (!members.length || members.some(p => !p.connected)) throw Error('모든 참가자가 연결된 뒤 게임을 변경해 주세요.');
       const range = Object.hasOwn(limits, data?.game) ? limits[data.game] : null;
-      if (!range || members.length < range[0] || members.length > range[1]) throw Error('현재 인원으로 이동할 수 없는 게임입니다.');
+      // Moving creates a lobby; the destination enforces its own start minimum.
+      if (!range || members.length > range[1]) throw Error('현재 인원으로 이동할 수 없는 게임입니다.');
       const nameLimit = ['deception', 'secret_hitler'].includes(data.game) ? 20 : 16;
       if (members.some(p => (p.nickname ?? p.name ?? '').length > nameLimit)) throw Error(`대상 게임은 닉네임을 ${nameLimit}자까지 지원합니다. 참가자 이름을 확인해 주세요.`);
       if (!data.sessions) {
