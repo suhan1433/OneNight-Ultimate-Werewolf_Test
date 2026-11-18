@@ -930,7 +930,6 @@ function Actions({
         {g.phase === "nomination" &&
           (g.president === id ? (
             <>
-              {targetLine(g.eligibleChancellors)}
               <HoldSign
                 t={t}
                 label={t.nominate}
@@ -967,7 +966,6 @@ function Actions({
                   onCast={() => act({ type: "vote", ja: false })}
                 />
               </div>
-              <p className="hint">{t.swipeHint}</p>
             </>
           ))}
         {["president_discard", "chancellor_enact", "veto"].includes(g.phase) &&

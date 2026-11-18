@@ -258,9 +258,9 @@ body .action-panel {
   animation: tray-up 0.4s var(--ease-metal) both;
 }
 @keyframes tray-up { from { opacity: 0; transform: translateY(24px); } }
-body .action-heading { display: flex; align-items: baseline; gap: 10px; padding: 0 0 6px; margin: 0 0 8px; border-bottom: 1px solid var(--line); }
+body .action-heading { display: flex; align-items: baseline; gap: 10px; padding: 0 0 4px; margin: 0 0 6px; border-bottom: 1px solid var(--line); }
 body .action-heading .eyebrow { font: 11px var(--font-type); display: inline; }
-body .action-heading h2 { margin: 0; font: 600 16px var(--font-serif); }
+body .action-heading h2 { margin: 0; font: 600 13px var(--font-serif); }
 .action-panel fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; min-width: 0; }
 .target-line { margin: 0; font: 14px var(--font-type); color: var(--muted); display: flex; gap: 10px; align-items: baseline; }
 .target-line strong { color: var(--lamp); font: 600 16px var(--font-serif); }
@@ -762,10 +762,6 @@ body[data-reduce="true"] .legislation-progress *,body[data-low="true"] .legislat
 .proposal-person small { display: block; font: 9px/1.4 var(--font-type); color: #b9ab90; }
 .proposal-person b { display: block; font: 600 11px/1.5 var(--font-serif); color: #e0d7c2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .proposal-link { color: #9c8b68; }
-.proposal-steps { display: flex; gap: 10px; list-style: none; padding: 0; margin: 10px 0 0; font: 10px/1.5 var(--font-type); color: #899493; }
-.proposal-steps li { display: flex; gap: 4px; align-items: center; }
-.proposal-steps li[aria-current] { color: #dfc690; }
-.proposal-steps li > span { border: 1px solid currentColor; border-radius: 50%; width: 14px; height: 14px; display: grid; place-items: center; font-size: 8px; }
 .election-risk { display: flex; align-items: flex-start; gap: 7px; margin: 10px 0 0; padding: 8px 10px; border: 1px solid #bb766540; border-radius: 2px; background: #75403724; color: #dfad98; font: 11px/1.65 var(--font-serif); word-break: keep-all; overflow-wrap: anywhere; }
 .election-risk > span { flex: 0 0 14px; display: grid; place-items: center; height: 14px; margin-top: 2px; border: 1px solid #bb7665; border-radius: 50%; font: 900 10px var(--font-serif); }
 .action-panel > .election-risk { margin: 0 0 10px; }

@@ -50,7 +50,8 @@ test("모바일: 공유·고정 좌석·10인 결과 확인·정책 엿보기·�
     await open(nomination);
     const before = await page.locator(".seat").evaluateAll((seats) => seats.map((s) => { const b = s.getBoundingClientRect(); return [b.x, b.y, b.width, b.height]; }));
     await page.locator(".seat.candidate").first().click();
-    await expect(page.locator(".target-line strong")).toHaveText("의원 2");
+    await expect(page.locator(".target-line")).toHaveCount(0);
+    await expect(page.locator(".government-proposal .candidate b")).toHaveText("의원 2");
     const after = await page.locator(".seat").evaluateAll((seats) => seats.map((s) => { const b = s.getBoundingClientRect(); return [b.x, b.y, b.width, b.height]; }));
     expect(after).toEqual(before);
     await expect(page.getByRole("button", { name: "공개 조서" })).toHaveCount(0);

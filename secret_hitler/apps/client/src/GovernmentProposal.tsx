@@ -20,9 +20,6 @@ export function GovernmentProposal({ g, t, paused = false }: { g: GameView; t: C
           <span><small>{confirmed ? t.nominee : ko ? '검토 중인 후보' : 'Candidate under review'}</small><b>{candidate?.name ?? (ko ? '아직 선택하지 않았습니다' : 'Not selected yet')}</b></span>
         </div>
       </div>
-      {!confirmed && <ol className="proposal-steps" aria-label={ko ? '지명 진행' : 'Nomination progress'}>
-        {[ko ? '후보 선택' : 'Select', ko ? '후보 검토' : 'Review', ko ? '지명 확정' : 'Confirm'].map((step, i) => <li key={step} aria-current={i === (candidate ? 1 : 0) ? 'step' : undefined}><span aria-hidden="true">{i + 1}</span>{step}</li>)}
-      </ol>}
     </div>
   </section>;
 }
