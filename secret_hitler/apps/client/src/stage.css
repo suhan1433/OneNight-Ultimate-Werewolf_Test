@@ -279,9 +279,13 @@ body .policy-hand { display: flex; grid-template-columns: none; gap: 12px; justi
 body .policy-card {
   --ch: clamp(124px, 22dvh, 190px); flex: 0 0 auto; height: var(--ch); width: calc(var(--ch) * 5 / 7); min-width: 0; overflow: hidden; padding: 0; background: none; border: 0; box-shadow: none;
   animation: deal 0.45s var(--ease-metal) both; animation-delay: calc(var(--i, 0) * 0.12s);
+  position: relative; touch-action: none; user-select: none; -webkit-user-select: none;
+  transform: translateY(calc(var(--lift, 0px) * -1)); transition: transform .2s var(--ease-metal), box-shadow .2s;
 }
 @keyframes deal { from { opacity: 0; transform: translateY(40px) rotate(-6deg); } }
-body .policy-card:hover:enabled { transform: translateY(-6px); background: none; }
+body .policy-card:hover:enabled:not(.armed):not(.dragging) { transform: translateY(-6px); background: none; }
+body .policy-card.armed { transform: translateY(calc(-14px - var(--lift, 0px))); box-shadow: 0 0 0 2px var(--lamp), 0 12px 24px #000a; }
+body .policy-card.dragging { transition: none; z-index: 2; }
 .policy-face { display: flex; flex-direction: column; align-items: center; justify-content: space-between; width: 100%; height: 100%; padding: 12px 8px; box-sizing: border-box; text-align: center; position: relative; }
 .policy-face strong { font: 900 14px/1.2 var(--font-serif); letter-spacing: 0.03em; word-break: keep-all; }
 .policy-face small { font: 11px var(--font-type); letter-spacing: 0.1em; }
@@ -560,3 +564,34 @@ body .peek-card .policy-face { padding-top: 22px; }
 .bf-choice { font: 11px/1.2 var(--font-serif); }
 body .action-panel:has(.private-result) { max-height: 52dvh; }
 body .assembly:has(.private-result) .round-table { min-height: 140px; }
+
+/* Public legislative waiting scene: sealed card backs only. */
+.legislation-progress{display:grid;gap:10px;box-sizing:border-box;width:100%;max-width:640px;margin:10px auto 0;padding:12px;border:1px solid #b5a27940;border-radius:6px;background:radial-gradient(ellipse at 50% 45%,#b5a27910,transparent 70%),#111413}
+.legislation-status{display:grid;gap:4px;text-align:center;min-width:0}
+.legislation-status strong{font:600 14px/1.55 var(--font-serif);color:var(--cream);word-break:keep-all;overflow-wrap:anywhere}
+.legislation-status>span{font:11px/1.55 var(--font-type);color:var(--muted);overflow-wrap:anywhere}
+.legislation-desk{position:relative;display:flex;justify-content:space-between;gap:80px;box-sizing:border-box;width:100%;max-width:320px;min-height:110px;margin:auto;padding:2px 8px}
+.legislation-official{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px;width:80px;min-width:0;text-align:center;color:var(--muted)}
+.legislation-seal{display:grid;place-items:center;width:36px;height:36px;border:1px solid #b5a27950;border-radius:50%;background:#222722;color:var(--brass);font:600 16px var(--font-serif)}
+.legislation-official.active .legislation-seal{border-color:var(--lamp);box-shadow:0 0 16px #d9c48725;animation:legislation-breathe 2.6s ease-in-out infinite}
+.legislation-official small{margin-top:28px;font:10px var(--font-type)}
+.legislation-official b{font:600 11px/1.4 var(--font-serif);color:var(--cream);width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legislation-route{position:absolute;left:25%;right:25%;top:24px;display:flex;align-items:center;justify-content:space-evenly;height:1px;background:#b5a27940}
+.legislation-route i{height:4px;width:4px;border-radius:50%;background:var(--brass);opacity:.4;animation:legislation-breathe 2s ease-in-out infinite}
+.legislation-route i:nth-child(2){animation-delay:.3s}.legislation-route i:nth-child(3){animation-delay:.6s}
+.legislation-papers{--packet-x:78px;position:absolute;left:50%;top:8px;margin-left:-21px;width:42px;height:56px;z-index:2;transform:translateX(var(--packet-x))}
+.legislation-progress[data-phase="president_discard"] .legislation-papers{--packet-x:-78px}
+.legislation-paper{position:absolute;inset:0;display:grid;place-items:center;border:1px solid #91876b;border-radius:3px;background:repeating-linear-gradient(45deg,#0000 0 4px,#b5a27913 4px 5px),#282c27;box-shadow:0 5px 10px #0008;color:#b5a279;font:24px Georgia,serif;transform:translateX(calc((var(--card) - (var(--cards) - 1)/2)*11px)) rotate(calc((var(--card) - (var(--cards) - 1)/2)*7deg))}
+.legislation-paper i{position:absolute;inset:4px;border:1px solid #b5a27950;border-radius:2px}
+.legislation-progress.is-transferring .legislation-papers{animation:legislation-pass 1.4s cubic-bezier(.25,.7,.25,1) both}
+.legislation-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0;padding:0;list-style:none}
+.legislation-steps li{display:flex;align-items:center;justify-content:center;gap:4px;padding-top:7px;border-top:2px solid #b5a27925;text-align:center;font:10px/1.4 var(--font-type);color:var(--muted);word-break:keep-all;overflow-wrap:anywhere}
+.legislation-steps li.current{border-color:var(--brass);color:var(--cream)}
+.legislation-steps li.complete{border-color:#b5a27980;color:var(--brass)}
+.legislation-steps li>span{font:10px var(--font-type);flex:none}
+.legislation-progress .legislation-private{margin:0;text-align:center;color:var(--muted);font:10px/1.5 var(--font-type);word-break:keep-all}
+.legislation-progress[data-paused="true"] *{animation-play-state:paused!important}
+@keyframes legislation-pass{0%{transform:translateX(-78px) rotate(-8deg)}45%{transform:translate(0,-10px) rotate(0)}100%{transform:translateX(78px) rotate(0)}}
+@keyframes legislation-breathe{50%{opacity:.65}}
+@media(prefers-reduced-motion:reduce){.legislation-progress *{animation:none!important}}
+body[data-reduce="true"] .legislation-progress *,body[data-low="true"] .legislation-progress *{animation:none!important}

@@ -32,6 +32,8 @@ import "@fontsource/noto-serif-kr/400.css";
 import "@fontsource/noto-serif-kr/600.css";
 import "@fontsource/noto-serif-kr/900.css";
 import { Portrait, Emblem, PolicyFace, ARCHETYPES } from "./Art";
+import { PolicyCard } from "./PolicyCard";
+import { LegislationProgress } from "./LegislationProgress";
 import { Presentation, VoteScene, useScenes, useTyped, playCue } from "./Presentation";
 import { PlayGuide, PhaseHelp } from "./Guide";
 import { layoutSeats, slotFor } from "./seatLayout";
@@ -872,6 +874,8 @@ function Actions({
     id = room.selfId,
     alive = g.players.find((p) => p.id === id)?.alive,
     { busy, connected } = useApp();
+  const [policyIndex, setPolicyIndex] = useState<number | null>(null);
+  useEffect(() => setPolicyIndex(null), [g.phase, g.version]);
   const targetLine = (ids: string[]) => (
     <p className="target-line" aria-live="polite">
       {ids.includes(selected) ? (
@@ -885,12 +889,23 @@ function Actions({
     </p>
   );
   const disabled = busy || !connected || room.paused;
+  const legislative = g.phase === "president_discard" || g.phase === "chancellor_enact" || g.phase === "veto";
+  const progress = legislative ? <LegislationProgress
+    key={`${room.code}:${g.round}`}
+    phase={g.phase}
+    president={g.players.find(p => p.id === g.president)?.name ?? t.president}
+    chancellor={g.players.find(p => p.id === g.chancellor)?.name ?? t.chancellor}
+    visible={!alive || (g.phase === "veto" ? g.president !== id : !g.hand)}
+    paused={room.paused}
+    t={t}
+  /> : null;
   if (!alive)
     return (
       <div className="action-panel">
         <p>
           {g.players.some((p) => p.id === id) ? t.executed : t.spectatorNote}
         </p>
+        {progress}
       </div>
     );
   return (
@@ -904,6 +919,7 @@ function Actions({
         <h2>{g.phase === "executive" && g.power ? t[g.power] : t[g.phase]}</h2>
       </div>
       <PhaseHelp g={g} selfId={id} t={t} />
+      {progress}
       <fieldset disabled={disabled}>
         {g.phase === "nomination" &&
           (g.president === id ? (
@@ -960,26 +976,28 @@ function Actions({
             <>
               <div className="policy-hand">
                 {g.hand.map((p, i) => (
-                  <button
-                    key={i}
-                    className={`policy-card ${p}`}
-                    style={{ ["--i" as string]: i } as React.CSSProperties}
-                    onClick={() =>
+                  <PolicyCard
+                    key={`${g.phase}:${g.version}:${i}`}
+                    policy={p}
+                    index={i}
+                    title={p === "liberal" ? t.policyL : t.policyF}
+                    action={g.phase === "president_discard" ? t.discard : t.enact}
+                    selected={policyIndex === i}
+                    disabled={disabled}
+                    confirmHint={t.policyConfirmHint}
+                    onSelect={() => setPolicyIndex(i)}
+                    onClear={() => setPolicyIndex(value => value === i ? null : value)}
+                    onConfirm={() =>
                       act(
                         g.phase === "president_discard"
                           ? { type: "discard", index: i }
                           : { type: "enact", index: i },
                       )
                     }
-                  >
-                    <PolicyFace
-                      policy={p}
-                      title={p === "liberal" ? t.policyL : t.policyF}
-                      sub={g.phase === "president_discard" ? t.discard : t.enact}
-                    />
-                  </button>
+                  />
                 ))}
               </div>
+              <p className="hint">{t.policyGestureHint}</p>
               {g.phase === "chancellor_enact" &&
                 g.vetoEnabled &&
                 !g.vetoDenied && (
@@ -1001,13 +1019,7 @@ function Actions({
                 {t.vetoReject}
               </button>
             </div>
-          ) : (
-            <div className="locked-door">
-              <span className="door" aria-hidden="true" />
-              <p>{t.locked}</p>
-              <small>{t.wait}</small>
-            </div>
-          ))}
+          ) : null)}
         {g.phase === "executive" &&
           (g.president === id ? (
             <>
