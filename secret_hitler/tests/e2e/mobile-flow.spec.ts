@@ -10,16 +10,19 @@ import { createGame, transition, eligibleChancellors } from "../../packages/rule
 test("모바일: 공유·고정 좌석·10인 결과 확인·정책 엿보기·도움말 예시", async ({ page }) => {
   const dataDir = mkdtempSync(join(tmpdir(), "sh-ui-"));
   const rng = () => .42;
-  function fixture(code: string, n: number, mode: "nomination" | "result" | "peek") {
+  function fixture(code: string, n: number, mode: "nomination" | "voting" | "result" | "peek") {
     const token = `test-${code}-${"x".repeat(40)}`;
     const players = Array.from({ length: n }, (_, i) => ({ id: randomUUID(), name: `의원 ${i + 1}`, avatar: i }));
     let game = createGame(players, rng);
     for (const p of game.players) game = transition(game, p.id, { type: "acknowledge" }, rng);
     const selfId = players[0].id;
     game.president = selfId;
-    if (mode === "result") {
+    if (mode === "result" || mode === "voting") {
       game = transition(game, selfId, { type: "nominate", target: eligibleChancellors(game)[0] }, rng);
-      for (const [i, p] of game.players.entries()) game = transition(game, p.id, { type: "vote", ja: i < 6 }, rng);
+      for (const [i, p] of game.players.entries()) {
+        if (mode === "voting" && p.id === selfId) continue;
+        game = transition(game, p.id, { type: "vote", ja: i < 6 }, rng);
+      }
     }
     if (mode === "peek") {
       game.phase = "executive"; game.power = "peek";
@@ -32,6 +35,7 @@ test("모바일: 공유·고정 좌석·10인 결과 확인·정책 엿보기·�
   const nomination = fixture("ABCDEF", 10, "nomination");
   const result = fixture("GHJKLM", 10, "result");
   const peek = fixture("NPQRST", 5, "peek");
+  const voting = fixture("UVWXYZ", 10, "voting");
   const server = createGameServer({ dataDir, botDelayMs: 1000000 });
   await new Promise<void>((resolve) => server.server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${(server.server.address() as { port: number }).port}`;
@@ -50,6 +54,35 @@ test("모바일: 공유·고정 좌석·10인 결과 확인·정책 엿보기·�
     const after = await page.locator(".seat").evaluateAll((seats) => seats.map((s) => { const b = s.getBoundingClientRect(); return [b.x, b.y, b.width, b.height]; }));
     expect(after).toEqual(before);
     await expect(page.getByRole("button", { name: "공개 조서" })).toHaveCount(0);
+
+    for (const [width, height] of [[390, 844], [1440, 1050]]) {
+      await open(voting, width, height);
+      await expect(page.locator(".vote-down")).toHaveCount(9);
+      await expect(page.locator(".rig-wrap")).toHaveClass(/dual/);
+      await expect(page.locator(".rig .warm")).toHaveCount(2);
+      // Let the lamps settle after the seat layout has been measured.
+      await page.waitForTimeout(900);
+      const lamps = await page.evaluate(() => {
+        const center = (selector: string) => {
+          const b = document.querySelector(selector)!.getBoundingClientRect();
+          return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+        };
+        return [
+          [center(".seat.president"), center(".rig:not(.rig-secondary)")],
+          [center(".seat.chancellor"), center(".rig-secondary")],
+        ];
+      });
+      for (const [seat, lamp] of lamps) {
+        expect(Math.abs(seat.x - lamp.x)).toBeLessThan(2);
+        expect(Math.abs(seat.y - lamp.y)).toBeLessThan(2);
+      }
+      const namesVisible = await page.locator(".seat > strong").evaluateAll((names) => names.every((name) => {
+        const b = name.getBoundingClientRect();
+        return document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2) === name;
+      }));
+      expect(namesVisible).toBe(true);
+      await page.screenshot({ path: `test-results/voting-${width}.png`, animations: "disabled" });
+    }
 
     await open(result);
     await expect(page.locator(".ballot-flip")).toHaveCount(10);

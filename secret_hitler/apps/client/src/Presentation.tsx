@@ -316,6 +316,8 @@ export function tensionOf(g?: GameView | null) {
 function focusFor(view: RoomView | null, scene: Scene | null) {
   const g = view?.game,
     e = scene?.ev as any;
+  if (g?.phase === "voting")
+    return { id: g.president, night: false };
   if (scene) {
     if (scene.kind === "exec" || scene.kind === "focus" || e.type === "special_election")
       return { id: scene.focus ?? null, night: false };
@@ -348,9 +350,11 @@ export function LightRig({
   dip: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null),
+    secondRef = useRef<HTMLDivElement>(null),
     g = view?.game,
     tension = tensionOf(g),
     { id, night } = focusFor(view, scene),
+    secondId = g?.phase === "voting" ? g.chancellor : null,
     inGame = !!g && g.phase !== "finished";
   const place = useCallback(() => {
     const r = ref.current;
@@ -362,7 +366,16 @@ export function LightRig({
       x = b ? b.left + b.width / 2 : window.innerWidth / 2,
       y = b ? b.top + b.height / 2 : window.innerHeight * 0.4;
     r.style.transform = `translate(${x}px,${y}px)`;
-  }, [id]);
+    const second = secondId
+      ? document.querySelector(`[data-seat-id="${secondId}"]`)?.getBoundingClientRect()
+      : null;
+    const secondX = second ? second.left + second.width / 2 : x;
+    const secondY = second ? second.top + second.height / 2 : y;
+    r.style.setProperty("--second-dx", `${secondX - x}px`);
+    r.style.setProperty("--second-dy", `${secondY - y}px`);
+    if (secondRef.current)
+      secondRef.current.style.transform = `translate(${secondX}px,${secondY}px)`;
+  }, [id, secondId]);
   useLayoutEffect(place, [place, g?.version, g?.phase]);
   useEffect(() => {
     let raf = 0;
@@ -375,7 +388,11 @@ export function LightRig({
     };
     window.addEventListener("resize", on);
     window.addEventListener("scroll", on, { passive: true });
+    const observer = new ResizeObserver(on);
+    const table = document.querySelector("[data-table]");
+    if (table) observer.observe(table);
     return () => {
+      observer.disconnect();
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", on);
       window.removeEventListener("scroll", on);
@@ -393,11 +410,12 @@ export function LightRig({
   };
   useEffect(setVars, [tension, night, inGame]);
   return (
-    <div className={`rig-wrap ${dip ? "dip" : ""}`} aria-hidden="true">
+    <div className={`rig-wrap ${secondId ? "dual" : ""} ${dip ? "dip" : ""}`} aria-hidden="true">
       <div className="rig" ref={ref}>
         <div className="shade" />
         <div className="warm" />
       </div>
+      {secondId && <div className="rig rig-secondary" ref={secondRef}><div className="warm" /></div>}
       <div className="blk" />
       <div className="rim" />
     </div>
