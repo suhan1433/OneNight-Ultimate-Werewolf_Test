@@ -24,6 +24,8 @@ export const useApp = create<{
   connected: boolean;
   resuming: boolean;
   busy: boolean;
+  /** seat the local player is currently pointing at (never sent anywhere; drives the private lamp) */
+  pick: string;
   setRoom: (room: RoomView | null) => void;
   setError: (error: string | null) => void;
 }>((set) => ({
@@ -32,6 +34,7 @@ export const useApp = create<{
   connected: false,
   resuming: false,
   busy: false,
+  pick: "",
   setRoom: (room) => set({ room }),
   setError: (error) => set({ error }),
 }));
@@ -59,7 +62,7 @@ export function call<T = unknown>(
       .emit(event, data, (err: Error | null, result: Ack<T>) => {
         if (err)
           reject(
-            Error("서버 응답이 지연되고 있습니다. 연결 상태를 확인하십시오."),
+            Error("@errTimeout"),
           );
         else if (result.ok) resolve(result.data);
         else reject(Error(result.error));
@@ -68,7 +71,7 @@ export function call<T = unknown>(
 }
 export async function run(event: string, data: unknown = {}) {
   if (!socket.connected || useApp.getState().resuming) {
-    useApp.setState({ error: "연결 복구 후 다시 시도하십시오." });
+    useApp.setState({ error: "@errResuming" });
     return;
   }
   if (useApp.getState().busy) return;
@@ -113,7 +116,7 @@ function requestId(): string {
 }
 export async function leave() {
   if (!socket.connected) {
-    useApp.setState({ error: "연결 복구 후 나갈 수 있습니다." });
+    useApp.setState({ error: "@errLeaveOffline" });
     return;
   }
   try {
@@ -145,14 +148,14 @@ export function connect() {
   socket.on("connect_error", () => useApp.setState({ connected: false }));
   socket.on("REMOVED", () => {
     writeLocal("sh-session", "");
-    useApp.setState({ room: null, error: "방에서 퇴장했습니다." });
+    useApp.setState({ room: null, error: "@errRemoved" });
   });
   socket.on("SESSION_REPLACED", () => {
     writeLocal("sh-session", "");
     socket.disconnect();
     useApp.setState({
       room: null,
-      error: "다른 창에서 접속하여 이 세션이 종료되었습니다.",
+      error: "@errReplaced",
     });
   });
   socket.connect();

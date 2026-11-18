@@ -1,9 +1,14 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createRoot } from "react-dom/client";
 import type {
   GameView,
   RoomView,
-  Action,
   PublicEvent,
 } from "../../../packages/shared-types/src/index";
 import {
@@ -19,9 +24,18 @@ import {
   socket,
 } from "./store";
 import { copy, type Language, type Copy } from "./i18n";
-import { Portrait, Emblem, ARCHETYPES } from "./Art";
-import { Presentation } from "./Presentation";
+import "@fontsource/special-elite";
+import "@fontsource/nanum-gothic-coding";
+import "@fontsource/nanum-gothic-coding/700.css";
+import "@fontsource/stardos-stencil";
+import "@fontsource/noto-serif-kr/400.css";
+import "@fontsource/noto-serif-kr/600.css";
+import "@fontsource/noto-serif-kr/900.css";
+import { Portrait, Emblem, PolicyFace, ARCHETYPES } from "./Art";
+import { Presentation, useScenes, useTyped, playCue } from "./Presentation";
+import { layoutSeats, slotFor } from "./seatLayout";
 import "./styles.css";
+import "./stage.css";
 
 function Modal({
   title,
@@ -60,7 +74,30 @@ function Modal({
   );
 }
 function Home({ t }: { t: Copy }) {
-  const [introSkipped, setIntroSkipped] = useState(false);
+  const [introSkipped, setIntroSkipped] = useState(false),
+    [soundOn, setSoundOn] = useState(readLocal("sh-sound", "0") === "1");
+  const calm =
+    matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    document.body.dataset.reduce === "true";
+  // S0: dark → lamp lights → title is typed → "극비" stamp lands
+  const typed = useTyped("SECRET HITLER", !introSkipped && !calm, 95, 1100),
+    lastLen = useRef(0);
+  useEffect(() => {
+    if (introSkipped || calm) return;
+    document.body.dataset.intro = "true";
+    const a = setTimeout(() => delete document.body.dataset.intro, 900),
+      b = setTimeout(() => playCue("stamp"), 2700);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+      delete document.body.dataset.intro;
+    };
+  }, [introSkipped, calm]);
+  useEffect(() => {
+    if (!introSkipped && !calm && typed.length > lastLen.current && typed.trim())
+      playCue("tick");
+    lastLen.current = typed.length;
+  }, [typed, introSkipped, calm]);
   const [name, setName] = useState(readLocal("sh-name", "")),
     [avatar, setAvatar] = useState(Number(readLocal("sh-avatar", "0")) || 0);
   const [code, setCode] = useState(
@@ -83,11 +120,11 @@ function Home({ t }: { t: Copy }) {
         <div className="blinds" />
         <div className="home-folder">
           <span>
-            REIC H S T A G<br />
+            REICHSTAG<br />
             ARCHIV / 1932
           </span>
           <Emblem party="fascist" size={150} />
-          <b>STRENG GEHEIM</b>
+          <b>{t.topSecret}</b>
           <small>AKTE № 017—SH</small>
         </div>
         <div className="home-notes">
@@ -105,13 +142,29 @@ function Home({ t }: { t: Copy }) {
       </div>
       <section className="home-content">
         <p className="eyebrow">{t.tag}</p>
-        <h1>
-          SECRET
-          <br />
-          <span>HITLER</span>
+        <h1 aria-label="SECRET HITLER">
+          <i className="ty" aria-hidden="true">
+            {typed.slice(0, 6)}
+            <br />
+            <span>{typed.slice(7)}</span>
+            {typed.length < 13 && <b className="caret" />}
+          </i>
         </h1>
         <p className="korean-title">{t.title}</p>
         <p className="subtitle">{t.sub}</p>
+        <button
+          type="button"
+          className="sound-prompt"
+          aria-pressed={soundOn}
+          onClick={() => {
+            const next = readLocal("sh-sound", "0") !== "1";
+            writeLocal("sh-sound", next ? "1" : "0");
+            setSoundOn(next);
+            window.dispatchEvent(new Event("sh-sound"));
+          }}
+        >
+          {soundOn ? "◖)) " + t.soundOn : "◖× " + t.soundPrompt}
+        </button>
         <div className="home-facts">
           <span>05—10 PLAYERS</span>
           <span>30—45 MIN</span>
@@ -416,7 +469,7 @@ function SecretFile({
   return (
     <div className="secret-file">
       <button
-        className={`hold-file ${open ? "opened" : ""}`}
+        className={`hold-file ${open ? `opened ${g.selfRole}` : ""}`}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           reveal();
@@ -440,25 +493,22 @@ function SecretFile({
         onContextMenu={(e) => e.preventDefault()}
       >
         <span className="file-seal">
-          {open ? "DECLASSIFIED" : "STRENG GEHEIM"}
+          {open ? t.declassified : t.topSecret}
         </span>
         {open ? (
           <>
-            <Emblem party={g.selfRole} size={70} />
-            <h2>
-              {t[g.selfRole]}
-              {g.selfRole === "hitler" && " / HITLER"}
-            </h2>
+            <Emblem party={g.selfRole} size={76} />
+            <h2>{t[g.selfRole]}</h2>
             <p>{g.knownPlayers.length ? t.allies : t.noAllies}</p>
             {g.knownPlayers.map((p) => (
-              <div key={p.id}>
+              <div key={p.id} className="ally-line">
                 {g.players.find((q) => q.id === p.id)?.name} · {t[p.role]}
               </div>
             ))}
           </>
         ) : (
           <>
-            <span className="sealed-mark">▤</span>
+            <span className="envelope" aria-hidden="true" />
             <strong>{t.hold}</strong>
             <small>{t.release}</small>
           </>
@@ -480,7 +530,19 @@ function SecretFile({
     </div>
   );
 }
-function Track({ g, t }: { g: GameView; t: Copy }) {
+
+function Track({
+  g,
+  t,
+  full = false,
+}: {
+  g: GameView;
+  t: Copy;
+  full?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const pips = (n: number, have: number) =>
+    Array.from({ length: n }, (_, i) => <i key={i} className={i < have ? "on" : ""} />);
   const powers =
     g.players.length <= 6
       ? [null, null, "peek", "execute", "execute", null]
@@ -494,66 +556,301 @@ function Track({ g, t }: { g: GameView; t: Copy }) {
             "execute",
             null,
           ];
+  const short = (p: string | null) =>
+    p === "investigate"
+      ? t.investigateShort
+      : p === "special_election"
+        ? t.specialShort
+        : p === "peek"
+          ? t.peekShort
+          : p === "execute"
+            ? t.execute
+            : "";
   return (
-    <section className="policy-board" aria-label="Policy tracks">
+    <section
+      className={`policy-board ledger ${open ? "open" : ""} ${full ? "static" : ""} ${g.tracker >= 2 ? "tracker-warn" : ""}`}
+      aria-label={`${t.liberal} / ${t.fascist}`}
+    >
+      <button
+        className="ledger-mini"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span className="lm lib">
+          <Emblem party="liberal" size={20} />
+          {pips(5, g.liberal)}
+        </span>
+        <span className="lm fas">
+          <Emblem party="fascist" size={20} />
+          {pips(6, g.fascist)}
+        </span>
+        <span className="lm trk">
+          {t.tracker} {pips(3, g.tracker)}
+        </span>
+        <span aria-hidden="true">{open ? "−" : "＋"}</span>
+      </button>
+      <div className="ledger-full">
       <div className="policy-track liberal">
         <div className="track-title">
-          <Emblem party="liberal" />
-          <span>
-            {t.liberal}
-            <small>LIBERAL POLICIES</small>
-          </span>
+          <Emblem party="liberal" size={30} />
+          <span>{t.liberal}</span>
           <b>{g.liberal}/5</b>
         </div>
         <div className="track-slots">
           {Array.from({ length: 5 }, (_, i) => (
             <div key={i} className={i < g.liberal ? "enacted" : ""}>
-              <span>
-                {i < g.liberal ? "❧" : String(i + 1).padStart(2, "0")}
-              </span>
-              <small>{i === 4 ? "VICTORY" : "POLICY"}</small>
+              {i < g.liberal ? (
+                <Emblem party="liberal" size={28} />
+              ) : (
+                <span>{String(i + 1).padStart(2, "0")}</span>
+              )}
+              <small>{i === 4 ? t.victory : ""}</small>
             </div>
           ))}
         </div>
       </div>
       <div className="policy-track fascist">
         <div className="track-title">
-          <Emblem party="fascist" />
-          <span>
-            {t.fascist}
-            <small>FASCIST POLICIES</small>
-          </span>
+          <Emblem party="fascist" size={30} />
+          <span>{t.fascist}</span>
           <b>{g.fascist}/6</b>
         </div>
         <div className="track-slots">
           {Array.from({ length: 6 }, (_, i) => (
             <div key={i} className={i < g.fascist ? "enacted" : ""}>
-              <span>
-                {i < g.fascist ? "⚒" : String(i + 1).padStart(2, "0")}
-              </span>
+              {i < g.fascist ? (
+                <Emblem party="fascist" size={28} />
+              ) : (
+                <span>{String(i + 1).padStart(2, "0")}</span>
+              )}
               <small>
-                {powers[i] ? t[powers[i] as "peek"] : i === 5 ? "VICTORY" : "—"}
+                {i === 5 ? t.victory : short(powers[i])}
+                {i === 4 && ` · ${t.vetoShort}`}
               </small>
-              {i === 4 && <em>VETO</em>}
             </div>
           ))}
         </div>
       </div>
       <div className="board-meta">
-        <span>
-          {t.tracker} <i className={g.tracker >= 1 ? "lit" : ""} />
-          <i className={g.tracker >= 2 ? "lit" : ""} />
-          <i /> <b>{g.tracker}/3</b>
+        <span
+          className="tracker-gauge"
+          role="img"
+          aria-label={`${t.tracker} ${g.tracker}/3`}
+        >
+          {t.tracker}
+          {[1, 2, 3].map((n) => (
+            <i key={n} className={g.tracker >= n ? "lit" : ""} />
+          ))}
         </span>
         <span>
-          {t.deck} <b>{g.deckCount}</b> / {t.discardPile}{" "}
-          <b>{g.discardCount}</b>
+          {t.deck} <b>{g.deckCount}</b>
+        </span>
+        <span>
+          {t.discardPile} <b>{g.discardCount}</b>
         </span>
         {g.vetoEnabled && <span className="veto-seal">{t.vetoOpen}</span>}
+      </div>
       </div>
     </section>
   );
 }
+
+/** Long-press signature: deliberate, hard to mis-tap, keyboard accessible. */
+function HoldSign({
+  label,
+  ms,
+  danger,
+  disabled,
+  onDone,
+  t,
+}: {
+  label: string;
+  ms: number;
+  danger?: boolean;
+  disabled?: boolean;
+  onDone: () => void;
+  t: Copy;
+}) {
+  const [p, setP] = useState(0),
+    raf = useRef(0),
+    t0 = useRef(0),
+    fired = useRef(false);
+  const stop = () => {
+    cancelAnimationFrame(raf.current);
+    raf.current = 0;
+    t0.current = 0;
+    setP(0);
+  };
+  const step = (now: number) => {
+    if (!t0.current) t0.current = now;
+    const v = Math.min(1, (now - t0.current) / ms);
+    setP(v);
+    if (v >= 1) {
+      if (!fired.current) {
+        fired.current = true;
+        onDone();
+      }
+      return;
+    }
+    raf.current = requestAnimationFrame(step);
+  };
+  const begin = () => {
+    if (disabled || raf.current) return;
+    fired.current = false;
+    raf.current = requestAnimationFrame(step);
+  };
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  return (
+    <button
+      className={`hold-sign ${danger ? "danger" : "primary"}`}
+      style={{ ["--p" as string]: p } as React.CSSProperties}
+      disabled={disabled}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        begin();
+      }}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      onLostPointerCapture={stop}
+      onKeyDown={(e) => {
+        if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+          e.preventDefault();
+          begin();
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.key === " " || e.key === "Enter") stop();
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <span className="sign-fill" aria-hidden="true" />
+      <span className="sign-label">{label}</span>
+      <small>{t.holdSign}</small>
+    </button>
+  );
+}
+
+/** Ballot card: slide up to cast. Tap arms it, a second tap casts. */
+function BallotCard({
+  ja,
+  label,
+  onCast,
+}: {
+  ja: boolean;
+  label: string;
+  onCast: () => void;
+}) {
+  const [lift, setLift] = useState(0),
+    [armed, setArmed] = useState(false),
+    y0 = useRef<number | null>(null),
+    moved = useRef(false);
+  return (
+    <button
+      className={`ballot-card ${ja ? "ja" : "nein"} ${armed ? "armed" : ""}`}
+      style={{ ["--lift" as string]: `${lift}px` } as React.CSSProperties}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        y0.current = e.clientY;
+        moved.current = false;
+      }}
+      onPointerMove={(e) => {
+        if (y0.current === null) return;
+        const d = Math.max(0, y0.current - e.clientY);
+        if (d > 6) moved.current = true;
+        setLift(Math.min(d, 150));
+      }}
+      onPointerUp={() => {
+        if (y0.current === null) return;
+        const d = lift,
+          wasTap = !moved.current;
+        y0.current = null;
+        setLift(0);
+        if (d >= 70) onCast();
+        else if (wasTap) armed ? onCast() : setArmed(true);
+      }}
+      onPointerCancel={() => {
+        y0.current = null;
+        setLift(0);
+      }}
+      onClick={(e) => {
+        if (e.detail !== 0) return; // pointer taps are handled above
+        armed ? onCast() : setArmed(true);
+      }}
+      onBlur={() => setArmed(false)}
+    >
+      <span className="bc-glyph" aria-hidden="true">
+        {ja ? <Emblem party="liberal" size={34} /> : <Emblem party="fascist" size={34} />}
+      </span>
+      <strong>{label}</strong>
+    </button>
+  );
+}
+
+/** S10a: the investigated file opens under the lamp; only the acting president ever renders this. */
+function PartyCard({
+  g,
+  party,
+  target,
+  t,
+}: {
+  g: GameView;
+  party: "liberal" | "fascist";
+  target?: string;
+  t: Copy;
+}) {
+  const p = g.players.find((q) => q.id === target);
+  return (
+    <div className={`party-card ${party}`}>
+      <div className="pc-inner">
+        <div className="pc-back">
+          <span>{t.topSecret}</span>
+        </div>
+        <div className="pc-front">
+          <div className="pc-photo">
+            <Portrait avatar={p?.avatar ?? 0} />
+          </div>
+          <strong>{p?.name}</strong>
+          <Emblem party={party} size={40} />
+          <span>
+            {t.party}: {t[party]}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+/** S10c: the top three policies fan out for the president and are sealed again afterwards. */
+function PeekFan({
+  policies,
+  t,
+}: {
+  policies: ("liberal" | "fascist")[];
+  t: Copy;
+}) {
+  return (
+    <div className="peek-fan">
+      <div className="peek-cards">
+        {policies.map((p, i) => (
+          <div
+            key={i}
+            className={`peek-card ${p}`}
+            style={
+              { "--i": i - (policies.length - 1) / 2 } as React.CSSProperties
+            }
+          >
+            <PolicyFace
+              policy={p}
+              size={32}
+              title={p === "liberal" ? t.policyL : t.policyF}
+            />
+          </div>
+        ))}
+      </div>
+      <small>{t.sealedAfter}</small>
+    </div>
+  );
+}
+
 function Actions({
   room,
   t,
@@ -569,25 +866,17 @@ function Actions({
     id = room.selfId,
     alive = g.players.find((p) => p.id === id)?.alive,
     { busy, connected } = useApp();
-  const [confirm, setConfirm] = useState<Action | null>(null);
-  const targetSelect = (ids: string[]) => (
-    <>
-      <label>
-        {t.select}
-        <select
-          aria-label={t.select}
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
-        >
-          <option value="">—</option>
-          {ids.map((pid) => (
-            <option value={pid} key={pid}>
-              {g.players.find((p) => p.id === pid)?.name}
-            </option>
-          ))}
-        </select>
-      </label>
-    </>
+  const targetLine = (ids: string[]) => (
+    <p className="target-line" aria-live="polite">
+      {ids.includes(selected) ? (
+        <>
+          <span>{t.target}</span>
+          <strong>{g.players.find((p) => p.id === selected)?.name}</strong>
+        </>
+      ) : (
+        t.select
+      )}
+    </p>
   );
   const disabled = busy || !connected || room.paused;
   if (!alive)
@@ -605,21 +894,24 @@ function Actions({
       aria-live="polite"
     >
       <div className="action-heading">
-        <span className="eyebrow">CURRENT PROCEDURE</span>
+        <span className="eyebrow">{t.protocol}</span>
         <h2>{t[g.phase]}</h2>
       </div>
       <fieldset disabled={disabled}>
         {g.phase === "nomination" &&
           (g.president === id ? (
             <>
-              {targetSelect(g.eligibleChancellors)}
-              <button
-                className="primary"
+              {targetLine(g.eligibleChancellors)}
+              <HoldSign
+                t={t}
+                label={t.nominate}
+                ms={600}
                 disabled={!g.eligibleChancellors.includes(selected)}
-                onClick={() => act({ type: "nominate", target: selected })}
-              >
-                {t.nominate}
-              </button>
+                onDone={() => {
+                  act({ type: "nominate", target: selected });
+                  setSelected("");
+                }}
+              />
             </>
           ) : (
             <p>{t.wait}</p>
@@ -631,20 +923,21 @@ function Actions({
               {g.players.filter((p) => p.alive).length}
             </p>
           ) : (
-            <div className="ballots">
-              <button
-                className="ja"
-                onClick={() => act({ type: "vote", ja: true })}
-              >
-                {t.ja}
-              </button>
-              <button
-                className="nein"
-                onClick={() => act({ type: "vote", ja: false })}
-              >
-                {t.nein}
-              </button>
-            </div>
+            <>
+              <div className="ballots">
+                <BallotCard
+                  ja
+                  label={t.ja}
+                  onCast={() => act({ type: "vote", ja: true })}
+                />
+                <BallotCard
+                  ja={false}
+                  label={t.nein}
+                  onCast={() => act({ type: "vote", ja: false })}
+                />
+              </div>
+              <p className="hint">{t.swipeHint}</p>
+            </>
           ))}
         {["president_discard", "chancellor_enact", "veto"].includes(g.phase) &&
           (g.hand && g.phase !== "veto" ? (
@@ -654,6 +947,7 @@ function Actions({
                   <button
                     key={i}
                     className={`policy-card ${p}`}
+                    style={{ ["--i" as string]: i } as React.CSSProperties}
                     onClick={() =>
                       act(
                         g.phase === "president_discard"
@@ -662,11 +956,11 @@ function Actions({
                       )
                     }
                   >
-                    <Emblem party={p} size={54} />
-                    <strong>{p === "liberal" ? t.policyL : t.policyF}</strong>
-                    <small>
-                      {g.phase === "president_discard" ? t.discard : t.enact}
-                    </small>
+                    <PolicyFace
+                      policy={p}
+                      title={p === "liberal" ? t.policyL : t.policyF}
+                      sub={g.phase === "president_discard" ? t.discard : t.enact}
+                    />
                   </button>
                 ))}
               </div>
@@ -679,7 +973,7 @@ function Actions({
                 )}
             </>
           ) : g.phase === "veto" && g.president === id ? (
-            <div className="ballots">
+            <div className="ballots veto-answer">
               <button
                 onClick={() => act({ type: "answer_veto", accept: true })}
               >
@@ -693,7 +987,7 @@ function Actions({
             </div>
           ) : (
             <div className="locked-door">
-              <span>▥</span>
+              <span className="door" aria-hidden="true" />
               <p>{t.locked}</p>
               <small>{t.wait}</small>
             </div>
@@ -705,25 +999,14 @@ function Actions({
               {g.privateResult ? (
                 <div className="private-result">
                   {g.privateResult.party ? (
-                    <>
-                      <Emblem party={g.privateResult.party} />
-                      <strong>
-                        {
-                          g.players.find(
-                            (p) => p.id === g.privateResult?.target,
-                          )?.name
-                        }{" "}
-                        · {t.party}: {t[g.privateResult.party]}
-                      </strong>
-                    </>
+                    <PartyCard
+                      g={g}
+                      party={g.privateResult.party}
+                      target={g.privateResult.target}
+                      t={t}
+                    />
                   ) : (
-                    <div className="peek-policies">
-                      {g.privateResult.policies?.map((p, i) => (
-                        <span key={i} className={p}>
-                          {i + 1}. {p === "liberal" ? t.policyL : t.policyF}
-                        </span>
-                      ))}
-                    </div>
+                    <PeekFan policies={g.privateResult.policies ?? []} t={t} />
                   )}
                   <button
                     className="primary"
@@ -741,48 +1024,31 @@ function Actions({
                 </button>
               ) : (
                 <>
-                  {targetSelect(g.eligibleTargets)}
-                  <button
-                    className={g.power === "execute" ? "danger" : "primary"}
+                  {targetLine(g.eligibleTargets)}
+                  <HoldSign
+                    t={t}
+                    danger={g.power === "execute"}
+                    label={g.power ? t[g.power] : ""}
+                    ms={g.power === "execute" ? 1000 : 600}
                     disabled={!g.eligibleTargets.includes(selected)}
-                    onClick={() =>
-                      g.power === "execute"
-                        ? setConfirm({ type: "power", target: selected })
-                        : act({ type: "power", target: selected })
-                    }
-                  >
-                    {g.power && t[g.power]}
-                  </button>
+                    onDone={() => {
+                      act({ type: "power", target: selected });
+                      setSelected("");
+                    }}
+                  />
                 </>
               )}
             </>
           ) : (
-            <p>{t.wait}</p>
+            <p className="investigating">
+              {g.power === "investigate" ? t.investigating : t.wait}
+            </p>
           ))}
       </fieldset>
-      {confirm && (
-        <Modal title={t.execute} close={() => setConfirm(null)}>
-          <p>{t.executeAsk}</p>
-          <p>
-            <strong>{g.players.find((p) => p.id === selected)?.name}</strong>
-          </p>
-          <div className="modal-actions">
-            <button onClick={() => setConfirm(null)}>{t.cancel}</button>
-            <button
-              className="danger"
-              onClick={() => {
-                act(confirm);
-                setConfirm(null);
-              }}
-            >
-              {t.confirm}
-            </button>
-          </div>
-        </Modal>
-      )}
     </section>
   );
 }
+
 function TimeRemaining({ deadline }: { deadline: number | null }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -804,14 +1070,38 @@ function TimeRemaining({ deadline }: { deadline: number | null }) {
 function Board({ room, t }: { room: RoomView; t: Copy }) {
   const g = room.game!,
     [selected, setSelected] = useState(""),
-    [file, setFile] = useState(false);
+    [file, setFile] = useState(false),
+    [logOpen, setLogOpen] = useState(false),
+    [tableEl, setTableEl] = useState<HTMLDivElement | null>(null),
+    [box, setBox] = useState({ w: 340, h: 380 });
+  // seats are placed from the *measured* table box so they never overlap or clip
+  useLayoutEffect(() => {
+    if (!tableEl) return;
+    const measure = () => {
+      // floor the fractional flex size so seats can never poke past the real box
+      const r = tableEl.getBoundingClientRect();
+      setBox({ w: Math.floor(r.width), h: Math.floor(r.height) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(tableEl);
+    return () => ro.disconnect();
+  }, [tableEl]);
+  const ring = useMemo(
+    () => layoutSeats(box.w, box.h, g.players.length),
+    [box.w, box.h, g.players.length],
+  );
   useEffect(() => {
     setSelected("");
   }, [g.phase, g.round]);
+  useEffect(() => {
+    useApp.setState({ pick: selected });
+    return () => useApp.setState({ pick: "" });
+  }, [selected]);
   if (g.phase === "night")
     return (
       <main className="night content">
-        <p className="eyebrow">CLASSIFIED / EYES ONLY</p>
+        <p className="eyebrow">{t.eyesOnly}</p>
         <h1>{t.night}</h1>
         <SecretFile g={g} selfId={room.selfId} t={t} />
         <p className="fine-print">
@@ -823,21 +1113,46 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
     <main className="board content">
       <div className="session-line">
         <p className="eyebrow">
-          {t.session} {String(g.round).padStart(2, "0")} {t.sessionEnd} /{" "}
-          {room.code}
+          {t.session} {String(g.round).padStart(2, "0")} {t.sessionEnd}
+          <span className="room-code"> / {room.code}</span>
         </p>
-        <span>{t[g.phase]}</span>
+        <span className="phase-name">{t[g.phase]}</span>
         <TimeRemaining deadline={room.deadline} />
         {g.selfRole && (
-          <button onClick={() => setFile(!file)}>▤ {t.hold}</button>
+          <button
+            className="icon-btn"
+            aria-label={t.hold}
+            onClick={() => setFile(!file)}
+          >
+            ▤<span className="lbl"> {t.fileOpen}</span>
+          </button>
         )}
+        <button
+          className="icon-btn log-button"
+          aria-label={t.log}
+          onClick={() => setLogOpen(true)}
+        >
+          ≡<span className="lbl"> {t.log}</span>
+        </button>
       </div>
       <Track g={g} t={t} />
       <div className="assembly-layout">
         <section className="assembly">
-          <div className="round-table">
-            <div className="table-mark">
-              <Emblem party="liberal" size={90} />
+          <div
+            className="round-table"
+            data-table
+            ref={setTableEl}
+            style={
+              {
+                "--ph": `${ring.ph}px`,
+                "--sw": `${ring.sw}px`,
+                "--sh": `${ring.sh}px`,
+              } as React.CSSProperties
+            }
+          >
+            <div className="table-surface" aria-hidden="true" />
+            <div className="table-mark" aria-hidden="true">
+              <Emblem party="liberal" size={72} />
               <span>
                 PARLAMENT
                 <br />
@@ -853,17 +1168,30 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
                   (g.phase === "executive" &&
                     g.president === room.selfId &&
                     g.eligibleTargets.includes(p.id));
-              const angle = (i / g.players.length) * 2 * Math.PI - Math.PI / 2,
+              const selfIdx = Math.max(
+                  0,
+                  g.players.findIndex((q) => q.id === room.selfId),
+                ),
+                pos = slotFor(ring, i, selfIdx, g.players.length),
+                dx = box.w / 2 - pos.x,
+                dy = box.h / 2 - pos.y,
+                len = Math.hypot(dx, dy) || 1,
                 style = {
-                  "--seat-x": `${50 + 42 * Math.cos(angle)}%`,
-                  "--seat-y": `${50 + 39 * Math.sin(angle)}%`,
+                  left: pos.x,
+                  top: pos.y,
+                  // unit vector toward the table centre (where the ballot card lands)
+                  "--vx": dx / len,
+                  "--vy": dy / len,
                 } as React.CSSProperties;
+              const voted = g.phase === "voting" && g.voted.includes(p.id);
               return (
                 <button
                   key={p.id}
+                  data-seat-id={p.id}
                   style={style}
-                  className={`seat ${p.id === g.president ? "president" : ""} ${!p.alive ? "dead" : ""} ${selected === p.id ? "selected" : ""}`}
+                  className={`seat ${p.id === g.president ? "president" : ""} ${p.id === g.chancellor ? "chancellor" : ""} ${!p.alive ? "dead" : ""} ${selected === p.id ? "selected" : ""} ${candidate ? "candidate" : ""}`}
                   disabled={!candidate}
+                  aria-label={`${p.name}${p.id === g.president ? ` · ${t.president}` : ""}${p.id === g.chancellor ? ` · ${t.chancellor}` : ""}${!p.alive ? ` · ${t.executed}` : ""}`}
                   title={
                     !p.alive
                       ? t.executed
@@ -886,6 +1214,11 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
                 >
                   <div className="seat-photo">
                     <Portrait avatar={p.avatar} />
+                    {!p.alive && (
+                      <span className="dead-stamp">{t.executed}</span>
+                    )}
+                  </div>
+                  <div className="nameplates">
                     {p.id === g.president && (
                       <span className="office president-office">
                         {t.president}
@@ -899,22 +1232,18 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
                   </div>
                   <strong>
                     {p.name}
-                    {p.id === room.selfId && " · YOU"}
+                    {p.id === room.selfId && ` · ${t.you}`}
                   </strong>
                   <div className="seat-stamps">
-                    {!p.alive ? (
-                      <span>{t.executed}</span>
-                    ) : (
+                    {p.alive && (
                       <>
                         {p.investigated && <span>{t.investigated}</span>}
                         {p.notHitler && <span>{t.notHitler}</span>}
                         {!member?.connected && <span>{t.offline}</span>}
-                        {g.phase === "voting" && g.voted.includes(p.id) && (
-                          <span>✓</span>
-                        )}
                       </>
                     )}
                   </div>
+                  {voted && <span className="vote-down" aria-hidden="true" />}
                 </button>
               );
             })}
@@ -931,20 +1260,27 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
         </aside>
       </div>
       {file && (
-        <Modal title="CLASSIFIED" close={() => setFile(false)}>
+        <Modal title={t.topSecret} close={() => setFile(false)}>
           <SecretFile g={g} selfId={room.selfId} t={t} />
+        </Modal>
+      )}
+      {logOpen && (
+        <Modal title={t.log} close={() => setLogOpen(false)}>
+          <Log g={g} t={t} />
+          <Chat room={room} t={t} inline />
         </Modal>
       )}
     </main>
   );
 }
+
 function eventLabel(e: PublicEvent, t: Copy) {
   const labels: Record<string, string> = {
     start: t.night,
     night_end: t.nomination,
     nomination: t.nomination,
     policy: t.enact,
-    chaos: "CHAOS",
+    chaos: t.chaos,
     shuffle: t.deck,
     executive: t.executive,
     investigation: t.investigate,
@@ -961,7 +1297,7 @@ function Log({ g, t }: { g: GameView; t: Copy }) {
     <section className="log">
       <h2>
         <span>☷</span> {t.log}
-        <small>PROTOKOLL</small>
+        <small>{t.protocol}</small>
       </h2>
       <div className="log-entries">
         {[...g.events].reverse().map((e) => (
@@ -972,8 +1308,8 @@ function Log({ g, t }: { g: GameView; t: Copy }) {
                 {e.type === "vote"
                   ? Object.values(e.votes ?? {}).filter(Boolean).length >
                     Object.keys(e.votes ?? {}).length / 2
-                    ? "JA!"
-                    : "NEIN!"
+                    ? t.approved
+                    : t.rejected
                   : eventLabel(e, t)}
               </strong>
               {e.policy && (
@@ -1001,7 +1337,7 @@ function Log({ g, t }: { g: GameView; t: Copy }) {
                   {Object.entries(e.votes).map(([id, ja]) => (
                     <span key={id} className={ja ? "vote-ja" : "vote-nein"}>
                       {g.players.find((p) => p.id === id)?.name}:{" "}
-                      {ja ? "Ja!" : "Nein!"}
+                      {ja ? t.jaShort : t.neinShort}
                     </span>
                   ))}
                 </div>
@@ -1013,9 +1349,17 @@ function Log({ g, t }: { g: GameView; t: Copy }) {
     </section>
   );
 }
-function Chat({ room, t }: { room: RoomView; t: Copy }) {
+function Chat({
+  room,
+  t,
+  inline = false,
+}: {
+  room: RoomView;
+  t: Copy;
+  inline?: boolean;
+}) {
   const [text, setText] = useState(""),
-    [open, setOpen] = useState(false),
+    [open, setOpen] = useState(inline),
     ref = useRef<HTMLDivElement>(null);
   const g = room.game,
     p = g?.players.find((p) => p.id === room.selfId),
@@ -1030,17 +1374,19 @@ function Chat({ room, t }: { room: RoomView; t: Copy }) {
     ref.current?.scrollTo(0, ref.current.scrollHeight);
   }, [room.chat.length, open]);
   return (
-    <div className={`chat ${open ? "chat-open" : ""}`}>
-      <button
-        className="chat-toggle"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        {t.chat}
-        <span>
-          {room.chat.length} {open ? "−" : "＋"}
-        </span>
-      </button>
+    <div className={`chat ${open ? "chat-open" : ""} ${inline ? "chat-inline" : ""}`}>
+      {!inline && (
+        <button
+          className="chat-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          {t.chat}
+          <span>
+            {room.chat.length} {open ? "−" : "＋"}
+          </span>
+        </button>
+      )}
       {open && (
         <>
           <div className="messages" ref={ref}>
@@ -1088,9 +1434,12 @@ function Results({ room, t }: { room: RoomView; t: Copy }) {
     a.click();
     URL.revokeObjectURL(url);
   }
+  const name = (id?: string) => g.players.find((p) => p.id === id)?.name ?? "";
   return (
     <main className={`results content ${g.winner ?? ""}`}>
-      <p className="eyebrow">FINAL REPORT / {room.code}</p>
+      <p className="eyebrow">
+        {t.finished} / {room.code}
+      </p>
       <Emblem party={g.winner ?? "liberal"} size={90} />
       <h1>
         {g.winner === "liberal"
@@ -1110,15 +1459,26 @@ function Results({ room, t }: { room: RoomView; t: Copy }) {
               : t.reasonElection
             : t.reasonEnded}
       </p>
-      <Track g={g} t={t} />
+      <Track g={g} t={t} full />
       <div className="result-roles">
-        {g.players.map((p) => (
-          <article key={p.id}>
-            <Portrait avatar={p.avatar} />
-            <strong>{p.name}</strong>
-            <span>{g.revealedRoles && t[g.revealedRoles[p.id]]}</span>
-          </article>
-        ))}
+        {g.players.map((p, i) => {
+          const role = g.revealedRoles?.[p.id];
+          return (
+            <article
+              key={p.id}
+              className={role ? `role-${role}` : ""}
+              style={{ ["--i" as string]: i } as React.CSSProperties}
+            >
+              <Portrait avatar={p.avatar} />
+              <strong>{p.name}</strong>
+              <span className="role-line">
+                {role && <Emblem party={role} size={20} />}
+                {role && t[role]}
+                <i className="redact-bar" aria-hidden="true" />
+              </span>
+            </article>
+          );
+        })}
       </div>
       <div className="result-actions">
         {room.hostId === room.selfId && (
@@ -1133,26 +1493,59 @@ function Results({ room, t }: { room: RoomView; t: Copy }) {
       {replay && (
         <section className="paper replay">
           <h2>{t.replay}</h2>
-          {g.replay?.map((r, i) => (
-            <p key={i}>
-              <b>
-                #{i + 1} / {r.round}
-              </b>{" "}
-              {g.players.find((p) => p.id === r.actor)?.name} · {r.action.type}{" "}
-              {"target" in r.action &&
-                g.players.find(
-                  (p) => p.id === ("target" in r.action ? r.action.target : ""),
-                )?.name}{" "}
-              {"ja" in r.action && (r.action.ja ? "Ja!" : "Nein!")}{" "}
-              {"index" in r.action && `[${r.action.index + 1}]`}{" "}
-              {r.hand.length > 0 && `(${r.hand.map((p) => t[p]).join(", ")})`}
-            </p>
-          ))}
+          {g.replay?.map((r, i) => {
+            const a = r.action as any,
+              verb =
+                a.type === "acknowledge"
+                  ? t.r_ack
+                  : a.type === "nominate"
+                    ? t.r_nominate
+                    : a.type === "vote"
+                      ? a.ja
+                        ? t.r_vote_ja
+                        : t.r_vote_nein
+                      : a.type === "discard"
+                        ? t.r_discard
+                        : a.type === "enact"
+                          ? t.r_enact
+                          : a.type === "request_veto"
+                            ? t.r_request_veto
+                            : a.type === "answer_veto"
+                              ? a.accept
+                                ? t.r_veto_yes
+                                : t.r_veto_no
+                              : a.type === "power"
+                                ? t.r_power
+                                : a.type === "confirm_power"
+                                  ? t.r_confirm
+                                  : a.type;
+            return (
+              <p key={i} className={`replay-line ${a.type}`}>
+                <b>
+                  {String(i + 1).padStart(3, "0")} · {t.session} {r.round}
+                </b>
+                <span>
+                  {name(r.actor)} — {verb}
+                  {a.target ? ` → ${name(a.target)}` : ""}
+                </span>
+                {r.hand.length > 0 && (
+                  <span className="hand">
+                    {r.hand.map((p, j) => (
+                      <i key={j} className={p}>
+                        {p === "liberal" ? "L" : "F"}
+                      </i>
+                    ))}
+                  </span>
+                )}
+              </p>
+            );
+          })}
         </section>
       )}
     </main>
   );
 }
+
 function Rulebook({ t, lang }: { t: Copy; lang: Language }) {
   return (
     <div className="rulebook">
@@ -1305,6 +1698,11 @@ function App() {
       ) === "1",
     ),
     [low, setLow] = useState(readLocal("sh-low", "0") === "1");
+  const { view, scene, skip } = useScenes(room, reduce);
+  // action clock and pause are always the server's truth, even while a scene delays the rest
+  const shown = (
+    view && room ? { ...view, deadline: room.deadline, paused: room.paused } : (view ?? room)
+  ) as RoomView;
   useEffect(() => {
     document.documentElement.lang = lang;
     document.body.dataset.reduce = String(reduce);
@@ -1312,12 +1710,23 @@ function App() {
     writeLocal("sh-reduce", reduce ? "1" : "0");
     writeLocal("sh-low", low ? "1" : "0");
   }, [lang, reduce, low]);
+  useEffect(() => {
+    document.body.dataset.stage = String(
+      !!shown?.game && shown.game.phase !== "finished",
+    );
+  }, [shown?.game?.phase, !!shown?.game]);
   return (
     <>
-      <Presentation room={room} t={t} reduced={reduce} />
+      <Presentation
+        view={view}
+        scene={scene}
+        skip={skip}
+        t={t}
+        reduced={reduce}
+      />
       <div className="ambient" aria-hidden="true">
-        <div className="ceiling-light" />
-        <div className="light-cone" />
+        <div className="wall" />
+        <div className="lamp-fixture" />
         <div className="vignette" />
       </div>
       <header className="topbar">
@@ -1363,12 +1772,12 @@ function App() {
         <main className="loading">{t.reconnecting}</main>
       ) : !room ? (
         <Home t={t} />
-      ) : !room.game ? (
+      ) : !shown.game ? (
         <Lobby room={room} t={t} />
-      ) : room.game.phase === "finished" ? (
-        <Results room={room} t={t} />
+      ) : shown.game.phase === "finished" ? (
+        <Results room={shown} t={t} />
       ) : (
-        <Board room={room} t={t} />
+        <Board room={shown} t={t} />
       )}
       <footer>
         <span>SECRET HITLER / NON-COMMERCIAL FAN ADAPTATION</span>
@@ -1516,7 +1925,11 @@ function App() {
       )}
       {error && (
         <div role="alert" className="toast">
-          <span>{error}</span>
+          <span>
+            {error.startsWith("@")
+              ? ((t[error.slice(1) as keyof Copy] as string | undefined) ?? error)
+              : error}
+          </span>
           <button
             aria-label="Close"
             onClick={() => useApp.getState().setError(null)}
@@ -1538,3 +1951,4 @@ if (
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("/secret_hitler/sw.js");
   });
+

@@ -1,11 +1,11 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700;900&family=Special+Elite&display=swap");
+/* Fonts are self-hosted via @fontsource imports in main.tsx (offline / Capacitor safe). */
 :root {
   font-family: "Noto Serif KR", Georgia, serif;
   color: #d2d0bd;
-  background: #171a19;
+  background: #171818;
   font-synthesis: none;
   --ink: #d2d0bd;
-  --muted: #94978a;
+  --muted: #8a8c8e;
   --brass: #b5a279;
   --paper: #c9c2a4;
   --blue: #73909b;
@@ -34,8 +34,8 @@ select {
 }
 button {
   color: inherit;
-  background: #272d28;
-  border: 1px solid #73766566;
+  background: #28292a;
+  border: 1px solid #686b6d66;
   padding: 12px 19px;
   cursor: pointer;
   transition:
@@ -46,7 +46,7 @@ button {
   line-height: 1.45;
 }
 button:hover:enabled {
-  background: #343c32;
+  background: #343637;
   border-color: var(--brass);
 }
 button:active:enabled {
@@ -65,8 +65,8 @@ select:focus-visible {
 }
 input,
 select {
-  background: #151b17;
-  border: 1px solid #747b6266;
+  background: #161718;
+  border: 1px solid #686c6f66;
   color: var(--ink);
   width: 100%;
   min-height: 45px;
@@ -74,7 +74,7 @@ select {
   border-radius: 2px;
 }
 input::placeholder {
-  color: #757c70;
+  color: #717374;
 }
 input[type="checkbox"] {
   width: 17px;
@@ -130,13 +130,13 @@ button.full {
 }
 .primary {
   background: #b5a279;
-  color: #171b18;
+  color: #181819;
   border-color: #b5a279;
   font-weight: 700;
 }
 .primary:hover:enabled {
   background: #cabc91;
-  color: #171b18;
+  color: #181819;
 }
 .danger {
   background: #572e2c;
@@ -144,7 +144,7 @@ button.full {
   border-color: #7d4c43;
 }
 .dashed {
-  border: 1px dashed #777b6466;
+  border: 1px dashed #696d6f66;
   background: transparent;
   width: 100%;
   margin-top: 18px;
@@ -160,7 +160,7 @@ button.full {
   color: var(--muted);
 }
 .eyebrow {
-  font-family: "Special Elite", "Courier New", monospace;
+  font-family: "Special Elite", "Nanum Gothic Coding", "Courier New", monospace;
   font-size: 11px;
   letter-spacing: 0.15em;
   color: var(--brass);
@@ -187,8 +187,8 @@ button.full {
   overflow: hidden;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 50% 0%, #3f453126, transparent 55%),
-    linear-gradient(110deg, #151918, #242b25 48%, #141a18);
+    radial-gradient(ellipse at 50% 0%, #373a3c26, transparent 55%),
+    linear-gradient(110deg, #161617, #252627 48%, #151617);
 }
 .ambient:after {
   content: "";
@@ -203,7 +203,7 @@ button.full {
   top: 0;
   width: 2px;
   height: 90px;
-  background: #474d3d;
+  background: #414345;
   z-index: 2;
 }
 .ceiling-light:before {
@@ -213,7 +213,7 @@ button.full {
   top: 78px;
   width: 50px;
   height: 12px;
-  background: #757760;
+  background: #65696b;
   border-radius: 50% 50% 0 0;
   box-shadow: 0 5px 22px #d5d0a444;
 }
@@ -254,14 +254,14 @@ button.full {
   border-bottom: 1px solid var(--line);
   position: relative;
   z-index: 5;
-  background: #11161366;
+  background: #12131466;
 }
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  font-family: "Special Elite", monospace;
+  font-family: "Special Elite", "Nanum Gothic Coding", monospace;
   font-size: 16px;
   letter-spacing: 0.1em;
 }
@@ -270,7 +270,7 @@ button.full {
   font-family: Georgia, serif;
   font-size: 8px;
   letter-spacing: 0.18em;
-  color: #888e7a;
+  color: #7d8183;
   margin-top: 5px;
 }
 .topbar nav {
@@ -314,7 +314,7 @@ footer {
   font-family: "Courier New", monospace;
   font-size: 10px;
   letter-spacing: 0.08em;
-  color: #858a79;
+  color: #7b7e80;
   position: relative;
 }
 footer button {
@@ -359,7 +359,7 @@ body:has(.chat) footer {
 }
 .subtitle {
   font-size: 15px;
-  color: #a8ae9c;
+  color: #9da0a3;
   letter-spacing: 0.05em;
 }
 .home-facts {
@@ -415,7 +415,7 @@ body:has(.chat) footer {
   margin: 20px 0 16px;
 }
 .join-form input {
-  font-family: "Special Elite", monospace;
+  font-family: "Special Elite", "Nanum Gothic Coding", monospace;
   letter-spacing: 0.2em;
 }
 .join-form button {
@@ -428,7 +428,7 @@ body:has(.chat) footer {
 .home-scene {
   position: relative;
   min-height: 800px;
-  background: radial-gradient(ellipse at 65% 40%, #6871551c, transparent 60%);
+  background: radial-gradient(ellipse at 65% 40%, #5c61641c, transparent 60%);
 }
 .blinds {
   position: absolute;
@@ -436,14 +436,14 @@ body:has(.chat) footer {
   top: 75px;
   width: 90%;
   height: 235px;
-  border: 10px solid #1b211e;
+  border: 10px solid #1c1d1e;
   transform: perspective(500px) rotateY(12deg) rotateZ(-5deg);
   background: repeating-linear-gradient(
     0deg,
-    #a2ab831a 0px,
-    #a2ab831a 5px,
-    #0f1713 6px,
-    #0f1713 24px
+    #8d93981a 0px,
+    #8d93981a 5px,
+    #111314 6px,
+    #111314 24px
   );
   box-shadow: 0 15px 70px #0009;
 }
@@ -457,11 +457,11 @@ body:has(.chat) footer {
   background: linear-gradient(135deg, #716c4c, #57573f 50%, #666549);
   box-shadow:
     12px 25px 40px #0008,
-    inset 0 0 80px #1e241b88;
+    inset 0 0 80px #1d1f2088;
   padding: 32px;
   border: 1px solid #87856655;
   border-radius: 2px;
-  color: #22291f;
+  color: #222324;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -479,20 +479,20 @@ body:has(.chat) footer {
 }
 .home-folder > span {
   align-self: flex-start;
-  font-family: "Special Elite", monospace;
+  font-family: "Special Elite", "Nanum Gothic Coding", monospace;
   font-size: 13px;
   letter-spacing: 0.15em;
   line-height: 1.8;
 }
 .home-folder .emblem {
-  color: #313b2a;
+  color: #2f3133;
   opacity: 0.8;
 }
 .home-folder b {
   border: 3px double #512e25;
   padding: 7px 13px;
   transform: rotate(-7deg);
-  font-family: "Special Elite", monospace;
+  font-family: "Special Elite", "Nanum Gothic Coding", monospace;
   letter-spacing: 0.2em;
   font-size: 18px;
   color: #512e25;
@@ -515,7 +515,7 @@ body:has(.chat) footer {
   padding: 28px 35px;
   transform: rotate(10deg);
   font:
-    14px/2.3 "Special Elite",
+    14px/2.3 "Special Elite", "Nanum Gothic Coding",
     monospace;
   box-shadow: 10px 10px 40px #0007;
   z-index: 1;
@@ -525,8 +525,8 @@ body:has(.chat) footer {
   width: 110px;
   height: 110px;
   border-radius: 50%;
-  background: conic-gradient(#333c30, #7d826b, #252e24, #82876c, #252e24);
-  border: 9px solid #292f27;
+  background: conic-gradient(#333536, #707376, #262829, #72767a, #262829);
+  border: 9px solid #292a2b;
   box-shadow: 5px 10px 30px #000a;
   left: 18%;
   top: 750px;
@@ -536,7 +536,7 @@ body:has(.chat) footer {
   position: absolute;
   inset: 37px;
   border-radius: 50%;
-  background: #22281f;
+  background: #212324;
 }
 .section-title {
   display: flex;
@@ -554,7 +554,7 @@ body:has(.chat) footer {
   display: flex;
   align-items: center;
   gap: 18px;
-  background: #10171377;
+  background: #12131477;
   border: 1px solid var(--line);
   padding: 14px 18px;
 }
@@ -563,7 +563,7 @@ body:has(.chat) footer {
 }
 .registration strong {
   font:
-    26px "Special Elite",
+    26px "Special Elite", "Nanum Gothic Coding",
     monospace;
   letter-spacing: 0.12em;
 }
@@ -582,7 +582,7 @@ body:has(.chat) footer {
   display: flex;
   justify-content: space-between;
   font:
-    11px "Special Elite",
+    11px "Special Elite", "Nanum Gothic Coding",
     monospace;
   color: var(--muted);
   padding-bottom: 17px;
@@ -599,9 +599,9 @@ body:has(.chat) footer {
   display: grid;
   grid-template-columns: 66px 1fr;
   column-gap: 18px;
-  background: linear-gradient(120deg, #363d2f, #292f25);
+  background: linear-gradient(120deg, #323536, #27292a);
   padding: 34px 20px 18px;
-  border: 1px solid #767d5b44;
+  border: 1px solid #646a6d44;
   min-height: 145px;
   box-shadow: 0 5px 12px #0002;
 }
@@ -612,25 +612,25 @@ body:has(.chat) footer {
   top: -4px;
   width: 11px;
   height: 27px;
-  border: 2px solid #9a9d8466;
+  border: 2px solid #898d9066;
   border-radius: 4px;
   transform: rotate(12deg);
 }
 .dossier.ready {
-  border-color: #93966b77;
+  border-color: #777e8377;
 }
 .file-number {
   position: absolute;
   top: 11px;
   left: 20px;
   font:
-    9px "Special Elite",
+    9px "Special Elite", "Nanum Gothic Coding",
     monospace;
   letter-spacing: 0.14em;
-  color: #92967e;
+  color: #828689;
 }
 .dossier .portrait {
-  border: 3px solid #8b8c7133;
+  border: 3px solid #777b7e33;
 }
 .dossier h3 {
   font-size: 16px;
@@ -656,19 +656,19 @@ body:has(.chat) footer {
 }
 .empty-file {
   min-height: 145px;
-  border: 1px dashed #868c6a44;
+  border: 1px dashed #73787c44;
   display: grid;
   place-items: center;
-  color: #656c58;
+  color: #5c6062;
   font:
-    10px "Special Elite",
+    10px "Special Elite", "Nanum Gothic Coding",
     monospace;
   letter-spacing: 0.15em;
 }
 .paper {
   padding: 28px;
   background: linear-gradient(120deg, #d0c7a9, #bdb699);
-  color: #242d25;
+  color: #262729;
   border: 1px solid #dad1b0;
   box-shadow: 0 8px 30px #0004;
   position: relative;
@@ -677,32 +677,32 @@ body:has(.chat) footer {
   content: "";
   position: absolute;
   inset: 8px;
-  border: 1px solid #31392322;
+  border: 1px solid #2a2d3022;
   pointer-events: none;
 }
 .paper .eyebrow {
-  color: #5a624b;
+  color: #515457;
 }
 .paper .fine-print {
-  color: #626851;
+  color: #575a5d;
 }
 .paper h2 {
   font-size: 21px;
 }
 .paper button {
-  border-color: #525d4488;
-  background: #6c745d22;
-  color: #283221;
+  border-color: #4b4f5188;
+  background: #62666822;
+  color: #26292b;
 }
 .paper .primary {
-  background: #313f2e;
+  background: #333537;
   color: #e1dcc3;
 }
 .paper input,
 .paper select {
   background: #b0ad8e88;
-  color: #25321f;
-  border-color: #7e856333;
+  color: #25282a;
+  border-color: #6c717533;
 }
 .settings {
   align-self: start;
@@ -715,7 +715,7 @@ body:has(.chat) footer {
 }
 .rule-divider {
   height: 1px;
-  background: #4d5c3b44;
+  background: #454a4e44;
   margin: 24px 0;
 }
 .balance {
@@ -750,7 +750,7 @@ body:has(.chat) footer {
   min-height: 310px;
   padding: 40px 24px 30px;
   width: 100%;
-  background: linear-gradient(130deg, #554f37, #383e2e);
+  background: linear-gradient(130deg, #554f37, #323537);
   color: #ccc3a5;
   box-shadow: 0 15px 55px #0005;
   touch-action: none;
@@ -760,15 +760,15 @@ body:has(.chat) footer {
   position: relative;
 }
 .hold-file.opened {
-  background: #141c18;
-  border-color: #7d8a6e;
+  background: #161718;
+  border-color: #74797c;
 }
 .hold-file h2 {
   margin: 18px 0 12px;
 }
 .hold-file small {
   margin-top: 12px;
-  color: #a4a58a;
+  color: #8f9497;
 }
 .hold-file p {
   font-size: 12px;
@@ -783,7 +783,7 @@ body:has(.chat) footer {
   right: 18px;
   top: 16px;
   font:
-    10px "Special Elite",
+    10px "Special Elite", "Nanum Gothic Coding",
     monospace;
   color: #a47460;
   letter-spacing: 0.12em;
@@ -816,19 +816,19 @@ body:has(.chat) footer {
   margin: 0;
 }
 .session-line > span {
-  color: #b8bea7;
+  color: #aaaeb1;
 }
 .session-line button {
   font-size: 10px;
   padding: 6px 9px;
   background: transparent;
-  border-color: #7d856333;
+  border-color: #6c717533;
 }
 .board {
   padding-top: 32px;
 }
 .policy-board {
-  background: #11191599;
+  background: #13151599;
   border: 1px solid var(--line);
   padding: 22px 26px 15px;
   display: grid;
@@ -855,7 +855,7 @@ body:has(.chat) footer {
 .track-title small {
   display: block;
   font:
-    8px "Special Elite",
+    8px "Special Elite", "Nanum Gothic Coding",
     monospace;
   letter-spacing: 0.13em;
   margin-top: 5px;
@@ -887,7 +887,7 @@ body:has(.chat) footer {
   opacity: 1;
   background: #4e697142;
   border: 1px solid currentColor;
-  box-shadow: inset 0 0 22px #121a1655;
+  box-shadow: inset 0 0 22px #14161655;
 }
 .fascist .track-slots > div.enacted {
   background: #7c3c373d;
@@ -907,7 +907,7 @@ body:has(.chat) footer {
   font: 7px monospace;
   position: absolute;
   bottom: -6px;
-  background: #171f19;
+  background: #191a1b;
   padding: 1px 4px;
   font-style: normal;
 }
@@ -930,7 +930,7 @@ body:has(.chat) footer {
 .board-meta i {
   width: 10px;
   height: 10px;
-  border: 1px solid #7e876866;
+  border: 1px solid #70757866;
   border-radius: 50%;
   display: inline-block;
 }
@@ -965,13 +965,13 @@ body:has(.chat) footer {
   content: "";
   position: absolute;
   inset: 100px 95px 80px;
-  border: 9px solid #434c3a55;
+  border: 9px solid #3f414355;
   border-radius: 50%;
-  background: radial-gradient(ellipse, #39463188, #25312099);
+  background: radial-gradient(ellipse, #373a3d88, #25282a99);
   box-shadow:
     0 12px 35px #0005,
-    inset 0 0 0 2px #141e16,
-    inset 0 0 40px #111a15;
+    inset 0 0 0 2px #17181a,
+    inset 0 0 40px #141516;
 }
 .table-mark {
   position: absolute;
@@ -983,9 +983,9 @@ body:has(.chat) footer {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  color: #acb293;
+  color: #999ea2;
   font:
-    10px/1.8 "Special Elite",
+    10px/1.8 "Special Elite", "Nanum Gothic Coding",
     monospace;
   letter-spacing: 0.2em;
 }
@@ -1018,11 +1018,11 @@ body:has(.chat) footer {
   transform: translate(-50%, -50%);
 }
 .seat:hover:enabled {
-  background: #43513988;
+  background: #40434688;
 }
 .seat.selected {
   border-color: var(--brass);
-  background: #4e583733;
+  background: #41464a33;
 }
 .seat-photo {
   width: 57px;
@@ -1030,7 +1030,7 @@ body:has(.chat) footer {
   margin-bottom: 7px;
 }
 .seat .portrait {
-  border: 2px solid #a9ac8b44;
+  border: 2px solid #92989c44;
   box-shadow: 0 3px 12px #0005;
   filter: brightness(0.75) sepia(0.2);
 }
@@ -1057,11 +1057,11 @@ body:has(.chat) footer {
 .president-office {
   top: -10px;
   background: #c6b98d;
-  color: #222e21;
+  color: #252728;
 }
 .chancellor-office {
   bottom: 0;
-  background: #333f34;
+  background: #363839;
   color: #c8c3a5;
 }
 .seat-stamps {
@@ -1076,8 +1076,8 @@ body:has(.chat) footer {
   font-size: 7px;
   line-height: 1.3;
   padding: 2px 3px;
-  border: 1px solid #8b9b7466;
-  color: #b2b89b;
+  border: 1px solid #7e848966;
+  color: #a0a5a9;
 }
 .seat.dead {
   opacity: 0.45 !important;
@@ -1088,7 +1088,7 @@ body:has(.chat) footer {
 }
 .action-panel {
   padding: 25px 28px;
-  background: #202a2099;
+  background: #23242599;
   border: 1px solid var(--line);
   box-shadow: 0 7px 20px #0002;
 }
@@ -1127,8 +1127,8 @@ body:has(.chat) footer {
   font-size: 22px;
   letter-spacing: 0.03em;
   background: #b9b494;
-  color: #263321;
-  border: 3px double #747e5b;
+  color: #26292b;
+  border: 3px double #646a6e;
   max-width: 280px;
 }
 .ballots button.nein {
@@ -1225,7 +1225,7 @@ body:has(.chat) footer {
 }
 .log {
   border: 1px solid var(--line);
-  background: #121a1599;
+  background: #14161699;
 }
 .log h2 {
   font-size: 14px;
@@ -1239,7 +1239,7 @@ body:has(.chat) footer {
 .log h2 small {
   margin-left: auto;
   font:
-    9px "Special Elite",
+    9px "Special Elite", "Nanum Gothic Coding",
     monospace;
   color: var(--muted);
 }
@@ -1247,21 +1247,21 @@ body:has(.chat) footer {
   max-height: 675px;
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: #70765b #1a221a;
+  scrollbar-color: #626669 #1c1d1e;
 }
 .log article {
   display: flex;
   gap: 12px;
   padding: 18px 15px;
-  border-bottom: 1px solid #7e856320;
+  border-bottom: 1px solid #6c717520;
   font-size: 11px;
   line-height: 1.7;
 }
 .log-index {
   font:
-    10px "Special Elite",
+    10px "Special Elite", "Nanum Gothic Coding",
     monospace;
-  color: #727d64;
+  color: #6a6e71;
   padding-top: 3px;
 }
 .log article > div {
@@ -1292,10 +1292,10 @@ body:has(.chat) footer {
 .vote-record span {
   font-size: 9px;
   padding: 1px 4px;
-  border: 1px solid #87966e33;
+  border: 1px solid #787f8433;
 }
 .vote-ja {
-  color: #aab79b;
+  color: #a0a5a8;
 }
 .vote-nein {
   color: #ae8b76;
@@ -1325,7 +1325,7 @@ body:has(.chat) footer {
 }
 .result-roles article {
   border: 1px solid var(--line);
-  background: #2b3429;
+  background: #2c2d2f;
   padding: 15px;
   display: flex;
   align-items: center;
@@ -1372,14 +1372,14 @@ body:has(.chat) footer {
   right: 25px;
   width: 320px;
   z-index: 20;
-  border: 1px solid #7b836255;
+  border: 1px solid #6b707455;
   box-shadow: 0 -5px 40px #0004;
-  background: #20291f;
+  background: #222324;
 }
 .chat-toggle {
   border: 0;
   border-bottom: 1px solid var(--line);
-  background: #293325;
+  background: #292b2d;
   width: 100%;
   text-align: left;
   display: flex;
@@ -1389,7 +1389,7 @@ body:has(.chat) footer {
   padding: 14px 18px;
 }
 .chat-toggle span {
-  color: #a1aa8b;
+  color: #91979a;
   font: 12px monospace;
 }
 .messages {
@@ -1407,7 +1407,7 @@ body:has(.chat) footer {
   overflow-wrap: anywhere;
 }
 .messages b {
-  color: #a2aa8b;
+  color: #91979a;
   font-size: 10px;
   margin-bottom: 3px;
 }
@@ -1418,7 +1418,7 @@ body:has(.chat) footer {
   display: flex;
   gap: 7px;
   padding: 10px;
-  background: #151d15;
+  background: #171819;
 }
 .chat input {
   font-size: 11px;
@@ -1434,15 +1434,15 @@ body:has(.chat) footer {
 dialog {
   width: min(650px, calc(100vw - 30px));
   max-height: 85dvh;
-  background: #20291f;
+  background: #222324;
   color: var(--ink);
-  border: 1px solid #87927577;
+  border: 1px solid #7b808477;
   padding: 28px;
   box-shadow: 0 20px 100px #0009;
   scrollbar-width: thin;
 }
 dialog::backdrop {
-  background: #080f0bce;
+  background: #0a0b0cce;
   backdrop-filter: blur(6px);
 }
 .modal-head {
@@ -1554,7 +1554,7 @@ dialog::backdrop {
   width: 100%;
   z-index: 90;
   background: #8c7544;
-  color: #11190e;
+  color: #111314;
   padding: 8px 20px;
   text-align: center;
   font-size: 12px;
@@ -1564,7 +1564,7 @@ dialog::backdrop {
   font-size: 11px;
   margin-left: 15px;
   color: #e8e0c7;
-  background: #414c2e;
+  background: #373c3f;
 }
 .loading {
   min-height: 70vh;
@@ -1576,7 +1576,7 @@ dialog::backdrop {
   position: fixed;
   inset: 78px 0 0;
   z-index: 50;
-  background: #0c140cdb;
+  background: #0e1011db;
   backdrop-filter: blur(6px);
   display: grid;
   place-items: center;
@@ -1616,13 +1616,13 @@ dialog::backdrop {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, #111b1166, transparent 65%);
+  background: radial-gradient(ellipse at center, #14161766, transparent 65%);
 }
 .event-stamp {
   border: 3px double #b8aa7c;
   color: #cab986;
   padding: 19px 27px;
-  background: #1b2519f0;
+  background: #1c1e20f0;
   box-shadow: 0 10px 35px #0006;
   transform: rotate(-3deg);
   max-width: 90vw;
@@ -1632,7 +1632,7 @@ dialog::backdrop {
 .event-stamp small {
   display: block;
   font:
-    9px "Special Elite",
+    9px "Special Elite", "Nanum Gothic Coding",
     monospace;
   letter-spacing: 0.2em;
   margin-bottom: 10px;
@@ -1659,7 +1659,7 @@ dialog::backdrop {
   bottom: 72px;
   font-size: 10px;
   padding: 6px 12px;
-  background: #111a13dd;
+  background: #141516dd;
   opacity: 0.85;
 }
 .presentation.execution {
@@ -1735,10 +1735,10 @@ body[data-low="true"] .pause-overlay {
 }
 @keyframes execution-dark {
   0% {
-    background: #080d0a;
+    background: #0a0a0b;
   }
   70% {
-    background: #080d0ae0;
+    background: #0a0a0be0;
   }
   100% {
     background: transparent;
@@ -2286,7 +2286,7 @@ body[data-low="true"] .pause-overlay {
     font-size: 8px;
     width: 100%;
     padding: 6px;
-    background: #222e2166;
+    background: #25272866;
   }
   .policy-board {
     grid-template-columns: 1fr;
@@ -2364,13 +2364,13 @@ body[data-low="true"] .pause-overlay {
     padding: 8px 1px;
     min-width: 0;
     justify-content: flex-start;
-    background: #26302166 !important;
+    background: #25282966 !important;
   }
   .seat:active:enabled {
     transform: none;
   }
   .seat.selected {
-    background: #4d5939aa !important;
+    background: #42484baa !important;
   }
   .seat-photo {
     width: 42px;
@@ -2401,8 +2401,8 @@ body[data-low="true"] .pause-overlay {
     padding: 2px;
   }
   .seat.president {
-    background: #4c573baa !important;
-    border-color: #a5aa7855;
+    background: #43474baa !important;
+    border-color: #858e9455;
   }
   .seat.president .seat-photo {
     width: 46px;
@@ -2612,7 +2612,7 @@ body[data-low="true"] .pause-overlay {
 }
 .timer-hud {
   font:
-    11px "Special Elite",
+    11px "Special Elite", "Nanum Gothic Coding",
     monospace;
   color: var(--brass);
   margin-left: auto;
@@ -2622,12 +2622,12 @@ body[data-low="true"] .pause-overlay {
 }
 body:has(.results.liberal) .ambient {
   background:
-    radial-gradient(ellipse at 55% 0%, #83867144, transparent 70%),
-    linear-gradient(120deg, #263428, #333e31, #1c281f);
+    radial-gradient(ellipse at 55% 0%, #75787b44, transparent 70%),
+    linear-gradient(120deg, #2a2c2e, #343638, #1f2123);
 }
 body:has(.results.fascist) .ambient {
   background:
-    radial-gradient(ellipse at 50% 0%, #632c2777, transparent 80%), #151814;
+    radial-gradient(ellipse at 50% 0%, #632c2777, transparent 80%), #151516;
 }
 .home[data-skip="true"] .home-content,
 .home[data-skip="true"] .home-scene {
