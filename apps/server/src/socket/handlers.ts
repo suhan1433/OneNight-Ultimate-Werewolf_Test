@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { AVATAR_IDS, NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type ClientGameState, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
 import { z } from 'zod';
-import { assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, nextRoomVersion, startNightIntro, validateNightAction } from '../game/engine.js';
+import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, nextRoomVersion, startNightIntro, validateNightAction, votingComplete } from '../game/engine.js';
 import { appendChat, appendLobbyChat, canCreateRoom, clearChat, clearLobbyChat, clearReadiness, clearVotes, consumeRateLimit, deleteRoom, getChatHistory, getLobbyChatHistory, getReadiness, getRoom, getVotes, recordVote, removeVotesForPlayer, saveRoom, sweepExpiredRooms, toggleReady, withRoomLock } from '../services/redis.js';
 import { processExpiredRoom } from '../services/scheduler.js';
 
@@ -20,8 +20,16 @@ const LOBBY_TTL_MS = 60 * 60 * 1000;
 const ALL_OFFLINE_GRACE_MS = 10 * 60 * 1000;
 const RESULT_TTL_MS = 30 * 60 * 1000;
 
+async function roomForClients(room: Room): Promise<Room> {
+  if (room.phase !== 'lobby') return room;
+  // Readiness is stored separately. Settings/profile/reconnect snapshots must
+  // merge it too, otherwise they can undo a newer READY_PROGRESS packet.
+  const readiness = await getReadiness(room.roomCode);
+  return { ...room, players: room.players.map(p => ({ ...p, isReady: p.isBot || (readiness[p.id] === undefined ? p.isReady : readiness[p.id] === '1') })) };
+}
 export async function emitRoomState(io: Server, room: Room) {
-  for (const p of room.players) io.to(playerChannel(p.id)).emit('ROOM_STATE', buildPlayerGameState(room, p.id, room.privateResults));
+  const view = await roomForClients(room);
+  for (const p of view.players) io.to(playerChannel(p.id)).emit('ROOM_STATE', buildPlayerGameState(view, p.id));
 }
 
 function bind(socket: Socket, room: Room, playerId: string) {
@@ -59,7 +67,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       const room = await processExpiredRoom(io, code) ?? await getRoom(code);
       const player = room?.players.find((candidate) => candidate.id === playerId);
       if (!room || !player?.connected || player.socketId !== socket.id) { callback?.({ ok: false, error: '게임 상태를 찾을 수 없습니다.' }); return; }
-      const state = buildPlayerGameState(room, playerId, room.privateResults);
+      const state = buildPlayerGameState(await roomForClients(room), playerId);
       socket.emit('ROOM_STATE', state);
       callback?.({ ok: true, data: state });
     } catch (error) {
@@ -93,7 +101,7 @@ export function registerHandlers(io: Server, socket: Socket) {
   relayVoiceSignal('VOICE_OFFER'); relayVoiceSignal('VOICE_ANSWER'); relayVoiceSignal('VOICE_ICE');
 
   on(socket, 'ROOM_CREATE', async (raw) => {
-    const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)), botMode: z.boolean().optional().default(false) }), raw);
+    const data = safe(z.object({ nickname: nicknameSchema, maxPlayers: z.number().int().min(3).max(10), selectedRoles: z.array(z.string()).min(6).max(13), actionTimeLimitSeconds: z.number().int().refine((v) => [8,10,15,20,30].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)), botMode: z.boolean().optional().default(false) }), raw);
     if (data.selectedRoles.length !== data.maxPlayers + 3 || data.selectedRoles.some((r) => !(r in ROLE_DEFINITIONS))) throw new Error('역할 카드는 인원수 + 3장이어야 합니다.');
     for (const definition of Object.values(ROLE_DEFINITIONS)) if (data.selectedRoles.filter((r) => r === definition.id).length > definition.maxCount) throw new Error(`${definition.name} 역할이 허용 수량을 초과했습니다.`);
     if (!canCreateRoom()) throw new Error('지금 방이 많이 몰려 있습니다. 잠시 후 다시 시도해주세요.');
@@ -149,7 +157,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       delete room.privateResults[playerId];
       if (room.hostId === playerId && room.players.length) room.hostId = room.players.find((p) => p.connected)?.id ?? room.players[0]!.id;
       if (room.phase === 'card_reveal' && room.players.length && room.players.every((p) => p.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startNightIntro(room)); }
-      if (room.phase === 'voting' && room.players.length && Object.keys(room.votes).length === room.players.length) { room.result = calculateResult(room); room.phase = 'result'; room.resultExpiresAt = Date.now() + RESULT_TTL_MS; }
+      if (room.phase === 'voting' && votingComplete(room)) { room.result = calculateResult(room); room.phase = 'result'; room.resultExpiresAt = Date.now() + RESULT_TTL_MS; }
       if (room.players.every((player) => !player.connected)) room.allOfflineExpiresAt = Date.now() + ALL_OFFLINE_GRACE_MS;
       room.updatedAt = nextRoomVersion(room);
       if (room.players.length) { await saveRoom(room, data.requestId); } else await deleteRoom(room.roomCode);
@@ -161,11 +169,18 @@ export function registerHandlers(io: Server, socket: Socket) {
   });
 
   on(socket, 'PLAYER_READY', async (raw) => {
-    const data = safe(requestSchema, raw); const playerId = assertSession(socket, data.roomCode); const room = await getRoom(data.roomCode);
-    const player = room?.players.find((candidate) => candidate.id === playerId);
-    if (!room || room.phase !== 'lobby') throw new Error('로비에서만 준비할 수 있습니다.');
-    if (!player?.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
-    const isReady = await toggleReady(data.roomCode, playerId, data.requestId);
+    const data = safe(requestSchema, raw); const playerId = assertSession(socket, data.roomCode);
+    const isReady = await withRoomLock(data.roomCode, async room => {
+      const player = room.players.find(p => p.id === playerId);
+      if (room.phase !== 'lobby') throw new Error('로비에서만 준비할 수 있습니다.');
+      if (!player?.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
+      const ready = await toggleReady(data.roomCode, playerId, data.requestId);
+      player.isReady = ready;
+      // ROOM_SYNC must also be able to recover a lost READY_PROGRESS packet.
+      room.updatedAt = nextRoomVersion(room);
+      await saveRoom(room);
+      return ready;
+    });
     io.to(roomChannel(data.roomCode)).emit('READY_PROGRESS', { playerId, isReady });
     return { isReady };
   });
@@ -179,7 +194,7 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (room.hostId !== playerId || room.phase !== 'lobby') throw new Error('방장만 설정할 수 있습니다.');
     // Accept a legacy room's old 3/5-second value once, then migrate it to
     // the new 8-second minimum when any lobby setting is saved.
-    const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,8,10,15].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)), maxPlayers: z.number().int().min(3).max(10).optional(), selectedRoles: z.array(z.string()).max(13).optional() }), payload);
+    const settings = safe(z.object({ actionTimeLimitSeconds: z.number().int().refine((v) => [3,5,8,10,15,20,30].includes(v)), dayTimeLimitSeconds: z.number().int().refine((v) => [300,600,1200,1800].includes(v)), maxPlayers: z.number().int().min(3).max(10).optional(), selectedRoles: z.array(z.string()).max(13).optional() }), payload);
     if (settings.maxPlayers !== undefined) {
       if (settings.maxPlayers < room.players.length) throw new Error('현재 참가 인원보다 정원을 적게 설정할 수 없습니다.');
       if (settings.selectedRoles && settings.selectedRoles.length !== settings.maxPlayers + 3) throw new Error('변경한 정원에 맞춰 역할 카드를 설정해주세요.');
@@ -202,12 +217,13 @@ export function registerHandlers(io: Server, socket: Socket) {
     room.players = room.players.map((p) => ({ ...p, isReady: p.isBot || readiness[p.id] === '1' }));
     if (room.players.length !== room.maxPlayers || !room.players.every((p) => p.isReady)) throw new Error('정원이 모두 입장하고 준비해야 합니다.');
     if (room.selectedRoles.length !== room.players.length + 3) throw new Error('역할 카드는 인원수 + 3장 모두 선택해야 시작할 수 있습니다.');
+    if (room.selectedRoles.filter(role => role === 'mason').length === 1) throw new Error('프리메이슨은 두 장을 함께 사용하세요.');
     const assigned = assignRoles(room.players, room.selectedRoles);
     // Votes are stored separately from the room for atomic confirmations.
     // Starting a rematch reuses player IDs, so retaining this map would make
     // last game's ballots look like instant votes in the new voting phase.
     await clearVotes(room.roomCode);
-    room.players = assigned.players.map((player) => ({ ...player, vote: null, hasConfirmedCard: !!player.isBot })); room.centerCards = assigned.centerCards; room.phase = 'card_reveal'; room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.pendingNightCommands = {}; room.nightResolutionExpiresAt = null; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
+    room.players = assigned.players.map((player) => ({ ...player, vote: null, hasConfirmedCard: !!player.isBot })); room.centerCards = assigned.centerCards; room.phase = 'card_reveal'; room.result = null; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.pendingNightCommands = {}; room.nightResolutionExpiresAt = null; room.publicReveals = []; room.nightLog = []; room.protectedPlayerId = null; room.protectedPlayerIds = []; room.witchChoices = {}; room.replay = []; room.dayExpiresAt = null; room.lobbyExpiresAt = null; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
     await clearLobbyChat(room.roomCode);
   }, 'GAME_STARTED'));
   on(socket, 'CARD_CONFIRM', async (raw) => mutate(io, socket, raw, (room, playerId) => {
@@ -215,15 +231,14 @@ export function registerHandlers(io: Server, socket: Socket) {
     if (room.players.every((x) => x.hasConfirmedCard)) { room.phase = 'night'; room.nightActionQueue = buildNightActionQueue(room.selectedRoles, room.players); room.currentNightActionIndex = 0; Object.assign(room, startNightIntro(room)); }
   }, 'CARD_CONFIRM_PROGRESS', (room) => { if (room.phase === 'night') io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.nightStart, audioKey: 'night-start', actionId: 'night-start', stateVersion: room.updatedAt, timestamp: Date.now() }); }));
   on(socket, 'NIGHT_ACTION_SUBMIT', async (raw) => {
-    const base = safe(requestSchema.extend({ actionId: z.string().uuid(), command: z.custom<NightCommand>() }), raw); const playerId = assertSession(socket, base.roomCode);
+    const base = safe(requestSchema.extend({ actionId: z.string().uuid(), command: z.object({ type: z.enum(['skip','confirm','inspect_player','inspect_center','inspect_centers','swap_player','swap_players','swap_center','protect']), targetPlayerIds: z.array(z.string().uuid()).max(2).optional(), centerIndexes: z.array(z.number().int().min(0).max(3)).max(2).optional() }).strict() }), raw); const playerId = assertSession(socket, base.roomCode);
     let duplicate = false;
     const room = await withRoomLock(base.roomCode, async (room, alreadyProcessed) => {
       if (alreadyProcessed) { duplicate = true; return room; }
       const player = room.players.find((p) => p.id === playerId);
       if (!player || !player.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
       const error = validateNightAction(room, playerId, base.actionId, base.command); if (error) throw new Error(error);
-      if (room.pendingNightCommands?.[playerId]) throw new Error('밤 행동은 한 번만 선택할 수 있습니다.');
-      room.pendingNightCommands = { ...(room.pendingNightCommands ?? {}), [playerId]: base.command };
+      room = applyNightAction(room, playerId, base.command).room;
       room.updatedAt = nextRoomVersion(room); await saveRoom(room, base.requestId); return room;
     }, base.requestId);
     if (duplicate) return {};
@@ -238,8 +253,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       const player = room.players.find((p) => p.id === playerId);
       if (!player || !player.connected || player.socketId !== socket.id) throw new Error('다른 기기에서 세션이 갱신되었습니다.');
       const command: NightCommand = { type: 'confirm' }; const error = validateNightAction(room, playerId, base.actionId, command); if (error) throw new Error(error);
-      if (room.pendingNightCommands?.[playerId]) throw new Error('밤 행동은 한 번만 선택할 수 있습니다.');
-      room.pendingNightCommands = { ...(room.pendingNightCommands ?? {}), [playerId]: command };
+      room = applyNightAction(room, playerId, command).room;
       room.updatedAt = nextRoomVersion(room); await saveRoom(room, base.requestId); return room;
     }, base.requestId);
     if (duplicate) return {};
@@ -251,7 +265,7 @@ export function registerHandlers(io: Server, socket: Socket) {
       if (room.phase !== 'day') throw new Error('토론 단계가 아닙니다.');
       const requests = new Set(room.voteStartRequests ?? []); requests.add(playerId); room.voteStartRequests = [...requests];
       if (room.botMode) room.voteStartRequests = [...new Set([...room.voteStartRequests, ...room.players.filter((p) => p.isBot).map((p) => p.id)])];
-      if (room.voteStartRequests.length >= room.players.filter((p) => p.connected).length) { room.phase = 'voting'; room.dayExpiresAt = null; }
+      if (room.players.filter(p => p.connected).every(p => requests.has(p.id) || (room.botMode && p.isBot))) { room.phase = 'voting'; room.dayExpiresAt = null; }
     }, 'VOTE_PROGRESS');
     // Start bot voting immediately. This avoids relying on a later heartbeat,
     // which is especially important when the server is running serverlessly.
@@ -298,9 +312,8 @@ export function registerHandlers(io: Server, socket: Socket) {
         votes = await getVotes(data.roomCode);
       }
       locked.votes = votes;
-      const currentEligible = locked.players.filter((p) => p.connected).length;
-      if (Object.keys(votes).length < currentEligible) { locked.updatedAt = nextRoomVersion(locked); await saveRoom(locked, data.requestId); return locked; }
-      locked.votes = votes; locked.result = calculateResult(locked); locked.players = locked.players.map((p) => ({ ...p, currentRole: locked.result!.players.find((x) => x.id === p.id)!.currentRole })); locked.phase = 'result'; locked.resultExpiresAt = Date.now() + RESULT_TTL_MS; locked.updatedAt = nextRoomVersion(locked); await saveRoom(locked, data.requestId); return locked;
+      if (!votingComplete(locked)) { locked.updatedAt = nextRoomVersion(locked); await saveRoom(locked, data.requestId); return locked; }
+      locked.votes = votes; locked.result = calculateResult(locked); locked.phase = 'result'; locked.resultExpiresAt = Date.now() + RESULT_TTL_MS; locked.updatedAt = nextRoomVersion(locked); await saveRoom(locked, data.requestId); return locked;
     }, data.requestId);
     const votesCompleted = Object.keys(completed.votes).length;
     io.to(roomChannel(data.roomCode)).emit('VOTE_PROGRESS', { playerId, votesCompleted });
@@ -310,14 +323,14 @@ export function registerHandlers(io: Server, socket: Socket) {
   });
   on(socket, 'GAME_RESTART', async (raw) => mutate(io, socket, raw, async (room, playerId) => {
     if (room.hostId !== playerId || room.phase !== 'result') throw new Error('방장만 대기실로 돌아갈 수 있습니다.');
-    room.players = room.players.map((p) => ({ ...p, originalRole: null, currentRole: null, isReady: !!p.isBot, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
-    room.centerCards = []; room.phase = 'lobby'; room.nightActionQueue = []; room.currentNightActionIndex = 0; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.pendingNightCommands = {}; room.nightResolutionExpiresAt = null; room.publicReveals = []; room.nightLog = []; room.chat = []; room.dayExpiresAt = null; room.result = null; room.protectedPlayerId = null; room.lobbyExpiresAt = Date.now() + LOBBY_TTL_MS; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
+    room.players = room.players.map((p) => ({ ...p, copiedRole: undefined, nightCopiedRole: undefined, originalRole: null, currentRole: null, isReady: !!p.isBot, hasConfirmedCard: false, hasActedTonight: false, vote: null }));
+    room.centerCards = []; room.phase = 'lobby'; room.nightActionQueue = []; room.currentNightActionIndex = 0; room.votes = {}; room.voteStartRequests = []; room.privateResults = {}; room.privateNightActions = {}; room.pendingNightCommands = {}; room.nightResolutionExpiresAt = null; room.publicReveals = []; room.nightLog = []; room.chat = []; room.dayExpiresAt = null; room.result = null; room.protectedPlayerId = null; room.protectedPlayerIds = []; room.witchChoices = {}; room.replay = []; room.lobbyExpiresAt = Date.now() + LOBBY_TTL_MS; room.allOfflineExpiresAt = null; room.resultExpiresAt = null;
     await Promise.all([clearChat(room.roomCode), clearReadiness(room.roomCode), clearVotes(room.roomCode)]);
   }, 'PHASE_CHANGED'));
 
   socket.on('disconnect', async () => {
     const code = socket.data.roomCode as string | undefined; const playerId = socket.data.playerId as string | undefined; if (!code || !playerId) return;
-    try { const room = await withRoomLock(code, async (room) => { const p = room.players.find((x) => x.id === playerId); if (p && p.socketId === socket.id) { p.connected = false; p.socketId = null; p.disconnectedAt = Date.now(); if (room.phase === 'night' && room.nightActionQueue.some((action) => action.status === 'active' && action.playerIds.includes(playerId))) for (const action of room.nightActionQueue) if (action.status === 'active') action.expiresAt = Math.min(action.expiresAt, Date.now() + 5_000); if (room.hostId === playerId && Date.now() >= (socket.data.gameSwitchReservationUntil ?? 0)) room.hostId = room.players.find((x) => x.id !== playerId && x.connected)?.id ?? room.hostId; if (room.players.every((player) => !player.connected)) room.allOfflineExpiresAt = Date.now() + ALL_OFFLINE_GRACE_MS; await saveRoom(room); } return room; }); await emitRoomState(io, room); io.to(roomChannel(code)).emit('PLAYER_LEFT', { playerId }); } catch { /* expired room */ }
+    try { const room = await withRoomLock(code, async (room) => { const p = room.players.find((x) => x.id === playerId); if (p && p.socketId === socket.id) { p.connected = false; p.socketId = null; p.disconnectedAt = Date.now(); if (room.hostId === playerId && Date.now() >= (socket.data.gameSwitchReservationUntil ?? 0)) room.hostId = room.players.find((x) => x.id !== playerId && x.connected)?.id ?? room.hostId; if (room.players.every((player) => !player.connected)) room.allOfflineExpiresAt = Date.now() + ALL_OFFLINE_GRACE_MS; await saveRoom(room); } return room; }); await emitRoomState(io, room); io.to(roomChannel(code)).emit('PLAYER_LEFT', { playerId }); } catch { /* expired room */ }
   });
 }
 
@@ -334,7 +347,7 @@ async function mutate(io: Server, socket: Socket, raw: unknown, change: (room: R
 
 export function emitActionStart(io: Server, room: Room) {
   const action = room.nightActionQueue[room.currentNightActionIndex]; if (!action) return;
-  io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.action(action.role), audioKey: action.role, actionId: action.id, stateVersion: room.updatedAt, timestamp: Date.now() });
-  io.to(roomChannel(room.roomCode)).emit('NIGHT_ACTION_STARTED', { actionId: action.id, role: action.role, expiresAt: action.expiresAt });
+  io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: action.copied ? '도플갱어는 복사한 능력을 사용하세요. 다른 플레이어는 기다려주세요.' : NARRATOR_LINES.action(action.role), audioKey: action.copied && action.order !== 9.1 ? undefined : action.role, actionId: action.id, stateVersion: room.updatedAt, timestamp: Date.now() });
+  io.to(roomChannel(room.roomCode)).emit('NIGHT_ACTION_STARTED', { actionId: action.id, role: action.copied ? (action.order === 9.1 ? 'insomniac' : 'doppelganger') : action.role, expiresAt: action.expiresAt });
 }
 export function emitDayStart(io: Server, room: Room) { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.dayStart, audioKey: 'day-start', actionId: 'day-start', stateVersion: room.updatedAt, timestamp: Date.now() }); io.to(roomChannel(room.roomCode)).emit('DAY_STARTED', { expiresAt: room.dayExpiresAt }); }

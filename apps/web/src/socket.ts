@@ -73,6 +73,7 @@ function clearNarration() {
   if (currentNarration) {
     const audio = currentNarration;
     currentNarration = null;
+    window.dispatchEvent(new CustomEvent('werewolf:narration', {detail:false}));
     currentNarrationInfo = null;
     audio.onpause = null;
     audio.pause();
@@ -98,6 +99,7 @@ function reconcileNarration(game: ClientGameState) {
   if (currentNarration && !isCurrentNarration(currentNarrationInfo!, game)) {
     const audio = currentNarration;
     currentNarration = null;
+    window.dispatchEvent(new CustomEvent('werewolf:narration', {detail:false}));
     currentNarrationInfo = null;
     audio.onpause = null;
     audio.pause();
@@ -138,10 +140,12 @@ function playNextNarration() {
   const audio = getNarrationAudio(next.audioKey);
   audio.currentTime = 0;
   currentNarration = audio;
+  window.dispatchEvent(new CustomEvent('werewolf:narration', {detail:true}));
   currentNarrationInfo = next;
   const discardCurrent = () => {
     if (currentNarration !== audio) return;
     currentNarration = null;
+    window.dispatchEvent(new CustomEvent('werewolf:narration', {detail:false}));
     currentNarrationInfo = null;
     narrationQueue = narrationQueue.filter((narration) => narration !== next);
     playNextNarration();
@@ -154,7 +158,8 @@ function playNextNarration() {
     // started by a Socket event until the next real user gesture. Keep this
     // instruction queued for that gesture; ROOM_STATE clears it when the
     // game moves to a different phase, so it cannot surface in a later phase.
-    if (currentNarration === audio) { currentNarration = null; currentNarrationInfo = null; }
+    if (currentNarration === audio) { currentNarration = null;
+    window.dispatchEvent(new CustomEvent('werewolf:narration', {detail:false})); currentNarrationInfo = null; }
   });
 }
 

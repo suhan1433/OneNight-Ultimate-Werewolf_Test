@@ -66,13 +66,11 @@ for(const width of [320,390,768,1440]){
       expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     }
     for(let i=1;i<positions.length;i++)for(let j=0;j<positions[0].length;j++)expect(positions[i][j]).toBeCloseTo(positions[0][j],4);
-    if(width<=390){
-      const action=page.locator('.quest-actions');
-      const box=await action.boundingBox();
-      expect(box!.y+box!.height).toBeLessThanOrEqual(901);
-      await page.locator('.qcard.success').click();
-      await expect(action.getByRole('button')).toBeEnabled();
-    }
+    await expect(page.locator('.expedition-roster')).toContainText('기사1');
+    await expect(page.locator('.expedition-roster')).toContainText('기사2');
+    await expect(page.locator('.quest-actions')).toHaveCount(0);
+    await page.locator('.qcard.success').click();
+    await expect(page.locator('.qcard.success')).toHaveAttribute('aria-pressed','true');
   });
 }
 
@@ -95,3 +93,46 @@ test('reduced motion keeps results and the continue action available',async({pag
   await expect(page.locator('.cs-quest-verdict .primary')).toBeEnabled();
   await expect(page.locator('.cs-quest-verdict')).toContainText('원정 성공');
 });
+
+
+test('vote cards submit on the second tap and allow switching before submission',async({page})=>{
+  await show(page,council('team_vote'));
+  const approve=page.locator('.vote-stage .approve'),reject=page.locator('.vote-stage .reject');
+  await approve.tap();
+  expect(await page.evaluate(()=>(window as any).__commands.filter((c:any)=>c.event==='TEAM_VOTE'))).toHaveLength(0);
+  await reject.tap();
+  await expect(reject).toHaveAttribute('aria-pressed','true');
+  await reject.tap();
+  expect(await page.evaluate(()=>(window as any).__commands.filter((c:any)=>c.event==='TEAM_VOTE'))).toEqual([{event:'TEAM_VOTE',data:{roomCode:'CRESTS',approve:false}}]);
+  await expect(page.locator('.vote-stage .seal-btn')).toHaveCount(0);
+});
+
+test('quest cards submit once on two taps and good players cannot submit failure',async({page})=>{
+  await show(page,council('quest'));
+  await expect(page.locator('.qcard.fail')).toBeDisabled();
+  await page.locator('.qcard.success').tap();
+  expect(await page.evaluate(()=>(window as any).__commands.filter((c:any)=>c.event==='QUEST_CARD'))).toHaveLength(0);
+  await page.locator('.qcard.success').tap();
+  await expect(page.locator('.quest-stage')).toContainText('제출 중');
+  expect(await page.evaluate(()=>(window as any).__commands.filter((c:any)=>c.event==='QUEST_CARD'))).toEqual([{event:'QUEST_CARD',data:{roomCode:'CRESTS',card:'success'}}]);
+});
+
+for(const width of [320,390,768,1440]){
+  test(`five quest result cards fit in their dedicated stage at ${width}px`,async({page})=>{
+    await page.setViewportSize({width,height:900});
+    await page.emulateMedia({reducedMotion:'reduce'});
+    const state=council('quest_result',10);state.questSize=5;state.proposedTeam=['p0','p1','p2','p3','p4'];state.questResult={success:false,fails:2};state.results=['fail'];
+    await show(page,state);
+    await expect(page.locator('.cs-quest-verdict')).toContainText('성공 카드 3장');
+    await expect(page.locator('.cs-quest-verdict')).toContainText('실패 카드 2장');
+    const stage=(await page.locator('.cs-altar-camera').boundingBox())!;
+    for(const card of await page.locator('.cs-qcard').all()){
+      const box=(await card.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(stage.x);
+      expect(box.x+box.width).toBeLessThanOrEqual(stage.x+stage.width);
+      expect(box.y).toBeGreaterThanOrEqual(stage.y);
+      expect(box.y+box.height).toBeLessThanOrEqual(stage.y+stage.height);
+    }
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  });
+}

@@ -407,3 +407,26 @@ export function WolfSilhouette({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** Engraved animal seals share the role cards' ink-and-gold visual language. */
+export function AnimalSeal({ id }: { id: string }) {
+  const shapes: Record<string,string> = {
+    wolf:'M7 14 5 4 13 9 19 9 27 4 25 14 26 21 20 28 12 28 6 21ZM11 17l3 2m7-2-3 2m-4 4h4l-2 3Z',
+    fox:'M5 4 14 10 18 10 27 4 25 19 16 29 7 19ZM8 18l8 7 8-7M11 16h2m6 0h2',
+    owl:'M6 8 5 3 13 7h6l8-4-1 5v12c0 6-20 6-20 0ZM7 14a5 5 0 1 0 10 0 5 5 0 1 0-10 0m10 0a5 5 0 1 0 10 0 5 5 0 1 0-10 0M15 21l1 3 1-3',
+    cat:'M7 13V4l8 5h2l8-5v9c7 19-25 19-18 0ZM11 17h2m6 0h2m-6 5h2M3 20l8 1m10 0 8-1M4 25l7-2m10 0 7 2',
+    rabbit:'M10 13C-2-4 15-2 14 12h4C17-2 34-4 22 13c12 20-24 20-12 0ZM11 20h1m8 0h1m-7 4h4',
+    bear:'M8 12C-2 10 3 0 11 6h10c8-6 13 4 3 6 10 23-26 23-16 0ZM11 17h1m8 0h1m-9 8c0-7 8-7 8 0m-5-2h2',
+    bat:'M3 10 9 14 12 5 16 9 20 5 23 14 29 10 27 25 22 21 16 28 10 21 5 25ZM13 17h1m4 0h1',
+    deer:'M11 12 7 7 6 2m1 5H3m18 5 4-5 1-5m-1 5h4M9 12 4 10l3 8 9 12 9-12 3-8-5 2ZM11 18h1m8 0h1m-7 7h4',
+    frog:'M8 12C0 2 15 0 14 11h4C17 0 32 2 24 12c18 21-34 21-16 0ZM8 9h1m14 0h1M9 23q7 6 14 0',
+    lion:'M16 2 22 5 28 5 27 13 30 20 24 23 22 29 16 27 10 29 8 23 2 20 5 13 4 5 10 5ZM10 12h12v10l-6 3-6-3Zm3 4h1m4 0h1m-5 4h4',
+    panda:'M7 12C-1 8 4 0 11 6h10c7-6 12 2 4 6 11 23-29 23-18 0ZM9 16l4-1-1 5-3-1Zm14 0-4-1 1 5 3-1Zm-9 8h4',
+    octopus:'M8 17v-6c0-12 16-12 16 0v6m-16-3-5 6c-5 6 5 11 8 3m-1-7-3 10c-2 7 8 5 9-2m6-10 7 6c5 6-5 11-8 3m1-7 3 10c2 7-8 5-9-2M12 11h1m6 0h1',
+    raccoon:'M7 12 4 5 12 8h8l8-3-3 7c12 22-30 22-18 0ZM7 16l7-2 2 4 2-4 7 2-6 6-3-3-3 3Zm7 9h4',
+    penguin:'M8 15C8-3 24-3 24 15l5 8-6-2c-1 12-13 12-14 0l-6 2Zm4-3q4-6 4 3 0-9 4-3v11h-8Zm2 6h4',
+    boar:'M7 13 4 5l9 5h6l9-5-3 8c10 21-28 21-18 0ZM11 17h1m8 0h1M9 23q7-9 14 0l-2 5H11Zm4 1h1m4 0h1M8 22l-4-4v8m20-4 4-4v8',
+    turtle:'M8 21C0 4 32 4 24 21ZM16 6V3c0-3 6-3 6 0v4M8 20l-4 6m9-5-3 7m11-7 4 7m-1-9 6 4M16 9l-6 6 6 6 6-6Zm-6 6H5m17 0h5',
+  };
+  return <svg className="animal-seal" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={shapes[id]??shapes.wolf}/></svg>;
+}

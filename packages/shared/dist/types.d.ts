@@ -29,6 +29,10 @@ export interface Player {
     hasActedTonight: boolean;
     vote: string | null;
     connected: boolean;
+    /** Copied identity belongs to the Doppelganger card and moves with it. */
+    copiedRole?: RoleType;
+    /** Role copied at night, independent of later card exchanges. */
+    nightCopiedRole?: RoleType;
     /** Selected profile character. Optional for rooms saved before profiles existed. */
     avatar?: AvatarId;
     /** Server-controlled participant used only in test bot rooms. */
@@ -40,9 +44,10 @@ export interface CenterCard {
     id: string;
     role: RoleType;
     originalRole: RoleType;
+    copiedRole?: RoleType;
 }
 export interface NightCommand {
-    type: 'confirm' | 'inspect_player' | 'inspect_center' | 'inspect_centers' | 'swap_player' | 'swap_players' | 'swap_center' | 'protect';
+    type: 'skip' | 'confirm' | 'inspect_player' | 'inspect_center' | 'inspect_centers' | 'swap_player' | 'swap_players' | 'swap_center' | 'protect';
     targetPlayerIds?: string[];
     centerIndexes?: number[];
 }
@@ -76,7 +81,26 @@ export interface ChatMessage {
     text: string;
     at: number;
 }
+export interface NightReplayEntry {
+    role: RoleType;
+    actorId: string;
+    result: Record<string, unknown>;
+    changes: Array<{
+        location: string;
+        before: RoleType;
+        after: RoleType;
+    }>;
+}
 export interface GameResult {
+    winnerIds?: string[];
+    reasons?: string[];
+    executionReasons?: Record<string, string>;
+    replay?: NightReplayEntry[];
+    centerCards?: Array<{
+        label: string;
+        originalRole: RoleType;
+        role: RoleType;
+    }>;
     winners: Faction[];
     executedIds: string[];
     voteCounts: Record<string, number>;
@@ -112,7 +136,12 @@ export interface Room {
     chat: ChatMessage[];
     publicReveals: string[];
     privateResults: Record<string, Record<string, unknown>>;
-    /** Choices collected during the simultaneous night-input window. */
+    /** Server-only action history; published only after the game ends. */
+    replay?: NightReplayEntry[];
+    protectedPlayerIds?: string[];
+    /** Two-stage Witch choices, private to their owner. */
+    witchChoices?: Record<string, number>;
+    /** Commands retained for room compatibility. */
     pendingNightCommands?: Record<string, NightCommand>;
     /** Brief private-result window shown after ordered night resolution. */
     nightResolutionExpiresAt?: number | null;
@@ -170,6 +199,8 @@ export interface ClientGameState {
         dayTimeLimitSeconds: number;
     };
     result: GameResult | null;
+    protectedPlayerIds?: string[];
+    centerCardCount?: number;
     nightEndsAt?: number | null;
     /** While set, ordered night effects are complete and private results are being shown before dawn. */
     nightResolutionEndsAt?: number | null;

@@ -21,6 +21,8 @@ import './chat-game-bar.css';
 import './profile.css';
 import './cinematic-plus.css';
 import './immersion.css';
+import './expedition.css';
+import {ExpeditionRoster} from './ExpeditionRoster';
 import {useImmersion} from './immersion';
 import {HouseCrest} from './HouseCrest';
 import {RoundTable} from './RoundTable';
@@ -477,13 +479,14 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
 
   return <section ref={rootRef} className={`vt${revealing?' is-reveal':''}${revealing?(resultPassed?' ok':' no'):''}${plan?.mode==='identity'?' identity':''}${placement==='seat'?' seat-coins':''}${reduced||skipped?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
     <span className="vt-sr">{isResult?`찬성 ${totals?.approve??0}표, 반대 ${totals?.reject??0}표`: `투표 ${voteCount}/${game.players.length}명 완료`}</span>
+    <ExpeditionRoster game={game}/>
     {revealing&&<div className="vt-dark" aria-hidden="true"/>}
     {isResult&&plan&&!reduced&&!skipped&&<div className="vt-result-bar" role="status"><span>투표 완료 · 결과 공개 중</span><button type="button" onClick={()=>setSkipped(true)}>투표 결과 바로 보기</button></div>}
     <div className="vt-wrap">
       <div className="vt-tilt vt-tilt--table">
         <div ref={tableRef} className={`table vt-table table--${game.players.length}`}>
           <RoundTable className="council-table-art"/><div className="table-center"><div className="selection-core"><FactionSeal team="good" size={36}/><strong>{isResult?'투표 공개':`${voteCount} / ${game.players.length}`}</strong><span>{isResult?'원탁의 판결을 확인합니다':'찬성 또는 반대를 비밀리에 선택하세요'}</span></div></div>
-          {game.players.map((player,index)=><div className="seat vt-seat" style={{...seatPos(index,game.players.length,43),'--i':index} as React.CSSProperties} key={player.id}>
+          {game.players.map((player,index)=><div className={`seat vt-seat${game.proposedTeam.includes(player.id)?' on-expedition':''}`} style={{...seatPos(index,game.players.length,43),'--i':index} as React.CSSProperties} key={player.id}>
             {player.id===game.leaderId&&<span className={`leader-crown${isResult&&!resultPassed?' vt-crown-seat':''}`} title="리더"><CrownIcon size={16}/></span>}
             {(()=>{const step=plan?.mode==='identity'?plan.stepOf[index]:undefined;const v=step===undefined?undefined:plan?.outcomes[step];
               return <div className="plate"><SeatFace name={player.nickname} playerId={player.id}/>{player.hasVoted&&!revealing&&<i className="vt-voted" aria-label="투표 완료"/>}
@@ -515,26 +518,38 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
       <h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2>
       <div className="vt-continue"><button className="primary" disabled={game.hasContinued} onClick={()=>call('VOTE_RESULT_CONTINUE',{roomCode:game.roomCode})}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button></div>
     </>:null) : <div className="vote-stage">
-      <h2>원정대 투표</h2><div className="team-chips">{game.proposedTeam.map(id=><span className="chip" key={id}><PlayerAvatar playerId={id} size={18}/>{game.players.find(player=>player.id===id)?.nickname}</span>)}</div>
-      {ballot.submitting||ballot.hasVoted?<><Pips done={game.teamVotesCompleted} total={game.players.length}/><p className="waiting" role="status">{ballot.submitting?'투표 제출 중…':'투표 완료 · 다른 기사를 기다리는 중'}<Dots/></p></>:<><div className="vote-tokens"><button className={`token approve${approve===true?' active':''}`} onClick={()=>setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button><button className={`token reject${approve===false?' active':''}`} onClick={()=>setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button></div><button className="primary seal-btn" disabled={approve===null} onClick={()=>approve!==null&&ballot.submit(approve)}>원정 투표하기 ({game.teamVotesCompleted}/{game.players.length})</button></>}</div>}
+      <h2>원정대 투표</h2>
+      {ballot.submitting||ballot.hasVoted?<><Pips done={game.teamVotesCompleted} total={game.players.length}/><p className="waiting" role="status">{ballot.submitting?'투표 제출 중…':'투표 완료 · 다른 기사를 기다리는 중'}<Dots/></p></>:<><div className="vote-tokens"><button className={`token approve${approve===true?' active':''}`} aria-pressed={approve===true} onClick={()=>approve===true?ballot.submit(true):setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button><button className={`token reject${approve===false?' active':''}`} aria-pressed={approve===false} onClick={()=>approve===false?ballot.submit(false):setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button></div><p className="card-tap-hint" role="status">{approve===null?'카드를 두 번 탭하면 바로 투표합니다':`선택한 ${approve?'찬성':'반대'} 카드를 한 번 더 탭하면 제출됩니다`}</p></>}</div>}
   </section>;
 }
 
 function Board({game}:{game:ClientGameState}){
   const[approve,setApprove]=useState<boolean|null>(null);
   const[questCard,setQuestCard]=useState<'success'|'fail'|null>(null);
+  const[questSubmitting,setQuestSubmitting]=useState(false);
+  const questLock=useRef(false);
   const[openRound,setOpenRound]=useState<number|null>(null);
   const[questDisclosed,setQuestDisclosed]=useState(false);
   const me=game.playerId,leader=game.leaderId===me;
   const phase=game.phase;
   const leaderPlayer=game.players.find(p=>p.id===game.leaderId);
   const leaderName=leaderPlayer?.nickname;
-  const teamChips=(ids:string[])=><div className="team-chips">{ids.map(id=><span className="chip" key={id}><PlayerAvatar playerId={id} size={18}/>{game.players.find(p=>p.id===id)?.nickname}</span>)}</div>;
+
   const meP=game.players.find(p=>p.id===me);
   const myTurn=phase==='team_build'?leader:phase==='team_vote'?!meP?.hasVoted:phase==='quest'?game.proposedTeam.includes(me)&&!meP?.hasQuestCard:phase==='assassination'?!!game.hasAssassinationAbility:false;
   const historyGame=phase==='quest_result'&&!questDisclosed?{...game,results:game.results.slice(0,-1),roundHistory:game.roundHistory.map(record=>record.round===game.round?{...record,fails:undefined,success:undefined}:record)}:game;
   useEffect(()=>{if(myTurn&&['team_vote','quest'].includes(phase))navigator.vibrate?.(60);},[myTurn,phase,game.round]);
-  useEffect(()=>{setApprove(null);setQuestCard(null);},[phase,game.round,game.proposedTeam.join(',')]);
+  useEffect(()=>{setApprove(null);setQuestCard(null);setQuestSubmitting(false);questLock.current=false;},[phase,game.round,game.proposedTeam.join(',')]);
+
+  const chooseQuest=(card:'success'|'fail')=>{
+    if(phase!=='quest'||meP?.hasQuestCard||questLock.current)return;
+    if(card==='fail'&&ROLE_DEFINITIONS[game.selfRole!].team==='good')return;
+    if(questCard!==card){setQuestCard(card);return;}
+    questLock.current=true;setQuestSubmitting(true);
+    void emit('QUEST_CARD',{roomCode:game.roomCode,card}).catch(error=>{
+      questLock.current=false;setQuestSubmitting(false);useGame.getState().setError(error.message);
+    });
+  };
 
   return <>
     <header className="game-status" aria-label="현재 원정 현황">
@@ -555,16 +570,15 @@ function Board({game}:{game:ClientGameState}){
 
       {(phase==='quest'||phase==='quest_result')&&<QuestScene key={`${game.roomCode}:${game.round}`} game={game} onResolved={setQuestDisclosed}><div className="quest-stage">
         <h2>원정 카드 제출</h2>
-        {teamChips(game.proposedTeam)}
         {game.proposedTeam.includes(me)?
-          game.players.find(p=>p.id===me)?.hasQuestCard?
-            <><div className="card-back"><CheckIcon size={20}/><span>제출 완료</span></div><Pips done={game.questCardsCompleted} total={game.proposedTeam.length}/></>
+          meP?.hasQuestCard||questSubmitting?
+            <><div className="card-back"><CheckIcon size={20}/><span>{questSubmitting&&!meP?.hasQuestCard?'제출 중…':'제출 완료'}</span></div><Pips done={game.questCardsCompleted} total={game.proposedTeam.length}/></>
           :<><div className="quest-cards">
-            <button className={`qcard success${questCard==='success'?' active':''}`} onClick={()=>setQuestCard('success')}><FactionSeal team="good" size={42}/><span>원정 성공</span><small>SUCCESS</small></button>
+            <button className={`qcard success${questCard==='success'?' active':''}`} aria-pressed={questCard==='success'} onClick={()=>chooseQuest('success')}><FactionSeal team="good" size={42}/><span>원정 성공</span><small>SUCCESS</small></button>
             <span className="qcard-disabled-wrap" title="선의 세력은 원정 실패를 선택할 수 없습니다.">
-              <button className={`qcard fail${questCard==='fail'?' active':''}`} disabled={ROLE_DEFINITIONS[game.selfRole!].team==='good'} onClick={()=>setQuestCard('fail')} aria-describedby={ROLE_DEFINITIONS[game.selfRole!].team==='good'?'fail-card-disabled-note':undefined}><FactionSeal team="evil" size={42}/><span>원정 실패</span><small>{ROLE_DEFINITIONS[game.selfRole!].team==='good'?'선택 불가':'FAIL'}</small></button>
+              <button className={`qcard fail${questCard==='fail'?' active':''}`} disabled={ROLE_DEFINITIONS[game.selfRole!].team==='good'} aria-pressed={questCard==='fail'} onClick={()=>chooseQuest('fail')} aria-describedby={ROLE_DEFINITIONS[game.selfRole!].team==='good'?'fail-card-disabled-note':undefined}><FactionSeal team="evil" size={42}/><span>원정 실패</span><small>{ROLE_DEFINITIONS[game.selfRole!].team==='good'?'선택 불가':'FAIL'}</small></button>
             </span>
-          </div>{ROLE_DEFINITIONS[game.selfRole!].team==='good'&&<p className="quest-rule-note" id="fail-card-disabled-note">선의 세력은 원정 실패를 선택할 수 없습니다.</p>}<div className="quest-actions"><button className="primary seal-btn" disabled={!questCard} onClick={()=>questCard&&call('QUEST_CARD',{roomCode:game.roomCode,card:questCard})}>{questCard?`원정 ${questCard==='success'?'성공':'실패'} 카드 봉인`:'봉인할 카드를 선택하세요'} ({game.questCardsCompleted}/{game.proposedTeam.length})</button></div></>
+          </div>{ROLE_DEFINITIONS[game.selfRole!].team==='good'&&<p className="quest-rule-note" id="fail-card-disabled-note">선의 세력은 원정 실패를 선택할 수 없습니다.</p>}<p className="card-tap-hint" role="status">{questCard?`선택한 ${questCard==='success'?'성공':'실패'} 카드를 한 번 더 탭하면 제출됩니다`:'카드를 두 번 탭하면 바로 제출합니다'}</p></>
         :<div className="card-back"><span>원정대가 제출 중</span><Dots/></div>}
       </div></QuestScene>}
 
@@ -691,9 +705,8 @@ function ChatAction({game,st,toGame}:{game:ClientGameState;st:ReturnType<typeof 
     case 'vote':
       if(ballot.submitting){text='투표 제출 중…';btns=<button type="button" className="ac-act-go" disabled>제출 중…</button>;break;}
       text=names?`원정대 ${names}`:st.text;
-      btns=pick===null
-        ?<><button type="button" className="ac-act-yes" onClick={()=>setPick(true)}>찬성</button><button type="button" className="ac-act-no" onClick={()=>setPick(false)}>반대</button></>
-        :<><button type="button" className="ac-act-sub" disabled={busy} onClick={()=>setPick(null)}>변경</button><button type="button" className={pick?'ac-act-yes on':'ac-act-no on'} disabled={busy} onClick={()=>ballot.submit(pick)}>{pick?'찬성':'반대'} 확정</button></>;
+      text+=pick===null?' · 두 번 탭해 투표':` · ${pick?'찬성':'반대'} 한 번 더 탭해 제출`;
+      btns=<><button type="button" className={`ac-act-yes${pick===true?' on':''}`} aria-pressed={pick===true} onClick={()=>pick===true?ballot.submit(true):setPick(true)}>찬성</button><button type="button" className={`ac-act-no${pick===false?' on':''}`} aria-pressed={pick===false} onClick={()=>pick===false?ballot.submit(false):setPick(false)}>반대</button></>;
       break;
     case 'continue':
       btns=<button type="button" className="ac-act-go" disabled={busy} onClick={()=>fire(game.phase==='quest_result'?'QUEST_RESULT_CONTINUE':'VOTE_RESULT_CONTINUE')}>계속</button>;
@@ -741,7 +754,7 @@ function ChatPanel({game,close}:{game:ClientGameState;close:()=>void}){
     prevKey.current=alertKey;
     if(st.mine)navigator.vibrate?.([40,60,40]);
   },[alertKey,mobile]);
-  const showAct=mobile&&st.mine&&!!st.act&&!(isMini&&st.act==='board');   // mini 에선 게임이 그대로 보이므로 '보드에서 고르기'는 생략
+  const showAct=mobile&&st.mine&&!!st.act&&!(isMini&&['board','vote','continue'].includes(st.act)); // Collapsed chat keeps the board's decision and result controls unobstructed.
   const curLastId=messages[messages.length-1]?.id;
   const seenRef=useRef<string|undefined>(curLastId);   // mini 에서 놓친 새 메시지 수 계산용: 펼쳐 봤거나 내가 보낸 시점까지는 '본 것'
   useEffect(()=>{if(!isMini)seenRef.current=curLastId;},[isMini,curLastId]);

@@ -4,3 +4,7 @@ export declare const ROLE_LIST: RoleDefinition[];
 export declare const NIGHT_ROLES: RoleDefinition[];
 export declare const WOLF_ROLES: RoleType[];
 export declare const PRESETS: Record<string, RoleType[]>;
+export declare const BASE_ROLES: RoleType[];
+export declare const DAYBREAK_ROLES: RoleType[];
+export declare function roleEdition(id: RoleType): "기본판" | "Daybreak" | "커스텀" | "보너스";
+export declare function deckWarnings(roles: RoleType[]): string[];

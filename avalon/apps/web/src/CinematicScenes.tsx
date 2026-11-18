@@ -5,6 +5,7 @@ import {useGame} from './store';
 import {PlayerAvatar,useCharacterResolver} from './profile';
 import {HouseCrest} from './HouseCrest';
 import {RoundTable} from './RoundTable';
+import {ExpeditionRoster} from './ExpeditionRoster';
 import {roleArtFor} from './role-art';
 import {useEndingAudio} from './use-recorded-audio';
 
@@ -107,7 +108,7 @@ export function TeamScene({game}:{game:ClientGameState}){
         <button type="button" disabled={!leader||submitting||(!team.includes(player.id)&&ready)} aria-pressed={team.includes(player.id)} onClick={()=>toggle(player.id)}><Avatar playerId={player.id}/><span className="cs-name">{player.nickname}</span></button>
       </div>;})}
     </div></div>
-    <div className="cs-selection" aria-live="polite"><small>선택된 기사 · {team.length}/{game.questSize}</small><div>{selected.length?selected.map(player=><span key={player.id}><PlayerAvatar playerId={player.id} size={18}/>{player.nickname}</span>):<em>아직 선택된 기사가 없습니다</em>}</div></div>
+    <ExpeditionRoster game={game} team={team} selecting/>
     {leader&&<button className="primary cs-propose" disabled={!ready||submitting} onClick={propose}><Sigil kind="crown" size={20}/>{submitting?'원정대를 제안하고 있습니다':'원정대 제안'}</button>}
   </section>;
 }
@@ -166,6 +167,7 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
     {reveal&&!resolved&&!clock.final&&<><i className="cs-letterbox top" aria-hidden="true"/><i className="cs-letterbox bottom" aria-hidden="true"/></>}
     {resolved&&!clock.final&&<><i className="cs-verdict-flash" aria-hidden="true"/><i className="cs-verdict-wave" aria-hidden="true"/></>}
     <SceneCaption eyebrow={`QUEST ${game.round+1} · THE ALTAR`} title={reveal?'원정의 진실':'중앙 제단에 카드를 봉인합니다'} body={reveal?'카드를 섞어 한 장씩 공개합니다. 누가 제출했는지는 공개되지 않습니다.':`봉인된 카드 ${count} / ${total}장 · 원정대원만 카드를 제출할 수 있습니다.`}/>
+    <ExpeditionRoster game={game}/>
     <div className="cs-altar-camera">
       <RoundTable className="council-table-art"/>
       <div className="quest-witnesses" aria-label="원탁의 기사들">{game.players.map((player,index)=>{const p=position(index,game.players.length);const member=game.proposedTeam.includes(player.id);return <div className={`quest-witness${member?' on-quest':''}${player.id===game.leaderId?' leader':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
@@ -176,7 +178,7 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
       <AltarFace/><div className="cs-altar-glow"/><div className="cs-altar-seal"><Sigil size={150}/></div>
       {[15,50,85].map((left,k)=><Flame key={left} x={left} y={k===1?25:30} s={1.35} cls="lamp" style={{...vars({'--lk':k}),...(reveal?anim('csLampDip',1.1,.04):{})}}>{fails>0&&<Smoke/>}</Flame>)}
       <div className="cs-failflash" style={reveal?anim('csFailLight',.8,0):undefined} aria-hidden="true"/>
-      <div className="cs-quest-cards" aria-hidden="true">{Array.from({length:count},(_,index)=><div className={`cs-qcard${reveal&&order[index]?' fail':' success'}${index<revealed?' turned':''}`} style={vars({'--i':index,'--slot':index-(total-1)/2,'--pile-x':`${((index*23)%43)-21}px`,'--pile-y':`${((index*11)%31)-15}px`,'--rotation':`${index*29-30}deg`,'--flip-at':`${strike+index*gap}s`})} key={index}>
+      <div className="cs-quest-cards" style={vars({'--team-size':total})} aria-hidden="true">{Array.from({length:count},(_,index)=><div className={`cs-qcard${reveal&&order[index]?' fail':' success'}${index<revealed?' turned':''}`} style={vars({'--i':index,'--slot':index-(total-1)/2,'--pile-x':`${((index*23)%43)-21}px`,'--pile-y':`${((index*11)%31)-15}px`,'--rotation':`${index*29-30}deg`,'--flip-at':`${strike+index*gap}s`})} key={index}>
         <i className="cs-card-land"/>
         <div className="cs-qcard-inner">
           <div className="cs-card-back"><span className="cs-medal"><Sigil size={26}/></span><small>AVALON</small></div>
@@ -192,7 +194,7 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
       <p className="cs-progress" role="status">{resolved?`성공 ${total-fails}장 · 실패 ${fails}장`:still?'봉인을 깨기 직전, 원탁이 숨을 멈춥니다.':revealed?<>공개 · 성공 <b className="ok">{revealed-shownFails}</b> · 실패 <b className="no">{shownFails}</b> · 미공개 <b>{total-revealed}</b></>:'카드를 섞고 있습니다.'}</p>
       {resolved&&<div className="cs-quest-verdict cs-glass">
         <div className="cs-verdict-seal" aria-hidden="true"><Sigil kind={game.questResult?.success?'good':'evil'} size={30}/></div>
-        <small>ROUND {game.round+1} · 원정 보고</small><h2>{game.questResult?.success?'원정 성공':'원정 실패'}</h2><p>실패 카드 {fails}장{game.round===3&&game.maxPlayers>=7?' · 이번 원정은 실패 2장부터 실패':''}</p>
+        <small>ROUND {game.round+1} · 원정 보고</small><h2>{game.questResult?.success?'원정 성공':'원정 실패'}</h2><p className="quest-result-counts"><span>성공 카드 <b>{total-fails}</b>장</span> · <span>실패 카드 <b>{fails}</b>장</span>{game.round===3&&game.maxPlayers>=7?' · 이번 원정은 실패 2장부터 실패':''}</p>
         <div className="cs-score" aria-label="원정 진행 점수">{Array.from({length:5},(_,i)=><span className={`${game.results[i]??'pending'}${i===game.round?' now':''}`} key={i}>{i+1}<small>{game.results[i]==='success'?'성공':game.results[i]==='fail'?'실패':'대기'}</small></span>)}</div>
         <button className="primary" disabled={game.hasContinued||clock.time<end-.5} onClick={()=>void emit('QUEST_RESULT_CONTINUE',{roomCode:game.roomCode}).catch(error=>useGame.getState().setError(error.message))}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button></div>}
       {!resolved&&<button className="cs-skip" onClick={clock.skip}>결과 바로 보기</button>}

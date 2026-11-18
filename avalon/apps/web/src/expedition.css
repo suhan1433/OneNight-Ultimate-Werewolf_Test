@@ -1,0 +1,54 @@
+/* Keep public membership and personal decisions in separate, opaque panels. */
+.expedition-roster{position:relative;z-index:4;width:100%;margin:16px auto 24px;padding:18px;text-align:left;background:#101c1e;border:1px solid var(--hair-strong);border-radius:14px;box-sizing:border-box}
+.expedition-roster header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.expedition-roster header small{font:600 9px var(--numeral);letter-spacing:.15em;color:var(--brass)}
+.expedition-roster h3{margin:6px 0 0;font-size:17px;color:var(--parchment)}
+.expedition-roster h3>b{margin-left:8px;color:var(--brass-hi);font-variant-numeric:tabular-nums}
+.expedition-roster h3>b>span{font-size:12px;font-weight:400;color:var(--muted)}
+.expedition-status{flex-shrink:0;padding:6px 9px;border:1px solid var(--hair);border-radius:6px;font-size:11px;color:var(--muted)}
+.expedition-status.participating{color:var(--brass-hi);border-color:var(--brass)}
+.expedition-roster ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;list-style:none;margin:0;padding:0}
+.expedition-roster li{min-width:0;display:flex;align-items:center;gap:8px;padding:10px;background:#19292b;border:1px solid var(--hair);border-radius:8px}
+.expedition-roster li.is-me{border-color:var(--brass)}
+.expedition-number{font:500 11px var(--numeral);color:var(--brass);flex-shrink:0}
+.expedition-name{min-width:0;font-size:13px;overflow-wrap:anywhere;line-height:1.5}
+.expedition-name small{display:block;font-size:10px;color:var(--muted)}
+.expedition-me{margin-left:auto;flex-shrink:0;font-size:10px;color:var(--brass-hi)}
+.expedition-roster>p{font-size:12px;color:var(--muted)}
+.vt{isolation:isolate}
+.vote-stage,.cs-quest .quest-stage{position:relative;z-index:4;margin:24px auto 0;padding:24px 16px;background:#101b1e;border:1px solid var(--hair-strong);border-radius:16px;box-shadow:0 16px 40px #0005}
+.vote-stage h2,.quest-stage h2{margin:0 0 12px;font-size:22px}
+.card-tap-hint{margin:14px 0 0;font-size:13px;color:var(--brass-hi);line-height:1.7;text-wrap:balance}
+.vote-tokens button,.quest-cards button,.ac-act-yes,.ac-act-no{touch-action:manipulation}
+.vt .on-expedition .avatar{outline:2px solid var(--brass-hi);outline-offset:3px}
+.vt .on-expedition .seat-name{border-color:var(--brass);color:var(--brass-hi)}
+.vt-dark,.cs-quest .cs-spot{display:none}
+/* During the reveal the altar becomes a dedicated card stage. No seats sit behind cards. */
+.cs-quest.is-reveal .cs-altar-camera{width:100%;aspect-ratio:auto;height:clamp(240px,45vw,340px);margin:22px auto 16px;border:1px solid var(--hair);border-radius:16px;background:radial-gradient(ellipse at 50% 60%,#253737,#0c1619 75%);isolation:isolate}
+.cs-quest.is-reveal .cs-altar-camera>.council-table-art,.cs-quest.is-reveal .quest-witnesses{display:none}
+.cs-quest.is-reveal .cs-altar-quake{inset:0}
+.cs-quest.is-reveal .cs-altar{height:100%;aspect-ratio:auto;transform:none;animation:none}
+.cs-quest.is-reveal .cs-altar-face,.cs-quest.is-reveal .cs-altar-seal,.cs-quest.is-reveal .cs-flame,.cs-quest.is-reveal .cs-altar-glow{display:none}
+.cs-quest.is-reveal .cs-quest-cards{--card-width:min(110px,calc((100vw - 84px)/(var(--team-size)*1.12)));--card-height:calc(var(--card-width)*1.55)}
+.cs-quest.is-reveal .cs-card-front strong{font-size:clamp(16px,3vw,24px)}
+.cs-quest.is-reveal.is-resolved .cs-qcard{animation:questCardDisplay .45s ease-out both;filter:none}
+@keyframes questCardDisplay{to{transform:translateX(calc(var(--slot)*var(--spacing))) rotate(0deg);opacity:1}}
+.cs-quest .cs-quest-verdict{width:100%;padding:30px 20px;background:#122125;border-color:var(--hair-strong)}
+.cs-quest-verdict h2{font-size:clamp(32px,7vw,44px)}
+.cs-quest-verdict .quest-result-counts{font-size:16px;margin:16px 0;line-height:1.8}
+.quest-result-counts b{font-size:24px;color:var(--parchment)}
+.cs-quest-verdict .primary{min-width:200px;min-height:48px;margin-top:12px}
+@media(max-width:390px){.expedition-roster{padding:12px}.expedition-roster li{padding:8px 6px;gap:6px}.expedition-number{display:none}.expedition-roster h3{font-size:15px}.expedition-name{font-size:12px}.expedition-roster .pf-avatar{width:26px!important;height:26px!important}.vote-stage,.cs-quest .quest-stage{padding:20px 10px}}
+@media(prefers-reduced-motion:reduce){.cs-quest.is-reveal.is-resolved .cs-qcard{animation-duration:0s}}
+/* Put the decision directly below the roster; the council remains available below it. */
+.vt:not(.is-reveal){display:flex;flex-direction:column}
+.vt:not(.is-reveal) .vote-stage{order:1;width:100%;margin-top:0}
+.vt:not(.is-reveal) .vt-wrap{order:2;margin-top:28px}
+.cs-quest:not(.is-reveal){display:flex;flex-direction:column}
+.cs-quest:not(.is-reveal) .quest-stage{order:1;width:100%;margin-top:0}
+.cs-quest:not(.is-reveal) .cs-altar-camera{order:2;margin-top:28px}
+
+.app[data-phase="quest"] .board{padding-bottom:32px}
+
+.expedition-roster>header{background:none;border:0;padding:0;box-shadow:none}
+.cs-quest.is-resolved .cs-qcard .cs-qcard-inner{animation:none!important;transform:rotateY(180deg);scale:1}
