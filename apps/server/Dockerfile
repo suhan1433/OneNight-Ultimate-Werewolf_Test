@@ -60,6 +60,8 @@ COPY deception deception
 COPY secret_hitler secret_hitler
 COPY game-selector game-selector
 COPY game-audio game-audio
+# Shared game-switch runtime and type declarations are required by game servers.
+COPY game-switch game-switch
 # All browser apps share /app/apps/web/dist.
 RUN npm run build:render
 
