@@ -61,13 +61,29 @@ test('seven destinations and player ranges match the game implementations',()=>{
   }
 });
 test('responsive layouts, readable cards and unique SVG ids',async()=>{
-  for(const width of [1440,1024,768,390,320]){
+  for(const width of [1440,1024,768,701,700,390,320]){
     const {context,page,errors}=await open({viewport:{width,height:950}});
     try{
       await page.locator('html.is-ready').waitFor();
       assert.equal((await visibleIds(page)).length,7);
       if(width<=700) assert.equal(await page.locator(".title-star").evaluate(el=>getComputedStyle(el).position),"absolute","decorative star must not wrap onto its own headline line");
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${width}: horizontal overflow`);
+      const layoutProblems=await page.evaluate(()=>{
+        const problems=[];
+        for(const element of document.querySelectorAll('.title-line, .spotlight-content, .spotlight-footer, .card-body')){
+          if(element.scrollWidth>element.clientWidth+1) problems.push(`${element.className}: clipped content`);
+        }
+        const text=document.querySelector('.spotlight-content>div').getBoundingClientRect();
+        const play=document.querySelector('.spotlight-play').getBoundingClientRect();
+        if(text.left<play.right&&text.right>play.left&&text.top<play.bottom&&text.bottom>play.top) problems.push('preview text overlaps play button');
+        for(const card of document.querySelectorAll('.game-card')){
+          const facts=card.querySelector('.card-facts').getBoundingClientRect();
+          const action=card.querySelector('.card-bottom').getBoundingClientRect();
+          if(facts.bottom>action.top+1) problems.push(`${card.dataset.game}: details overlap action`);
+        }
+        return problems;
+      });
+      assert.deepEqual(layoutProblems,[],`${width}: text and actions must fit without overlapping`);
       const ids=await page.locator('[id]').evaluateAll(elements=>elements.map(element=>element.id));
       assert.equal(ids.length,new Set(ids).size,`${width}: SVG ids must be unique`);
       const overlap=await page.locator('.spotlight-play').evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));});

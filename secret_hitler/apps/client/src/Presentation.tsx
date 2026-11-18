@@ -14,7 +14,6 @@ import type {
 import type { Copy } from "./i18n";
 import { readLocal, writeLocal, useApp } from "./store";
 import { Emblem, Portrait, PolicyFace } from "./Art";
-import { ElectionRisk } from "./GovernmentProposal";
 
 /* ------------------------------------------------------------------ *
  *  Audio — synthesized placeholder layer. Swap `sound()` bodies for
@@ -642,7 +641,6 @@ function NominationScene({ scene, g, t }: { scene: Scene; g: GameView; t: Copy }
       <div className="nomination-person candidate"><span>{t.nominee}</span><Portrait avatar={candidate?.avatar ?? 0} /><strong>{candidate?.name}</strong><b className="nomination-seal">{ko ? "지명 확정" : "NOMINATED"}</b></div>
     </div>
     <p className="nomination-next">{ko ? "이 두 사람에게 정부를 맡길지, 생존자 모두가 투표합니다." : "Every living player will vote on whether to trust this pair."}</p>
-    <ElectionRisk g={g} t={t} />
     <div className="nomination-timeline" aria-hidden="true"><i /></div>
   </section>;
 }

@@ -2,14 +2,6 @@ import type { GameView } from '../../../packages/shared-types/src/index';
 import type { Copy } from './i18n';
 import { Portrait } from './Art';
 
-export function ElectionRisk({ g, t }: { g: GameView; t: Copy }) {
-  if (g.fascist < 3) return null;
-  const ko = t.confirm === '확인';
-  return <p className="election-risk"><span aria-hidden="true">!</span>{ko
-    ? '파시스트 정책 3개 이상 · 히틀러가 수상에 당선되면 파시스트가 승리합니다.'
-    : '3+ Fascist policies · Electing Hitler as Chancellor wins the game for the Fascists.'}</p>;
-}
-
 /** Selection and nomination are public; no role information is used here. */
 export function GovernmentProposal({ g, t, paused = false }: { g: GameView; t: Copy; paused?: boolean }) {
   const ko = t.confirm === '확인';
@@ -31,7 +23,6 @@ export function GovernmentProposal({ g, t, paused = false }: { g: GameView; t: C
       {!confirmed && <ol className="proposal-steps" aria-label={ko ? '지명 진행' : 'Nomination progress'}>
         {[ko ? '후보 선택' : 'Select', ko ? '후보 검토' : 'Review', ko ? '지명 확정' : 'Confirm'].map((step, i) => <li key={step} aria-current={i === (candidate ? 1 : 0) ? 'step' : undefined}><span aria-hidden="true">{i + 1}</span>{step}</li>)}
       </ol>}
-      <ElectionRisk g={g} t={t} />
     </div>
   </section>;
 }

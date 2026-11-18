@@ -35,7 +35,7 @@ import { Portrait, Emblem, PolicyFace, ARCHETYPES } from "./Art";
 import { PolicyCard } from "./PolicyCard";
 import { LegislationProgress } from "./LegislationProgress";
 import { ActivityProgress } from "./ActivityProgress";
-import { GovernmentProposal, ElectionRisk } from "./GovernmentProposal";
+import { GovernmentProposal } from "./GovernmentProposal";
 import { Presentation, VoteScene, useScenes, useTyped, playCue } from "./Presentation";
 import { Rulebook } from "./Rulebook";
 import { layoutSeats, slotFor } from "./seatLayout";
@@ -925,7 +925,6 @@ function Actions({
       </div>
       {progress}
       {g.phase === "voting" && <GovernmentProposal g={g} t={t} paused={room.paused} />}
-      {g.phase === "vote_result" && <ElectionRisk g={g} t={t} />}
       {activity}
       <fieldset disabled={disabled}>
         {g.phase === "nomination" &&
@@ -1265,7 +1264,6 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
                     {p.alive && (
                       <>
                         {p.investigated && <span>{t.investigated}</span>}
-                        {p.notHitler && <span>{t.notHitler}</span>}
                         {!member?.connected && <span>{t.offline}</span>}
                       </>
                     )}
