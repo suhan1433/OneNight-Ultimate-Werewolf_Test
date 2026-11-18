@@ -1,3 +1,4 @@
+import { installGameSwitch } from '../../../../game-switch/client';
 import { create } from "zustand";
 import { io } from "socket.io-client";
 import type { Action, RoomView, Session } from "@deception/shared";
@@ -99,3 +100,5 @@ for (const event of ["kicked", "replaced"])
     useRoom.setState({ room: null, error: message });
   });
 socket.connect();
+
+installGameSwitch(socket, 'deception');

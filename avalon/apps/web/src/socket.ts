@@ -1,3 +1,4 @@
+import { installGameSwitch } from '../../../../game-switch/client';
 import { io } from 'socket.io-client'; import type { Ack, ChatMessage, ClientGameState } from '@werewolf/shared'; import { useGame } from './store';
 export const socket=io(import.meta.env.DEV?(import.meta.env.VITE_SOCKET_URL??'http://localhost:3002'):undefined,{path:import.meta.env.DEV?'/socket.io':'/api/avalon/socket',transports:['websocket','polling']});
 export type AssassinAimState={roomCode:string;targetId:string|null;actorId?:string;locked?:boolean};
@@ -16,3 +17,5 @@ export const emit=(event:string,data:unknown)=>new Promise<any>((resolve,reject)
 export const session=()=>{try{return JSON.parse(localStorage.getItem('avalon-session')??'null');}catch{return null;}};
 export const saveSession=(value:unknown)=>localStorage.setItem('avalon-session',JSON.stringify(value));
 socket.on('connect',()=>{const s=session();if(s)void emit('ROOM_JOIN',s).catch(()=>localStorage.removeItem('avalon-session'));});
+
+installGameSwitch(socket, 'avalon');

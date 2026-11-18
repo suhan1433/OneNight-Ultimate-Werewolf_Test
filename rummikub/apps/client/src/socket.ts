@@ -1,3 +1,4 @@
+import { installGameSwitch } from '../../../../game-switch/client';
 import { io } from 'socket.io-client'; import type { Ack, PublicView } from '@rummikub/protocol';
 export const socket = io(
   import.meta.env.DEV ? (import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:3010') : undefined,
@@ -26,3 +27,5 @@ export const ensureConnected = () => {
 export type Session = { roomId: string; playerId: string; sessionToken: string; name: string };
 const key = 'rummikub-neon-session'; export const session = (): Session | null => { try { return JSON.parse(localStorage.getItem(key) ?? 'null') as Session | null; } catch { return null; } }; export const saveSession = (value: Session) => localStorage.setItem(key, JSON.stringify(value)); export const clearSession = () => localStorage.removeItem(key);
 export type StateListener = (view: PublicView) => void;
+
+installGameSwitch(socket, 'rummikub');

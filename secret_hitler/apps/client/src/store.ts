@@ -1,3 +1,4 @@
+import { installGameSwitch } from '../../../../game-switch/client';
 import { create } from "zustand";
 import { io } from "socket.io-client";
 import type {
@@ -157,3 +158,5 @@ export function connect() {
   });
   socket.connect();
 }
+
+installGameSwitch(socket, 'secret_hitler');

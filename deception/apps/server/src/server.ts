@@ -1,3 +1,4 @@
+import { registerGameSwitch } from '../../../../game-switch/server.mjs';
 import { createServer as createHttpServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { resolve, extname, sep } from "node:path";
@@ -151,7 +152,8 @@ export function createApp(
         const allowed = options.origin?.split(",") ?? [];
         callback(
           null,
-          allowed.includes(origin) || new URL(origin).host === req.headers.host,
+          allowed.includes(origin) || new URL(origin).host === req.headers.host ||
+            (process.env.NODE_ENV !== 'production' && new URL(origin).hostname === (req.headers.host ?? '').split(':')[0]),
         );
       } catch {
         callback(null, false);
@@ -278,6 +280,7 @@ export function createApp(
     };
   }
   io.on("connection", (socket) => {
+  registerGameSwitch(io, socket, async () => { const { room, member } = session(socket); return { hostId: room.hostId, members: room.members, actorId: member.id }; });
     function handle(name: string, fn: (payload: any) => unknown) {
       socket.on(name, (payload: unknown, ack?: (response: unknown) => void) => {
         try {
@@ -626,7 +629,7 @@ export function createApp(
         if (member.id === forensicId(game)) room.pausedAt ??= now();
         sync(room, next);
       }
-      if (room.hostId === member.id)
+      if (room.hostId === member.id && Date.now() >= (socket.data.gameSwitchReservationUntil ?? 0))
         room.hostId = room.members.find((m) => m.connected && !m.isBot)?.id ?? member.id;
       room.updatedAt = now();
       emit(room);
@@ -731,7 +734,7 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const app = createApp({ origin: process.env.WEB_ORIGIN });
-  const port = Number(process.env.PORT ?? 3004);
+  const port = Number(process.env.PORT ?? 3007);
   app.http.listen(port, "0.0.0.0", () =>
     console.log(`네온 사건파일 서버: http://localhost:${port}`),
   );

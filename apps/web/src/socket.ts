@@ -1,3 +1,4 @@
+import { installGameSwitch } from '../../../game-switch/client';
 import { gameAudio } from './audio-settings';
 import { preferAmbientAudio } from '../../../game-audio/audio';
 import { io } from 'socket.io-client';
@@ -316,3 +317,5 @@ export async function emitAck<T>(event: string, payload: unknown): Promise<T> {
     return send();
   }
 }
+
+installGameSwitch(socket, 'werewolf');

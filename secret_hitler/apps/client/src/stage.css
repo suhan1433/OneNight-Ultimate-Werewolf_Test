@@ -199,6 +199,14 @@ body .board-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px
 .tracker-gauge i.lit { background: var(--brass); box-shadow: 0 0 8px #a8894f88; }
 .ledger.tracker-warn .tracker-gauge i.lit:last-child { background: #c9695c; border-color: #c9695c; box-shadow: 0 0 8px #c9695c88; }
 body .veto-seal { border: 1px solid var(--brass); padding: 1px 8px; color: var(--brass); }
+.ledger.static .track-title > span { white-space: nowrap; }
+.ledger.static .track-title .emblem,
+.ledger.static .track-slots .emblem { flex-shrink: 0; }
+body .ledger.static .track-slots > div { height: auto; min-height: 74px; }
+body .ledger.static .track-slots > div > small {
+  width: calc(100% - 4px); min-width: 0; min-height: 2.8em;
+  line-height: 1.4; white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+}
 @media (max-width: 800px) {
   .ledger-mini {
     display: flex; width: 100%; min-height: 44px; align-items: center; gap: 8px; padding: 6px 8px; box-sizing: border-box; overflow: hidden;
@@ -215,7 +223,7 @@ body .veto-seal { border: 1px solid var(--brass); padding: 1px 8px; color: var(-
   .ledger-full { display: none; }
   .ledger.open .ledger-full { display: grid; grid-template-columns: 1fr; position: absolute; left: 0; right: 0; top: 100%; z-index: 20; border: 1px solid var(--line); background: #101112f5; box-shadow: 0 14px 30px #000c; }
   .ledger.static .ledger-mini { display: none; }
-  .ledger.static .ledger-full { display: grid; position: static; }
+  .ledger.static .ledger-full { display: grid; grid-template-columns: minmax(0, 1fr); position: static; gap: 18px; }
 }
 
 /* ---------- action tray: part of the flow, always visible, never covers the table ---------- */

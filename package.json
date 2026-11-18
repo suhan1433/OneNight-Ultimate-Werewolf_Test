@@ -12,7 +12,9 @@
     "build": "npm run build -w @werewolf/shared && npm run build -w @werewolf/server && npm run build -w @werewolf/web && npm --prefix avalon run build && npm --prefix skullking run build && npm --prefix spacecrew run build && npm --prefix rummikub run build && cp game-selector/index.html apps/web/dist/index.html && cp game-selector/launcher.css apps/web/dist/launcher.css",
     "test:audio": "node game-audio/audio.test.cjs",
     "test": "npm run test -w @werewolf/server",
-    "typecheck": "npm run typecheck -w @werewolf/shared && npm run typecheck -w @werewolf/server && npm run typecheck -w @werewolf/web"
+    "typecheck": "npm run typecheck -w @werewolf/shared && npm run typecheck -w @werewolf/server && npm run typecheck -w @werewolf/web",
+    "test:game-switch": "node --import tsx game-switch/integration.test.mjs",
+    "test:game-switch:browser": "GAME_SWITCH_BROWSER=1 node --import tsx game-switch/integration.test.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",

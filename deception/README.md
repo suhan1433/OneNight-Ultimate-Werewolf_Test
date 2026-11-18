@@ -11,11 +11,11 @@ npx pnpm@10.11.0 install --frozen-lockfile
 npx pnpm@10.11.0 dev
 ```
 
-웹: http://localhost:5176 · 서버: http://localhost:3004 · 상태 확인: http://localhost:3004/health.
+웹: http://localhost:5176 · 서버: http://localhost:3007 · 상태 확인: http://localhost:3007/health.
 
 서로 다른 브라우저/시크릿 창 또는 기기에서 4명 이상 접속한다. 한 명이 닉네임을 정하고 방을 만든 뒤 4자리 코드·링크·QR로 초대한다. 전원이 준비하면 방장이 시작한다. 같은 컴퓨터에서 여러 명을 테스트할 때는 **독립 브라우저 컨텍스트**를 사용한다. 같은 프로필의 여러 탭은 같은 플레이어 세션을 공유하며, 새 탭이 이전 탭을 대체한다.
 
-같은 LAN의 휴대전화에서는 `http://<개발 PC의 LAN IP>:5176`으로 접속한다. 웹 개발 서버가 Socket.IO를 프록시하므로 휴대전화에 `localhost:3004`를 지정하지 않는다. 개발 서버는 같은 호스트의 Origin만 허용한다. PWA 설치·오프라인 캐시는 HTTPS 또는 localhost에서 동작하며, 실제 멀티플레이에는 온라인 연결이 필요하다.
+같은 LAN의 휴대전화에서는 `http://<개발 PC의 LAN IP>:5176`으로 접속한다. 웹 개발 서버가 Socket.IO를 프록시하므로 휴대전화에 `localhost:3007`를 지정하지 않는다. 개발 서버는 같은 호스트의 Origin만 허용한다. PWA 설치·오프라인 캐시는 HTTPS 또는 localhost에서 동작하며, 실제 멀티플레이에는 온라인 연결이 필요하다.
 
 ## 검증과 시뮬레이터
 
@@ -96,14 +96,14 @@ docker stop afterhours-deception-test
 
 ```bash
 npx pnpm@10.11.0 build
-PORT=3004 npx pnpm@10.11.0 start
+PORT=3007 npx pnpm@10.11.0 start
 ```
 
 빌드 후 Node 서버 하나가 웹 정적 파일과 Socket.IO를 함께 제공한다. 정적 호스팅만으로는 게임 서버를 실행할 수 없다. 장기 실행 Node 프로세스에서 운영하고, 역방향 프록시에서 `/socket.io` WebSocket upgrade와 polling을 모두 전달한다.
 
 | 변수              | 위치     | 기본값 / 용도                                                                   |
 | ----------------- | -------- | ------------------------------------------------------------------------------- |
-| `PORT`            | server   | `3004`                                                                          |
+| `PORT`            | server   | `3007`                                                                          |
 | `WEB_ORIGIN`      | server   | 별도 웹 도메인이 있을 때 허용 Origin을 쉼표로 지정. 미설정이면 같은 Host만 허용 |
 | `VITE_SERVER_URL` | web 빌드 | 기본은 웹과 같은 Origin. 서버를 별도로 배포할 때 지정                           |
 | `VITE_SOCKET_PATH` | web 빌드 | 기본은 `/socket.io`, 통합 빌드는 `/api/deception/socket/`. 별도 프록시 경로가 있을 때 지정 |

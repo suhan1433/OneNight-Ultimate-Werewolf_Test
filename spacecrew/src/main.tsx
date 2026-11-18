@@ -1,3 +1,4 @@
+import { installGameSwitch } from '../../game-switch/client';
 /**
  * 더 크루: 행성 9를 찾아서 — 장면 중심 UI 재설계
  *
@@ -45,7 +46,7 @@ function App() {
 
   useEffect(() => watchAppHeight(), []);
   useEffect(() => {
-    const next = io({ path: '/api/spacecrew/socket/', transports: ['websocket', 'polling'] }); setSocket(next);
+    const next = io({ path: '/api/spacecrew/socket/', transports: ['websocket', 'polling'] }); setSocket(next); const cleanupGameSwitch = installGameSwitch(next, 'spacecrew');
     next.on('ROOM_STATE', (state: Game) => { if (leavingRef.current) return; setGame(state); });
     next.on('ERROR', ({ message }: { message: string }) => setError(message));
     next.on('ROOM_KICKED', ({ message }: { message: string }) => { leavingRef.current = true; clearSession(); setGame(null); setDrawer(d => ({ ...d, open: false })); setError(message); });
@@ -55,7 +56,7 @@ function App() {
       if (previous) next.emit('ROOM_JOIN', previous, (reply: { ok: boolean }) => { if (!reply.ok) clearSession(); });
     });
     next.on('disconnect', () => { if (!leavingRef.current) setOnline(false); });
-    return () => { next.close(); };
+    return () => { cleanupGameSwitch(); next.close(); };
   }, []);
   useEffect(() => { if (!error) return; const id = window.setTimeout(() => setError(''), 3500); return () => window.clearTimeout(id); }, [error]);
 

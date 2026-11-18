@@ -1,3 +1,4 @@
+import { registerGameSwitch } from '../../../../game-switch/server.mjs';
 import http from "node:http";
 import {
   randomBytes,
@@ -37,6 +38,7 @@ import type {
 
 type StoredMember = Member & { tokenHash: string };
 interface Room {
+  hostTransferUntil?: number;
   code: string;
   version: number;
   hostId: string;
@@ -101,7 +103,7 @@ export function createGameServer(options: ServerOptions = {}) {
       const origin = req.headers.origin;
       let sameOrigin = false;
       try {
-        sameOrigin = !!origin && new URL(origin).host === req.headers.host;
+        sameOrigin = !!origin && (new URL(origin).host === req.headers.host || (process.env.NODE_ENV !== 'production' && new URL(origin).hostname === (req.headers.host ?? '').split(':')[0]));
       } catch {}
       cb(null, !origin || origins.includes(origin) || sameOrigin);
     },
@@ -257,6 +259,7 @@ export function createGameServer(options: ServerOptions = {}) {
     next();
   });
   io.on("connection", (socket) => {
+  registerGameSwitch(io, socket, async () => { const r = rooms.get(socket.data.code); if (!r || sessions.get(socket.data.id)?.id !== socket.id) throw Error('유효하지 않은 세션입니다.'); return { hostId: r.hostId, members: r.members, actorId: socket.data.id, reserve: () => { if (r.hostId === socket.data.id) r.hostTransferUntil = Date.now() + 120_000; } }; });
     const on = (name: string, handler: (data: any) => unknown) =>
       socket.on(name, (data: unknown, ack?: Function) => {
         try {
@@ -382,10 +385,12 @@ export function createGameServer(options: ServerOptions = {}) {
       const r = structuredClone(source);
       r.members.find((p) => p.id === d.id)!.connected = true;
       if (
+        Date.now() >= (r.hostTransferUntil ?? 0) &&
         !r.members.some((p) => p.id === r.hostId && p.connected && !p.bot) &&
         !r.members.find((p) => p.id === d.id)!.spectator
       )
         r.hostId = d.id;
+      if (d.id === r.hostId) delete r.hostTransferUntil;
       commit(r, "resume", d.id);
       bind(socket, r.code, d.id);
       broadcast(r);
@@ -612,7 +617,7 @@ export function createGameServer(options: ServerOptions = {}) {
       if (!p) return;
       p.connected = false;
       // A connected participant can resolve pauses when the original host disconnects.
-      if (r.hostId === id)
+      if (r.hostId === id && Date.now() >= (socket.data.gameSwitchReservationUntil ?? 0))
         r.hostId =
           r.members.find(
             (p) => p.id !== id && !p.bot && p.connected && !p.spectator,

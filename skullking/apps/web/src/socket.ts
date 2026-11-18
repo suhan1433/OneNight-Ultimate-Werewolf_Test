@@ -1,6 +1,9 @@
+import { installGameSwitch } from '../../../../game-switch/client';
 import { io } from 'socket.io-client';import type { Ack,ClientGameState } from '@skullking/shared';import { useGame } from './store';
 const key='skullking-session';export const socket=io(import.meta.env.DEV?(import.meta.env.VITE_SOCKET_URL??'http://localhost:3004'):undefined,{path:import.meta.env.DEV?'/socket.io':'/api/skullking/socket',transports:['websocket','polling']});
 export const session=()=>{try{return JSON.parse(localStorage.getItem(key)??'null');}catch{return null;}};export const saveSession=(value:unknown)=>localStorage.setItem(key,JSON.stringify(value));export const clearSession=()=>localStorage.removeItem(key);
 export const emit=(name:string,data:unknown)=>new Promise<any>((resolve,reject)=>socket.emit(name,data,(reply:Ack)=>reply.ok?resolve(reply.data):reject(Error(reply.error))));
 socket.on('ROOM_STATE',(game:ClientGameState)=>useGame.getState().setGame(game));socket.on('ERROR',({message}:{message:string})=>useGame.getState().setError(message));socket.on('connect',()=>{useGame.getState().setOnline(true);const saved=session();if(saved)emit('ROOM_JOIN',saved).catch(()=>{clearSession();useGame.getState().setGame(null);});});socket.on('disconnect',()=>useGame.getState().setOnline(false));
 socket.on('ROOM_KICKED',({message}:{message:string})=>{clearSession();useGame.getState().setGame(null);useGame.getState().setError(message);});
+
+installGameSwitch(socket, 'skullking');

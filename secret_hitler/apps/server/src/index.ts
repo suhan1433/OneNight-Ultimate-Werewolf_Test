@@ -5,7 +5,7 @@ const { server, close } = createGameServer({
     ? Math.max(10, Number(process.env.BOT_DELAY_MS) || 900)
     : undefined,
 });
-const port = Number(process.env.PORT ?? 3007);
+const port = Number(process.env.PORT ?? 3008);
 server.listen(port, "0.0.0.0", () =>
   console.log(`Secret Hitler server: http://localhost:${port}/secret_hitler/`),
 );

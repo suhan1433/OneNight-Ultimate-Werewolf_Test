@@ -12,8 +12,8 @@ export default defineConfig({
     port: 5176,
     strictPort: true,
     proxy: {
-      "/socket.io": { target: "http://127.0.0.1:3004", ws: true },
-      "/health": "http://127.0.0.1:3004",
+      "/socket.io": { target: "http://127.0.0.1:3007", ws: true },
+      "/health": "http://127.0.0.1:3007",
     },
   },
 });

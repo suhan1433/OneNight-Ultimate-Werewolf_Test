@@ -12,7 +12,7 @@ npm run dev
 ```
 
 - 웹: **http://localhost:5179/secret_hitler/**
-- 서버: http://localhost:3007/health
+- 서버: http://localhost:3008/health
 - 개발 프록시가 Socket.IO를 서버에 연결합니다. 다른 기기에서 개발 서버에 접속하려면 `WEB_ORIGIN`에 해당 LAN 주소와 포트를 추가하십시오.
 - 이름과 신분증 사진 선택 → 새 의회 개설 → 초대 링크 전달 → 5~10명 준비 완료 → 개회 선언.
 - 혼자 확인할 때는 **훈련 의원 추가**로 4명 이상 채웁니다. 봇은 본인에게 허용된 정보만 사용합니다.
@@ -23,7 +23,7 @@ npm run dev
 ```sh
 npm run build
 npm start
-# http://localhost:3007/secret_hitler/
+# http://localhost:3008/secret_hitler/
 ```
 
 Docker:

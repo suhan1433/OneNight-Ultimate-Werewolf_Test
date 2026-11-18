@@ -1,3 +1,4 @@
+import { registerGameSwitch } from '../../../../game-switch/server.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { AVATAR_IDS, NARRATOR_LINES, ROLE_DEFINITIONS, type Ack, type ClientGameState, type NightCommand, type RoleType, type Room } from '@werewolf/shared';
@@ -41,6 +42,7 @@ function on<T>(socket: Socket, event: string, handler: (payload: T) => Promise<u
 }
 
 export function registerHandlers(io: Server, socket: Socket) {
+  registerGameSwitch(io, socket, async () => { const r = await getRoom(socket.data.roomCode); if (!r) throw Error('방을 찾을 수 없습니다.'); return { hostId: r.hostId, members: r.players, actorId: socket.data.playerId }; });
   // Vercel has no reliable process-global interval. Sweep a small bounded
   // batch before every incoming event so abandoned rooms do not accumulate.
   socket.use((_event, next) => { void sweepExpiredRooms().then(() => next(), next); });
@@ -315,7 +317,7 @@ export function registerHandlers(io: Server, socket: Socket) {
 
   socket.on('disconnect', async () => {
     const code = socket.data.roomCode as string | undefined; const playerId = socket.data.playerId as string | undefined; if (!code || !playerId) return;
-    try { const room = await withRoomLock(code, async (room) => { const p = room.players.find((x) => x.id === playerId); if (p && p.socketId === socket.id) { p.connected = false; p.socketId = null; p.disconnectedAt = Date.now(); if (room.phase === 'night' && room.nightActionQueue.some((action) => action.status === 'active' && action.playerIds.includes(playerId))) for (const action of room.nightActionQueue) if (action.status === 'active') action.expiresAt = Math.min(action.expiresAt, Date.now() + 5_000); if (room.hostId === playerId) room.hostId = room.players.find((x) => x.id !== playerId && x.connected)?.id ?? room.hostId; if (room.players.every((player) => !player.connected)) room.allOfflineExpiresAt = Date.now() + ALL_OFFLINE_GRACE_MS; await saveRoom(room); } return room; }); await emitRoomState(io, room); io.to(roomChannel(code)).emit('PLAYER_LEFT', { playerId }); } catch { /* expired room */ }
+    try { const room = await withRoomLock(code, async (room) => { const p = room.players.find((x) => x.id === playerId); if (p && p.socketId === socket.id) { p.connected = false; p.socketId = null; p.disconnectedAt = Date.now(); if (room.phase === 'night' && room.nightActionQueue.some((action) => action.status === 'active' && action.playerIds.includes(playerId))) for (const action of room.nightActionQueue) if (action.status === 'active') action.expiresAt = Math.min(action.expiresAt, Date.now() + 5_000); if (room.hostId === playerId && Date.now() >= (socket.data.gameSwitchReservationUntil ?? 0)) room.hostId = room.players.find((x) => x.id !== playerId && x.connected)?.id ?? room.hostId; if (room.players.every((player) => !player.connected)) room.allOfflineExpiresAt = Date.now() + ALL_OFFLINE_GRACE_MS; await saveRoom(room); } return room; }); await emitRoomState(io, room); io.to(roomChannel(code)).emit('PLAYER_LEFT', { playerId }); } catch { /* expired room */ }
   });
 }
 

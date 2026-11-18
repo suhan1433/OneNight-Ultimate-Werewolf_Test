@@ -1,3 +1,4 @@
+import { registerGameSwitch } from '../game-switch/server.mjs';
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -348,6 +349,7 @@ function ack(socket, event, handler) {
   socket.on(event, (payload = {}, callback) => { try { const data = handler(payload); callback?.({ ok: true, data }); } catch (error) { const message = error instanceof Error ? error.message : '요청을 처리하지 못했습니다.'; callback?.({ ok: false, error: message }); socket.emit('ERROR', { message }); } });
 }
 io.on('connection', socket => {
+  registerGameSwitch(io, socket, () => { const r = rooms.get(socket.data.room); if (!r) throw Error('방을 찾을 수 없습니다.'); return { hostId: r.hostId, members: r.players, actorId: socket.data.playerId }; });
   ack(socket, 'ROOM_CREATE', data => {
     const nickname = validName(data.nickname); const maxPlayers = Number(data.maxPlayers); const missionId = Number(data.missionId);
     if (![3, 4, 5].includes(maxPlayers)) throw Error('3~5명을 선택해 주세요.'); if (!MISSIONS[missionId]) throw Error('지원하지 않는 미션입니다.');

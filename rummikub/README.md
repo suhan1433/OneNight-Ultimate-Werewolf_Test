@@ -10,7 +10,7 @@ npm install
 npm run dev
 ```
 
-- Client: `http://localhost:5177`
+- Client: `http://localhost:5178`
 - Socket/health server: `http://localhost:3010/health`
 - 두 브라우저 탭에서 한 사람이 방을 만들고, 표시된 6자리 코드(또는 공유 링크)로 다른 사람이 입장합니다.
 - 방장은 `봇으로 채우기`를 사용해 빈 좌석을 채울 수 있습니다.

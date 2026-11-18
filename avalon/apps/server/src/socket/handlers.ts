@@ -1,3 +1,4 @@
+import { registerGameSwitch } from '../../../../../game-switch/server.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { COUNT_TABLE, ROLE_DEFINITIONS, isAvatarId, type Ack, type AvalonOptions, type Player, type Room } from '@werewolf/shared';
@@ -159,6 +160,7 @@ function scheduleBotAssassination(io:Server, room:Room) {
   aimTimer.unref();
 }
 export function registerHandlers(io:Server,socket:Socket){
+  registerGameSwitch(io, socket, async () => { const r = await getRoom(socket.data.roomCode); if (!r) throw Error('방을 찾을 수 없습니다.'); return { hostId: r.hostId, members: r.players, actorId: socket.data.playerId }; });
  // Like an assassin's aim, team selection is an ephemeral visual event.  The
  // proposed team itself remains authoritative only once TEAM_PROPOSE succeeds.
  socket.on('TEAM_SELECTION',async(d:{roomCode?:string;team?:unknown})=>{
