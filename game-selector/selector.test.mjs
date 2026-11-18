@@ -17,9 +17,9 @@ const screenshots=process.env.SELECTOR_SCREENSHOTS||join(tmpdir(),'after-hours-s
 before(async()=>{
   server=http.createServer((req,res)=>{
     const path=new URL(req.url,'http://localhost').pathname;
-    if(path==='/launcher.css'){res.setHeader('Content-Type','text/css');res.end(css);return;}
+    if(path==='/launcher.css'||path==='/game-selector/launcher.css'){res.setHeader('Content-Type','text/css');res.end(css);return;}
     res.setHeader('Content-Type','text/html; charset=utf-8');
-    if(path==='/')res.end(html);
+    if(path==='/'||path==='/game-selector/'||path==='/game-selector/index.html')res.end(html);
     else if(games.some(game=>game.href===path))res.end('<!doctype html><html lang="ko"><title>게임 입장 경로 확인</title><h1>게임 입장 경로 확인</h1></html>');
     else{res.statusCode=404;res.end('Not found');}
   });
@@ -37,6 +37,17 @@ const open=async(options={})=>{
   return {context,page,errors};
 };
 const visibleIds=page=>page.locator('.game-card:visible').evaluateAll(cards=>cards.map(card=>card.dataset.game));
+
+test('launcher styles load at the root, in its folder and from a local HTML file',async()=>{
+  const {context,page}=await open();
+  try{
+    for(const url of [origin,`${origin}/game-selector/`,`${origin}/game-selector/index.html`,new URL('./index.html',import.meta.url).href]){
+      await page.goto(url,{waitUntil:'load'});
+      assert.equal(await page.locator('.hero').evaluate(el=>getComputedStyle(el).display),'grid',`${url}: hero stylesheet missing`);
+      assert.equal(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(11, 20, 21)',`${url}: theme stylesheet missing`);
+    }
+  }finally{await context.close();}
+});
 
 test('seven destinations and player ranges match the game implementations',()=>{
   assert.equal(games.length,7);

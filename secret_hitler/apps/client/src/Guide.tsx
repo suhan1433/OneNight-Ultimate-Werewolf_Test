@@ -1,4 +1,3 @@
-import type { GameView } from "../../../packages/shared-types/src/index";
 import { Emblem, PolicyFace, Portrait } from "./Art";
 import type { Copy } from "./i18n";
 
@@ -29,32 +28,6 @@ const english = [
   ["Execution", "President selects one survivor", "Check the target portrait and name, then hold Execute. This decision cannot be undone.", "Executing Hitler immediately wins for Liberals. Otherwise the role stays secret and the executed player may no longer talk, vote or hold office.", "Everyone sees the target. If the game continues, start the next election."],
   ["Veto and chaos", "Chancellor requests; President responds", "After 5 Fascist policies, the Chancellor can request a veto. Consent discards both policies; refusal requires enacting one.", "An approved veto or failed election advances the tracker. At 3, the top policy is automatically enacted as chaos.", "Enacting a policy resets the tracker. Chaos clears term limits and triggers no executive power."],
 ];
-
-export function PhaseHelp({ g, selfId, t }: { g: GameView; selfId: string; t: Copy }) {
-  const ko = t.confirm === "확인";
-  const key = g.phase === "executive" ? g.power : g.phase;
-  const i = steps.findIndex((s) => s.key === key);
-  if (i < 0) return null;
-  const acting = g.phase === "chancellor_enact" ? g.chancellor : g.president;
-  const collective = ["night", "voting", "vote_result"].includes(g.phase);
-  const label = collective ? (ko ? "모두의 차례" : "Everyone acts") : acting === selfId ? (ko ? "내 차례" : "Your turn") : `${g.players.find((p) => p.id === acting)?.name} · ${t.wait}`;
-  const tasks: Record<string, [string, string]> = {
-    night: ['내 비밀 역할을 확인하고 완료를 눌러요', 'Check your secret role, then confirm'],
-    nomination: ['대통령이 수상 후보를 고릅니다', 'The President chooses a Chancellor'],
-    voting: ['이 두 사람에게 맡길지 투표해요', 'Vote on trusting this pair'],
-    vote_result: ['결과를 읽고 확인 버튼을 눌러요', 'Read the results and confirm'],
-    president_discard: ['대통령은 버릴 카드 1장을 골라요', 'President: choose 1 card to discard'],
-    chancellor_enact: ['수상은 통과시킬 카드 1장을 골라요', 'Chancellor: choose 1 card to enact'],
-    investigate: ['한 사람의 정당을 비공개로 확인해요', 'Privately check one player’s party'],
-    peek: ['앞으로 나올 3장을 보기만 해요', 'Look at the top 3 cards without changing them'],
-    special_election: ['다음 선거의 대통령을 지정해요', 'Choose the next President'],
-    execute: ['대상을 신중히 고르고 길게 눌러요', 'Check the target, then hold to execute'],
-    veto: ['대통령이 거부권 승인 여부를 정해요', 'The President accepts or refuses the veto'],
-  };
-  const submitted = g.phase === 'voting' ? g.voted.includes(selfId) : ['night','vote_result'].includes(g.phase) && g.acknowledged.includes(selfId);
-  const task = submitted ? (ko ? '내 확인은 끝났어요. 다른 참가자를 기다려요' : 'You are done. Wait for the others') : tasks[key ?? '']?.[ko ? 0 : 1];
-  return <details className="phase-help"><summary><span>{collective || acting === selfId ? label : `${g.players.find(p => p.id === acting)?.name ?? (ko?'담당자':'Acting player')} · ${ko?'진행 중':'acting'}`}</span><strong>{task}</strong></summary><ol>{(ko ? steps[i].how : english[i][2]).split('. ').map((line,index)=><li key={index}>{line}</li>)}</ol><p><b>{ko?'다음에는: ':'Next: '}</b>{ko ? steps[i].next : english[i][4]}</p></details>;
-}
 
 function Example({ kind, t, ko }: { kind: string; t: Copy; ko: boolean }) {
   const policies = kind === "president_discard" ? ["liberal", "fascist", "fascist"] as const : kind === "chancellor_enact" ? ["liberal", "fascist"] as const : ["fascist", "liberal", "fascist"] as const;

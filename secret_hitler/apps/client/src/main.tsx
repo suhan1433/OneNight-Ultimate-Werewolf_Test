@@ -34,8 +34,9 @@ import "@fontsource/noto-serif-kr/900.css";
 import { Portrait, Emblem, PolicyFace, ARCHETYPES } from "./Art";
 import { PolicyCard } from "./PolicyCard";
 import { LegislationProgress } from "./LegislationProgress";
+import { ActivityProgress } from "./ActivityProgress";
+import { GovernmentProposal, ElectionRisk } from "./GovernmentProposal";
 import { Presentation, VoteScene, useScenes, useTyped, playCue } from "./Presentation";
-import { PhaseHelp } from "./Guide";
 import { Rulebook } from "./Rulebook";
 import { layoutSeats, slotFor } from "./seatLayout";
 import "./styles.css";
@@ -890,6 +891,7 @@ function Actions({
     </p>
   );
   const disabled = busy || !connected || room.paused;
+  const activity = <ActivityProgress g={g} selfId={id} paused={room.paused} t={t} />;
   const legislative = g.phase === "president_discard" || g.phase === "chancellor_enact" || g.phase === "veto";
   const progress = legislative ? <LegislationProgress
     key={`${room.code}:${g.round}`}
@@ -907,6 +909,8 @@ function Actions({
           {g.players.some((p) => p.id === id) ? t.executed : t.spectatorNote}
         </p>
         {progress}
+        {activity}
+        {g.phase === "voting" && <GovernmentProposal g={g} t={t} paused={room.paused} />}
       </div>
     );
   return (
@@ -919,8 +923,10 @@ function Actions({
         <span className="eyebrow">{t.protocol}</span>
         <h2>{g.phase === "executive" && g.power ? t[g.power] : t[g.phase]}</h2>
       </div>
-      <PhaseHelp g={g} selfId={id} t={t} />
       {progress}
+      {g.phase === "voting" && <GovernmentProposal g={g} t={t} paused={room.paused} />}
+      {g.phase === "vote_result" && <ElectionRisk g={g} t={t} />}
+      {activity}
       <fieldset disabled={disabled}>
         {g.phase === "nomination" &&
           (g.president === id ? (
@@ -937,9 +943,7 @@ function Actions({
                 }}
               />
             </>
-          ) : (
-            <p>{t.wait}</p>
-          ))}
+          ) : null)}
         {g.phase === "vote_result" && <>
           <button className="primary vote-confirm"
             disabled={g.acknowledged.includes(id)}
@@ -950,12 +954,7 @@ function Actions({
           <p className="hint">{t.resultWait}</p>
         </>}
         {g.phase === "voting" &&
-          (g.voted.includes(id) ? (
-            <p className="sealed-vote">
-              ✓ {t.voted} {g.voted.length}/
-              {g.players.filter((p) => p.alive).length}
-            </p>
-          ) : (
+          (g.voted.includes(id) ? null : (
             <>
               <div className="ballots">
                 <BallotCard
@@ -1067,11 +1066,7 @@ function Actions({
                 </>
               )}
             </>
-          ) : (
-            <p className="investigating">
-              {g.power === "investigate" ? t.investigating : t.wait}
-            </p>
-          ))}
+          ) : null)}
       </fieldset>
     </section>
   );
@@ -1126,6 +1121,7 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
         <p className="eyebrow">{t.eyesOnly}</p>
         <h1>{t.night}</h1>
         <SecretFile g={g} selfId={room.selfId} t={t} />
+        <ActivityProgress g={g} selfId={room.selfId} paused={room.paused} t={t} />
         <p className="fine-print">
           {g.acknowledged.length} / {g.players.length}
         </p>
@@ -1138,7 +1134,11 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
           {t.session} {String(g.round).padStart(2, "0")} {t.sessionEnd}
           <span className="room-code"> / {room.code}</span>
         </p>
-        <span className="phase-name">{t[g.phase]}</span>
+        <span className="phase-name">
+          {g.phase === "executive" && g.power ? t[g.power] : t[g.phase]}
+          {["nomination", "executive", "president_discard", "chancellor_enact", "veto"].includes(g.phase) &&
+            ` · ${g.players.find(p => p.id === (g.phase === "chancellor_enact" ? g.chancellor : g.president))?.name ?? ""}`}
+        </span>
         <TimeRemaining deadline={room.deadline} />
         <button className="icon-btn" aria-label={t.chat} onClick={() => setChatOpen(true)}>☏</button>
         {g.selfRole && (
@@ -1241,12 +1241,19 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
                   <div className="nameplates">
                     {p.id === g.president && (
                       <span className="office president-office">
-                        {t.president}
+                        <svg className="office-emblem" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M7 20C2 17 2 9 6 5M17 20C22 17 22 9 18 5M5 15l-3-2m3-2L3 8m4 0L6 4m13 11 3-2m-3-2 2-3m-4 0 1-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <path d="m12 5 1.8 3.7 4.1.6-3 2.9.7 4.1-3.6-1.9-3.6 1.9.7-4.1-3-2.9 4.1-.6Z" fill="currentColor" />
+                        </svg>
+                        <span className="office-label">{t.president}</span>
                       </span>
                     )}
                     {p.id === g.chancellor && (
-                      <span className="office chancellor-office">
-                        {g.phase === "voting" ? t.nominee : t.chancellor}
+                      <span className="office chancellor-office" data-nominee={g.phase === "voting" ? "true" : undefined}>
+                        <svg className="office-emblem" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="m3 8 9-5 9 5ZM4 20h16M6 17h12M7 10v7m5-7v7m5-7v7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span className="office-label">{g.phase === "voting" ? t.nominee : t.chancellor}</span>
                       </span>
                     )}
                   </div>
@@ -1360,6 +1367,11 @@ function Chat({
 }
 function Results({ room, t }: { room: RoomView; t: Copy }) {
   const g = room.game!;
+  const ko = t.confirm === "확인";
+  const selfRole = g.revealedRoles?.[room.selfId];
+  const selfWon = selfRole && g.winner ? (selfRole === "liberal" ? "liberal" : "fascist") === g.winner : null;
+  const winLabel = ko ? "승리" : "Victory";
+  const lossLabel = ko ? "패배" : "Defeat";
   return (
     <main className={`results content ${g.winner ?? ""}`}>
       <p className="eyebrow">
@@ -1373,6 +1385,16 @@ function Results({ room, t }: { room: RoomView; t: Copy }) {
             ? t.fascistWin
             : t.ended}
       </h1>
+      {g.winner && <section className="result-outcome-summary" aria-label={ko ? "최종 승패" : "Final outcome"}>
+        {selfWon !== null && <div className={`result-personal ${selfWon ? "won" : "lost"}`}>
+          <span>{ko ? "나의 결과" : "YOUR RESULT"}</span>
+          <strong>{selfWon ? winLabel : lossLabel}</strong>
+        </div>}
+        <div className="result-team-summary">
+          <span className="winning-team"><i aria-hidden="true">✦</i>{winLabel}<b>{t[g.winner]}</b></span>
+          <span className="losing-team"><i aria-hidden="true">×</i>{lossLabel}<b>{t[g.winner === "liberal" ? "fascist" : "liberal"]}</b></span>
+        </div>
+      </section>}
       <p>
         {g.winner === "liberal"
           ? g.liberal === 5
@@ -1388,19 +1410,45 @@ function Results({ room, t }: { room: RoomView; t: Copy }) {
       <div className="result-roles">
         {g.players.map((p, i) => {
           const role = g.revealedRoles?.[p.id];
+          const team = role ? (role === "liberal" ? "liberal" : "fascist") : null;
+          const outcome = g.winner && team ? (team === g.winner ? "winner" : "loser") : "neutral";
+          const label = outcome === "winner" ? winLabel : outcome === "loser" ? lossLabel : (ko ? "승부 미결정" : "No result");
           return (
             <article
               key={p.id}
-              className={role ? `role-${role}` : ""}
+              className={`result-player ${role ? `role-${role}` : ""} ${outcome}`}
+              data-player-id={p.id}
+              data-outcome={outcome}
+              data-self={p.id === room.selfId}
+              aria-label={`${p.name}${role ? ` · ${t[role]}` : ""} · ${label}`}
               style={{ ["--i" as string]: i } as React.CSSProperties}
             >
-              <Portrait avatar={p.avatar} />
+              <span className="result-player-outcome"><span aria-hidden="true">{outcome === "winner" ? "✦" : outcome === "loser" ? "×" : "—"}</span>{label}</span>
+              <div className="result-portrait-frame">
+                <Portrait avatar={p.avatar} />
+                {outcome === "loser" && <svg className="result-defeat-mark" viewBox="0 0 120 150" fill="none" aria-hidden="true">
+                  <g className="result-cross" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m24 22 19 24 23 23 31 38M97 23 76 48 52 74 23 107" stroke="#370e13" strokeWidth="15" />
+                    <path d="m24 22 19 24 23 23 31 38M97 23 76 48 52 74 23 107" stroke="#b33037" strokeWidth="9" />
+                    <path d="m25 22 23 29m24 28 21 23M96 24 75 49 56 70" stroke="#ed7861" strokeWidth="2" opacity=".65" />
+                  </g>
+                  <g className="result-blood-trails" fill="#9c252e">
+                    <path d="M39 48h6l-1 40-2 25-2-25ZM77 88h7l-2 27-2 24-2-24ZM23 102h5l-1 22-2 9-1-9ZM94 104h5l-1 17-2 8-1-8Z" />
+                    <ellipse cx="42" cy="115" rx="2.7" ry="4" /><ellipse cx="80" cy="141" rx="3" ry="4.5" />
+                    <circle cx="20" cy="35" r="2" /><circle cx="101" cy="42" r="2.4" /><circle cx="31" cy="118" r="1.7" />
+                  </g>
+                </svg>}
+                {outcome === "winner" && <svg className="result-victor-seal" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                  <circle cx="20" cy="20" r="18" fill="#302815" stroke="#d2b878" /><circle cx="20" cy="20" r="15" stroke="#9b7d43" />
+                  <path d="m20 10 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3.1-5.8 3.1 1.1-6.5-4.7-4.6 6.5-.9Z" fill="#e5ca88" />
+                </svg>}
+              </div>
               <strong>{p.name}</strong>
               <span className="role-line">
                 {role && <Emblem party={role} size={20} />}
                 {role && t[role]}
-                <i className="redact-bar" aria-hidden="true" />
               </span>
+              <span className="result-player-state">{p.id === room.selfId && `${t.you} · `}{p.alive ? (ko ? "생존" : "Survived") : (ko ? "처형됨" : "Executed")}</span>
             </article>
           );
         })}

@@ -14,6 +14,7 @@ import type {
 import type { Copy } from "./i18n";
 import { readLocal, writeLocal, useApp } from "./store";
 import { Emblem, Portrait, PolicyFace } from "./Art";
+import { ElectionRisk } from "./GovernmentProposal";
 
 /* ------------------------------------------------------------------ *
  *  Audio — synthesized placeholder layer. Swap `sound()` bodies for
@@ -141,7 +142,7 @@ function sound(cue: Cue) {
 /* ------------------------------------------------------------------ *
  *  Scene queue + presented-state gating
  * ------------------------------------------------------------------ */
-type SceneKind = "vote" | "policy" | "chaos" | "exec" | "victory" | "stamp" | "focus";
+type SceneKind = "vote" | "policy" | "chaos" | "exec" | "victory" | "stamp" | "focus" | "nomination" | "election";
 export type Scene = {
   ev: PublicEvent;
   kind: SceneKind;
@@ -149,6 +150,7 @@ export type Scene = {
   base: number; // authored duration
   focus?: string | null; // seat the lamp goes to (resolved from state, not only from event fields)
   accepted?: boolean; // veto outcome
+  outcome?: GameView; // confirmed public state for terminal scenes, independent of the held board
 };
 /** Does the local player owe the server an action right now? Then scenes must not eat their clock. */
 function mustAct(r: RoomView) {
@@ -184,7 +186,7 @@ const SCENES: Record<string, { kind: SceneKind; ms: number }> = {
   special_election: { kind: "stamp", ms: 1900 },
   veto_request: { kind: "stamp", ms: 1700 },
   veto_answer: { kind: "stamp", ms: 1900 },
-  nomination: { kind: "focus", ms: 1300 },
+  nomination: { kind: "nomination", ms: 2200 },
 };
 
 /**
@@ -222,7 +224,8 @@ export function useScenes(room: RoomView | null, reduced: boolean) {
       return;
     }
     setScene(s);
-    timer.current = setTimeout(next, reducedRef.current ? Math.min(s.ms, 900) : s.ms);
+    // Keep the identity and short reason readable even when motion is reduced.
+    timer.current = setTimeout(next, reducedRef.current && s.kind !== "election" ? Math.min(s.ms, 900) : s.ms);
   }, []);
 
   useLayoutEffect(() => {
@@ -270,8 +273,12 @@ export function useScenes(room: RoomView | null, reduced: boolean) {
         } else if (ev.type === "special_election") {
           sc.focus = e.target ?? g.president ?? null;
         }
+        if (ev.type === "victory") sc.outcome = g;
         return sc;
       });
+    batch = batch.flatMap(s => s.kind === "victory" && g.winner === "fascist" && g.fascist >= 3 && g.fascist < 6 && g.chancellor && g.revealedRoles?.[g.chancellor] === "hitler"
+      ? [{ ...s, kind: "election" as const, ms: 3000, base: 3000, focus: g.chancellor }, s]
+      : [s]);
     if (isMe) {
       batch = batch.filter((s) => s.kind !== "stamp" && s.kind !== "focus");
       const total = batch.reduce((a, s) => a + s.ms, 0),
@@ -319,7 +326,7 @@ function focusFor(view: RoomView | null, scene: Scene | null) {
   if (g?.phase === "voting")
     return { id: g.president, night: false };
   if (scene) {
-    if (scene.kind === "exec" || scene.kind === "focus" || e.type === "special_election")
+    if (scene.kind === "exec" || scene.kind === "focus" || scene.kind === "nomination" || e.type === "special_election")
       return { id: scene.focus ?? null, night: false };
     return { id: null, night: false };
   }
@@ -447,8 +454,6 @@ export function useTyped(text: string, on: boolean, ms = 30, delay = 0) {
   }, [text, on, ms, delay]);
   return text.slice(0, n);
 }
-const nameOf = (g: GameView, id?: string) =>
-  g.players.find((p) => p.id === id)?.name ?? "";
 
 export function VoteScene({
   ev,
@@ -560,13 +565,56 @@ function ChaosScene({ t, reduced }: { t: Copy; reduced: boolean }) {
     </div>
   );
 }
-function ExecScene({ id, g, t, ms }: { id?: string | null; g: GameView; t: Copy; ms: number }) {
+function ExecScene({ id, g, t, ms, reduced }: { id?: string | null; g: GameView; t: Copy; ms: number; reduced: boolean }) {
+  const target = g.players.find((p) => p.id === id);
+  const ko = t.confirm === "확인";
   return (
-    <div className="sc-exec" style={{ animationDuration: `${ms}ms` }}>
-      <div className="exec-text" style={{ animationDuration: `${ms}ms` }}>
-        <strong>{t.executed}</strong>
-        <span>{nameOf(g, id ?? undefined)}</span>
+    <div className={`sc-exec${reduced ? " is-reduced" : ""}`} style={{ "--exec-duration": `${ms}ms` } as React.CSSProperties}>
+      <div className="exec-heading">
+        <span className="exec-rule" />
+        <p>{ko ? "대통령 명령 · 사형 집행" : "PRESIDENTIAL ORDER · EXECUTION"}</p>
+        <h2>{target?.name ?? (ko ? "집행 대상" : "Condemned player")}</h2>
+        <span className="exec-subtitle">{ko ? "명령이 내려졌습니다" : "The order has been given"}</span>
       </div>
+      <div className="exec-stage">
+        <div className="exec-wall" />
+        <div className="exec-beam" />
+        <svg className="exec-tableau" viewBox="0 0 720 420" fill="none" aria-hidden="true">
+          <path d="M430 0v35m-25 18 12-18h26l12 18Z" stroke="#8d9698" strokeWidth="3" fill="#333e42" />
+          <path d="M410 54h40" stroke="#e0c79a" strokeWidth="4" />
+          <path d="M0 376h720" stroke="#798080" strokeOpacity=".3" />
+          <ellipse cx="438" cy="378" rx="77" ry="9" fill="#05090b" opacity=".65" />
+          <g className="exec-person">
+            <path d="M420 265 406 371h22l12-85 9 85h23l-12-106Z" fill="#111b22" stroke="#687275" strokeWidth="1.5" />
+            <path d="M415 173q25-13 48 0l10 95q-32 15-65 0Z" fill="#253239" stroke="#778083" strokeWidth="1.5" />
+            <path d="m416 180-17 67 16 8 11-49m32-26 22 64-13 13-18-51" fill="#202d34" stroke="#657175" strokeWidth="1.5" />
+            <path d="m430 170 10 26 10-26M440 196v67" stroke="#87908b" strokeOpacity=".55" strokeWidth="2" />
+            <path d="M431 153v19q9 8 18 0v-19" fill="#8d8876" />
+            <ellipse cx="440" cy="134" rx="23" ry="29" fill="#aaa18b" stroke="#d1c6aa" />
+            <path d="M418 131q-3-35 25-30 24 1 20 34l-9-17-34 7Z" fill="#222b2d" />
+            <path d="m418 131 43 2-1 10-42-2Z" fill="#172128" />
+            <path d="m436 153 10 1" stroke="#4f5149" strokeWidth="2" />
+          </g>
+          <g className="exec-rifle" fill="#101a20" stroke="#627079" strokeWidth="1.5" strokeLinejoin="round">
+            <path d="M-25 270 65 223l27-8 88-15h65v9l-64 5-27 16-39 3-44 30-60 52Z" />
+            <path d="M113 218h64v14h-22l-14 33h-17l6-31h-17Z" />
+            <path d="M177 200h88v7h-88Zm63-6h6v7h-6ZM-20 340l85-83 40-12 19 17-44 27-65 79Z" />
+          </g>
+          <g className="exec-smoke" stroke="#b2b4a8" strokeWidth="3" strokeLinecap="round" opacity="0">
+            <path d="M267 203q24-18 45-4t36-12M271 210q22 14 41 2t43 6M280 191q13-22 34-18" />
+          </g>
+        </svg>
+        <div className="exec-impact" />
+        <div className="exec-file">
+          <Portrait avatar={target?.avatar ?? 0} />
+          <span>{ko ? "집행 대상" : "SUBJECT"}</span>
+        </div>
+        <div className="exec-verdict">
+          <span className="exec-pending">{ko ? "집행 대기" : "AWAITING EXECUTION"}</span>
+          <strong className="exec-complete">{t.executed}</strong>
+        </div>
+      </div>
+      <p className="exec-footer">{ko ? "의회 기록에 집행 결과가 기재됩니다" : "The execution is entered into the parliamentary record"}</p>
     </div>
   );
 }
@@ -581,6 +629,47 @@ export function winReason(g: GameView, t: Copy) {
         : t.reasonElection
       : t.reasonEnded;
 }
+function NominationScene({ scene, g, t }: { scene: Scene; g: GameView; t: Copy }) {
+  const ko = t.confirm === "확인";
+  const president = g.players.find(p => p.id === (scene.ev.president ?? g.president));
+  const candidate = g.players.find(p => p.id === scene.focus);
+  return <section className="sc-nomination" style={{ "--nomination-duration": `${scene.ms}ms` } as React.CSSProperties}>
+    <p className="sc-eyebrow">{ko ? "새 정부 구성" : "FORMING A GOVERNMENT"}</p>
+    <h2>{ko ? "수상 후보가 지명되었습니다" : "Chancellor nominee announced"}</h2>
+    <div className="nomination-pair">
+      <div className="nomination-person president"><span>{t.president}</span><Portrait avatar={president?.avatar ?? 0} /><strong>{president?.name}</strong></div>
+      <div className="nomination-transfer"><span>{ko ? "지명" : "NOMINATES"}</span><i aria-hidden="true">→</i></div>
+      <div className="nomination-person candidate"><span>{t.nominee}</span><Portrait avatar={candidate?.avatar ?? 0} /><strong>{candidate?.name}</strong><b className="nomination-seal">{ko ? "지명 확정" : "NOMINATED"}</b></div>
+    </div>
+    <p className="nomination-next">{ko ? "이 두 사람에게 정부를 맡길지, 생존자 모두가 투표합니다." : "Every living player will vote on whether to trust this pair."}</p>
+    <ElectionRisk g={g} t={t} />
+    <div className="nomination-timeline" aria-hidden="true"><i /></div>
+  </section>;
+}
+
+/** Rendered only after a server-confirmed Hitler election victory. */
+function ElectionScene({ g, t }: { g: GameView; t: Copy }) {
+  const ko = t.confirm === "확인";
+  const elected = g.players.find(p => p.id === g.chancellor);
+  const vote = [...g.events].reverse().find(e => e.type === "vote");
+  const ballots = Object.values(vote?.votes ?? {});
+  return <section className="sc-election">
+    <p className="sc-eyebrow">{ko ? "정부 신임 표결 · 가결" : "GOVERNMENT VOTE · APPROVED"}</p>
+    <h2>{ko ? `${elected?.name ?? "수상 후보"} 수상 당선` : `${elected?.name ?? "The nominee"} is elected Chancellor`}</h2>
+    {ballots.length > 0 && <p className="election-tally">{t.ayes} {ballots.filter(Boolean).length} · {t.nays} {ballots.filter(v => !v).length}</p>}
+    <div className="election-identity">
+      <div className="election-identity-inner">
+        <div className="election-identity-back"><span>§</span><b>{ko ? "신원 확인" : "IDENTITY CHECK"}</b></div>
+        <div className="election-identity-front"><Portrait avatar={elected?.avatar ?? 0} /><span>{ko ? "당선 수상의 정체" : "THE ELECTED CHANCELLOR IS"}</span><strong>{t.hitler}</strong></div>
+      </div>
+    </div>
+    <div className="election-explanation">
+      <span className="election-policy-count">{ko ? `파시스트 정책 ${g.fascist}개 제정` : `${g.fascist} Fascist policies enacted`}</span>
+      <p>{ko ? "파시스트 정책이 3개 이상인 상태에서 히틀러가 수상에 당선되었습니다." : "Hitler was elected Chancellor with at least 3 Fascist policies enacted."}</p>
+    </div>
+  </section>;
+}
+
 function VictoryScene({ g, t }: { g: GameView; t: Copy }) {
   const w = g.winner === "liberal" ? "liberal" : "fascist";
   return (
@@ -636,7 +725,7 @@ export function Presentation({
 }) {
   const [enabled, setEnabled] = useState(readLocal("sh-sound", "0") === "1"),
     [dip, setDip] = useState(false),
-    g = view?.game;
+    g = scene?.outcome ?? view?.game;
 
   useEffect(() => {
     // the title screen can switch sound on too
@@ -674,7 +763,7 @@ export function Presentation({
         sound("telegraph");
         break;
       case "exec":
-        at(700 * (scene.ms / scene.base), () => sound("gun"));
+        if (!reduced) at(scene.ms * 0.48, () => sound("gun"));
         break;
       case "victory":
         sound(g?.winner === "liberal" ? "dawn" : "doom");
@@ -682,13 +771,19 @@ export function Presentation({
       case "stamp":
         at(250, () => sound("stamp"));
         break;
+      case "nomination":
+        at(350 * sp, () => sound("stamp"));
+        break;
+      case "election":
+        at(reduced ? 0 : 800, () => sound("doom"));
+        break;
     }
     return () => {
       timers.forEach(clearTimeout);
       setDip(false);
       delete document.body.dataset.shake;
     };
-  }, [scene?.ev.id]);
+  }, [scene?.ev.id, scene?.kind]);
 
   // ambience: drone layers grow with PUBLIC fascist policy count only
   useEffect(() => {
@@ -765,7 +860,11 @@ export function Presentation({
               ? g?.winner === "liberal"
                 ? t.liberalWin
                 : t.fascistWin
-              : stampLabel(scene.ev, t, scene.accepted)
+              : scene.kind === "nomination"
+                ? (t.confirm === "확인" ? "수상 후보가 지명되었습니다. 정부 신임 투표가 시작됩니다." : "A Chancellor has been nominated. The government vote will begin.")
+                : scene.kind === "election"
+                  ? t.reasonElection
+                  : stampLabel(scene.ev, t, scene.accepted)
     : "";
   return (
     <>
@@ -792,17 +891,20 @@ export function Presentation({
       </div>
       {scene && g && scene.kind !== "focus" && (
         <div
-          key={scene.ev.id}
+          key={`${scene.ev.id}:${scene.kind}`}
           className={`scene ${scene.kind}`}
-          aria-hidden="true"
+          role="region"
+          aria-label={sr || t.protocol}
         >
+          {scene.kind === "nomination" && <NominationScene scene={scene} g={g} t={t} />}
+          {scene.kind === "election" && <ElectionScene g={g} t={t} />}
           {scene.kind === "vote" && (
             <VoteScene ev={scene.ev} g={g} t={t} reduced={reduced} speed={scene.ms / scene.base} />
           )}
           {scene.kind === "policy" && <PolicyScene ev={scene.ev} t={t} />}
           {scene.kind === "chaos" && <ChaosScene t={t} reduced={reduced} />}
           {scene.kind === "exec" && (
-            <ExecScene id={scene.focus} g={g} t={t} ms={scene.ms} />
+            <ExecScene id={scene.focus} g={g} t={t} ms={scene.ms} reduced={reduced} />
           )}
           {scene.kind === "victory" && <VictoryScene g={g} t={t} />}
           {scene.kind === "stamp" && (
@@ -813,9 +915,9 @@ export function Presentation({
               <strong>{stampLabel(scene.ev, t, scene.accepted)}</strong>
             </div>
           )}
-          <button className="scene-skip" onClick={skip}>
+          {scene.kind !== "election" && <button className="scene-skip" onClick={skip}>
             {t.skip}
-          </button>
+          </button>}
         </div>
       )}
     </>
