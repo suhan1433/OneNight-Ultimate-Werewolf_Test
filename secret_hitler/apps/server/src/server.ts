@@ -7,12 +7,9 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import {
-  appendFileSync,
-  closeSync,
+  renameSync,
   existsSync,
-  fsyncSync,
   mkdirSync,
-  openSync,
   readFileSync,
   readdirSync,
   unlinkSync,
@@ -64,6 +61,7 @@ const profileSchema = z.object({
 const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("acknowledge") }),
   z.object({ type: z.literal("nominate"), target: z.string().max(80) }),
+  z.object({ type: z.literal("select_target"), target: z.string().max(80) }),
   z.object({ type: z.literal("vote"), ja: z.boolean() }),
   z.object({
     type: z.literal("discard"),
@@ -115,18 +113,11 @@ export function createGameServer(options: ServerOptions = {}) {
   const dataDir = options.dataDir ?? resolve(process.cwd(), ".data");
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const file = (code: string) => join(dataDir, `${code}.jsonl`);
-  // Append-only write-ahead records: each committed event carries a recovery snapshot.
-  function persist(room: Room, command: string, actor: string | null) {
-    const fd = openSync(file(room.code), "a", 0o600);
-    try {
-      appendFileSync(
-        fd,
-        JSON.stringify({ at: Date.now(), command, actor, state: room }) + "\n",
-      );
-      fsyncSync(fd);
-    } finally {
-      closeSync(fd);
-    }
+  // Replace the latest recovery snapshot; do not retain an action history.
+  function persist(room: Room, _command: string, _actor: string | null) {
+    const path = file(room.code);
+    writeFileSync(`${path}.tmp`, JSON.stringify({ state: room }) + "\n", { mode: 0o600 });
+    renameSync(`${path}.tmp`, path);
   }
   for (const name of readdirSync(dataDir))
     if (/^[A-HJ-NP-Z2-9]{6}\.jsonl$/.test(name)) {
@@ -147,6 +138,11 @@ export function createGameServer(options: ServerOptions = {}) {
               lines.slice(0, i + 1).join("\n") + "\n",
               { mode: 0o600 },
             );
+          if (r.game) {
+            r.game.secrets = [];
+            r.game.events = r.game.events.slice(-16);
+            r.game.selectedTarget ??= null;
+          }
           r.members.forEach((p) => {
             if (!p.bot) p.connected = false;
           });
@@ -198,6 +194,7 @@ export function createGameServer(options: ServerOptions = {}) {
       !room.game ||
       room.game.phase === "finished" ||
       room.game.phase === "night" ||
+      room.game.phase === "vote_result" ||
       room.settings.timerSeconds === 0
     )
       room.deadline = null;
@@ -501,7 +498,7 @@ export function createGameServer(options: ServerOptions = {}) {
       if (!source.game || source.paused)
         throw Error("현재 게임을 진행할 수 없습니다.");
       const simultaneous =
-        d.action.type === "vote" || d.action.type === "acknowledge";
+        d.action.type === "vote" || d.action.type === "acknowledge" || d.action.type === "select_target";
       if (
         d.version > source.game.version ||
         d.version <

@@ -34,9 +34,9 @@ test(
       let steps = 0;
       while (s.phase !== "finished") {
         const ids =
-          s.phase === "night"
+          (s.phase === "night" || s.phase === "vote_result")
             ? s.players
-                .filter((p) => !s.acknowledged.includes(p.id))
+                .filter((p) => p.alive && !s.acknowledged.includes(p.id))
                 .map((p) => p.id)
             : s.phase === "voting"
               ? s.players

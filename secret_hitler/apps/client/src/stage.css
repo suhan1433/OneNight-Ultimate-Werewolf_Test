@@ -466,3 +466,84 @@ body[data-intro="true"] .lamp-fixture:after { opacity: 0.15; }
 
 /* title folder: manila/nicotine paper instead of olive */
 .home-folder { background: linear-gradient(135deg, #8a7a52, #5d5238) !important; }
+
+/* Stable table width and target row: choosing a name must not rearrange seats. */
+body .board .assembly-layout { grid-template-columns: minmax(0, 1fr); }
+body .target-line { height: 44px; min-height: 44px; flex-wrap: nowrap; align-items: center; overflow: hidden; white-space: nowrap; }
+body .target-line strong { overflow: hidden; text-overflow: ellipsis; }
+.phase-help { margin: 0 0 8px; font: 12px/1.65 var(--font-serif); color: var(--cream); }
+.phase-help summary { cursor: pointer; min-height: 32px; padding: 5px 0; }
+.phase-help p { margin: 6px 0; }
+
+/* Override legacy .ballots button and hover backgrounds with the full card art. */
+body .ballots button.ballot-card.ja,
+body .ballots button.ballot-card.ja:hover:enabled {
+  background: repeating-linear-gradient(0deg, #0000 0 15px, #3f5f7026 15px 16px), var(--cream);
+  color: #1f2f38; border: 3px double var(--ink-blue);
+}
+body .ballots button.ballot-card.nein,
+body .ballots button.ballot-card.nein:hover:enabled {
+  background: repeating-linear-gradient(45deg, #0000 0 6px, #0000003a 6px 7px), #5b2320;
+  color: #ecdccb; border: 0; box-shadow: inset 0 0 0 2px #b0564b88;
+}
+.bf-front.nein { background: repeating-linear-gradient(45deg, #0000 0 6px, #0000003a 6px 7px), #5b2320; color: #ecdccb; }
+body .round-table.show-vote-result { display: grid; place-items: center; overflow: auto; z-index: 6; }
+.show-vote-result .table-surface, .show-vote-result .table-mark { display: none; }
+.show-vote-result .sc-vote { width: 100%; gap: 10px; padding: 10px 0; }
+.show-vote-result .ballots-reveal { display: grid; grid-template-columns: repeat(5, minmax(0, 84px)); gap: 8px; width: 100%; }
+.show-vote-result .ballot-flip { width: 100%; height: 124px; }
+.show-vote-result .bf-front small { white-space: normal; overflow-wrap: anywhere; text-align: center; }
+.show-vote-result .sc-eyebrow { letter-spacing: .08em; }
+.show-vote-result .stamp-big { font-size: clamp(22px, 5vw, 34px); }
+.show-vote-result .tally { font-size: 22px; min-height: 26px; }
+.vote-confirm { width: 100%; min-height: 48px; }
+
+/* Peek is a readable row in deck order, contained by the tray on phones. */
+body .private-result { width: 100%; justify-items: stretch; }
+body .peek-fan { width: 100%; min-width: 0; gap: 8px; }
+body .peek-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 94px)); justify-content: center; gap: 8px; position: static; height: auto; }
+body .peek-card { position: relative; left: auto; top: auto; margin: 0; width: 100%; height: auto; aspect-ratio: 5 / 7; transform: none; animation: peek-in .5s var(--ease-metal) both; }
+.peek-order { position: absolute; z-index: 1; left: 6px; top: 4px; font: 12px var(--font-type); color: var(--cream); background: #151617; border-radius: 50%; padding: 2px 5px; }
+@keyframes peek-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+body .peek-card .policy-face { padding-top: 22px; }
+.invite-url { display: grid; gap: 6px; max-width: min(360px, 80vw); white-space: normal; }
+.invite-url input { font-size: 16px; }
+
+.play-guide { font: 14px/1.8 var(--font-serif); }
+.guide-step { margin: 12px 0; border: 1px solid var(--line); padding: 12px; }
+.guide-step summary { cursor: pointer; font-weight: 700; min-height: 44px; align-content: center; }
+.guide-step dl { margin: 12px 0; }
+.guide-step dl > div { margin: 10px 0; }
+.guide-step dt { color: var(--brass); font-weight: 700; }
+.guide-step dd { margin: 2px 0; }
+.guide-example { margin: 16px 0 0; padding: 14px; border: 1px dashed var(--brass); background: #101213; text-align: center; }
+.guide-example figcaption { color: var(--brass); font-size: 12px; margin-bottom: 12px; }
+.guide-example p { font-size: 12px; }
+.guide-policies { display: flex; justify-content: center; gap: 8px; }
+.guide-policies > div { width: min(28%, 94px); min-width: 0; }
+.guide-policies .policy-face { height: auto; aspect-ratio: 5 / 7; padding: 6px 3px; }
+.guide-policies .policy-face strong { font-size: 11px; }
+.guide-policies small { display: block; font-size: 11px; }
+.guide-portraits, .guide-voters { display: flex; justify-content: center; gap: 10px; }
+.guide-portraits > div, .guide-voters > div { width: min(28%, 84px); display: grid; justify-items: center; gap: 5px; }
+.guide-portraits .chosen { outline: 2px solid var(--lamp); background: #a8894f33; }
+.guide-voters > div { padding: 6px 3px; font-size: 11px; background: var(--cream); color: #1f2f38; }
+.guide-voters > .nein { background: #5b2320; color: #ecdccb; }
+.guide-voters .portrait { width: 44px; max-width: 100%; }
+.guide-role { display: grid; justify-items: center; gap: 10px; padding: 16px; }
+.guide-button { display: block; margin-top: 12px; padding: 10px; border: 1px solid var(--brass); font-size: 12px; }
+@media (max-width: 480px) {
+  .show-vote-result .ballots-reveal { gap: 5px; }
+  .show-vote-result .ballot-flip { height: 106px; }
+  .show-vote-result .bf-photo { width: 34px; }
+  .show-vote-result .bf-front b { font-size: 15px; }
+  body .peek-cards { gap: 6px; grid-template-columns: repeat(3, minmax(0, 80px)); }
+}
+@media (max-height: 600px) and (orientation: landscape) {
+  body[data-stage="true"] .board { height: auto; min-height: calc(100dvh - 52px); overflow: visible; }
+  body .round-table { flex: none; height: 260px; }
+  body .action-panel { max-height: none; }
+}
+.bf-choice { font: 11px/1.2 var(--font-serif); }
+body .action-panel:has(.private-result) { max-height: 52dvh; }
+body .assembly:has(.private-result) .round-table { min-height: 140px; }

@@ -9,7 +9,7 @@ import type {
   PublicPlayer,
   Role,
 } from "../../shared-types/src/index.js";
-import tables from "./rule-tables.json";
+import tables from "./rule-tables.json" with { type: "json" };
 export type Random = () => number;
 export const ROLE_COUNTS = tables.roles;
 export function shuffle<T>(items: T[], random: Random): T[] {
@@ -36,7 +36,7 @@ function event(
   extra: Partial<PublicEvent> = {},
 ) {
   s.events.push({
-    id: s.events.length + 1,
+    id: (s.events.at(-1)?.id ?? 0) + 1,
     round: s.round,
     type,
     text,
@@ -83,6 +83,7 @@ export function createGame(
     specialResume: null,
     votes: {},
     acknowledged: [],
+    selectedTarget: null,
     deck: shuffle<Policy>(
       [...Array(6).fill("liberal"), ...Array(11).fill("fascist")],
       random,
@@ -209,6 +210,35 @@ function requireThat(
 ): asserts condition {
   if (!condition) throw Error(message);
 }
+function resolveElection(s: GameState, random: Random) {
+  const alive = s.players.filter((p) => p.alive).length;
+  const passed = Object.values(s.votes).filter(Boolean).length > alive / 2;
+  if (!passed) {
+    failedGovernment(s, random);
+    return;
+  }
+  s.previousGovernment = {
+    president: s.president,
+    chancellor: s.chancellor!,
+  };
+  const elected = s.players.find((p) => p.id === s.chancellor)!;
+  if (s.fascist >= 3) {
+    if (elected.role === "hitler") {
+      finish(
+        s,
+        "fascist",
+        "파시스트 정책 3개 이후 히틀러가 수상으로 당선되었습니다.",
+      );
+      return;
+    }
+    elected.notHitler = true;
+  }
+  reshuffle(s, random);
+  s.hand = s.deck.splice(0, 3);
+  requireThat(s.hand.length === 3);
+  s.phase = "president_discard";
+  s.vetoDenied = false;
+}
 /** Pure transition: rejected input never mutates its source. Randomness is injected. */
 export function transition(
   source: GameState,
@@ -220,24 +250,27 @@ export function transition(
   const player = source.players.find((p) => p.id === actor);
   requireThat(player?.alive, "생존 플레이어만 행동할 수 있습니다.");
   const s = structuredClone(source);
-  s.secrets.push({
-    actor,
-    action: structuredClone(action),
-    round: s.round,
-    phase: s.phase,
-    hand: [...s.hand],
-  });
   const president = actor === s.president,
     chancellor = actor === s.chancellor;
   switch (action.type) {
     case "acknowledge":
-      requireThat(s.phase === "night" && !s.acknowledged.includes(actor));
+      requireThat((s.phase === "night" || s.phase === "vote_result") && !s.acknowledged.includes(actor));
       s.acknowledged.push(actor);
-      if (s.acknowledged.length === s.players.length) {
-        s.phase = "nomination";
-        event(s, "night_end", "심문을 개시합니다.");
+      if (s.acknowledged.length === s.players.filter((p) => p.alive).length) {
+        if (s.phase === "vote_result") resolveElection(s, random);
+        else {
+          s.phase = "nomination";
+          event(s, "night_end", "심문을 개시합니다.");
+        }
       }
       break;
+    case "select_target": {
+      requireThat(president && (s.phase === "nomination" || (s.phase === "executive" && !s.privateResults[actor])));
+      const eligible = s.phase === "nomination" ? eligibleChancellors(s) : eligibleTargets(s);
+      requireThat(eligible.includes(action.target), "선택할 수 없는 대상입니다.");
+      s.selectedTarget = action.target;
+      break;
+    }
     case "nominate":
       requireThat(s.phase === "nomination" && president);
       requireThat(
@@ -273,31 +306,8 @@ export function transition(
             votes: { ...s.votes },
           },
         );
-        if (!passed) {
-          failedGovernment(s, random);
-          break;
-        }
-        s.previousGovernment = {
-          president: s.president,
-          chancellor: s.chancellor!,
-        };
-        const elected = s.players.find((p) => p.id === s.chancellor)!;
-        if (s.fascist >= 3) {
-          if (elected.role === "hitler") {
-            finish(
-              s,
-              "fascist",
-              "파시스트 정책 3개 이후 히틀러가 수상으로 당선되었습니다.",
-            );
-            break;
-          }
-          elected.notHitler = true;
-        }
-        reshuffle(s, random);
-        s.hand = s.deck.splice(0, 3);
-        requireThat(s.hand.length === 3);
-        s.phase = "president_discard";
-        s.vetoDenied = false;
+        s.phase = "vote_result";
+        s.acknowledged = [];
       }
       break;
     }
@@ -416,6 +426,10 @@ export function transition(
     default:
       throw Error("알 수 없는 행동입니다.");
   }
+  if (s.phase !== source.phase || s.privateResults[actor]) s.selectedTarget = null;
+  // Only recent public cues are needed for presentation; no replay is retained.
+  s.events = s.events.slice(-16);
+  s.secrets = [];
   s.version++;
   if (s.phase !== source.phase) s.phaseVersion = s.version;
   return s;
@@ -463,6 +477,7 @@ export function gameView(s: GameState, viewer: string | null): GameView {
     vetoEnabled: s.fascist >= 5,
     vetoDenied: s.vetoDenied,
     acknowledged: [...s.acknowledged],
+    selectedTarget: s.selectedTarget ?? null,
     voted: Object.keys(s.votes),
     ...(self ? { selfRole: self.role } : {}),
     knownPlayers,
@@ -480,7 +495,7 @@ export function gameView(s: GameState, viewer: string | null): GameView {
           revealedRoles: Object.fromEntries(
             s.players.map((p) => [p.id, p.role]),
           ),
-          replay: structuredClone(s.secrets),
+
         }
       : {}),
   };
@@ -496,7 +511,7 @@ export function canChat(s: GameState, id: string): boolean {
 /** Automated players consume only their authorized view; policy choices are intentional. */
 export function botAction(v: GameView, id: string): Action | null {
   if (!v.players.find((p) => p.id === id)?.alive) return null;
-  if (v.phase === "night")
+  if (v.phase === "night" || v.phase === "vote_result")
     return v.acknowledged.includes(id) ? null : { type: "acknowledge" };
   if (v.phase === "nomination" && v.president === id) {
     const knownHitler = v.knownPlayers.find((p) => p.role === "hitler")?.id;

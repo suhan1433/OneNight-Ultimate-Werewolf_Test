@@ -167,13 +167,14 @@ function mustAct(r: RoomView) {
       return g.chancellor === me;
     case "voting":
       return !g.voted.includes(me);
+    case "vote_result":
+      return !g.acknowledged.includes(me);
     default:
       return false;
   }
 }
 const ACT_BUDGET = 2600; // ms of presentation we allow while a decision is pending
 const SCENES: Record<string, { kind: SceneKind; ms: number }> = {
-  vote: { kind: "vote", ms: 4800 },
   policy: { kind: "policy", ms: 2800 },
   chaos: { kind: "chaos", ms: 4200 },
   execution: { kind: "exec", ms: 3600 },
@@ -312,7 +313,7 @@ const mix = (a: string, b: string, t: number) => {
 export function tensionOf(g?: GameView | null) {
   return g ? Math.min(1, (g.fascist / 6) * 0.8 + (g.tracker / 3) * 0.2) : 0;
 }
-function focusFor(view: RoomView | null, scene: Scene | null, pick: string) {
+function focusFor(view: RoomView | null, scene: Scene | null) {
   const g = view?.game,
     e = scene?.ev as any;
   if (scene) {
@@ -327,8 +328,7 @@ function focusFor(view: RoomView | null, scene: Scene | null, pick: string) {
   switch (g.phase) {
     case "nomination":
     case "executive":
-      // the acting president's own screen follows the seat they are pointing at (private)
-      return { id: p === view?.selfId && pick ? pick : p, night: false };
+      return { id: g.selectedTarget || p, night: false };
     case "president_discard":
     case "veto":
       return { id: p, night: false };
@@ -350,8 +350,7 @@ export function LightRig({
   const ref = useRef<HTMLDivElement>(null),
     g = view?.game,
     tension = tensionOf(g),
-    pick = useApp((s) => s.pick),
-    { id, night } = focusFor(view, scene, pick),
+    { id, night } = focusFor(view, scene),
     inGame = !!g && g.phase !== "finished";
   const place = useCallback(() => {
     const r = ref.current;
@@ -433,7 +432,7 @@ export function useTyped(text: string, on: boolean, ms = 30, delay = 0) {
 const nameOf = (g: GameView, id?: string) =>
   g.players.find((p) => p.id === id)?.name ?? "";
 
-function VoteScene({
+export function VoteScene({
   ev,
   g,
   t,
@@ -492,6 +491,7 @@ function VoteScene({
                 <div className="bf-back" />
                 <div className={`bf-front ${v ? "ja" : "nein"}`}>
                   <b>{v ? t.jaShort : t.neinShort}</b>
+                  <span className="bf-choice">{v ? t.ayes : t.nays}</span>
                   <div className="bf-photo">
                     <Portrait avatar={p?.avatar ?? 0} />
                   </div>

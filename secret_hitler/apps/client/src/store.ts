@@ -24,8 +24,6 @@ export const useApp = create<{
   connected: boolean;
   resuming: boolean;
   busy: boolean;
-  /** seat the local player is currently pointing at (never sent anywhere; drives the private lamp) */
-  pick: string;
   setRoom: (room: RoomView | null) => void;
   setError: (error: string | null) => void;
 }>((set) => ({
@@ -34,7 +32,6 @@ export const useApp = create<{
   connected: false,
   resuming: false,
   busy: false,
-  pick: "",
   setRoom: (room) => set({ room }),
   setError: (error) => set({ error }),
 }));

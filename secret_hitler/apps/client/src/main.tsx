@@ -9,7 +9,6 @@ import { createRoot } from "react-dom/client";
 import type {
   GameView,
   RoomView,
-  PublicEvent,
 } from "../../../packages/shared-types/src/index";
 import {
   useApp,
@@ -32,7 +31,8 @@ import "@fontsource/noto-serif-kr/400.css";
 import "@fontsource/noto-serif-kr/600.css";
 import "@fontsource/noto-serif-kr/900.css";
 import { Portrait, Emblem, PolicyFace, ARCHETYPES } from "./Art";
-import { Presentation, useScenes, useTyped, playCue } from "./Presentation";
+import { Presentation, VoteScene, useScenes, useTyped, playCue } from "./Presentation";
+import { PlayGuide, PhaseHelp } from "./Guide";
 import { layoutSeats, slotFor } from "./seatLayout";
 import "./styles.css";
 import "./stage.css";
@@ -251,7 +251,7 @@ function Lobby({ room, t }: { room: RoomView; t: Copy }) {
   const self = room.members.find((p) => p.id === room.selfId)!,
     host = room.hostId === room.selfId,
     { busy } = useApp();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false), [showInvite, setShowInvite] = useState(false);
   const players = room.members.filter((m) => !m.spectator),
     ready = players.filter((p) => p.ready && p.connected).length;
   const settings = (key: string, value: string | number) =>
@@ -266,21 +266,24 @@ function Lobby({ room, t }: { room: RoomView; t: Copy }) {
         <div className="registration">
           <small>{t.code}</small>
           <strong>{room.code}</strong>
-          <button
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(
-                  invitationUrl(room.code),
-                );
-                setCopied(true);
-                setTimeout(() => setCopied(false), 3000);
-              } catch {
-                useApp.getState().setError(`${t.code}: ${room.code}`);
-              }
-            }}
-          >
-            {copied ? t.copied : t.invite} ↗
-          </button>
+          <button onClick={async () => {
+            const url = invitationUrl(room.code);
+            if (navigator.share) {
+              try { await navigator.share({ title: t.title, text: t.shareText, url }); return; }
+              catch (error) { if ((error as Error).name === "AbortError") return; }
+            }
+            setShowInvite(true);
+          }}>{t.shareInvite} ↗</button>
+          <button onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(invitationUrl(room.code));
+              setCopied(true);
+              setTimeout(() => setCopied(false), 3000);
+            } catch { setShowInvite(true); }
+          }}>{copied ? t.copied : t.invite}</button>
+          {showInvite && <label className="invite-url">{t.inviteFallback}
+            <input readOnly value={invitationUrl(room.code)} onFocus={(e) => e.currentTarget.select()} />
+          </label>}
         </div>
       </div>
       <div className="lobby-layout">
@@ -838,6 +841,7 @@ function PeekFan({
               { "--i": i - (policies.length - 1) / 2 } as React.CSSProperties
             }
           >
+            <span className="peek-order">{i + 1}</span>
             <PolicyFace
               policy={p}
               size={32}
@@ -895,8 +899,9 @@ function Actions({
     >
       <div className="action-heading">
         <span className="eyebrow">{t.protocol}</span>
-        <h2>{t[g.phase]}</h2>
+        <h2>{g.phase === "executive" && g.power ? t[g.power] : t[g.phase]}</h2>
       </div>
+      <PhaseHelp g={g} selfId={id} t={t} />
       <fieldset disabled={disabled}>
         {g.phase === "nomination" &&
           (g.president === id ? (
@@ -916,6 +921,15 @@ function Actions({
           ) : (
             <p>{t.wait}</p>
           ))}
+        {g.phase === "vote_result" && <>
+          <button className="primary vote-confirm"
+            disabled={g.acknowledged.includes(id)}
+            onClick={() => act({ type: "acknowledge" })}>
+            {g.acknowledged.includes(id) ? t.resultConfirmed : t.confirmResult}
+            {` · ${g.acknowledged.length}/${g.players.filter((p) => p.alive).length}`}
+          </button>
+          <p className="hint">{t.resultWait}</p>
+        </>}
         {g.phase === "voting" &&
           (g.voted.includes(id) ? (
             <p className="sealed-vote">
@@ -995,7 +1009,6 @@ function Actions({
         {g.phase === "executive" &&
           (g.president === id ? (
             <>
-              <h3>{g.power && t[g.power]}</h3>
               {g.privateResult ? (
                 <div className="private-result">
                   {g.privateResult.party ? (
@@ -1069,9 +1082,10 @@ function TimeRemaining({ deadline }: { deadline: number | null }) {
 }
 function Board({ room, t }: { room: RoomView; t: Copy }) {
   const g = room.game!,
-    [selected, setSelected] = useState(""),
+    selected = g.selectedTarget ?? "",
+    setSelected = (target: string) => { if (target && target !== selected) act({ type: "select_target", target }); },
     [file, setFile] = useState(false),
-    [logOpen, setLogOpen] = useState(false),
+    [chatOpen, setChatOpen] = useState(false),
     [tableEl, setTableEl] = useState<HTMLDivElement | null>(null),
     [box, setBox] = useState({ w: 340, h: 380 });
   // seats are placed from the *measured* table box so they never overlap or clip
@@ -1091,13 +1105,6 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
     () => layoutSeats(box.w, box.h, g.players.length),
     [box.w, box.h, g.players.length],
   );
-  useEffect(() => {
-    setSelected("");
-  }, [g.phase, g.round]);
-  useEffect(() => {
-    useApp.setState({ pick: selected });
-    return () => useApp.setState({ pick: "" });
-  }, [selected]);
   if (g.phase === "night")
     return (
       <main className="night content">
@@ -1118,6 +1125,7 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
         </p>
         <span className="phase-name">{t[g.phase]}</span>
         <TimeRemaining deadline={room.deadline} />
+        <button className="icon-btn" aria-label={t.chat} onClick={() => setChatOpen(true)}>☏</button>
         {g.selfRole && (
           <button
             className="icon-btn"
@@ -1127,19 +1135,12 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
             ▤<span className="lbl"> {t.fileOpen}</span>
           </button>
         )}
-        <button
-          className="icon-btn log-button"
-          aria-label={t.log}
-          onClick={() => setLogOpen(true)}
-        >
-          ≡<span className="lbl"> {t.log}</span>
-        </button>
       </div>
       <Track g={g} t={t} />
       <div className="assembly-layout">
         <section className="assembly">
           <div
-            className="round-table"
+            className={`round-table ${g.phase === "vote_result" ? "show-vote-result" : ""}`}
             data-table
             ref={setTableEl}
             style={
@@ -1159,7 +1160,11 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
                 1932
               </span>
             </div>
-            {g.players.map((p, i) => {
+            {g.phase === "vote_result" && <VoteScene
+              key={[...g.events].reverse().find((e) => e.type === "vote")?.id}
+              ev={[...g.events].reverse().find((e) => e.type === "vote")!} g={g} t={t}
+              reduced={document.body.dataset.reduce === "true"} speed={1} />}
+            {g.phase !== "vote_result" && g.players.map((p, i) => {
               const member = room.members.find((m) => m.id === p.id),
                 candidate =
                   (g.phase === "nomination" &&
@@ -1255,100 +1260,17 @@ function Board({ room, t }: { room: RoomView; t: Copy }) {
             setSelected={setSelected}
           />
         </section>
-        <aside className="records">
-          <Log g={g} t={t} />
-        </aside>
       </div>
+      {chatOpen && <Modal title={t.chat} close={() => setChatOpen(false)}><Chat room={room} t={t} inline /></Modal>}
       {file && (
         <Modal title={t.topSecret} close={() => setFile(false)}>
           <SecretFile g={g} selfId={room.selfId} t={t} />
-        </Modal>
-      )}
-      {logOpen && (
-        <Modal title={t.log} close={() => setLogOpen(false)}>
-          <Log g={g} t={t} />
-          <Chat room={room} t={t} inline />
         </Modal>
       )}
     </main>
   );
 }
 
-function eventLabel(e: PublicEvent, t: Copy) {
-  const labels: Record<string, string> = {
-    start: t.night,
-    night_end: t.nomination,
-    nomination: t.nomination,
-    policy: t.enact,
-    chaos: t.chaos,
-    shuffle: t.deck,
-    executive: t.executive,
-    investigation: t.investigate,
-    special_election: t.special_election,
-    execution: t.executed,
-    veto_request: t.vetoRequest,
-    veto_answer: t.veto,
-    victory: t.finished,
-  };
-  return labels[e.type] ?? (t === copy.ko ? e.text : e.type);
-}
-function Log({ g, t }: { g: GameView; t: Copy }) {
-  return (
-    <section className="log">
-      <h2>
-        <span>☷</span> {t.log}
-        <small>{t.protocol}</small>
-      </h2>
-      <div className="log-entries">
-        {[...g.events].reverse().map((e) => (
-          <article key={e.id} className={e.policy ?? e.type}>
-            <span className="log-index">{String(e.id).padStart(3, "0")}</span>
-            <div>
-              <strong>
-                {e.type === "vote"
-                  ? Object.values(e.votes ?? {}).filter(Boolean).length >
-                    Object.keys(e.votes ?? {}).length / 2
-                    ? t.approved
-                    : t.rejected
-                  : eventLabel(e, t)}
-              </strong>
-              {e.policy && (
-                <span>{e.policy === "liberal" ? t.policyL : t.policyF}</span>
-              )}
-              {e.president && (
-                <small>
-                  {t.president}:{" "}
-                  {g.players.find((p) => p.id === e.president)?.name}
-                </small>
-              )}
-              {e.chancellor && (
-                <small>
-                  {t.chancellor}:{" "}
-                  {g.players.find((p) => p.id === e.chancellor)?.name}
-                </small>
-              )}
-              {e.target && (
-                <small>
-                  → {g.players.find((p) => p.id === e.target)?.name}
-                </small>
-              )}
-              {e.votes && (
-                <div className="vote-record">
-                  {Object.entries(e.votes).map(([id, ja]) => (
-                    <span key={id} className={ja ? "vote-ja" : "vote-nein"}>
-                      {g.players.find((p) => p.id === id)?.name}:{" "}
-                      {ja ? t.jaShort : t.neinShort}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
 function Chat({
   room,
   t,
@@ -1422,19 +1344,7 @@ function Chat({
   );
 }
 function Results({ room, t }: { room: RoomView; t: Copy }) {
-  const g = room.game!,
-    [replay, setReplay] = useState(false);
-  function download() {
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(g, null, 2)], { type: "application/json" }),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `secret-hitler-${room.code}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-  const name = (id?: string) => g.players.find((p) => p.id === id)?.name ?? "";
+  const g = room.game!;
   return (
     <main className={`results content ${g.winner ?? ""}`}>
       <p className="eyebrow">
@@ -1486,62 +1396,7 @@ function Results({ room, t }: { room: RoomView; t: Copy }) {
             {t.rematch}
           </button>
         )}
-        <button onClick={() => setReplay(!replay)}>{t.replay}</button>
-        <button onClick={download}>{t.export} ↓</button>
       </div>
-      <Log g={g} t={t} />
-      {replay && (
-        <section className="paper replay">
-          <h2>{t.replay}</h2>
-          {g.replay?.map((r, i) => {
-            const a = r.action as any,
-              verb =
-                a.type === "acknowledge"
-                  ? t.r_ack
-                  : a.type === "nominate"
-                    ? t.r_nominate
-                    : a.type === "vote"
-                      ? a.ja
-                        ? t.r_vote_ja
-                        : t.r_vote_nein
-                      : a.type === "discard"
-                        ? t.r_discard
-                        : a.type === "enact"
-                          ? t.r_enact
-                          : a.type === "request_veto"
-                            ? t.r_request_veto
-                            : a.type === "answer_veto"
-                              ? a.accept
-                                ? t.r_veto_yes
-                                : t.r_veto_no
-                              : a.type === "power"
-                                ? t.r_power
-                                : a.type === "confirm_power"
-                                  ? t.r_confirm
-                                  : a.type;
-            return (
-              <p key={i} className={`replay-line ${a.type}`}>
-                <b>
-                  {String(i + 1).padStart(3, "0")} · {t.session} {r.round}
-                </b>
-                <span>
-                  {name(r.actor)} — {verb}
-                  {a.target ? ` → ${name(a.target)}` : ""}
-                </span>
-                {r.hand.length > 0 && (
-                  <span className="hand">
-                    {r.hand.map((p, j) => (
-                      <i key={j} className={p}>
-                        {p === "liberal" ? "L" : "F"}
-                      </i>
-                    ))}
-                  </span>
-                )}
-              </p>
-            );
-          })}
-        </section>
-      )}
     </main>
   );
 }
@@ -1549,6 +1404,7 @@ function Results({ room, t }: { room: RoomView; t: Copy }) {
 function Rulebook({ t, lang }: { t: Copy; lang: Language }) {
   return (
     <div className="rulebook">
+      <PlayGuide t={t} ko={lang === "ko"} />
       {lang === "ko" ? (
         <>
           <p>

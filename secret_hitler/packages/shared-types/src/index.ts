@@ -6,6 +6,7 @@ export type Phase =
   | "night"
   | "nomination"
   | "voting"
+  | "vote_result"
   | "president_discard"
   | "chancellor_enact"
   | "veto"
@@ -14,6 +15,7 @@ export type Phase =
 export type Action =
   | { type: "acknowledge" }
   | { type: "nominate"; target: string }
+  | { type: "select_target"; target: string }
   | { type: "vote"; ja: boolean }
   | { type: "discard"; index: number }
   | { type: "enact"; index: number }
@@ -60,6 +62,7 @@ export interface GameState {
   specialResume: string | null;
   votes: Record<string, boolean>;
   acknowledged: string[];
+  selectedTarget: string | null;
   deck: Policy[];
   discard: Policy[];
   hand: Policy[];
@@ -94,6 +97,7 @@ export interface GameView {
   vetoEnabled: boolean;
   vetoDenied: boolean;
   acknowledged: string[];
+  selectedTarget: string | null;
   voted: string[];
   selfRole?: Role;
   knownPlayers: { id: string; role: Role }[];

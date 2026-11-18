@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -115,9 +115,14 @@ test(
       const president = clients.find(
         (s) => states.get(s)?.selfId === g.president,
       )!;
+      await call(president, "ACTION", {
+        requestId: randomUUID(), version: g.version,
+        action: { type: "select_target", target: g.eligibleChancellors[0] },
+      });
+      await wait(() => states.get(observer)?.game?.selectedTarget === g.eligibleChancellors[0]);
       const action = {
         requestId: randomUUID(),
-        version: g.version,
+        version: states.get(president)!.game!.version,
         action: { type: "nominate", target: g.eligibleChancellors[0] },
       };
       await call(president, "ACTION", action);
@@ -133,6 +138,20 @@ test(
           version: states.get(s)!.game!.version,
           action: { type: "vote", ja: true },
         });
+      await wait(() => states.get(host)?.game?.phase === "vote_result");
+      assert.equal(states.get(host)?.deadline, null);
+      const resultVersion = states.get(host)!.game!.version;
+      await Promise.all(clients.slice(0, 4).map((s) => call(s, "ACTION", {
+        requestId: randomUUID(), version: resultVersion,
+        action: { type: "acknowledge" },
+      })));
+      await wait(() => states.get(host)?.game?.acknowledged.length === 4);
+      await delay(80);
+      assert.equal(states.get(host)?.game?.phase, "vote_result");
+      await call(clients[4], "ACTION", {
+        requestId: randomUUID(), version: resultVersion,
+        action: { type: "acknowledge" },
+      });
       await wait(() => states.get(host)?.game?.phase === "president_discard");
       for (const s of clients.slice(0, 5))
         assert.equal(
@@ -175,7 +194,10 @@ test(
       }
       assert.equal(states.get(host)?.game?.phase, "finished");
       assert(states.get(host)?.game?.revealedRoles);
-      assert(states.get(observer)?.game?.replay);
+      assert.equal(states.get(observer)?.game?.replay, undefined);
+      const snapshots = readFileSync(join(dataDir, `${session.code}.jsonl`), "utf8").trim().split("\n");
+      assert.equal(snapshots.length, 1);
+      assert.deepEqual(JSON.parse(snapshots[0]).state.game.secrets, []);
       await instance.close();
       instance = createGameServer({ dataDir, botDelayMs: 2 });
       await new Promise<void>((r) => instance.server.listen(0, "127.0.0.1", r));

@@ -29,10 +29,15 @@ function prepared(n = 5) {
   for (const p of s.players) s = act(s, p.id, { type: "acknowledge" });
   return s;
 }
+function confirmResult(s: GameState) {
+  for (const p of s.players.filter((p) => p.alive))
+    s = act(s, p.id, { type: "acknowledge" });
+  return s;
+}
 function vote(s: GameState, ja = true) {
   for (const p of s.players.filter((p) => p.alive))
     s = act(s, p.id, { type: "vote", ja });
-  return s;
+  return confirmResult(s);
 }
 function elected(n = 5) {
   let s = prepared(n);
@@ -105,6 +110,7 @@ test("동수 부결, 부결 정부는 이전 정부를 바꾸지 않음, 사망�
   });
   const previous = s.previousGovernment;
   for (let i = 0; i < 6; i++) s = act(s, `p${i}`, { type: "vote", ja: i < 3 });
+  s = confirmResult(s);
   assert.equal(s.tracker, 1);
   assert.deepEqual(s.previousGovernment, previous);
   assert.equal(s.phase, "nomination");
@@ -114,6 +120,7 @@ test("동수 부결, 부결 정부는 이전 정부를 바꾸지 않음, 사망�
     target: eligibleChancellors(s)[0],
   });
   for (let i = 0; i < 5; i++) s = act(s, `p${i}`, { type: "vote", ja: i < 3 });
+  s = confirmResult(s);
   assert.equal(s.phase, "president_discard");
   assert.equal(s.tracker, 1);
 });
@@ -403,4 +410,54 @@ test("혼란 후 잔여 2장도 즉시 재셔플, 혼란 정책도 승리 판정
   });
   s = vote(s, false);
   assert.equal(s.winner, "liberal");
+});
+
+test("투표 결과는 전원 확인까지 유지, 재확인·관전자 거절 및 정책 비공개", () => {
+  for (const ja of [true, false]) {
+    let s = prepared(6);
+    s.players[5].alive = false;
+    s = act(s, s.president, { type: "nominate", target: eligibleChancellors(s)[0] });
+    const survivors = s.players.filter((p) => p.alive);
+    for (const p of survivors) s = act(s, p.id, { type: "vote", ja });
+    assert.equal(s.phase, "vote_result");
+    const v = gameView(s, s.president);
+    assert.equal(v.hand, undefined);
+    assert.equal(v.events.at(-1)?.votes?.[survivors[0].id], ja);
+    const reconnected = gameView(structuredClone(s), s.president);
+    assert.deepEqual(reconnected.acknowledged, []);
+    assert.throws(() => act(s, "spectator", { type: "acknowledge" }));
+    assert.throws(() => act(s, "p5", { type: "acknowledge" }));
+    assert.throws(() => act(s, s.president, { type: "discard", index: 0 }));
+    for (const p of survivors.slice(0, -1)) {
+      s = act(s, p.id, { type: "acknowledge" });
+      assert.equal(s.phase, "vote_result");
+      assert.throws(() => act(s, p.id, { type: "acknowledge" }));
+    }
+    const saved = structuredClone(s);
+    assert.equal(gameView(saved, s.president).acknowledged.length, 4);
+    s = act(s, survivors.at(-1)!.id, { type: "acknowledge" });
+    assert.equal(s.phase, ja ? "president_discard" : "nomination");
+    assert.equal(s.tracker, ja ? 0 : 1);
+  }
+});
+
+test("수상·권한 대상 선택은 모두에게 공유되지만 비공개 조사 결과는 대통령만 확인", () => {
+  let s = prepared(7);
+  const target = eligibleChancellors(s)[0];
+  const other = s.players.find((p) => p.id !== s.president)!;
+  assert.throws(() => act(s, other.id, { type: "select_target", target }));
+  assert.throws(() => act(s, s.president, { type: "select_target", target: s.president }));
+  s = act(s, s.president, { type: "select_target", target });
+  assert.equal(s.chancellor, null);
+  assert.equal(gameView(s, null).selectedTarget, target);
+  s = act(s, s.president, { type: "nominate", target });
+  assert.equal(gameView(s, other.id).selectedTarget, null);
+  s.phase = "executive";
+  s.power = "investigate";
+  s = act(s, s.president, { type: "select_target", target });
+  assert.equal(gameView(s, other.id).selectedTarget, target);
+  s = act(s, s.president, { type: "power", target });
+  assert(gameView(s, s.president).privateResult?.party);
+  assert.equal(gameView(s, other.id).privateResult, undefined);
+  assert.equal(s.selectedTarget, null);
 });

@@ -3,6 +3,7 @@ import { test, expect } from "@playwright/test";
 test("데스크톱: 홈 → 대기실 → 봇 4명 → 역할 열람 → 실시간 플레이 → 결과", async ({
   page,
 }) => {
+  test.setTimeout(120000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setViewportSize({ width: 1440, height: 1050 });
@@ -23,7 +24,7 @@ test("데스크톱: 홈 → 대기실 → 봇 4명 → 역할 열람 → 실시�
   }
   await page.getByRole("button", { name: "준비 완료", exact: true }).click();
   await page.screenshot({
-    path: "docs/screenshots/lobby-desktop.png",
+    path: "test-results/lobby-desktop.png",
     fullPage: true,
     animations: "disabled",
   });
@@ -41,23 +42,26 @@ test("데스크톱: 홈 → 대기실 → 봇 4명 → 역할 열람 → 실시�
     .click();
   await expect(page.locator(".policy-board")).toBeVisible();
   await page.screenshot({
-    path: "docs/screenshots/board-desktop.png",
+    path: "test-results/board-desktop.png",
     fullPage: true,
     animations: "disabled",
   });
   for (let i = 0; i < 150; i++) {
     if (await page.locator(".results").count()) break;
-    if (await page.locator(".action-panel select").count()) {
-      const select = page.locator(".action-panel select");
-      const options = await select.locator("option").all();
-      if (options.length > 1) {
-        await select.selectOption({ index: 1 });
-        const btn = page
-          .locator(".action-panel button.primary,.action-panel button.danger")
-          .last();
-        if (await btn.isEnabled()) await btn.click();
+    const candidate = page.locator(".seat.candidate").first();
+    if (await candidate.isVisible()) {
+      await candidate.click();
+      const sign = page.locator(".hold-sign");
+      await expect(sign).toBeEnabled();
+      if (await sign.isEnabled()) {
+        await sign.focus();
+        await page.keyboard.down("Space");
+        await page.waitForTimeout(1200);
+        await page.keyboard.up("Space");
       }
     }
+    const result = page.locator(".vote-confirm");
+    if (await result.isVisible() && await result.isEnabled()) await result.click();
     if (await page.locator("dialog[open]").count()) {
       const confirm = page
         .locator("dialog[open]")
@@ -79,7 +83,7 @@ test("데스크톱: 홈 → 대기실 → 봇 4명 → 역할 열람 → 실시�
   await expect(page.locator(".results")).toBeVisible({ timeout: 10000 });
   await expect(page.locator(".result-roles article")).toHaveCount(5);
   await page.screenshot({
-    path: "docs/screenshots/result-desktop.png",
+    path: "test-results/result-desktop.png",
     fullPage: true,
     animations: "disabled",
   });
@@ -97,7 +101,7 @@ test("모바일 390px: 가로 넘침·키보드 접근·규칙·크레딧·PWA",
     page.getByRole("button", { name: "새 의회 개설" }),
   ).toBeVisible();
   await page.screenshot({
-    path: "docs/screenshots/home-mobile.png",
+    path: "test-results/home-mobile.png",
     fullPage: true,
     animations: "disabled",
   });
@@ -138,7 +142,7 @@ test("모바일 390px: 가로 넘침·키보드 접근·규칙·크레딧·PWA",
     ),
   ).toBe(true);
   await page.screenshot({
-    path: "docs/screenshots/board-mobile.png",
+    path: "test-results/board-mobile.png",
     fullPage: true,
     animations: "disabled",
   });
