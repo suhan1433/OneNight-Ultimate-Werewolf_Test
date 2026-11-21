@@ -62,7 +62,7 @@ test('a delayed vote immediately locks both controls, and a rejection allows ret
   await expect(page.locator('.vote-stage [role="status"]')).toContainText('다른 기사를 기다리는 중');
 });
 
-test('vote results start immediately and can be shown without waiting for the cinematic', async ({ page }) => {
+test('vote results reveal automatically without a skip button', async ({ page }) => {
   await setGame(page, game());
   await page.locator('.token.reject').scrollIntoViewIfNeeded();
   const state = game('vote_result');
@@ -71,11 +71,11 @@ test('vote results start immediately and can be shown without waiting for the ci
   // A server without identity data must still start the result immediately.
   state.voteResult = { approve: 3, reject: 2, passed: true };
   await setGame(page, state);
-  await expect(page.getByRole('button', { name: '투표 결과 바로 보기' })).toBeVisible({ timeout: 700 });
+  await expect(page.locator('.vt')).toHaveClass(/is-reveal/);
+  await expect(page.getByRole('button', { name: '투표 결과 바로 보기' })).toHaveCount(0);
   expect(await page.locator('.vt').evaluate(el => el.getBoundingClientRect().top)).toBeGreaterThanOrEqual(-1);
-  await page.getByRole('button', { name: '투표 결과 바로 보기' }).click();
-  await expect(page.locator('.vt-summary')).toHaveCSS('opacity', '1');
-  await expect(page.locator('.vt-continue')).toHaveCSS('opacity', '1');
+  await expect(page.locator('.vt-summary')).toHaveCSS('opacity', '1', {timeout:12000});
+  await expect(page.locator('.vt-continue')).toHaveCSS('opacity', '1', {timeout:12000});
   await expect(page.locator('.chat-panel .ac-act-go')).toHaveCount(0);
   await page.getByRole('button', { name: '지난 대화 보기' }).click();
   await expect(page.locator('.chat-panel .ac-act-go')).toHaveText('계속');

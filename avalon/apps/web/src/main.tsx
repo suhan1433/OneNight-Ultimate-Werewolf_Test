@@ -29,8 +29,9 @@ import './council-polish.css';
 import {ExpeditionRoster} from './ExpeditionRoster';
 import {RoundTrack,QUEST_SIZES} from './RoundTrack';
 import {useImmersion} from './immersion';
+import {useCouncilLayout} from './use-council-layout';
 import {HouseCrest} from './HouseCrest';
-import {RoundTable,ExpeditionLinks} from './RoundTable';
+import {RoundTable,ExpeditionBadge,CouncilAtmosphere} from './RoundTable';
 import {CHARACTERS,characterById,myAvatarId,setMyAvatarId,serverAvatarId,syncAvatar,useCharacterResolver,PlayerAvatar,PlayerEmoji,ProfileDialog,type Character} from './profile';
 import {TeamScene,QuestScene,AssassinScene,EndingScene} from './CinematicScenes';
 import {GateIntro,Table,useGateIntro} from './GateIntro';
@@ -119,9 +120,9 @@ function PhaseBanner({game}:{game:ClientGameState}){
   if(!shown)return null;
   return <div className="phase-banner" key={shown} aria-hidden="true"><small>{game.round+1}번째 원정</small><strong>{BANNERS[game.phase]}</strong></div>;
 }
-function SeatFace({name,playerId}:{name:string;playerId:string}){
+function SeatFace({name,playerId,member=false}:{name:string;playerId:string;member?:boolean}){
   const c=useCharacterResolver()(playerId);
-  return <><span className="avatar has-char" style={{background:c.bg,textTransform:'none'}} aria-hidden="true"><HouseCrest id={c.id}/></span><span className="seat-name">{name}</span></>;
+  return <><span className="avatar has-char" style={{background:c.bg,textTransform:'none'}} aria-hidden="true"><HouseCrest id={c.id}/>{member&&<ExpeditionBadge/>}</span><span className="seat-name">{name}</span></>;
 }
 function Pips({done,total}:{done:number;total:number}){
   return <div className="pips" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label="제출 현황">{Array.from({length:total},(_,i)=><i className={i<done?'on':''} key={i}/>)}</div>;
@@ -452,11 +453,6 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
   const tableRef=useRef<HTMLDivElement>(null);
   const isResult=game.phase==='vote_result';
   const ballot=useTeamVote(game);
-  const[skipped,setSkipped]=useState(false);
-  useLayoutEffect(()=>{
-    setSkipped(false);
-    if(isResult)rootRef.current?.scrollIntoView({block:'start',behavior:'instant'});
-  },[isResult,game.round,game.rejectCount]);
   const totals=game.voteResult;
   const voteCount=isResult?(totals?.approve??0)+(totals?.reject??0):game.teamVotesCompleted;
   const seed=`${game.roomCode}|${game.round}|${[...game.proposedTeam].sort().join(',')}`;
@@ -478,31 +474,30 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
     if(voteCount>previousCoins.current)recordedAudio.play('coin');
     previousCoins.current=voteCount;
   },[isResult,voteCount]);
-  useTableMetrics(tableRef,rootRef,revealing&&!reduced&&!skipped);
-  useRevealEffects(plan,revealing&&!reduced&&!skipped);
+  useTableMetrics(tableRef,rootRef,revealing&&!reduced);
+  useRevealEffects(plan,revealing&&!reduced);
 
   const style=plan?{'--R':`${plan.R}s`,'--S':`${plan.S}s`,'--ld':`${plan.ft[plan.N-1]!-.25}s`,'--sd':`${plan.S+1.2}s`,'--cd':`${plan.S+2}s`,'--kd':`${plan.S+.4}s`} as React.CSSProperties:undefined;
   const resultPassed=totals?.passed??false;
   const waitingVote=ballot.submitting||ballot.hasVoted;
   const voteWaiting=<div className="vote-stage vote-waiting"><p className="waiting" role="status">{ballot.submitting?'투표 제출 중…':'투표 완료 · 다른 기사를 기다리는 중'}<Dots/></p></div>;
 
-  return <section ref={rootRef} className={`vt${revealing?' is-reveal':''}${revealing?(resultPassed?' ok':' no'):''}${plan?.mode==='identity'?' identity':''}${placement==='seat'?' seat-coins':''}${reduced||skipped?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
+  return <section ref={rootRef} className={`vt${revealing?' is-reveal':''}${revealing?(resultPassed?' ok':' no'):''}${plan?.mode==='identity'?' identity':''}${placement==='seat'?' seat-coins':''}${reduced?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
     <span className="vt-sr">{isResult?`찬성 ${totals?.approve??0}표, 반대 ${totals?.reject??0}표`: `투표 ${voteCount}/${game.players.length}명 완료`}</span>
     {revealing&&<div className="vt-dark" aria-hidden="true"/>}
-    {isResult&&plan&&!reduced&&!skipped&&<div className="vt-result-bar" role="status"><span>투표 완료 · 결과 공개 중</span><button type="button" onClick={()=>setSkipped(true)}>투표 결과 바로 보기</button></div>}
     <div className="vt-wrap">
       <div className="vt-tilt vt-tilt--table">
         <div ref={tableRef} className={`table vt-table table--${game.players.length}`}>
-          <RoundTable className="council-table-art"/><div className="table-center">{isResult?<div className="vt-table-result"><div className="vt-summary"><span className="a">찬성 <b>{totals?.approve??0}</b></span><i>/</i><span className="r">반대 <b>{totals?.reject??0}</b></span></div><h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2></div>:<div className="selection-core"><FactionSeal team="good" size={36}/><strong>{`${voteCount} / ${game.players.length}`}</strong>{waitingVote?voteWaiting:<span>찬성 또는 반대를 비밀리에 선택하세요</span>}</div>}</div>
+          <RoundTable className="council-table-art"/><div className="table-center">{isResult?<div className="vt-table-result">{!reduced&&plan?.mode==='identity'&&<div className="vote-reveal-cue" aria-hidden="true"><ShieldIcon size={24}/><strong>봉인된 투표</strong><small>한 표씩 진실을 밝힙니다</small></div>}<div className="vt-summary"><span className="a">찬성 <b>{totals?.approve??0}</b></span><i>/</i><span className="r">반대 <b>{totals?.reject??0}</b></span></div><h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2></div>:<div className="selection-core"><FactionSeal team="good" size={36}/><strong>{`${voteCount} / ${game.players.length}`}</strong>{waitingVote?voteWaiting:<span>찬성 또는 반대를 비밀리에 선택하세요</span>}</div>}</div>
           {game.players.map((player,index)=><div className={`seat vt-seat${game.proposedTeam.includes(player.id)?' on-expedition':''}`} style={{...seatPos(index,game.players.length,43),'--i':index} as React.CSSProperties} key={player.id}>
             {player.id===game.leaderId&&<span className={`leader-crown${isResult&&!resultPassed?' vt-crown-seat':''}`} title="리더"><CrownIcon size={16}/></span>}
             {(()=>{const step=plan?.mode==='identity'?plan.stepOf[index]:undefined;const v=step===undefined?undefined:plan?.outcomes[step];
-              return <div className="plate"><SeatFace name={player.nickname} playerId={player.id}/>{player.hasVoted&&!revealing&&<i className="vt-voted" aria-label="투표 완료"/>}
+              return <div className="plate"><SeatFace name={player.nickname} playerId={player.id} member={game.proposedTeam.includes(player.id)}/>{player.hasVoted&&!revealing&&<i className="vt-voted" aria-label="투표 완료"/>}
                 {v!==undefined&&<span className="vt-mark" data-v={v?'a':'r'} style={{'--ft':plan!.ft[step!]!.toFixed(3)} as React.CSSProperties}>{v?<CheckIcon size={11}/>:<SwordsIcon size={11}/>}{v?'찬성':'반대'}</span>}</div>;})()}
           </div>)}
         </div>
         <div className="vt-tilt--top" aria-hidden="true">
-          <ExpeditionLinks players={game.players} team={game.proposedTeam}/>
+          <CouncilAtmosphere pulseKey={voteCount}/>
           {!resultPassed&&isResult&&<span className="vt-crown" style={{'--a0':'-90deg','--a1':`${-90+360/game.players.length}deg`} as React.CSSProperties}><CrownIcon size={26}/></span>}
           <div className="vt-pool" aria-hidden="true">
             {coinSeats.map((seat,index)=>{
@@ -531,6 +526,8 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
 }
 
 function Board({game}:{game:ClientGameState}){
+  const boardRef=useRef<HTMLElement>(null);
+  useCouncilLayout(boardRef,game.phase);
   const[approve,setApprove]=useState<boolean|null>(null);
   const[questCard,setQuestCard]=useState<'success'|'fail'|null>(null);
   const[questSubmitting,setQuestSubmitting]=useState(false);
@@ -568,8 +565,8 @@ function Board({game}:{game:ClientGameState}){
       <RoundHistory game={historyGame} open={openRound} setOpen={setOpenRound}/>
     </header>
 
-    <main className="board">
-      <PhaseRibbon game={game} turn={myTurn}/>
+    <main className="board" ref={boardRef}>
+      <PhaseRibbon key={`${phase}:${game.round}:${game.rejectCount}`} game={game} turn={myTurn}/>
 
       {phase==='team_build'&&<TeamScene key={`${game.roomCode}:${game.round}:${game.rejectCount}:${game.leaderId}`} game={game}/>}
 

@@ -90,7 +90,7 @@ export type CoinLayout={seats:number;placement:'seat'|'pile'};       // placemen
 const pct=(n:number)=>`${(50+n*100).toFixed(2)}%`;
 export function pileOf(i:number,seedKey:string){
   const r=rng(hash(`pile|${seedKey}|${i}`));
-  const ang=r()*Math.PI*2,rad=.03+r()*.2;
+  const ang=r()*Math.PI*2,rad=.02+r()*.1;
   return{x:Math.cos(ang)*rad,y:Math.sin(ang)*rad,rot:Math.round(r()*360)};
 }
 /** 좌석 i 의 '자기 앞' 위치: 같은 각도, 원탁 안쪽 링 (투표 영역 폭 기준 비율) */
@@ -150,8 +150,9 @@ export function useTableMetrics(ref:React.RefObject<HTMLElement>,root:React.RefO
     };
     upd();
     addEventListener('resize',upd);addEventListener('scroll',upd,{passive:true});
+    const observer=new ResizeObserver(upd);if(ref.current)observer.observe(ref.current);
     const iv=active?window.setInterval(upd,400):0;                                 // 레이아웃이 움직이는 동안(배너·채팅 등) 보정
-    return()=>{removeEventListener('resize',upd);removeEventListener('scroll',upd);window.clearInterval(iv);};
+    return()=>{observer.disconnect();removeEventListener('resize',upd);removeEventListener('scroll',upd);window.clearInterval(iv);};
   },[ref,root,active]);
 }
 

@@ -66,8 +66,10 @@ for(const width of [320,390,768,1440]){
       if(width<=640){
         const crown=page.locator(phase==='team_build'?'.cs-crown':phase==='team_vote'?'.leader-crown':'.witness-crown');
         await expect(crown).toBeVisible();
-        const ribbon=(await page.locator('.phase-ribbon').boundingBox())!;
-        await expect.poll(async()=>(await crown.boundingBox())!.y).toBeGreaterThanOrEqual(ribbon.y+ribbon.height+4);
+        await expect.poll(async()=>{
+          const ribbon=(await page.locator('.phase-ribbon').boundingBox())!,seatCrown=(await crown.boundingBox())!;
+          return seatCrown.y-ribbon.y-ribbon.height;
+        }).toBeGreaterThanOrEqual(4);
       }
       expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     }
@@ -254,6 +256,7 @@ for(const viewport of [{width:320,height:640},{width:375,height:667},{width:390,
       const box=(await choice.boundingBox())!;
       expect(box.width).toBeGreaterThanOrEqual(88);
       for(const text of await choice.locator(':scope > span,:scope > small').all()){
+        await expect(text).toHaveCSS('font-family',/Noto Sans KR/);
         const label=(await text.boundingBox())!;
         expect(label.x).toBeGreaterThanOrEqual(box.x);
         expect(label.x+label.width).toBeLessThanOrEqual(box.x+box.width);
@@ -261,7 +264,7 @@ for(const viewport of [{width:320,height:640},{width:375,height:667},{width:390,
       }
     }
     const stage=(await page.locator('.cs-altar-camera').boundingBox())!;
-    expect(stage.height).toBeGreaterThanOrEqual(220);
+    expect(stage.height).toBeGreaterThanOrEqual(200);
     const stack=(await page.locator('.cs-qcard').first().boundingBox())!;
     expect(stack.width).toBeGreaterThanOrEqual(35);
     expect(stack.y).toBeGreaterThan(stage.y);
@@ -288,3 +291,58 @@ for(const success of [false,true]){
     await expect(page.locator('.cs-quest-verdict .primary')).toBeEnabled();
   });
 }
+
+for(const viewport of [{width:320,height:640},{width:375,height:667},{width:390,height:844}]){
+  test(`long names, membership badges and ballots do not overlap at ${viewport.width}px`,async({page})=>{
+    await page.setViewportSize(viewport);
+    for(const phase of ['team_build','team_vote','quest'] as const){
+      const state=council(phase,10);state.questSize=5;state.proposedTeam=['p0','p1','p2','p3','p4'];state.options.revealVoteIdentities=true;
+      state.players.forEach((p,i)=>{p.nickname=`원탁기사${i}`;p.hasVoted=i>0&&i<8;});state.teamVotesCompleted=7;
+      await show(page,state);
+      if(phase==='team_build')for(let i=0;i<5;i++)await page.locator('.cs-seat button').nth(i).click();
+      await page.waitForTimeout(650);
+      const collisions=await page.evaluate(()=>{
+        const visible=(el:Element)=>{const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&Number(s.opacity)>.05&&el.getBoundingClientRect().width>0;};
+        const names=[...document.querySelectorAll('.cs-team .cs-name,.vt .seat-name,.quest-witness .witness-name')].filter(visible);
+        const marks=[...document.querySelectorAll('.cs-team .cs-avatar,.vt-seat .avatar,.quest-witness .pf-avatar,.seat-membership,.vt-coin')].filter(visible);
+        const hit=(a:DOMRect,b:DOMRect)=>Math.min(a.right,b.right)-Math.max(a.left,b.left)>.75&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>.75;
+        return names.flatMap(n=>marks.filter(m=>hit(n.getBoundingClientRect(),m.getBoundingClientRect())).map(m=>`${n.textContent}: ${m.className}`));
+      });
+      expect(collisions).toEqual([]);
+      const names=page.locator(phase==='team_build'?'.cs-name':phase==='team_vote'?'.vt .seat-name':'.witness-name');
+      const roster=(await page.locator('.expedition-roster').boundingBox())!;
+      for(const name of await names.all())expect((await name.boundingBox())!.y+(await name.boundingBox())!.height).toBeLessThanOrEqual(roster.y);
+      const action=page.locator(phase==='team_build'?'.cs-propose':phase==='team_vote'?'.vote-stage:not(.vote-waiting)':'.quest-stage');
+      const actionBox=(await action.boundingBox())!;
+      const chat=page.locator('.ac-compose');const bottom=await chat.count()?(await chat.boundingBox())!.y:viewport.height;
+      expect(actionBox.y+actionBox.height).toBeLessThanOrEqual(bottom);
+    }
+  });
+}
+
+for(const width of [320,375]){
+  test(`anonymous ballots leave the central count clear at ${width}px`,async({page})=>{
+    await page.setViewportSize({width,height:width===320?640:667});
+    const state=council('team_vote',10);state.questSize=5;state.proposedTeam=['p0','p1','p2','p3','p4'];
+    state.players.forEach((p,i)=>p.hasVoted=i>0&&i<8);state.teamVotesCompleted=7;
+    await show(page,state);await page.waitForTimeout(650);
+    await expect(page.locator('.vt-coin')).toHaveCount(7);
+    const count=(await page.locator('.selection-core strong').boundingBox())!;
+    for(const coin of await page.locator('.vt-coin').all()){
+      const box=(await coin.boundingBox())!;
+      const overlaps=Math.min(count.x+count.width,box.x+box.width)-Math.max(count.x,box.x)>.5&&Math.min(count.y+count.height,box.y+box.height)-Math.max(count.y,box.y)>.5;
+      expect(overlaps).toBe(false);
+    }
+  });
+}
+
+test('team construction uses the available height while keeping its last seat above the roster',async({page})=>{
+  await page.setViewportSize({width:375,height:667});
+  const state=council('team_build',10);state.questSize=5;
+  await show(page,state);for(let i=0;i<5;i++)await page.locator('.cs-seat button').nth(i).click();
+  await page.waitForTimeout(650);
+  const table=(await page.locator('.cs-table').boundingBox())!,action=(await page.locator('.cs-propose').boundingBox())!,dock=(await page.locator('.ac-compose').boundingBox())!;
+  expect(table.width).toBeGreaterThan(260);
+  expect(dock.y-action.y-action.height).toBeLessThanOrEqual(24);
+  await expect(page.locator('.cs-propose')).toHaveCSS('font-family',/Noto Sans KR/);
+});

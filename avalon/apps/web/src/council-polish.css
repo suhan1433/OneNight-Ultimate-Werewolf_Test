@@ -21,7 +21,7 @@
   position:relative;isolation:isolate;border:1px solid #b49a63;border-radius:7px;
   background:linear-gradient(180deg,#384039,#202a27 55%,#18211e);color:#f1dfb4;
   box-shadow:inset 0 0 0 3px #111a17,inset 0 0 0 4px #b59a6355,inset 0 5px 12px #ffffff0a,0 3px 0 #080e0b,0 6px 14px #0005;
-  font-family:var(--serif);font-weight:600;letter-spacing:.045em;text-shadow:0 1px 2px #000;
+  font-family:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;font-weight:700;letter-spacing:-.02em;text-shadow:none;
   transition:background .18s,border-color .18s,box-shadow .18s,translate .18s
 }
 .app .primary:hover:not(:disabled){border-color:#ead2a0;background:linear-gradient(180deg,#465047,#29362f 55%,#202b24)}
@@ -96,3 +96,101 @@
   .cs-quest .quest-cards{margin:3px 0}
   .cs-quest .card-tap-hint{font-size:9px;line-height:1.2}
 }
+
+/* Seat ornaments stay anchored to portraits; names and the ballot ring stay clear. */
+.app button,.chat-panel button{font-family:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;letter-spacing:-.02em}
+.cs-team .cs-seat.selected::after,.cs-team .cs-avatar::before,.cs-team .cs-avatar::after{display:none}
+.cs-team .cs-seat.selected .cs-avatar,.vt .on-expedition .avatar{outline:none;box-shadow:0 0 0 2px #c9b078,0 3px 10px #0006}
+.cs-team .cs-seat.leader .cs-avatar{filter:none;box-shadow:0 0 0 1px #bba472,0 3px 10px #0006}
+.cs-team .cs-seat.leader.selected .cs-avatar{box-shadow:0 0 0 2px #e1c990,0 3px 10px #0006}
+.cs-team .cs-avatar,.vt .vt-seat .avatar,.seat-portrait{position:relative;overflow:visible;flex:none}
+.seat-portrait{display:inline-grid;place-items:center}
+.seat-membership{position:absolute;right:-4px;bottom:-3px;z-index:3;display:grid;place-items:center;width:14px;height:14px;border:1px solid #d5bd84;border-radius:50%;background:#172c25;color:#f0dba4;box-shadow:0 0 0 2px #0a1511;animation:councilBadgeIn .4s cubic-bezier(.2,.8,.3,1.25) both;pointer-events:none}
+.seat-membership>svg{display:block;width:10px!important;height:10px!important;max-width:none}
+.vt .vt-voted{top:2px;left:auto;right:9px;width:6px;height:6px;box-shadow:0 0 0 2px #0b1418}
+.cs-team .cs-seat button{gap:7px}
+.cs-team .cs-core{z-index:2}
+.council-atmosphere{position:absolute;inset:17%;z-index:1;border-radius:50%;overflow:hidden;pointer-events:none;contain:paint}
+.council-light{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 30%,#d6bb6b12 42%,#e4c77f28 46%,transparent 56%);animation:councilLightDrift 16s linear infinite}
+.council-embers{position:absolute;inset:8%;background:radial-gradient(circle at 22% 66%,#e9cb8c99 0 1px,transparent 2px),radial-gradient(circle at 76% 28%,#edcc8a88 0 1px,transparent 2px),radial-gradient(circle at 63% 82%,#efc97866 0 1px,transparent 2px);animation:councilEmbers 6s ease-in-out infinite alternate}
+.council-pulse{position:absolute;inset:24%;border:1px solid #dfc58a;border-radius:50%;animation:councilPulseOut .9s ease-out both}
+.cs-team .cs-core-ring .fill{transition:stroke-dasharray .55s ease,filter .4s}
+.cs-team.is-ready .cs-core-ring .fill{filter:drop-shadow(0 0 4px #efd598);animation:councilReady 1.5s ease-in-out 2}
+.cs-team.is-proposing .council-pulse{animation:councilDeparture 1.1s ease-out both}
+.cs-team.is-proposing .council-light{animation:councilLightDrift 1.1s ease-out both;opacity:.9}
+.cs-team .cs-table{transition:width .3s ease,filter .8s ease}
+.board .phase-ribbon{animation:councilPhaseIn .5s ease-out both}
+.board .phase-ribbon::after{content:'';position:absolute;bottom:-1px;left:0;height:1px;width:100%;background:linear-gradient(90deg,transparent,#dec58b,transparent);transform-origin:left;animation:councilPhaseLine .9s ease-out both;pointer-events:none}
+.vote-reveal-cue{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#d9c391;animation:councilUnseal .45s ease calc(var(--R,1.85s) + 1.15s) forwards}
+.vote-reveal-cue strong{font-size:13px;font-weight:600;white-space:nowrap}
+.vote-reveal-cue small{font-size:9px;line-height:1.5;max-width:90px;color:var(--muted);text-wrap:balance}
+.vote-reveal-cue>svg{animation:councilReady 1.3s ease-in-out 2}
+.vt .vt-tally{padding:6px 8px;font-size:14px;box-shadow:0 5px 15px #0006;max-width:100%;box-sizing:border-box}
+.vt .vt-tally .u{font-size:9px;letter-spacing:.02em}
+@keyframes councilBadgeIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+@keyframes councilLightDrift{to{transform:rotate(360deg)}}
+@keyframes councilEmbers{from{opacity:.25;transform:translateY(4px)}to{opacity:.8;transform:translateY(-5px)}}
+@keyframes councilPulseOut{from{opacity:.7;transform:scale(.6)}to{opacity:0;transform:scale(2.2)}}
+@keyframes councilDeparture{0%{opacity:.8;transform:scale(.5)}100%{opacity:0;transform:scale(3)}}
+@keyframes councilReady{0%,100%{opacity:.65}50%{opacity:1}}
+@keyframes councilPhaseIn{from{opacity:.4;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes councilPhaseLine{0%{opacity:0;transform:scaleX(.1)}40%{opacity:1}100%{opacity:0;transform:scaleX(1)}}
+@keyframes councilUnseal{to{opacity:0;visibility:hidden;transform:scale(.92)}}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .seat-membership{width:12px;height:12px;right:-3px;bottom:-2px}
+  .seat-membership>svg{width:9px!important;height:9px!important}
+  .cs-team .cs-seat button{gap:7px}
+  .cs-team .cs-core small{max-width:85%;font-size:9px;line-height:1.3;letter-spacing:0;text-indent:0;text-align:center}
+  .vt .vt-seat .plate{gap:7px}
+  .vt .vt-voted{right:8px}
+  .quest-witness{gap:7px}
+  .cs-quest:not(.is-reveal) .cs-altar .lamp{scale:.55;transform-origin:50% 100%}
+  .vt .vt-note{font-size:9px;margin:6px auto;line-height:1.4}
+  .vt .vt-mark{margin-top:0;padding:1px 4px}
+  .vt.is-reveal .vt-wrap{margin-top:32px}
+  .vote-reveal-cue{gap:5px}
+}
+@media(prefers-reduced-motion:reduce){
+  .seat-membership,.council-light,.council-embers,.council-pulse,.cs-team.is-ready .cs-core-ring .fill,.board .phase-ribbon,.board .phase-ribbon::after,.vote-reveal-cue,.vote-reveal-cue>svg{animation:none}
+  .council-pulse,.board .phase-ribbon::after{display:none}
+  .cs-team .cs-table{transition:none}
+}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .board .expedition-roster ul{display:grid;grid-template-columns:repeat(var(--roster-count,5),minmax(0,1fr));gap:4px}
+  .board .expedition-roster li{min-width:0;flex-direction:column;gap:3px;padding:4px 2px}
+  .board .expedition-roster .expedition-name{max-width:100%;font-size:10px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .board .expedition-roster .expedition-me{display:none}
+  .board .expedition-roster .is-me .expedition-name{color:var(--brass-hi)}
+  .app[data-council-compact="true"] .cs-team .cs-avatar,.app[data-council-compact="true"] .vt .vt-seat .avatar{width:24px;height:24px}
+  .app[data-council-compact="true"] .quest-witness .pf-avatar{width:24px!important;height:24px!important}
+  .app[data-council-compact="true"] .cs-team .cs-seat,.app[data-council-compact="true"] .vt .vt-seat,.app[data-council-compact="true"] .quest-witness{width:38px}
+  .app[data-council-compact="true"] .cs-name,.app[data-council-compact="true"] .seat-name,.app[data-council-compact="true"] .witness-name{max-width:38px;box-sizing:border-box;font-size:8px;line-height:1.3;padding:2px 3px}
+  .app[data-council-compact="true"] .seat-membership{width:10px;height:10px;right:-2px;bottom:-1px}
+  .app[data-council-compact="true"] .seat-membership>svg{width:7px!important;height:7px!important}
+  .app[data-council-compact="true"] .vt:not(.is-reveal) .vt-pool{width:52%;--cs:18px}
+  .app[data-council-compact="true"] .vt .selection-core strong{font-size:20px}
+  .app[data-council-compact="true"] .vt .vt-voted{right:3px}
+}
+@media(max-width:360px) and (max-height:740px){
+  .board .expedition-roster li{padding:3px 1px}
+  .board .expedition-roster .expedition-name{font-size:9px}
+}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .board .cs-team .cs-camera{padding:36px 0 24px}
+  .cs-team .cs-seat{transform:translate(-50%,-50%)}
+  .cs-team .cs-seat button{padding:4px 2px}
+  .cs-team .expedition-roster ul,.cs-team .expedition-roster>p{display:none}
+  .cs-team .expedition-roster>header{margin:0}
+  .vt .vt-wrap,.vt.is-reveal .vt-wrap{margin-top:36px}
+  .cs-quest:not(.is-reveal) .cs-altar-camera{margin-top:38px;margin-bottom:16px}
+}
+/* Anonymous ballots gather below the count, without implying who cast a coin. */
+.vt:not(.seat-coins):not(.is-reveal) .selection-core{transform:translateY(calc(var(--council-size)*-.12))}
+.vt:not(.seat-coins):not(.is-reveal) .vt-pool{top:60%}
+.vt.is-final:not(.is-reveal) .vt-coin{display:block}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .app[data-council-compact="true"] .vote-tokens .token{width:clamp(56px,16vw,60px);height:clamp(56px,16vw,60px)}
+  .app .quest-cards .qcard.active,.app .quest-cards .qcard:hover:not(:disabled){translate:0 0;rotate:0deg}
+}
+.app .quest-cards .qcard>span,.app .quest-cards .qcard>small,.app .vote-tokens .token>span,.app .primary>span{font-family:inherit}
+.app .quest-cards .qcard>span{font-weight:600;letter-spacing:-.02em;text-shadow:none}

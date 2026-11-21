@@ -4,10 +4,11 @@ import {emit,socket,getAssassinAim,getTeamSelection,type AssassinAimState,type T
 import {useGame} from './store';
 import {PlayerAvatar,useCharacterResolver} from './profile';
 import {HouseCrest} from './HouseCrest';
-import {RoundTable,ExpeditionLinks} from './RoundTable';
+import {RoundTable,ExpeditionBadge,CouncilAtmosphere} from './RoundTable';
 import {ExpeditionRoster} from './ExpeditionRoster';
 import {roleArtFor} from './role-art';
 import {useEndingAudio} from './use-recorded-audio';
+import {recordedAudio} from './recorded-audio';
 
 /* 스토리보드 4(팀 구성) · 6(퀘스트 결과) · 7(암살) · 8(엔딩). 엔딩 음원은 타이틀 공개 시점에 재생한다.
    3·5번 장면과 같은 문법: 놋쇠 인레이 원탁 · 스포트라이트 암전 · 정적 → 타격 → 여운 · 캔버스 입자.
@@ -65,7 +66,7 @@ const ALTAR_CRACK=['M14 112 L44 103 L64 115 L90 97 L108 109 L131 90 L150 101 L17
 const END_CRACK=['M58 232 L104 214 L132 236 L170 196 L196 214 L226 184 L254 210 L290 196 L342 226','M170 196 L162 150 L186 118 L176 78','M254 210 L270 252 L252 290 L268 330','M132 236 L118 272 L132 306 L124 338','M226 184 L232 140 L216 108','M104 214 L84 188 L88 160'];
 const DEBRIS=Array.from({length:14},(_,i)=>({x:22+((i*47)%56),dx:((i*29)%70)-35,h:46+((i*37)%70),s:3+(i%3),d:(i%7)*.09}));
 /* 기존 .cs-avatar(링·호버·선택 연출)는 그대로 두고, 글자 대신 프로필 캐릭터를 넣는다 */
-function Avatar({playerId}:{playerId:string}){const ch=useCharacterResolver()(playerId);return <span className="cs-avatar has-char" style={vars({'--pf-bg':ch.bg})} aria-hidden="true"><HouseCrest id={ch.id}/></span>;}
+function Avatar({playerId,member=false}:{playerId:string;member?:boolean}){const ch=useCharacterResolver()(playerId);return <span className="cs-avatar has-char" style={vars({'--pf-bg':ch.bg})} aria-hidden="true"><HouseCrest id={ch.id}/>{member&&<ExpeditionBadge/>}</span>;}
 function SeatEmoji({playerId}:{playerId:string}){const c=useCharacterResolver()(playerId);return <HouseCrest id={c.id}/>;}
 
 /* =========================================================
@@ -83,15 +84,14 @@ export function TeamScene({game}:{game:ClientGameState}){
   useEffect(()=>()=>window.clearTimeout(timer.current),[]);
   useEffect(()=>{const receive=(message:TeamSelectionState)=>{if(message.roomCode===game.roomCode)setTeam(message.team);};socket.on('TEAM_SELECTION',receive);const cached=getTeamSelection(game.roomCode);if(cached)receive(cached);return()=>{socket.off('TEAM_SELECTION',receive);};},[game.roomCode]);
   const shareSelection=(next:string[])=>{setTeam(next);socket.emit('TEAM_SELECTION',{roomCode:game.roomCode,team:next});};
-  const toggle=(id:string)=>{if(!leader||submitting)return;if(team.includes(id)){shareSelection(team.filter(value=>value!==id));}else if(!ready){shareSelection([...team,id]);}};
+  const toggle=(id:string)=>{if(!leader||submitting)return;if(team.includes(id)){shareSelection(team.filter(value=>value!==id));}else if(!ready){shareSelection([...team,id]);recordedAudio.play('coin');if(!reduced)navigator.vibrate?.(12);}};
   const propose=()=>{if(!ready||submitting)return;setSubmitting(true);timer.current=window.setTimeout(()=>{void emit('TEAM_PROPOSE',{roomCode:game.roomCode,team}).catch(error=>{setSubmitting(false);useGame.getState().setError(error.message);});},reduced?0:1150);};
   return <section className={`cs cs-team${ready?' is-ready':''}${submitting?' is-proposing':''}${reduced?' cs-final':''}`}>
     <SceneCaption eyebrow={`ROUND ${game.round+1} · THE EXPEDITION`} title="원정대를 지명하세요" body={leader?`${game.questSize}명의 기사를 선택하세요. 당신이 이번 원정의 리더입니다.`:`${game.players.find(player=>player.id===game.leaderId)?.nickname??'리더'}이(가) ${game.questSize}명의 원정대를 구성하고 있습니다.`}/>
     <div className="cs-camera"><div className="cs-table">
       <RoundTable/>
       <div className="cs-leader-light" key={game.leaderId} style={vars({'--tlx':`${lightAt.x}%`,'--tly':`${lightAt.y}%`})}/>
-      {game.players.map((player,index)=>{const p=position(index,n,CANDLE_R);const isLeader=player.id===game.leaderId;return <Flame key={`f-${player.id}`} x={p.x} y={p.y} lean={isLeader?-12:0} s={isLeader?1.25:1} cls={team.includes(player.id)?'picked':''}/>;})}
-      <ExpeditionLinks players={game.players} team={team}/>
+      <CouncilAtmosphere pulseKey={team.join(',')}/>
       <div className="cs-core">
         <svg className="cs-core-ring" viewBox="0 0 100 100" aria-hidden="true"><circle className="track" cx="50" cy="50" r="48.5" pathLength="1"/><circle className="fill" cx="50" cy="50" r="48.5" pathLength="1" transform="rotate(-90 50 50)" style={{strokeDasharray:`${Math.min(1,team.length/Math.max(1,game.questSize))} 1`}}/></svg>
         <span className="cs-core-mark"><Sigil size={74}/></span>
@@ -99,7 +99,7 @@ export function TeamScene({game}:{game:ClientGameState}){
       </div>
       {game.players.map((player,index)=>{const p=position(index,n);return <div className={`cs-seat${team.includes(player.id)?' selected':''}${player.id===game.leaderId?' leader':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
         {player.id===game.leaderId&&<span className="cs-crown"><Sigil kind="crown" size={24}/></span>}
-        <button type="button" disabled={!leader||submitting||(!team.includes(player.id)&&ready)} aria-pressed={team.includes(player.id)} onClick={()=>toggle(player.id)}><Avatar playerId={player.id}/><span className="cs-name">{player.nickname}</span></button>
+        <button type="button" disabled={!leader||submitting||(!team.includes(player.id)&&ready)} aria-pressed={team.includes(player.id)} onClick={()=>toggle(player.id)}><Avatar playerId={player.id} member={team.includes(player.id)}/><span className="cs-name">{player.nickname}</span></button>
       </div>;})}
     </div></div>
     <ExpeditionRoster game={game} team={team} selecting/>
@@ -143,12 +143,13 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
     <div className="cs-spot" aria-hidden="true"/>
     <SceneCaption eyebrow={`QUEST ${game.round+1} · THE ROUND TABLE`} title={reveal?'원정의 진실':'원탁에 카드를 봉인합니다'} body={reveal?'카드를 섞어 한 장씩 공개합니다. 누가 제출했는지는 공개되지 않습니다.':`봉인된 카드 ${count} / ${total}장 · 원정대원만 카드를 제출할 수 있습니다.`}/>
     <div className="cs-altar-camera" aria-label={reveal?'원탁 위 원정 결과 공개':'원정 카드를 모으는 원탁'}>
+      {!reveal&&<CouncilAtmosphere pulseKey={count}/>}
       <div className="quest-stage-light" aria-hidden="true"/>
       <div className="quest-dust" aria-hidden="true">{Array.from({length:12},(_,i)=><i key={i} style={vars({'--i':i,'--x':`${9+(i*31)%83}%`,'--y':`${14+(i*17)%69}%`})}/>)}</div>
       <RoundTable className="council-table-art"/>
       <div className="quest-witnesses" aria-label="원탁의 기사들">{game.players.map((player,index)=>{const p=position(index,game.players.length);const member=game.proposedTeam.includes(player.id);return <div className={`quest-witness${member?' on-quest':''}${player.id===game.leaderId?' leader':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
         {player.id===game.leaderId&&<span className="witness-crown"><Sigil kind="crown" size={17}/></span>}
-        <PlayerAvatar playerId={player.id} size={36}/><span className="witness-name">{player.nickname}</span>{member&&<i className="expedition-mark" title="원정대원"/>}
+        <span className="seat-portrait"><PlayerAvatar playerId={player.id} size={36}/>{member&&<ExpeditionBadge/>}</span><span className="witness-name">{player.nickname}</span>
       </div>;})}</div>
       <div className="cs-altar-quake" style={reveal&&failTimes.length?{animation:[...failTimes.map(x=>`csQuake .5s ease ${(x+.08).toFixed(2)}s both`),`csQuakeBig .9s ease ${resultAt.toFixed(2)}s both`].join(',')}:undefined}><div className="cs-altar" ref={altar}>
       <div className="cs-altar-glow"/>
