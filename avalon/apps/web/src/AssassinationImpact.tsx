@@ -4,7 +4,9 @@ import {ROLE_DEFINITIONS} from '@werewolf/shared';
 import {PlayerAvatar} from './profile';
 import {roleArtFor} from './role-art';
 
-/** A short, non-interactive close-up; the server has already resolved the target. */
+export const ASSASSINATION_IMPACT_SECONDS=6.4;
+
+/** A non-interactive close-up; the server has already resolved the target. */
 export function AssassinationImpact({game}:{game:ClientGameState}){
   const target=game.players.find(player=>player.id===game.assassinTarget);
   const identity=game.revealedRoles?.find(player=>player.id===game.assassinTarget);

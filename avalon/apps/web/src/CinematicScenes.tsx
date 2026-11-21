@@ -8,7 +8,7 @@ import {RoundTable,ExpeditionBadge,CouncilAtmosphere} from './RoundTable';
 import {ExpeditionRoster} from './ExpeditionRoster';
 import {GameChronicle} from './GameChronicle';
 import {TableCinema} from './TableCinema';
-import {AssassinationImpact} from './AssassinationImpact';
+import {AssassinationImpact,ASSASSINATION_IMPACT_SECONDS} from './AssassinationImpact';
 import {questDestination} from './quest-destinations';
 import {roleArtFor} from './role-art';
 import {useEndingAudio} from './use-recorded-audio';
@@ -242,12 +242,12 @@ export function AssassinScene({game}:{game:ClientGameState}){
 
 /* =========================================================
    8. 엔딩 — 선은 '빛이 채워지고', 악은 '빛이 꺼진다'
-   (암살 단계를 거쳤다면 앞에 3.2초의 대상 클로즈업과 타격·정체 공개가 붙는다)
+   (암살 단계를 거쳤다면 앞에 6.4초의 대상 클로즈업과 타격·정체 공개가 붙는다)
    선: 0.0 촛불이 한 번에 켜짐 · 카메라 상승 / 1.5 황금 먼지 / 3.0 타이틀 각인 · 정체 카드 0.25s 간격 / 6.0 기록 패널
    악: 0.0 촛불이 하나씩 꺼짐(선 진영부터) · 마지막 하나는 붉게 / 1.5 카메라 하강 · 균열 / 3.0 붉은 놋쇠 타이틀 · 악인 카드 불꽃 / 6.0 기록 패널
    ========================================================= */
 export function EndingScene({game}:{game:ClientGameState}){
-  const good=game.winner==='good';const impact=!!game.assassinTarget;const offset=impact?3.2:0;const end=6+offset;
+  const good=game.winner==='good';const impact=!!game.assassinTarget;const offset=impact?ASSASSINATION_IMPACT_SECONDS:0;const end=6+offset;
   const clock=useClock(true,end);
   useEndingAudio(clock.time,offset+3,clock.final);
   const n=game.players.length;

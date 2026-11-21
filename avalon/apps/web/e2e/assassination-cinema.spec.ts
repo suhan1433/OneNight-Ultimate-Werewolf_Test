@@ -32,7 +32,9 @@ for(const hit of [true,false])test(`${hit?'hit':'miss'} shows the actual target 
   await expect(page.locator('.cs-identity-grid')).toHaveCSS('visibility','hidden');await expect(scene.locator('.execution-verdict')).toHaveCSS('opacity','1');await expect(scene.locator('.execution-name>span')).toHaveText(hit?'멀린':'충성스러운 신하');
   if(!hit)await expect(scene.locator('.execution-survivor')).toContainText('기사2');
   const box=await scene.boundingBox();expect(box!.width).toBe(390);expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(390);expect(await page.evaluate(()=>document.documentElement.scrollHeight)).toBeLessThanOrEqual(844);
-  await expect(scene).toHaveCount(0,{timeout:4000});await expect(page.locator('.cs-identity-grid')).toHaveCSS('visibility','visible');
+  // Keep the fully revealed verdict readable for at least two seconds.
+  await page.waitForTimeout(2000);await expect(scene).toBeVisible();await expect(scene).toHaveCSS('opacity','1');
+  await expect(scene).toHaveCount(0,{timeout:5000});await expect(page.locator('.cs-identity-grid')).toHaveCSS('visibility','visible');
 });
 test('the close-up fits a short mobile viewport and can be skipped immediately',async({page})=>{
   await page.setViewportSize({width:320,height:640});await show(page,result(false,10));const focus=await page.locator('.execution-focus').boundingBox();const verdict=await page.locator('.execution-verdict').boundingBox();expect(focus!.y).toBeGreaterThan(0);expect(verdict!.y+verdict!.height).toBeLessThan(570);await page.getByRole('button',{name:'엔딩 바로 보기'}).click();await expect(page.locator('.execution-cinema')).toHaveCount(0);await expect(page.getByRole('button',{name:'새 게임 시작'})).toBeEnabled();
