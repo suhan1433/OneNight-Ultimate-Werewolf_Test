@@ -1,0 +1,45 @@
+/* Film-like inserts are scenery on the felt: bounded, silent and never modal. */
+.table-cinema{position:absolute;left:50%;top:50%;translate:-50% -50%;width:64%;aspect-ratio:1;z-index:1;isolation:isolate;contain:layout paint style;overflow:hidden;border-radius:50%;pointer-events:none;user-select:none;opacity:0;animation:tcShot 1.8s ease-in-out both}
+.table-cinema *{pointer-events:none}
+.table-cinema>svg{display:block;width:100%;height:100%;overflow:hidden}
+.tc-oath{animation-duration:1.25s}
+.tc-ballot{animation-duration:.75s}
+.tc-unseal{animation-duration:1.4s;animation-delay:var(--R,0s)}
+.tc-reveal{animation-duration:1.3s}
+.tc-departure{animation-duration:2s}
+.tc-dawn,.tc-shadow{animation-duration:1.8s}
+.tc-inscription{stroke-dasharray:1;stroke-dashoffset:1;animation:tcInscribe 1s cubic-bezier(.2,.7,.2,1) both}
+.tc-unseal .tc-inscription{animation-delay:var(--R,0s)}
+.tc-engraving{transform-origin:100px 100px;animation:tcEngraving 1.25s ease-out both}
+.tc-grazing-light{animation:tcFoil 1.2s ease-out both}
+.tc-unseal .tc-grazing-light{animation-delay:var(--R,0s)}
+.tc-wax{transform-origin:100px 100px;animation:tcWax .7s cubic-bezier(.2,.8,.3,1) both}
+.tc-unseal .tc-wax{animation:tcUnseal 1.4s ease-out var(--R,0s) both}
+.tc-distance{transform-origin:140px 95px;animation:tcDolly 2s cubic-bezier(.2,.6,.4,1) both}
+.tc-forest{transform-origin:100px 155px;animation:tcForeground 2s ease-out both}
+.tc-door{transform-box:fill-box;animation:tcGate .95s cubic-bezier(.2,.7,.2,1) both}
+.tc-door-left{transform-origin:left center}.tc-door-right{transform-origin:right center}
+.tc-road-light{stroke-dasharray:1;stroke-dashoffset:1;animation:tcRoad 1.8s ease-out .1s both}
+.tc-mist{animation:tcMist 2s ease-in-out both}
+.tc-sunbeams{transform-origin:143px 53px;animation:tcDawn 1.8s ease-out both}
+.tc-ravens{animation:tcRavens 1.8s cubic-bezier(.2,.6,.3,1) both}
+.tc-shadow .tc-moon{fill:#d59ca3;opacity:.4}
+.tc-film-light{position:absolute;inset:0;border-radius:inherit;background:radial-gradient(ellipse at 38% 20%,#f1e2b51a,transparent 52%),linear-gradient(180deg,#02080b33,transparent 35%,#02080b88);box-shadow:inset 0 0 28px #01060888}
+.tc-frame{position:absolute;inset:4%;border:1px solid #d7c49122;border-radius:inherit;box-shadow:inset 0 0 0 3px #08131022}
+.cs-quest .table-cinema{width:calc(var(--quest-table-size)*.64)}
+.cs-quest.is-reveal .table-cinema{width:100%;height:100%;aspect-ratio:auto;border-radius:inherit}
+.cs-quest.is-reveal .tc-frame{border-radius:8px;inset:7% 4%}
+@keyframes tcShot{0%{opacity:0}15%{opacity:.85}62%{opacity:.85}100%{opacity:0}}
+@keyframes tcInscribe{to{stroke-dashoffset:0}}
+@keyframes tcEngraving{from{opacity:.2;transform:rotate(-9deg) scale(.92)}to{opacity:1;transform:none}}
+@keyframes tcFoil{from{transform:translateX(-200px)}to{transform:translateX(230px)}}
+@keyframes tcWax{0%{opacity:0;transform:scale(1.35)}45%{opacity:.85;transform:scale(.94)}100%{opacity:0;transform:scale(1.12)}}
+@keyframes tcUnseal{0%{opacity:.8;transform:scale(.8)}65%{opacity:.3}100%{opacity:0;transform:scale(1.4)}}
+@keyframes tcDolly{from{transform:scale(.94) translateY(2px)}to{transform:scale(1.06) translateY(-3px)}}
+@keyframes tcForeground{from{transform:scale(.95) translateY(7px)}to{transform:scale(1.13) translateY(1px)}}
+@keyframes tcGate{from{transform:scaleX(1);opacity:1}to{transform:scaleX(.08);opacity:.3}}
+@keyframes tcRoad{to{stroke-dashoffset:0}}
+@keyframes tcMist{from{transform:translateX(-12px);opacity:.02}50%{opacity:.18}to{transform:translateX(14px);opacity:.03}}
+@keyframes tcDawn{from{opacity:0;transform:rotate(-8deg)}45%{opacity:1}to{opacity:.25;transform:rotate(5deg)}}
+@keyframes tcRavens{0%{opacity:0;transform:translate(-23px,11px) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translate(32px,-17px) scale(1.1)}}
+@media(prefers-reduced-motion:reduce){.table-cinema{display:none}.table-cinema,.table-cinema *{animation:none!important}}

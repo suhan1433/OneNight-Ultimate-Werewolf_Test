@@ -194,3 +194,88 @@
 }
 .app .quest-cards .qcard>span,.app .quest-cards .qcard>small,.app .vote-tokens .token>span,.app .primary>span{font-family:inherit}
 .app .quest-cards .qcard>span{font-weight:600;letter-spacing:-.02em;text-shadow:none}
+
+/* One crown, anchored to the real seats before, during and after the handoff. */
+.vt .leader-crown.vote-crown{position:absolute;width:16px;height:16px;z-index:6;translate:none;transform:translate(-50%,-100%);animation:none!important;color:#f5dfa0;filter:drop-shadow(0 1px 2px #000) drop-shadow(0 0 5px #dfbb6666);pointer-events:none}
+.vote-crown>svg{display:block;width:16px;height:16px}
+.vote-crown[data-state="passing"]>svg{filter:drop-shadow(0 0 4px #f3d083)}
+.vote-crown[data-state="arrived"]>svg{animation:crownArrival .65s ease-out both}
+@keyframes crownArrival{0%{filter:brightness(1.8);transform:scale(1.25)}100%{filter:none;transform:none}}
+/* Membership has a readable name plate as well as a high-contrast seal. */
+.cs-team .cs-seat:not(.selected) .cs-avatar,.vt .vt-seat:not(.on-expedition) .avatar{opacity:.5;filter:saturate(.6)}
+.cs-team .cs-seat:not(.selected) .cs-name,.vt .vt-seat:not(.on-expedition) .seat-name,.quest-witness:not(.on-quest) .witness-name{color:#9dada5;border-color:#a5b0a522}
+.cs-team .cs-seat.selected .cs-name,.vt .vt-seat.on-expedition .seat-name,.quest-witness.on-quest .witness-name{color:#fff0c5;background:linear-gradient(#64532f,#403722);border-color:#dfc78c;font-weight:700;box-shadow:0 2px 7px #0008}
+.cs-team .cs-seat.selected .cs-avatar,.vt .vt-seat.on-expedition .avatar,.quest-witness.on-quest .pf-avatar{opacity:1;filter:none;box-shadow:0 0 0 2px #edd69d,0 0 14px #d8b96538;outline:none}
+.seat-membership{background:#ead8a5;color:#1a2c24;border-color:#fff0c7;box-shadow:0 0 0 2px #0a1511}
+.vt .vt-voted{background:#89bec4;box-shadow:0 0 0 2px #0b1418}
+/* Opening a quest record unfolds its evidence in the order it was gathered. */
+.round-detail{transform-origin:top;animation:questDossierOpen .35s cubic-bezier(.2,.8,.2,1) both}
+.round-detail-head{position:relative;overflow:hidden}
+.round-detail-head::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 20%,#e6d3a21a 50%,transparent 75%);transform:translateX(-100%);animation:questDossierLight .8s ease-out both;pointer-events:none}
+.round-detail .round-detail-section{animation:questEvidenceIn .4s ease-out both}
+.round-detail .round-detail-section:nth-child(2){animation-delay:.08s}.round-detail .round-detail-section:nth-child(3){animation-delay:.16s}.round-detail .round-detail-section:nth-child(4){animation-delay:.24s}
+.round-detail .member-chips>span{animation:questEvidenceIn .35s ease-out calc(.12s + var(--member-index,0)*.045s) both}
+.round-detail .quest-card-count>span{animation:questEvidenceStamp .5s ease-out .25s both}
+.cs-quest.is-reveal .cs-qcard.turned .cs-card-front{animation:questCardEvidence .7s ease-out both;--evidence-light:148,194,211}
+.cs-quest.is-reveal .cs-qcard.fail.turned .cs-card-front{--evidence-light:216,114,128}
+.cs-quest.is-resolved .quest-shot-label{animation:questEvidenceIn .6s ease-out both}
+@keyframes questDossierOpen{from{opacity:0;transform:translateY(-5px) scaleY(.96)}to{opacity:1;transform:none}}
+@keyframes questDossierLight{to{transform:translateX(100%)}}
+@keyframes questEvidenceIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@keyframes questEvidenceStamp{from{opacity:0;transform:scale(1.08)}to{opacity:1;transform:none}}
+@keyframes questCardEvidence{0%{filter:brightness(1.5);box-shadow:0 0 25px rgba(var(--evidence-light),.7)}100%{filter:none;box-shadow:0 0 0 1px rgba(var(--evidence-light),.65),0 6px 18px #0008}}
+/* A legible chronicle, rather than a compressed row of names and numbers. */
+.cs-ending-summary.chronicle{padding:24px;background:linear-gradient(145deg,#1d2b28f5,#0d1817f5);border:1px solid #b49a6355;border-radius:12px;text-align:left;box-sizing:border-box}
+.chronicle-heading>small{font-size:9px;letter-spacing:.15em;color:var(--brass)}
+.cs-ending-summary.chronicle h2{font-family:"Noto Sans KR",system-ui,sans-serif;font-size:22px;font-weight:600;letter-spacing:-.04em;margin:7px 0 10px;text-shadow:none}
+.chronicle-heading p{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0;font-size:12px;color:var(--muted)}
+.chronicle-heading p>span:first-of-type{color:#a9cdcf}.chronicle-heading p>span:last-of-type{color:#e3a6ad}
+.chronicle .round-history{margin:18px 0;gap:6px}
+.chronicle .round-track-slot{height:66px;min-height:66px;padding:7px 2px;gap:5px;border-radius:7px;background:#0a1513;border-color:#b49a632b}
+.chronicle .round-track-slot.success{color:#b8d8da;background:#1b3435;border-color:#8eb8bb55}
+.chronicle .round-track-slot.fail{color:#edbac0;background:#35232a;border-color:#c77d8555}
+.chronicle .round-seal{width:24px;height:24px;min-height:24px;margin:0;font-size:13px}
+.chronicle .round-seal svg{width:18px;height:18px}
+.chronicle .round-meta{font-size:10px;gap:4px}
+.chronicle .round-label,.chronicle .round-history::before{display:none}
+.chronicle-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.chronicle-entry{min-width:0;padding:14px;border:1px solid #a4b1a333;border-left:3px solid #9ba99c55;border-radius:8px;background:#101e1b;animation:questEvidenceIn .5s ease-out calc(var(--ending-offset,0s) + 6.15s + var(--entry-index)*.09s) both}
+.chronicle-entry.success{border-left-color:#8fbfc2;background:linear-gradient(110deg,#1b3030,#101e1b)}
+.chronicle-entry.fail{border-left-color:#d08a94;background:linear-gradient(110deg,#302127,#171e1c)}
+.chronicle-entry>header{position:static;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0;background:none;border:0;box-shadow:none;backdrop-filter:none;width:auto}
+.chronicle-round{font-size:13px;font-weight:700;color:var(--parchment)}
+.chronicle-outcome{padding:4px 7px;border:1px solid #b0b9a933;border-radius:5px;font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
+.success>.chronicle-outcome,.success>header>.chronicle-outcome{color:#b8dbdc;border-color:#90bec255;background:#8bbcc010}
+.fail>header>.chronicle-outcome{color:#edb2ba;border-color:#d08a9455;background:#d08a9410}
+.chronicle-leader{display:flex;align-items:center;gap:5px;margin:10px 0;color:var(--muted);font-size:11px}
+.chronicle-leader svg{color:var(--brass);flex:none}.chronicle-leader>span{color:var(--parchment);overflow-wrap:anywhere}
+.chronicle-members{display:flex;flex-wrap:wrap;gap:5px;list-style:none;margin:0;padding:0}
+.chronicle-members>li{display:flex;align-items:center;gap:5px;max-width:100%;min-width:0;padding:4px 7px;border:1px solid #baaa7e2b;border-radius:5px;background:#0b161350;color:var(--parchment);font-size:11px}
+.chronicle-members>li>span:last-child{min-width:0;overflow-wrap:anywhere}
+.chronicle-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:12px 0 0;padding-top:10px;border-top:1px solid #bdad8022}
+.chronicle-metrics>div{display:grid;gap:3px;justify-items:center;padding:2px}
+.chronicle-metrics dt{font-size:10px;color:var(--muted)}
+.chronicle-metrics dd{margin:0;font-size:21px;line-height:1.2;color:var(--parchment);font-variant-numeric:tabular-nums}
+.chronicle-metrics dd>small{margin-left:3px;font-size:10px;color:var(--muted)}
+.chronicle>footer{display:flex;justify-content:center;margin-top:20px}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .seat-membership{width:14px;height:14px;right:-3px;bottom:-2px}
+  .seat-membership>svg{width:10px!important;height:10px!important}
+  .app[data-council-compact="true"] .seat-membership{width:13px;height:13px}
+  .app[data-council-compact="true"] .seat-membership>svg{width:9px!important;height:9px!important}
+  .cs-ending-summary.chronicle{padding:16px 12px;margin-top:20px}
+  .cs-ending-summary.chronicle h2{font-size:20px}
+  .chronicle-heading p{font-size:11px;gap:9px}
+  .chronicle .round-track-slot{height:54px;min-height:54px;gap:3px;padding:5px 1px}
+  .chronicle .round-meta{font-size:9px;gap:3px}
+  .chronicle-entry{padding:12px 10px}
+  .chronicle-metrics dd{font-size:20px}
+}
+@media(prefers-reduced-motion:reduce){
+  .vote-crown[data-state="arrived"]>svg,.round-detail,.round-detail-head::after,.round-detail .round-detail-section,.round-detail .member-chips>span,.round-detail .quest-card-count>span,.cs-quest.is-reveal .cs-qcard.turned .cs-card-front,.cs-quest.is-resolved .quest-shot-label,.chronicle-entry{animation:none}
+  .round-detail-head::after{display:none}
+}
+.vt .vote-crown:not([data-ready]){visibility:hidden}
+.vt .vt-seat{animation:none}
+.chronicle>.chronicle-heading{position:static;width:auto;display:block;padding:0;background:none;border:0;backdrop-filter:none;box-shadow:none}
+.vt.no .next-leader-note{animation-delay:calc(var(--S) + 1.4s);color:var(--brass-hi)}

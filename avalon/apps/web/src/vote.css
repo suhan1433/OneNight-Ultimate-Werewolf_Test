@@ -141,14 +141,6 @@
      25%{stroke:#ee6580;stroke-dasharray:none;stroke-width:2.4;transform:none}
      100%{stroke:#c0364f;stroke-dasharray:6 5;stroke-width:2;transform:translate(var(--dx),var(--dy));filter:drop-shadow(0 0 4px rgba(238,101,128,.8))}}
    
-   /* 부결: 리더 왕관이 다음 좌석으로 굴러간다 */
-   .vt-crown{position:absolute;left:calc(50% + var(--sr,42%)*cos(var(--ca)));top:calc(50% + var(--sr,42%)*sin(var(--ca)));translate:-50% -150%;
-     --ca:var(--a0);color:var(--brass-hi);opacity:0;filter:drop-shadow(0 0 8px rgba(253,233,180,.8));
-     animation:vtCrownRoll 1.2s cubic-bezier(.5,0,.25,1) calc(var(--S) + .3s) both}
-   @keyframes vtCrownRoll{0%{--ca:var(--a0);opacity:0;rotate:0deg}4%{opacity:1}100%{--ca:var(--a1);opacity:1;rotate:720deg}}
-   .vt-crown-seat{animation:vtSeatCrownOut .2s ease calc(var(--S) + .3s) forwards}
-   @keyframes vtSeatCrownOut{to{opacity:0}}
-   
    /* ---------- 여운: 득표 요약만 각인 ---------- */
    .vt-summary{position:relative;z-index:31;width:fit-content;margin:18px auto 0;display:flex;gap:12px;align-items:center;white-space:nowrap;font:700 17px var(--numeral);letter-spacing:.04em;color:var(--parchment);opacity:0;
      padding:10px 22px 11px;border-radius:16px;font-variant-numeric:tabular-nums lining-nums;

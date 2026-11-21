@@ -6,6 +6,8 @@ import {PlayerAvatar,useCharacterResolver} from './profile';
 import {HouseCrest} from './HouseCrest';
 import {RoundTable,ExpeditionBadge,CouncilAtmosphere} from './RoundTable';
 import {ExpeditionRoster} from './ExpeditionRoster';
+import {GameChronicle} from './GameChronicle';
+import {TableCinema} from './TableCinema';
 import {roleArtFor} from './role-art';
 import {useEndingAudio} from './use-recorded-audio';
 import {recordedAudio} from './recorded-audio';
@@ -77,19 +79,19 @@ function SeatEmoji({playerId}:{playerId:string}){const c=useCharacterResolver()(
    ========================================================= */
 export function TeamScene({game}:{game:ClientGameState}){
   const[team,setTeam]=useState<string[]>(()=>getTeamSelection(game.roomCode)?.team??[]);const[submitting,setSubmitting]=useState(false);
-  const timer=useRef<number>();const reduced=useMotion();const leader=game.playerId===game.leaderId;
+  const proposalLock=useRef(false);const reduced=useMotion();const leader=game.playerId===game.leaderId;
   const n=game.players.length;
   const leaderIndex=Math.max(0,game.players.findIndex(player=>player.id===game.leaderId));const lightAt=position(leaderIndex,n,30);
   const ready=team.length===game.questSize;
-  useEffect(()=>()=>window.clearTimeout(timer.current),[]);
   useEffect(()=>{const receive=(message:TeamSelectionState)=>{if(message.roomCode===game.roomCode)setTeam(message.team);};socket.on('TEAM_SELECTION',receive);const cached=getTeamSelection(game.roomCode);if(cached)receive(cached);return()=>{socket.off('TEAM_SELECTION',receive);};},[game.roomCode]);
   const shareSelection=(next:string[])=>{setTeam(next);socket.emit('TEAM_SELECTION',{roomCode:game.roomCode,team:next});};
   const toggle=(id:string)=>{if(!leader||submitting)return;if(team.includes(id)){shareSelection(team.filter(value=>value!==id));}else if(!ready){shareSelection([...team,id]);recordedAudio.play('coin');if(!reduced)navigator.vibrate?.(12);}};
-  const propose=()=>{if(!ready||submitting)return;setSubmitting(true);timer.current=window.setTimeout(()=>{void emit('TEAM_PROPOSE',{roomCode:game.roomCode,team}).catch(error=>{setSubmitting(false);useGame.getState().setError(error.message);});},reduced?0:1150);};
+  const propose=()=>{if(!ready||proposalLock.current)return;proposalLock.current=true;setSubmitting(true);void emit('TEAM_PROPOSE',{roomCode:game.roomCode,team}).catch(error=>{proposalLock.current=false;setSubmitting(false);useGame.getState().setError(error.message);});};
   return <section className={`cs cs-team${ready?' is-ready':''}${submitting?' is-proposing':''}${reduced?' cs-final':''}`}>
     <SceneCaption eyebrow={`ROUND ${game.round+1} · THE EXPEDITION`} title="원정대를 지명하세요" body={leader?`${game.questSize}명의 기사를 선택하세요. 당신이 이번 원정의 리더입니다.`:`${game.players.find(player=>player.id===game.leaderId)?.nickname??'리더'}이(가) ${game.questSize}명의 원정대를 구성하고 있습니다.`}/>
     <div className="cs-camera"><div className="cs-table">
       <RoundTable/>
+      {ready&&<TableCinema scene="oath"/>}
       <div className="cs-leader-light" key={game.leaderId} style={vars({'--tlx':`${lightAt.x}%`,'--tly':`${lightAt.y}%`})}/>
       <CouncilAtmosphere pulseKey={team.join(',')}/>
       <div className="cs-core">
@@ -147,6 +149,7 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
       <div className="quest-stage-light" aria-hidden="true"/>
       <div className="quest-dust" aria-hidden="true">{Array.from({length:12},(_,i)=><i key={i} style={vars({'--i':i,'--x':`${9+(i*31)%83}%`,'--y':`${14+(i*17)%69}%`})}/>)}</div>
       <RoundTable className="council-table-art"/>
+      <TableCinema scene={reveal?(resolved?(game.questResult?.success?'dawn':'shadow'):'reveal'):'departure'} cue={game.round}/>
       <div className="quest-witnesses" aria-label="원탁의 기사들">{game.players.map((player,index)=>{const p=position(index,game.players.length);const member=game.proposedTeam.includes(player.id);return <div className={`quest-witness${member?' on-quest':''}${player.id===game.leaderId?' leader':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
         {player.id===game.leaderId&&<span className="witness-crown"><Sigil kind="crown" size={17}/></span>}
         <span className="seat-portrait"><PlayerAvatar playerId={player.id} size={36}/>{member&&<ExpeditionBadge/>}</span><span className="witness-name">{player.nickname}</span>
@@ -239,7 +242,7 @@ export function EndingScene({game}:{game:ClientGameState}){
   const good=game.winner==='good';const impact=!!game.assassinTarget;const offset=impact?3.2:0;const end=6+offset;
   const clock=useClock(true,end);const merlin=game.revealedRoles?.find(item=>item.role==='merlin');
   useEndingAudio(clock.time,offset+3,clock.final);
-  const target=game.players.find(player=>player.id===game.assassinTarget);const name=(id:string)=>game.players.find(player=>player.id===id)?.nickname??'기사';
+  const target=game.players.find(player=>player.id===game.assassinTarget);
   const n=game.players.length;
   const teamOf=(id:string)=>{const info=game.revealedRoles?.find(item=>item.id===id);return info?ROLE_DEFINITIONS[info.role]?.team:undefined;};
   const snuff=useMemo(()=>{
@@ -265,7 +268,7 @@ export function EndingScene({game}:{game:ClientGameState}){
         {good&&mIndex>=0&&(()=>{const mp=position(mIndex,n);return <div className="cs-merlin-return" style={{left:`${mp.x}%`,top:`${mp.y}%`}}><i className="cs-hitring m"/><i className="cs-merlin-rays"/></div>;})()}
         <div className="cs-impact-sigil"><Sigil kind={good?'good':'dagger'} size={56}/></div>
       </div>
-      <strong>{good?'단검이 빗나갔습니다':'멀린의 촛불이 꺼졌습니다'}</strong><span>{good?`멀린 ${merlin?name(merlin.id):''} · 청백색 빛이 다시 켜집니다`:`${target?.nickname??'멀린'} · 붉은 파편이 원탁에 퍼집니다`}</span>
+      <strong>{good?'단검이 빗나갔습니다':'멀린의 촛불이 꺼졌습니다'}</strong><span>{good?`멀린 ${merlin?game.players.find(player=>player.id===merlin.id)?.nickname??'':''} · 청백색 빛이 다시 켜집니다`:`${target?.nickname??'멀린'} · 붉은 파편이 원탁에 퍼집니다`}</span>
       <i className="cs-impact-flash"/>
     </div>}
     <div className="cs-ending-world" aria-hidden="true">
@@ -282,7 +285,7 @@ export function EndingScene({game}:{game:ClientGameState}){
     </div>
     <div className="cs-ending-title"><small>THE RESISTANCE · AVALON</small><h1>{good?'선의 승리':'악의 승리'}</h1><p>{game.winReason}</p></div>
     <div className="cs-identity-grid" aria-label="모든 기사의 정체 공개">{game.players.map((player,index)=>{const info=game.revealedRoles?.find(item=>item.id===player.id);const definition=info?ROLE_DEFINITIONS[info.role]:undefined;const won=definition?.team===game.winner;return <article className={`cs-identity ${definition?.team??'good'}${won?' winner':''}`} style={vars({'--i':index})} key={player.id} aria-label={`${player.nickname}, ${definition?.name??'역할 정보 없음'}, ${won?'승리':'패배'}`}><i className="cs-identity-halo" aria-hidden="true"/><p className="cs-identity-player">{player.nickname}</p><div className="cs-identity-inner"><div className="cs-card-back" aria-hidden="true"><span className="cs-medal"><Sigil size={30}/></span><small>AVALON</small></div><div className="cs-card-front">{info&&<img className="cs-role-card-art" src={roleArtFor(info.role,player.id)} alt="" aria-hidden="true" loading="eager"/>}<i className="cs-foil"/></div></div><div className="cs-identity-meta"><span className="cs-outcome">{won?'승리':'패배'}</span>{info?.hasAssassinationAbility&&info.role!=='assassin'&&<small className="cs-ability">암살 능력</small>}</div>{definition?.team==='evil'&&<Particles count={8}/>}</article>;})}</div>
-    <div className="cs-ending-summary cs-glass"><small>CHRONICLE OF THE ROUND TABLE</small><h2>원탁에 남겨진 기록</h2><div className="cs-score">{Array.from({length:5},(_,round)=>{const record=game.roundHistory.find(item=>item.round===round);return <span className={record?.success===true?'success':record?.success===false?'fail':'pending'} style={vars({'--ri':round})} key={round}>{round+1}<small>{record?.success===undefined?'미완료':record.success?'성공':'실패'}</small></span>;})}</div><div className="cs-chronicle">{game.roundHistory.map((record,ri)=><div style={vars({'--ri':ri})} key={record.round}><b className={record.success===undefined?'pending':record.success?'success':'fail'}><i>{record.round+1}</i></b><span>{record.team.map(name).join(' · ')}</span><small>찬성 {record.approveCount} / 반대 {record.rejectCount}{record.fails!==undefined?` · 실패 카드 ${record.fails}장`:''}</small><em>{record.success===undefined?'원정 미완료':record.success?'원정 성공':'원정 실패'}</em></div>)}</div>{game.playerId===game.hostId&&<button className="primary" disabled={clock.time<end} onClick={()=>void emit('GAME_RESTART',{roomCode:game.roomCode}).catch(error=>useGame.getState().setError(error.message))}>새 게임 시작</button>}</div>
+    <GameChronicle game={game}>{game.playerId===game.hostId&&<button className="primary" disabled={clock.time<end} onClick={()=>void emit('GAME_RESTART',{roomCode:game.roomCode}).catch(error=>useGame.getState().setError(error.message))}>새 게임 시작</button>}</GameChronicle>
     {clock.time<end&&<button className="cs-skip" onClick={clock.skip}>엔딩 바로 보기</button>}
   </section>;
 }
