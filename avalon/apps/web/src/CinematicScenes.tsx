@@ -4,9 +4,8 @@ import {emit,socket,getAssassinAim,getTeamSelection,type AssassinAimState,type T
 import {useGame} from './store';
 import {PlayerAvatar,useCharacterResolver} from './profile';
 import {HouseCrest} from './HouseCrest';
-import {RoundTable} from './RoundTable';
+import {RoundTable,ExpeditionLinks} from './RoundTable';
 import {ExpeditionRoster} from './ExpeditionRoster';
-import {RoundTrack} from './RoundTrack';
 import {roleArtFor} from './role-art';
 import {useEndingAudio} from './use-recorded-audio';
 
@@ -76,29 +75,23 @@ function SeatEmoji({playerId}:{playerId:string}){const c=useCharacterResolver()(
    인원 충족: 코어 링 완성 + 버튼 맥동 → 제안: 다각형 완성 + 카메라 후퇴
    ========================================================= */
 export function TeamScene({game}:{game:ClientGameState}){
-  const[team,setTeam]=useState<string[]>(()=>getTeamSelection(game.roomCode)?.team??[]);const[leaving,setLeaving]=useState<string[]>([]);const[submitting,setSubmitting]=useState(false);
+  const[team,setTeam]=useState<string[]>(()=>getTeamSelection(game.roomCode)?.team??[]);const[submitting,setSubmitting]=useState(false);
   const timer=useRef<number>();const reduced=useMotion();const leader=game.playerId===game.leaderId;
   const n=game.players.length;
-  const leaderIndex=Math.max(0,game.players.findIndex(player=>player.id===game.leaderId));const origin=position(leaderIndex,n);const lightAt=position(leaderIndex,n,30);
-  const selected=game.players.filter(player=>team.includes(player.id));const ready=team.length===game.questSize;
+  const leaderIndex=Math.max(0,game.players.findIndex(player=>player.id===game.leaderId));const lightAt=position(leaderIndex,n,30);
+  const ready=team.length===game.questSize;
   useEffect(()=>()=>window.clearTimeout(timer.current),[]);
   useEffect(()=>{const receive=(message:TeamSelectionState)=>{if(message.roomCode===game.roomCode)setTeam(message.team);};socket.on('TEAM_SELECTION',receive);const cached=getTeamSelection(game.roomCode);if(cached)receive(cached);return()=>{socket.off('TEAM_SELECTION',receive);};},[game.roomCode]);
   const shareSelection=(next:string[])=>{setTeam(next);socket.emit('TEAM_SELECTION',{roomCode:game.roomCode,team:next});};
-  const toggle=(id:string)=>{if(!leader||submitting)return;if(team.includes(id)){shareSelection(team.filter(value=>value!==id));setLeaving(previous=>[...previous.filter(value=>value!==id),id]);}else if(!ready){setLeaving(previous=>previous.filter(value=>value!==id));shareSelection([...team,id]);}};
+  const toggle=(id:string)=>{if(!leader||submitting)return;if(team.includes(id)){shareSelection(team.filter(value=>value!==id));}else if(!ready){shareSelection([...team,id]);}};
   const propose=()=>{if(!ready||submitting)return;setSubmitting(true);timer.current=window.setTimeout(()=>{void emit('TEAM_PROPOSE',{roomCode:game.roomCode,team}).catch(error=>{setSubmitting(false);useGame.getState().setError(error.message);});},reduced?0:1150);};
-  const at=(id:string)=>position(Math.max(0,game.players.findIndex(player=>player.id===id)),n);
-  const pts=selected.map(player=>{const p=position(game.players.indexOf(player),n);return`${p.x},${p.y}`;}).join(' ');
   return <section className={`cs cs-team${ready?' is-ready':''}${submitting?' is-proposing':''}${reduced?' cs-final':''}`}>
     <SceneCaption eyebrow={`ROUND ${game.round+1} · THE EXPEDITION`} title="원정대를 지명하세요" body={leader?`${game.questSize}명의 기사를 선택하세요. 당신이 이번 원정의 리더입니다.`:`${game.players.find(player=>player.id===game.leaderId)?.nickname??'리더'}이(가) ${game.questSize}명의 원정대를 구성하고 있습니다.`}/>
     <div className="cs-camera"><div className="cs-table">
       <RoundTable/>
       <div className="cs-leader-light" key={game.leaderId} style={vars({'--tlx':`${lightAt.x}%`,'--tly':`${lightAt.y}%`})}/>
       {game.players.map((player,index)=>{const p=position(index,n,CANDLE_R);const isLeader=player.id===game.leaderId;return <Flame key={`f-${player.id}`} x={p.x} y={p.y} lean={isLeader?-12:0} s={isLeader?1.25:1} cls={team.includes(player.id)?'picked':''}/>;})}
-      <svg className="cs-geometry" viewBox="0 0 100 100" aria-hidden="true">
-        {team.filter(id=>id!==game.leaderId).map(id=>{const t=at(id);const d=`M${origin.x} ${origin.y}Q50 50 ${t.x} ${t.y}`;return <g className="cs-link" key={id}><path className="cs-link-shadow" d={d}/><path className="cs-link-glow" d={d}/><path className="cs-thread" pathLength="1" d={d}/><circle className="cs-link-node" cx={t.x} cy={t.y} r="1.1"/></g>;})}
-        {leaving.filter(id=>id!==game.leaderId).map(id=>{const t=at(id);return <path className="cs-thread is-unwinding" pathLength="1" d={`M${origin.x} ${origin.y}Q50 50 ${t.x} ${t.y}`} key={`out-${id}`} onAnimationEnd={()=>setLeaving(previous=>previous.filter(value=>value!==id))}/>;})}
-        {submitting&&<><polygon className="cs-team-poly-fill" points={pts}/><polygon className="cs-team-poly" pathLength="1" points={pts}/>{selected.map((player,i)=>{const p=position(game.players.indexOf(player),n);return <circle className="cs-node" cx={p.x} cy={p.y} r="1.5" style={vars({'--i':i})} key={player.id}/>;})}</>}
-      </svg>
+      <ExpeditionLinks players={game.players} team={team}/>
       <div className="cs-core">
         <svg className="cs-core-ring" viewBox="0 0 100 100" aria-hidden="true"><circle className="track" cx="50" cy="50" r="48.5" pathLength="1"/><circle className="fill" cx="50" cy="50" r="48.5" pathLength="1" transform="rotate(-90 50 50)" style={{strokeDasharray:`${Math.min(1,team.length/Math.max(1,game.questSize))} 1`}}/></svg>
         <span className="cs-core-mark"><Sigil size={74}/></span>
@@ -174,7 +167,7 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
     </div></div>
       <div className="quest-camera-vignette" aria-hidden="true"/>
       {reveal&&<div className="quest-shot-label" aria-hidden="true"><span>QUEST {String(game.round+1).padStart(2,'0')}</span><span>{resolved?'THE VERDICT':still?'THE SILENCE':'THE REVEAL'}</span></div>}
-      {resolved&&<div className="quest-table-verdict" aria-hidden="true"><small>{game.questResult?.success?'LOYALTY PREVAILS':'A SHADOW AT THE TABLE'}</small><strong>{game.questResult?.success?'원정 성공':'원정 실패'}</strong></div>}
+      {resolved&&<div className="quest-table-verdict" role="status"><small>{game.questResult?.success?'LOYALTY PREVAILS':'A SHADOW AT THE TABLE'}</small><strong>{game.questResult?.success?'원정 성공':'원정 실패'}</strong><p className="quest-result-counts"><span>성공 카드 <b>{total-fails}</b>장</span> · <span>실패 카드 <b>{fails}</b>장</span>{game.round===3&&game.maxPlayers>=7&&<small className="quest-threshold">실패 2장부터 원정 실패</small>}</p></div>}
       {!reveal&&<div className="quest-sealed-count" role="status"><span>봉인된 원정 카드</span><b>{count}<small> / {total}</small></b></div>}
     </div>
     <ExpeditionRoster game={game}/>
@@ -182,8 +175,6 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
       <p className="cs-progress" role="status">{resolved?`성공 ${total-fails}장 · 실패 ${fails}장`:still?'봉인을 깨기 직전, 원탁이 숨을 멈춥니다.':revealed?<>공개 · 성공 <b className="ok">{revealed-shownFails}</b> · 실패 <b className="no">{shownFails}</b> · 미공개 <b>{total-revealed}</b></>:'카드를 섞고 있습니다.'}</p>
       {resolved&&<div className="cs-quest-verdict cs-glass">
         <div className="cs-verdict-seal" aria-hidden="true"><Sigil kind={game.questResult?.success?'good':'evil'} size={30}/></div>
-        <small>ROUND {game.round+1} · 원정 보고</small><h2>{game.questResult?.success?'원정 성공':'원정 실패'}</h2><p className="quest-result-counts"><span>성공 카드 <b>{total-fails}</b>장</span> · <span>실패 카드 <b>{fails}</b>장</span>{game.round===3&&game.maxPlayers>=7?' · 이번 원정은 실패 2장부터 실패':''}</p>
-        <RoundTrack game={game}/>
         <button className="primary" disabled={game.hasContinued||clock.time<end-.5} onClick={()=>void emit('QUEST_RESULT_CONTINUE',{roomCode:game.roomCode}).catch(error=>useGame.getState().setError(error.message))}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button></div>}
       {!resolved&&<button className="cs-skip" onClick={clock.skip}>결과 바로 보기</button>}
     </>:children}

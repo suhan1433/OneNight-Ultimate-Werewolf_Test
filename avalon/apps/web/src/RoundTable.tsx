@@ -1,5 +1,24 @@
 import React,{useId,useMemo} from 'react';
 
+/** Membership follows the brass rim, leaving the coin ring and names clear. */
+export function ExpeditionLinks({players,team}:{players:{id:string}[];team:string[]}){
+  const point=(angle:number,r=35)=>`${50+r*Math.cos(angle)},${50+r*Math.sin(angle)}`;
+  return <svg className="expedition-links" viewBox="0 0 100 100" aria-hidden="true">
+    <circle className="expedition-orbit" cx="50" cy="50" r="35"/>
+    {players.map((player,index)=>{
+      if(!team.includes(player.id))return null;
+      const angle=index/players.length*Math.PI*2-Math.PI/2;
+      const spread=Math.min(.22,Math.PI/players.length*.7);
+      return <g key={player.id}>
+        <path className="expedition-arc-shadow" d={`M${point(angle-spread)} A35 35 0 0 1 ${point(angle+spread)}`}/>
+        <path className="expedition-arc" d={`M${point(angle-spread)} A35 35 0 0 1 ${point(angle+spread)}`}/>
+        <path className="expedition-spoke" d={`M${point(angle,35)} L${point(angle,37)}`}/>
+        <circle className="expedition-pin" cx={50+37*Math.cos(angle)} cy={50+37*Math.sin(angle)} r=".75"/>
+      </g>;
+    })}
+  </svg>;
+}
+
 export function RoundTable({className='cs-tablesvg'}:{className?:string}){
   const uid=useId().replace(/:/g,'');
   const ticks=useMemo(()=>Array.from({length:60},(_,j)=>{const a=j*6*Math.PI/180,L=j%5===0?9:5;return{j,x1:200+112*Math.sin(a),y1:200-112*Math.cos(a),x2:200+(112+L)*Math.sin(a),y2:200-(112+L)*Math.cos(a)};}),[]);

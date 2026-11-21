@@ -65,6 +65,7 @@ for(const width of [320,390,768,1440]){
       for(const seat of layout){expect(seat.x).toBeGreaterThanOrEqual(-1);expect(seat.right).toBeLessThanOrEqual(width+1);}
       if(width<=640){
         const crown=page.locator(phase==='team_build'?'.cs-crown':phase==='team_vote'?'.leader-crown':'.witness-crown');
+        await expect(crown).toBeVisible();
         const ribbon=(await page.locator('.phase-ribbon').boundingBox())!;
         await expect.poll(async()=>(await crown.boundingBox())!.y).toBeGreaterThanOrEqual(ribbon.y+ribbon.height+4);
       }
@@ -88,7 +89,7 @@ test('quest outcome is hidden in the public history until the reveal is resolved
   await expect(round).toContainText('진행 중');
   await page.getByRole('button',{name:'결과 바로 보기',exact:true}).click();
   await expect(round).toContainText('실패');
-  await expect(page.locator('.cs-quest-verdict')).toContainText('실패 카드 1장');
+  await expect(page.locator('.quest-table-verdict')).toContainText('실패 카드 1장');
 });
 
 test('reduced motion keeps results and the continue action available',async({page})=>{
@@ -96,7 +97,7 @@ test('reduced motion keeps results and the continue action available',async({pag
   const state=council('quest_result');state.results=['success'];state.questResult={success:true,fails:0};
   await show(page,state);
   await expect(page.locator('.cs-quest-verdict .primary')).toBeEnabled();
-  await expect(page.locator('.cs-quest-verdict')).toContainText('원정 성공');
+  await expect(page.locator('.quest-table-verdict')).toContainText('원정 성공');
 });
 
 
@@ -128,8 +129,8 @@ for(const width of [320,390,768,1440]){
     await page.emulateMedia({reducedMotion:'reduce'});
     const state=council('quest_result',10);state.questSize=5;state.proposedTeam=['p0','p1','p2','p3','p4'];state.questResult={success:false,fails:2};state.results=['fail'];
     await show(page,state);
-    await expect(page.locator('.cs-quest-verdict')).toContainText('성공 카드 3장');
-    await expect(page.locator('.cs-quest-verdict')).toContainText('실패 카드 2장');
+    await expect(page.locator('.quest-table-verdict')).toContainText('성공 카드 3장');
+    await expect(page.locator('.quest-table-verdict')).toContainText('실패 카드 2장');
     const stage=(await page.locator('.cs-altar-camera').boundingBox())!;
     for(const card of await page.locator('.cs-qcard').all()){
       const box=(await card.boundingBox())!;
@@ -143,7 +144,7 @@ for(const width of [320,390,768,1440]){
 }
 
 
-for(const viewport of [{width:375,height:667},{width:390,height:844},{width:430,height:932}]){
+for(const viewport of [{width:320,height:640},{width:375,height:667},{width:390,height:844},{width:430,height:932}]){
   for(const phase of ['team_build','team_vote','quest','vote_result','quest_result'] as const){
     test(`${phase} fits above the mobile chat dock at ${viewport.width}x${viewport.height}`,async({page})=>{
       await page.setViewportSize(viewport);
@@ -161,20 +162,36 @@ for(const viewport of [{width:375,height:667},{width:390,height:844},{width:430,
       expect(box.y+box.height).toBeLessThanOrEqual(visibleBottom);
       expect(await page.evaluate(()=>window.scrollY)).toBe(0);
       const table=page.locator(phase.includes('vote')?'.vt-wrap':phase==='team_build'?'.cs-camera':'.cs-altar-camera');
-      const tableBox=(await table.boundingBox())!,roster=(await page.locator('.expedition-roster').boundingBox())!;
-      expect(roster.y).toBeGreaterThanOrEqual(tableBox.y+tableBox.height);
+      const tableBox=(await table.boundingBox())!;
+      if(phase==='vote_result'||phase==='quest_result'){
+        await expect(page.locator('.expedition-roster')).toBeHidden();
+        if(phase==='quest_result')await expect(page.locator('.quest-table-verdict')).toBeHidden();
+        const result=page.locator(phase==='vote_result'?'.vt-table-result':'.game-status .round-history');
+        await expect(result).toBeVisible();
+        const resultBox=(await result.boundingBox())!;
+        if(phase==='vote_result'){
+          expect(resultBox.y).toBeGreaterThanOrEqual(tableBox.y);
+          expect(resultBox.y+resultBox.height).toBeLessThanOrEqual(tableBox.y+tableBox.height);
+        }else{expect(resultBox.y+resultBox.height).toBeLessThanOrEqual(tableBox.y);}
+      }else{
+        const roster=(await page.locator('.expedition-roster').boundingBox())!;
+        expect(roster.y).toBeGreaterThanOrEqual(tableBox.y+tableBox.height);
+      }
     });
   }
 }
 
-test('quest report uses the same round markers as the public header',async({page})=>{
+test('mobile quest report shows its outcome in the header without a duplicate verdict',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});
   const state=council('quest_result');state.questResult={success:true,fails:0};state.results=['success'];
   await show(page,state);
-  await expect(page.locator('.cs-quest-verdict .round-history-item')).toHaveCount(5);
+  await expect(page.locator('.game-status .round-history-item')).toHaveCount(5);
   await expect(page.locator('.game-status .round-history-item').first()).toContainText('성공');
-  await expect(page.locator('.cs-quest-verdict .round-history')).toHaveText((await page.locator('.game-status .round-history').textContent())!);
-  await expect(page.locator('.cs-quest-verdict .cs-score')).toHaveCount(0);
+  await expect(page.locator('.quest-table-verdict')).toBeHidden();
+  await expect(page.locator('.game-status .result-success')).toBeVisible();
+  await expect(page.locator('.game-status .round-history-item').first()).toContainText('성공');
+  await expect(page.locator('.cs-quest-verdict .round-history')).toHaveCount(0);
+  await expect(page.locator('.cs-quest-verdict .primary')).toBeEnabled();
 });
 
 test('room creation gives immediate feedback and submits only once while waiting',async({page})=>{
@@ -252,5 +269,22 @@ for(const viewport of [{width:320,height:640},{width:375,height:667},{width:390,
     const action=(await page.locator('.quest-stage').boundingBox())!;
     expect(action.y+action.height).toBeLessThanOrEqual(viewport.height);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+  });
+}
+
+for(const success of [false,true]){
+  test(`header stamps a ${success?'successful':'failed'} quest only after the cards are revealed`,async({page})=>{
+    const state=council('quest_result');state.questResult={success,fails:success?0:1};state.results=[success?'success':'fail'];
+    state.roundHistory=[{round:0,leaderId:'p0',team:state.proposedTeam,approveCount:3,rejectCount:2,success,fails:success?0:1}];
+    await show(page,state);
+    const record=page.locator('.game-status .round-history-item').first();
+    await expect(record).toContainText('진행 중');
+    await expect(record).not.toHaveClass(/result-arrived/);
+    await page.getByRole('button',{name:'결과 바로 보기',exact:true}).click();
+    await expect(record).toHaveClass(new RegExp(`result-arrived result-${success?'success':'fail'}`));
+    await expect(record.locator('button')).toHaveCSS('animation-name','questRecordImpact, questRecordGlow');
+    await expect(record).toContainText(success?'성공':'실패');
+    await expect(page.locator('.quest-table-verdict')).toBeHidden();
+    await expect(page.locator('.cs-quest-verdict .primary')).toBeEnabled();
   });
 }

@@ -94,7 +94,7 @@ export function pileOf(i:number,seedKey:string){
   return{x:Math.cos(ang)*rad,y:Math.sin(ang)*rad,rot:Math.round(r()*360)};
 }
 /** 좌석 i 의 '자기 앞' 위치: 같은 각도, 원탁 안쪽 링 (투표 영역 폭 기준 비율) */
-export function seatFront(i:number,seats:number){const a=i/seats*Math.PI*2-Math.PI/2;return{x:Math.cos(a)*.4,y:Math.sin(a)*.4};}
+export function seatFront(i:number,seats:number){const a=i/seats*Math.PI*2-Math.PI/2;return{x:Math.cos(a)*.36,y:Math.sin(a)*.36};}
 export function coinStyle(i:number,seedKey:string,plan:Plan|null,layout?:CoinLayout){
   const seats=layout?.seats??plan?.N??1;
   const front=seatFront(i,seats);

@@ -24,11 +24,13 @@ import './immersion.css';
 import './expedition.css';
 import './compact-game.css';
 import './quest-film.css';
+import './council-layout.css';
+import './council-polish.css';
 import {ExpeditionRoster} from './ExpeditionRoster';
 import {RoundTrack,QUEST_SIZES} from './RoundTrack';
 import {useImmersion} from './immersion';
 import {HouseCrest} from './HouseCrest';
-import {RoundTable} from './RoundTable';
+import {RoundTable,ExpeditionLinks} from './RoundTable';
 import {CHARACTERS,characterById,myAvatarId,setMyAvatarId,serverAvatarId,syncAvatar,useCharacterResolver,PlayerAvatar,PlayerEmoji,ProfileDialog,type Character} from './profile';
 import {TeamScene,QuestScene,AssassinScene,EndingScene} from './CinematicScenes';
 import {GateIntro,Table,useGateIntro} from './GateIntro';
@@ -480,13 +482,9 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
   useRevealEffects(plan,revealing&&!reduced&&!skipped);
 
   const style=plan?{'--R':`${plan.R}s`,'--S':`${plan.S}s`,'--ld':`${plan.ft[plan.N-1]!-.25}s`,'--sd':`${plan.S+1.2}s`,'--cd':`${plan.S+2}s`,'--kd':`${plan.S+.4}s`} as React.CSSProperties:undefined;
-  const point=(id:string)=>{
-    const index=game.players.findIndex(player=>player.id===id);
-    const angle=(index/game.players.length)*Math.PI*2-Math.PI/2;
-    return `${50+42*Math.cos(angle)},${50+42*Math.sin(angle)}`;
-  };
-  const teamPoints=game.proposedTeam.map(point).join(' ');
   const resultPassed=totals?.passed??false;
+  const waitingVote=ballot.submitting||ballot.hasVoted;
+  const voteWaiting=<div className="vote-stage vote-waiting"><p className="waiting" role="status">{ballot.submitting?'투표 제출 중…':'투표 완료 · 다른 기사를 기다리는 중'}<Dots/></p></div>;
 
   return <section ref={rootRef} className={`vt${revealing?' is-reveal':''}${revealing?(resultPassed?' ok':' no'):''}${plan?.mode==='identity'?' identity':''}${placement==='seat'?' seat-coins':''}${reduced||skipped?' is-final':''}`} style={style} aria-label={isResult?'원정대 투표 결과':'원정대 투표'}>
     <span className="vt-sr">{isResult?`찬성 ${totals?.approve??0}표, 반대 ${totals?.reject??0}표`: `투표 ${voteCount}/${game.players.length}명 완료`}</span>
@@ -495,7 +493,7 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
     <div className="vt-wrap">
       <div className="vt-tilt vt-tilt--table">
         <div ref={tableRef} className={`table vt-table table--${game.players.length}`}>
-          <RoundTable className="council-table-art"/><div className="table-center"><div className="selection-core"><FactionSeal team="good" size={36}/><strong>{isResult?'투표 공개':`${voteCount} / ${game.players.length}`}</strong><span>{isResult?'원탁의 판결을 확인합니다':'찬성 또는 반대를 비밀리에 선택하세요'}</span></div></div>
+          <RoundTable className="council-table-art"/><div className="table-center">{isResult?<div className="vt-table-result"><div className="vt-summary"><span className="a">찬성 <b>{totals?.approve??0}</b></span><i>/</i><span className="r">반대 <b>{totals?.reject??0}</b></span></div><h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2></div>:<div className="selection-core"><FactionSeal team="good" size={36}/><strong>{`${voteCount} / ${game.players.length}`}</strong>{waitingVote?voteWaiting:<span>찬성 또는 반대를 비밀리에 선택하세요</span>}</div>}</div>
           {game.players.map((player,index)=><div className={`seat vt-seat${game.proposedTeam.includes(player.id)?' on-expedition':''}`} style={{...seatPos(index,game.players.length,43),'--i':index} as React.CSSProperties} key={player.id}>
             {player.id===game.leaderId&&<span className={`leader-crown${isResult&&!resultPassed?' vt-crown-seat':''}`} title="리더"><CrownIcon size={16}/></span>}
             {(()=>{const step=plan?.mode==='identity'?plan.stepOf[index]:undefined;const v=step===undefined?undefined:plan?.outcomes[step];
@@ -504,7 +502,7 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
           </div>)}
         </div>
         <div className="vt-tilt--top" aria-hidden="true">
-          <svg className="vt-poly" viewBox="0 0 100 100" preserveAspectRatio="none"><polygon className="vt-poly-fill" points={teamPoints}/><polygon className="vt-edge" points={teamPoints}/></svg>
+          <ExpeditionLinks players={game.players} team={game.proposedTeam}/>
           {!resultPassed&&isResult&&<span className="vt-crown" style={{'--a0':'-90deg','--a1':`${-90+360/game.players.length}deg`} as React.CSSProperties}><CrownIcon size={26}/></span>}
           <div className="vt-pool" aria-hidden="true">
             {coinSeats.map((seat,index)=>{
@@ -525,12 +523,10 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
     <ExpeditionRoster game={game}/>
     {isResult? (plan?<>
       {plan&&<p className="vt-note">{plan.mode==='identity'?'자리 앞의 코인이 각자의 선택입니다 · 뒤집힌 코인이 곧 그 사람의 표':'표가 섞였습니다 · 누구의 표인지는 공개되지 않습니다'}</p>}
-      <div className="vt-summary" style={{zIndex:31}}><span className="a">찬성 <b>{totals?.approve??0}</b></span><i>/</i><span className="r">반대 <b>{totals?.reject??0}</b></span></div>
-      <h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2>
       <div className="vt-continue"><button className="primary" disabled={game.hasContinued} onClick={()=>call('VOTE_RESULT_CONTINUE',{roomCode:game.roomCode})}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button></div>
-    </>:null) : <div className="vote-stage">
+    </>:null) : waitingVote?null:<div className="vote-stage">
       <h2>원정대 투표</h2>
-      {ballot.submitting||ballot.hasVoted?<><Pips done={game.teamVotesCompleted} total={game.players.length}/><p className="waiting" role="status">{ballot.submitting?'투표 제출 중…':'투표 완료 · 다른 기사를 기다리는 중'}<Dots/></p></>:<><div className="vote-tokens"><button className={`token approve${approve===true?' active':''}`} aria-pressed={approve===true} onClick={()=>approve===true?ballot.submit(true):setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button><button className={`token reject${approve===false?' active':''}`} aria-pressed={approve===false} onClick={()=>approve===false?ballot.submit(false):setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button></div><p className="card-tap-hint" role="status">{approve===null?'카드를 두 번 탭하면 바로 투표합니다':`선택한 ${approve?'찬성':'반대'} 카드를 한 번 더 탭하면 제출됩니다`}</p></>}</div>}
+      <div className="vote-tokens"><button className={`token approve${approve===true?' active':''}`} aria-pressed={approve===true} onClick={()=>approve===true?ballot.submit(true):setApprove(true)}><ShieldIcon size={26}/><span>찬성</span></button><button className={`token reject${approve===false?' active':''}`} aria-pressed={approve===false} onClick={()=>approve===false?ballot.submit(false):setApprove(false)}><SwordsIcon size={26}/><span>반대</span></button></div><p className="card-tap-hint" role="status">{approve===null?'카드를 두 번 탭하면 바로 투표합니다':`선택한 ${approve?'찬성':'반대'} 카드를 한 번 더 탭하면 제출됩니다`}</p></div>}
   </section>;
 }
 
@@ -615,7 +611,7 @@ type ChatSize='mini'|'half';
 // 모바일 채팅은 '독(mini)'과 '시트(half)' 두 단계뿐이다. (예전 mini→half→full 3단계는 체감상 너무 자주 바뀌었다)
 //  독   : 게임 위에 항상 떠 있다. 대화 말풍선(최근 3개)은 게임 위에 겹쳐 보이되 터치는 통과, 입력창·행동 버튼만 눌린다.
 //  시트 : 지난 대화를 읽을 때 연다. 화면 절반 이하를 사용해 위쪽 게임을 계속 볼 수 있다.
-const CHAT_COMPOSE_H=60;                 // 입력창 줄 높이(px)
+const CHAT_COMPOSE_H=50;                 // 입력창 줄 높이(px)
 const CHAT_ACT_H=56;                     // 행동 줄(준비·투표·계속) 높이
 const CHAT_FEED_ROW_H=34;                // 말풍선 한 줄 높이. 줄 수는 화면 높이에 맞춰 1~3개(키보드·가로모드에서는 줄임)
 const CHAT_FEED_TTL=45_000;              // 새 말풍선이 독에 떠 있는 시간. 조용해지면 사라져 게임 화면이 깨끗해진다(지난 대화는 ⌃ 시트에 그대로)

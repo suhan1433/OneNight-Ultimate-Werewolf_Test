@@ -1,0 +1,82 @@
+/* Separate the outer seats, membership rim, coin ring and central verdict. */
+.expedition-links{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible;fill:none}
+.expedition-orbit{stroke:#cbb27c;stroke-width:.2;opacity:.22}
+.expedition-arc-shadow{stroke:#050d10;stroke-width:1.7}
+.expedition-arc{stroke:#e1c78d;stroke-width:.65;stroke-linecap:round}
+.expedition-spoke{stroke:#d5b97a;stroke-width:.35}
+.expedition-pin{fill:#f1dba5;stroke:#735b30;stroke-width:.3}
+.vt .vt-tilt--top{z-index:2}
+.vt .vt-seat{z-index:4}
+.vt .vt-table .table-center:has(.vt-table-result){inset:32%;z-index:5;display:grid;place-items:center}
+.vt-table-result{width:100%;text-align:center}
+.vt-table-result .vt-summary{display:flex;flex-direction:column;gap:6px;margin:0 auto;padding:0;border:0;border-radius:0;background:none;box-shadow:none;font-size:12px}
+.vt-table-result .vt-summary i{display:none}
+.vt-table-result .vt-summary b{font-size:27px}
+.vt-table-result .vt-verdict{font-size:16px;line-height:1.4;margin:9px -15px 0;white-space:nowrap}
+.vt .vt-mark{position:relative;left:auto;top:auto;translate:none;margin-top:2px;animation-name:councilMarkIn;box-shadow:none;font-size:9px;padding:2px 5px}
+@keyframes councilMarkIn{from{opacity:0;scale:.8}to{opacity:1;scale:1}}
+.vt .vt-seat .plate{display:flex;flex-direction:column;align-items:center}
+.vt .vt-wrap{margin-bottom:24px}
+.vt .vt-note{font-size:10px;line-height:1.5;max-width:320px;margin:8px auto}
+.cs-quest.is-resolved>.cs-progress{display:none}
+.cs-quest.is-resolved .cs-quest-verdict{padding:0;border:0;background:none;box-shadow:none;margin:8px auto}
+.quest-table-verdict .quest-result-counts{margin:5px 0 0;font-size:12px;color:var(--parchment);line-height:1.5}
+.quest-table-verdict .quest-result-counts b{font-size:16px}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .app:has(.board){--council-size:min(420px,calc(100vw - 40px),max(220px,calc(100svh - 435px)))}
+  /* Reclaim the decision area once a ballot/card has been sealed or for spectators. */
+  .app:has(.vt:not(.is-reveal)):not(:has(.vote-tokens)),
+  .app:has(.cs-quest:not(.is-reveal)):not(:has(.quest-cards)),
+  .app:has(.cs-team):not(:has(.cs-propose)){
+    --council-size:min(420px,calc(100vw - 40px),max(240px,calc(100svh - 290px)))
+  }
+  .app[data-phase="vote_result"]{--council-size:min(420px,calc(100vw - 40px),max(240px,calc(100svh - 355px)))}
+  .app[data-phase="quest_result"]{--council-size:min(420px,calc(100vw - 40px),max(240px,calc(100svh - 300px)))}
+  .vt .vt-wrap{margin:32px auto 18px}
+  .vt.is-reveal .vt-wrap{margin-top:34px;margin-bottom:24px}
+  .vt .vt-seat,.vt .vt-seat .plate{width:58px}
+  .vt .vt-table{--seat-size:48px}
+  .vt .vt-seat .plate{gap:4px;padding:4px 0}
+  .vt .seat-name{max-width:58px;box-sizing:border-box;font-size:9px;line-height:1.3;padding:2px 4px}
+  .vt .vt-mark{line-height:1.2;gap:2px}
+  .vt .vt-mark svg{width:9px;height:9px}
+  .vt .vt-pool{--cs:clamp(22px,calc(var(--tw,330px)*.085),32px)}
+  .vt .vt-coin svg{width:14px;height:14px}
+  .vt-table-result .vt-summary{font-size:11px;gap:5px}
+  .vt-table-result .vt-summary b{font-size:24px}
+  .vt-table-result .vt-verdict{font-size:14px;margin-top:7px}
+  .vt .vt-result-bar{position:absolute;top:0;left:0;right:0;z-index:6;margin:0;padding:3px 8px;background:none;border:0}
+  .vt.is-reveal>.expedition-roster,.cs-quest.is-reveal>.expedition-roster{display:none}
+  .vt .vt-continue{margin-top:6px}
+  .vt .vt-continue .primary,.cs-quest-verdict .primary{min-height:40px;min-width:160px}
+  .cs-team .cs-seat button{gap:5px}
+  .cs-team .cs-seat.selected::after{top:23px;right:6px}
+  .quest-table-verdict{top:15%;gap:5px}
+  .quest-table-verdict .quest-result-counts{font-size:11px;margin-top:3px}
+  .quest-table-verdict .quest-result-counts b{font-size:15px}
+  .cs-quest.is-reveal .cs-qcard{top:63%}
+  .cs-quest .cs-quest-verdict{padding:0}
+  .cs-quest .quest-stage:has(.card-back){padding:5px 10px}
+  .cs-quest .quest-stage .card-back{width:auto;height:auto;min-height:28px;display:flex;align-items:center;justify-content:center;gap:6px;margin:2px auto;background:none;border:0;box-shadow:none}
+  aside.chat-panel[data-size="mini"] .ac-compose{min-height:50px;padding:5px 10px;gap:7px;align-items:center}
+  aside.chat-panel[data-size="mini"] .ac-compose textarea{box-sizing:border-box;min-height:38px;padding:7px 12px;line-height:22px;max-height:80px}
+  aside.chat-panel[data-size="mini"] .ac-expand,aside.chat-panel[data-size="mini"] .ac-send{width:38px;height:38px;min-height:38px;flex:0 0 38px}
+}
+@media(prefers-reduced-motion:reduce){.vt .vt-mark{animation-duration:0s;animation-delay:0s}}
+.vt.is-reveal{display:flow-root}
+.vt.is-reveal .table-center:has(.vt-table-result){animation:none;opacity:1}
+.vt .selection-core:has(.vote-waiting){width:100%;display:flex;flex-direction:column;align-items:center;gap:6px}
+.vt .selection-core .vote-waiting{padding:0;margin:0;background:none;border:0;box-shadow:none;min-width:0}
+.vt .vote-waiting .waiting{font-size:10px;line-height:1.5;margin:0;text-wrap:balance;color:var(--muted)}
+.vt .vote-waiting .waiting .dots{display:none}
+/* Keep cinematic light inside the table instead of widening the page. */
+.vt .vt-tilt--top{overflow:clip;border-radius:50%}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .board .vote-stage>h2{display:none}
+  .vt .vt-seat{width:clamp(46px,calc(var(--council-size)*.19),58px)}
+  .vt .vt-seat .plate{width:100%}
+  .vt .seat-name{max-width:100%}
+  .cs-team .cs-seat{width:clamp(46px,calc(var(--council-size)*.19),58px)}
+  .cs-team .cs-name{max-width:100%;box-sizing:border-box}
+}
+.quest-table-verdict .quest-threshold{display:block;margin-top:3px;font-size:9px;letter-spacing:0;color:var(--muted)}

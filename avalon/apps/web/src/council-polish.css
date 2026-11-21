@@ -1,0 +1,98 @@
+/* Quest counters are the board's permanent record; the seal receives the reveal. */
+.round-meta{display:flex;align-items:center;justify-content:center;gap:5px}
+.round-party-size{opacity:.75}
+.round-outcome{font-weight:600}
+.round-history-item{position:relative;min-width:0}
+.round-history-item>button,.round-track-slot{isolation:isolate}
+.round-history-item.result-arrived{z-index:2}
+.round-history-item.result-arrived>.fail,.round-history-item.result-arrived>.success{animation:questRecordImpact .65s cubic-bezier(.16,1,.3,1) both,questRecordGlow 1.1s ease-out .55s 2}
+.round-history-item.result-fail{--record-light:211,102,111}
+.round-history-item.result-success{--record-light:144,199,204}
+.round-history-item.result-arrived .round-seal{animation:questSealStamp .65s cubic-bezier(.2,.8,.3,1.2) both}
+.round-history-item.result-arrived::after{content:'';position:absolute;inset:-3px;pointer-events:none;border:1px solid rgba(var(--record-light),.8);border-radius:10px;animation:questRecordRipple 1s ease-out .3s both}
+.round-history-item.result-fail>.fail::after{content:'';position:absolute;inset:3px;z-index:-1;pointer-events:none;background:linear-gradient(128deg,transparent 46%,#f4afb21a 47%,#f4afb265 48%,transparent 49%);animation:questScarIn .6s ease-out .2s both}
+@keyframes questRecordImpact{0%{transform:translateY(-4px);filter:brightness(1.8)}35%{transform:translateY(2px)}65%{transform:translateY(-1px)}100%{transform:none;filter:none}}
+@keyframes questSealStamp{0%{opacity:0;transform:scale(1.8) rotate(-18deg)}65%{opacity:1;transform:scale(.9) rotate(3deg)}100%{opacity:1;transform:none}}
+@keyframes questRecordGlow{0%,100%{box-shadow:inset 0 1px #fff1,0 0 0 0 rgba(var(--record-light),0)}45%{box-shadow:inset 0 1px #fff2,0 0 20px rgba(var(--record-light),.35)}}
+@keyframes questRecordRipple{0%{opacity:.9;transform:scale(.95)}100%{opacity:0;transform:scale(1.17)}}
+@keyframes questScarIn{from{opacity:0}to{opacity:1}}
+/* Engraved brass frames and dyed leather, shared by the game's actual controls. */
+.app .primary,.app .primary:hover:not(:disabled),.chat-panel .ac-act-go{
+  position:relative;isolation:isolate;border:1px solid #b49a63;border-radius:7px;
+  background:linear-gradient(180deg,#384039,#202a27 55%,#18211e);color:#f1dfb4;
+  box-shadow:inset 0 0 0 3px #111a17,inset 0 0 0 4px #b59a6355,inset 0 5px 12px #ffffff0a,0 3px 0 #080e0b,0 6px 14px #0005;
+  font-family:var(--serif);font-weight:600;letter-spacing:.045em;text-shadow:0 1px 2px #000;
+  transition:background .18s,border-color .18s,box-shadow .18s,translate .18s
+}
+.app .primary:hover:not(:disabled){border-color:#ead2a0;background:linear-gradient(180deg,#465047,#29362f 55%,#202b24)}
+.app .primary:active:not(:disabled),.chat-panel .ac-act-go:active:not(:disabled){translate:0 2px;box-shadow:inset 0 0 0 3px #111a17,inset 0 0 0 4px #b59a6355,0 1px 0 #080e0b}
+.app .primary:disabled{opacity:.45;filter:saturate(.45);box-shadow:inset 0 0 0 3px #111a17,inset 0 0 0 4px #b59a6333}
+.app .primary:focus-visible,.app .token:focus-visible,.app .qcard:focus-visible{outline:2px solid #f1dfb4;outline-offset:4px}
+.app .utility-actions button,.app .leave-room{border-color:#9f865655;background:linear-gradient(155deg,#29332e,#101b19);box-shadow:inset 0 0 0 2px #08110f,inset 0 0 0 3px #b49a6322,0 2px 5px #0005;color:#dfcba1}
+.app .dossier-button,.app .leave-room{border-radius:6px}
+.app .vote-tokens .token{
+  border:1px solid #b49a63;background:radial-gradient(circle at 38% 30%,#445959,#23383b 60%,#122326);
+  color:#e3ece3;box-shadow:inset 0 0 0 3px #142522,inset 0 0 0 4px #c8b48388,inset 0 0 0 6px #071512,0 3px 0 #080f0c,0 7px 15px #0007;
+  text-shadow:0 1px 2px #000
+}
+.app .vote-tokens .token.reject{background:radial-gradient(circle at 38% 30%,#69484b,#40282e 60%,#241b22);color:#f4dedc;box-shadow:inset 0 0 0 3px #301d24,inset 0 0 0 4px #c8b48388,inset 0 0 0 6px #1b1117,0 3px 0 #10090c,0 7px 15px #0007}
+.app .vote-tokens .token.active{border-color:#f4d898;box-shadow:inset 0 0 0 3px #142522,inset 0 0 0 4px #ecd6a7,0 0 0 2px #b49a6366,0 6px 16px #0008}
+.app .quest-cards .qcard{position:relative;border:1px solid #b8a074;border-radius:7px;box-shadow:inset 0 0 0 4px #0b171966,inset 0 0 0 5px #d1bc8b55,0 3px 0 #080e10,0 8px 18px #0007;text-shadow:0 1px 2px #000}
+.app .quest-cards .qcard.success{background:radial-gradient(ellipse at 50% 0,#3b5658,transparent 75%),linear-gradient(135deg,#243e42,#11292e);color:#d7e5df}
+.app .quest-cards .qcard.fail{background:radial-gradient(ellipse at 50% 0,#68444b,transparent 75%),linear-gradient(135deg,#412932,#241a23);color:#ecd2d4}
+.app .quest-cards .qcard.active{border-color:#efd6a0;box-shadow:inset 0 0 0 4px #0b171966,inset 0 0 0 5px #dfc68b,0 0 0 2px #b49a6355,0 8px 18px #0007}
+.app .cs-skip,.app .vt-result-bar button{border:1px solid #9f865666;border-radius:5px;background:linear-gradient(#28332d,#16231e);box-shadow:inset 0 0 0 2px #0b141155;color:#e1cda5;letter-spacing:.02em}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .app .game-status{padding:7px 8px 8px;border:1px solid #a68c5544;background:linear-gradient(145deg,#1c2924ee,#101b18f5);box-shadow:inset 0 1px #d2bd8b12,0 5px 16px #0003}
+  .game-status .leader-row{font-size:11px;line-height:1.3;margin-bottom:6px;gap:5px}
+  .game-status .leader-row>.pf-avatar{width:16px!important;height:16px!important}
+  .game-status .leader-row>svg{width:14px;height:14px}
+  .game-status .council-distrust{gap:5px}
+  .game-status .round-history{gap:5px}
+  .game-status .round-history::before{display:none}
+  .game-status .round-history-item>button,.game-status .round-track-slot{
+    height:55px;min-height:55px;padding:5px 1px;gap:4px;border:1px solid #a68c552b;border-radius:7px;background:#0c1613;color:#b7b9a9;box-shadow:inset 0 1px #ffffff08;overflow:hidden
+  }
+  .game-status .round-history-item>button:disabled{opacity:1;cursor:default}
+  .game-status .round-history-item .current{border-color:#c2a36599;background:linear-gradient(#323528,#1e2920);color:#eee0ba}
+  .game-status .round-history-item .success{border-color:#8dbfc066;background:linear-gradient(#284344,#172e30);color:#b2d9d6}
+  .game-status .round-history-item .fail{border-color:#ca7d8266;background:linear-gradient(#4a2b30,#2b1b22);color:#f0afb4}
+  .game-status .round-seal{width:24px;height:24px;min-height:24px;font-size:13px;margin:0;background:#02090635;border:1px solid currentColor;box-shadow:inset 0 0 0 2px #07100c88;color:inherit}
+  .game-status .round-seal svg{width:17px;height:17px}
+  .game-status .round-history-item .round-meta{font-size:10px;line-height:1.2;gap:3px;letter-spacing:0}
+  .game-status .round-outcome{font-size:11px}
+  .game-status .round-label{display:none}
+  /* The header seal alone states the outcome; cards still reveal on the table. */
+  .cs-quest .quest-table-verdict{display:none}
+  .cs-quest.is-reveal .cs-qcard{top:53%}
+  .app:has(.board){--council-size:min(420px,calc(100vw - 40px),max(220px,calc(100svh - 469px)))}
+  .app:has(.vt:not(.is-reveal)):not(:has(.vote-tokens)),.app:has(.cs-quest:not(.is-reveal)):not(:has(.quest-cards)),.app:has(.cs-team):not(:has(.cs-propose)){--council-size:min(420px,calc(100vw - 40px),max(240px,calc(100svh - 324px)))}
+  .app[data-phase="vote_result"]{--council-size:min(420px,calc(100vw - 40px),max(240px,calc(100svh - 389px)))}
+  .app[data-phase="quest_result"]{--council-size:min(420px,calc(100vw - 40px),max(240px,calc(100svh - 334px)))}
+  .board .vote-stage:not(.vote-waiting){padding:5px 10px}
+  .app .vt-continue .primary,.app .cs-quest-verdict .primary{min-height:44px;padding:10px 26px;font-size:13px}
+}
+@media(prefers-reduced-motion:reduce){
+  .round-history-item.result-arrived,.round-history-item.result-arrived::after,.round-history-item.result-arrived>*,.round-history-item.result-arrived .round-seal,.round-history-item.result-fail>.fail::after{animation:none}
+  .round-history-item.result-arrived::after{display:none}
+  .app .primary,.app .quest-cards .qcard{transition:none}
+}
+.vt:not(.is-reveal) .table-center{justify-content:center}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .game-status .success .round-party-size,.game-status .fail .round-party-size{display:none}
+  .game-status .success .round-outcome,.game-status .fail .round-outcome{font-size:12px;font-weight:700;letter-spacing:.04em}
+}
+@media(max-width:360px) and (max-height:740px){
+  .board .expedition-roster ul{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+  .board .expedition-roster li{min-width:0;justify-content:center;padding:3px 1px}
+  .board .expedition-roster li .pf-avatar,.board .expedition-roster .expedition-me{display:none}
+  .board .expedition-roster .expedition-name{font-size:9px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .board .expedition-roster>header{margin-bottom:2px}
+  .board .vote-stage:not(.vote-waiting){padding:4px 8px}
+  .board .vote-tokens{margin:3px 0}
+  .board .vote-tokens .token{width:56px;height:56px}
+  .board .vote-tokens .token svg{width:18px;height:18px}
+  .board .vote-stage .card-tap-hint{font-size:9px;line-height:1.2;margin:3px 0 0}
+  .cs-quest .quest-cards{margin:3px 0}
+  .cs-quest .card-tap-hint{font-size:9px;line-height:1.2}
+}
