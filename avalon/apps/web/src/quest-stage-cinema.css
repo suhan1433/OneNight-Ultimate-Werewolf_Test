@@ -1,0 +1,77 @@
+/* Missions have a readable film frame of their own. The decision cards below
+   it remain ordinary live controls, never part of the cinematic overlay. */
+.cs-quest .cs-altar-camera,.cs-quest.is-reveal .cs-altar-camera{height:var(--quest-scene-height,360px);width:100%;margin:10px auto 12px;border:1px solid #b39b6144;border-radius:12px;overflow:hidden;background:#101b22;perspective:1000px;isolation:isolate}
+.cs-quest .cs-altar-camera>.council-table-art,.cs-quest .quest-witnesses,.cs-quest .cs-altar-glow,.cs-quest .cs-altar .lamp,.cs-quest .cs-fissure.altar,.cs-quest .quest-table-verdict,.cs-quest .quest-shot-label{display:none}
+.cs-quest .table-cinema,.cs-quest.is-reveal .table-cinema{display:block;inset:0;left:0;top:0;width:100%;height:100%;translate:none;aspect-ratio:auto;border-radius:inherit;opacity:1;animation:questHeroReveal 1.4s ease-out both}
+.cs-quest .table-cinema>svg:not(.tc-raven-overlay){position:absolute;inset:0;width:100%;height:100%}
+.tc-photograph{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s;transform-origin:center;animation:questPhotoPush 2.2s ease-out both;will-change:transform}
+.tc-photograph.is-loaded{opacity:1}
+.tc-location-strait .tc-photograph{animation-name:questPhotoCoast}
+.tc-location-pass .tc-photograph{animation-name:questPhotoRise}
+.tc-location-ruins .tc-photograph{animation-name:questPhotoTrack}
+.tc-location-sanctum .tc-photograph{animation-name:questPhotoSanctum}
+.tc-dawn .tc-photograph{filter:brightness(1.12) saturate(.95)}
+.tc-shadow .tc-photograph{filter:brightness(.64) saturate(.55)}
+.tc-weather-overlay,.tc-success-rays,.tc-failure-shadow{position:absolute;inset:0;pointer-events:none}
+.tc-weather-overlay{background:radial-gradient(ellipse at 12% 85%,#d0e0d030,transparent 60%),radial-gradient(ellipse at 85% 65%,#c2d8cb20,transparent 55%);animation:questMist 2.2s ease-out both}
+.tc-location-strait .tc-weather-overlay{background:repeating-linear-gradient(108deg,transparent 0 32px,#d9e9ed18 33px,transparent 34px 66px);animation-name:questRain}
+.tc-location-pass .tc-weather-overlay{background:radial-gradient(circle at 17% 32%,#f1f5eccc 0 1px,transparent 2px),radial-gradient(circle at 69% 51%,#eef6f3aa 0 1px,transparent 2px),radial-gradient(circle at 43% 71%,#fff9 0 1px,transparent 2px);background-size:80px 88px;animation-name:questSnow}
+.tc-location-ruins .tc-weather-overlay{background:radial-gradient(circle at 22% 55%,#f2c789aa 0 1px,transparent 2px),radial-gradient(circle at 74% 72%,#edbd7f88 0 1px,transparent 2px);background-size:90px 110px;animation-name:questAsh}
+.tc-location-sanctum .tc-weather-overlay{background:linear-gradient(108deg,transparent 30%,#f6e2b312 43%,transparent 50%);animation-name:questMist}
+.tc-success-rays{background:conic-gradient(from 142deg at 65% -10%,transparent 0deg,#fbe9ad55 8deg,transparent 15deg,#f6ebc125 21deg,transparent 29deg);animation:questSuccessLight 1.8s ease-out both;mix-blend-mode:screen}
+.tc-failure-shadow{background:linear-gradient(110deg,#210b2077,transparent 40%,#40192555);animation:questFailurePass 1.8s ease-out both}
+.tc-location-strait .tc-failure-shadow{background:linear-gradient(110deg,transparent 46%,#e7dae577 49%,transparent 51%);clip-path:polygon(65% 0,54% 34%,65% 31%,38% 92%,57% 44%,48% 46%);animation-name:questStormFlash}
+.tc-location-sanctum .tc-failure-shadow{background:radial-gradient(ellipse at 50% 0,#080516aa,transparent 70%)}
+.tc-raven-overlay{position:absolute;inset:12% 10% auto;width:80%;height:35%;fill:#070e16;animation:questRavens 1.8s ease-out both}
+.cs-quest .tc-film-light{background:linear-gradient(180deg,#030910c9,transparent 43%,transparent 58%,#030910b8);box-shadow:inset 0 0 30px #02070b44}
+.cs-quest .tc-frame{inset:8px;border-radius:7px;border-color:#e4d09c22}
+.cs-quest .quest-camera-vignette{opacity:.35;background:linear-gradient(180deg,#02060a44,transparent 25%,transparent 70%,#02060a55);z-index:4}
+.quest-scene-caption{position:absolute;left:18px;right:18px;top:18px;z-index:5;pointer-events:none;text-align:left;animation:questCaptionIn .55s ease-out both}
+.quest-scene-caption>span{font:500 8px/1.4 "Noto Sans KR",system-ui,sans-serif;letter-spacing:.14em;color:#e0ceb0}
+.quest-scene-caption h3{margin:5px 0 6px;font:700 25px/1.2 "Noto Sans KR",system-ui,sans-serif;letter-spacing:-.04em;color:#f1e9d8;text-shadow:0 2px 12px #0009}
+.quest-scene-caption p{margin:0;color:#eee4d4;font:500 11px/1.5 "Noto Sans KR",system-ui,sans-serif;text-shadow:0 1px 5px #000}
+.quest-scene-caption>small{display:block;margin-top:5px;font-size:10px;line-height:1.4;color:#ded1b9}
+.cs-quest.is-resolved.quest-success .quest-scene-caption h3{color:#e5edcb}
+.cs-quest.is-resolved.quest-failure .quest-scene-caption h3{color:#e7b9c4}
+.cs-quest .quest-sealed-count{top:auto;bottom:12px;left:14px;translate:none;padding:5px 8px;gap:7px;border:1px solid #d8c49144;border-radius:5px;background:#07101599;font-size:10px;color:#e9dcc3}
+.cs-quest .quest-sealed-count b{font-size:14px}
+.cs-quest:not(.is-reveal) .cs-quest-cards{inset:auto 14px 9px auto;width:58px;height:62px;--card-width:28px;--card-height:43px}
+.cs-quest:not(.is-reveal) .cs-qcard{top:50%;width:var(--card-width);height:var(--card-height)}
+.cs-quest:not(.is-reveal) .cs-card-back .cs-medal{width:16px;box-shadow:none}
+.cs-quest.is-reveal .cs-quest-cards{--card-width:min(70px,calc((100vw - 82px)/(var(--team-size)*1.2)));--card-height:calc(var(--card-width)*1.55);--spacing:calc(var(--card-width)*1.15)}
+.cs-quest.is-reveal .cs-qcard{top:calc(100% - 12px - var(--card-height)*.5)}
+.cs-quest.is-reveal .cs-card-front strong{font:700 13px "Noto Sans KR",system-ui,sans-serif;letter-spacing:0}
+@keyframes questHeroReveal{from{opacity:.25}to{opacity:1}}
+@keyframes questCaptionIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes questPhotoPush{from{transform:scale(1.02)}to{transform:scale(1.085)}}
+@keyframes questPhotoCoast{from{transform:scale(1.08) translateX(1%)}to{transform:scale(1.08) translateX(-1%)}}
+@keyframes questPhotoRise{from{transform:scale(1.06) translateY(1%)}to{transform:scale(1.1) translateY(-1%)}}
+@keyframes questPhotoTrack{from{transform:scale(1.08) translateX(-1%)}to{transform:scale(1.08) translateX(1%)}}
+@keyframes questPhotoSanctum{from{transform:scale(1.015)}to{transform:scale(1.1)}}
+@keyframes questMist{from{opacity:0;transform:translateX(-3%)}40%{opacity:.8}to{opacity:.3;transform:translateX(3%)}}
+@keyframes questRain{from{opacity:.1;transform:translate(1%,-4%)}40%{opacity:.6}to{opacity:.2;transform:translate(-1%,4%)}}
+@keyframes questSnow{from{opacity:.1;transform:translate(1%,-4%)}40%{opacity:.8}to{opacity:.3;transform:translate(-2%,4%)}}
+@keyframes questAsh{from{opacity:.1;transform:translate(-1%,4%)}40%{opacity:.6}to{opacity:.2;transform:translate(1%,-4%)}}
+@keyframes questSuccessLight{from{opacity:0}55%{opacity:1}to{opacity:.25}}
+@keyframes questFailurePass{from{opacity:0;transform:translateX(-8%)}65%{opacity:.8}to{opacity:.45;transform:none}}
+@keyframes questStormFlash{0%,25%,100%{opacity:0}40%{opacity:.7}70%{opacity:.1}}
+@keyframes questRavens{from{opacity:0;transform:translate(-9%,3%)}25%{opacity:.9}to{opacity:0;transform:translate(9%,-4%)}}
+@media(max-width:640px),(pointer:coarse) and (max-width:900px){
+  .cs-quest .cs-altar-camera,.cs-quest.is-reveal .cs-altar-camera{height:var(--quest-scene-height,250px);margin:8px auto 8px}
+  .quest-scene-caption{left:14px;right:14px;top:14px}
+  .quest-scene-caption h3{font-size:23px}
+  .quest-scene-caption>span{font-size:7px;letter-spacing:.08em}
+  .quest-scene-caption p{font-size:10px}
+  .cs-quest .quest-sealed-count{left:12px;bottom:10px;font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){
+  .cs-quest .table-cinema{display:block;opacity:1;animation:none!important}
+  .cs-quest .table-cinema *,.quest-scene-caption{animation:none!important;transition:none!important}
+  .tc-weather-overlay,.tc-success-rays,.tc-failure-shadow,.tc-raven-overlay{display:none}
+  .tc-photograph{transform:none;will-change:auto}
+}
+/* These selectors intentionally outrank the former circular-table scene rules. */
+.board .cs-quest .cs-altar-camera>.table-cinema{inset:0;left:0;top:0;width:100%;height:100%;translate:none;aspect-ratio:auto;border-radius:inherit;animation-duration:.6s}
+.board .cs-quest .cs-altar-camera>.council-table-art,.board .cs-quest .quest-witnesses,.board .cs-quest .cs-altar-glow,.board .cs-quest .cs-altar .lamp,.board .cs-quest .cs-fissure.altar{display:none}
+.board .cs-quest:not(.is-reveal) .cs-altar-camera{margin:8px auto}
+@media(prefers-reduced-motion:reduce){.board .cs-quest .cs-altar-camera>.table-cinema{animation:none!important;opacity:1}}

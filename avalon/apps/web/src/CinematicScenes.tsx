@@ -8,6 +8,8 @@ import {RoundTable,ExpeditionBadge,CouncilAtmosphere} from './RoundTable';
 import {ExpeditionRoster} from './ExpeditionRoster';
 import {GameChronicle} from './GameChronicle';
 import {TableCinema} from './TableCinema';
+import {AssassinationImpact} from './AssassinationImpact';
+import {questDestination} from './quest-destinations';
 import {roleArtFor} from './role-art';
 import {useEndingAudio} from './use-recorded-audio';
 import {recordedAudio} from './recorded-audio';
@@ -69,7 +71,6 @@ const END_CRACK=['M58 232 L104 214 L132 236 L170 196 L196 214 L226 184 L254 210 
 const DEBRIS=Array.from({length:14},(_,i)=>({x:22+((i*47)%56),dx:((i*29)%70)-35,h:46+((i*37)%70),s:3+(i%3),d:(i%7)*.09}));
 /* 기존 .cs-avatar(링·호버·선택 연출)는 그대로 두고, 글자 대신 프로필 캐릭터를 넣는다 */
 function Avatar({playerId,member=false}:{playerId:string;member?:boolean}){const ch=useCharacterResolver()(playerId);return <span className="cs-avatar has-char" style={vars({'--pf-bg':ch.bg})} aria-hidden="true"><HouseCrest id={ch.id}/>{member&&<ExpeditionBadge/>}</span>;}
-function SeatEmoji({playerId}:{playerId:string}){const c=useCharacterResolver()(playerId);return <HouseCrest id={c.id}/>;}
 
 /* =========================================================
    4. 팀 구성 — 일부러 절제한다. 5번(투표 공개)과 대비되는 구간
@@ -91,7 +92,7 @@ export function TeamScene({game}:{game:ClientGameState}){
     <SceneCaption eyebrow={`ROUND ${game.round+1} · THE EXPEDITION`} title="원정대를 지명하세요" body={leader?`${game.questSize}명의 기사를 선택하세요. 당신이 이번 원정의 리더입니다.`:`${game.players.find(player=>player.id===game.leaderId)?.nickname??'리더'}이(가) ${game.questSize}명의 원정대를 구성하고 있습니다.`}/>
     <div className="cs-camera"><div className="cs-table">
       <RoundTable/>
-      {ready&&<TableCinema scene="oath"/>}
+      {ready&&<TableCinema scene="oath" round={game.round}/>}
       <div className="cs-leader-light" key={game.leaderId} style={vars({'--tlx':`${lightAt.x}%`,'--tly':`${lightAt.y}%`})}/>
       <CouncilAtmosphere pulseKey={team.join(',')}/>
       <div className="cs-core">
@@ -134,6 +135,7 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
   const clock=useClock(reveal,end);const revealed=reveal?Math.min(total,Math.max(0,Math.floor((clock.time-strike)/gap)+1)):0;
   const shownFails=order.slice(0,revealed).filter(Boolean).length;const resolved=reveal&&clock.time>=resultAt;
   const count=reveal?total:game.questCardsCompleted;
+  const destination=questDestination(game.round);
   useEffect(()=>{onResolved?.(resolved);},[resolved,onResolved]);
   const still=reveal&&clock.time>=2.2&&clock.time<2.8&&!clock.final;
   useEffect(()=>{if(still)document.documentElement.setAttribute('data-cs-still','1');return()=>document.documentElement.removeAttribute('data-cs-still');},[still]);
@@ -144,12 +146,12 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
   return <section ref={root} className={`cs cs-quest${reveal?' is-reveal':''}${resolved?' is-resolved':''}${fails?' has-fail':' flawless'}${reveal?(game.questResult?.success?' quest-success':' quest-failure'):''}${clock.final?' cs-final':''}${still?' is-still':''}${shownFails?' has-revealed-fail':''}`} style={vars({'--result-at':`${resultAt}s`,'--after-at':`${end-.5}s`,'--count':total})}>
     <div className="cs-spot" aria-hidden="true"/>
     <SceneCaption eyebrow={`QUEST ${game.round+1} · THE ROUND TABLE`} title={reveal?'원정의 진실':'원탁에 카드를 봉인합니다'} body={reveal?'카드를 섞어 한 장씩 공개합니다. 누가 제출했는지는 공개되지 않습니다.':`봉인된 카드 ${count} / ${total}장 · 원정대원만 카드를 제출할 수 있습니다.`}/>
-    <div className="cs-altar-camera" aria-label={reveal?'원탁 위 원정 결과 공개':'원정 카드를 모으는 원탁'}>
+    <div className="cs-altar-camera" data-scene-layout="landscape" aria-label={`${destination.name} · ${reveal?'원정 결과 공개':'원정 장면'}`}>
       {!reveal&&<CouncilAtmosphere pulseKey={count}/>}
       <div className="quest-stage-light" aria-hidden="true"/>
       <div className="quest-dust" aria-hidden="true">{Array.from({length:12},(_,i)=><i key={i} style={vars({'--i':i,'--x':`${9+(i*31)%83}%`,'--y':`${14+(i*17)%69}%`})}/>)}</div>
       <RoundTable className="council-table-art"/>
-      <TableCinema scene={reveal?(resolved?(game.questResult?.success?'dawn':'shadow'):'reveal'):'departure'} cue={game.round}/>
+      <TableCinema scene={reveal?(resolved?(game.questResult?.success?'dawn':'shadow'):'reveal'):'departure'} cue={game.round} round={game.round}/>
       <div className="quest-witnesses" aria-label="원탁의 기사들">{game.players.map((player,index)=>{const p=position(index,game.players.length);const member=game.proposedTeam.includes(player.id);return <div className={`quest-witness${member?' on-quest':''}${player.id===game.leaderId?' leader':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
         {player.id===game.leaderId&&<span className="witness-crown"><Sigil kind="crown" size={17}/></span>}
         <span className="seat-portrait"><PlayerAvatar playerId={player.id} size={36}/>{member&&<ExpeditionBadge/>}</span><span className="witness-name">{player.nickname}</span>
@@ -170,7 +172,13 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
       {reveal&&fails>0&&resolved&&<Fissure className="altar" paths={ALTAR_CRACK}/>}
     </div></div>
       <div className="quest-camera-vignette" aria-hidden="true"/>
-      {reveal&&<div className="quest-shot-label" aria-hidden="true"><span>QUEST {String(game.round+1).padStart(2,'0')}</span><span>{resolved?'THE VERDICT':still?'THE SILENCE':'THE REVEAL'}</span></div>}
+      <div className="quest-scene-caption" role={resolved?'status':undefined}>
+        <span>원정 {String(game.round+1).padStart(2,'0')} · {destination.chapter}</span>
+        <h3>{destination.name}</h3>
+        <p>{resolved?(game.questResult?.success?'원정대가 임무를 완수했습니다':'원정대가 후퇴합니다'):reveal?'봉인된 카드에서 원정의 진실이 드러납니다':'원정대가 목적지에 진입합니다'}</p>
+        {resolved&&<small>성공 {total-fails}장 · 실패 {fails}장{game.round===3&&game.maxPlayers>=7&&<> · 실패 2장부터 원정 실패</>}</small>}
+      </div>
+      {reveal&&<div className="quest-shot-label" aria-hidden="true"><span className="quest-location">{String(game.round+1).padStart(2,'0')} · {questDestination(game.round).name}</span><span>{resolved?'THE VERDICT':still?'THE SILENCE':'THE REVEAL'}</span></div>}
       {resolved&&<div className="quest-table-verdict" role="status"><small>{game.questResult?.success?'LOYALTY PREVAILS':'A SHADOW AT THE TABLE'}</small><strong>{game.questResult?.success?'원정 성공':'원정 실패'}</strong><p className="quest-result-counts"><span>성공 카드 <b>{total-fails}</b>장</span> · <span>실패 카드 <b>{fails}</b>장</span>{game.round===3&&game.maxPlayers>=7&&<small className="quest-threshold">실패 2장부터 원정 실패</small>}</p></div>}
       {!reveal&&<div className="quest-sealed-count" role="status"><span>봉인된 원정 카드</span><b>{count}<small> / {total}</small></b></div>}
     </div>
@@ -187,19 +195,19 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
 
 /* =========================================================
    7. 암살 단계 — 게임에서 가장 어두운 장면
-   0.0 청백 승리의 빛이 올라오다 → 0.6 뚝 끊김(암전) · 붉은 베임선 → 0.8 단검 · 암살자 좌석에만 붉은 스포트라이트
-   2.0 카메라가 암살자 시점으로 접근 → 선택 중: 붉은 조준 링 + 암살자→대상 선 + 붉은 빛이 대상 쪽으로 (모두에게 실시간 공유)
-   확정: 정적 1초 · 대상 한 점만 남기고 완전 암전
+   짧은 원탁 접근 · 즉시 선택 가능 · 조준 링과 지목된 기사의 이름을 모두에게 공유.
+   확정은 서버의 1초 정적 후 결과로 전환하며, 요청 중에는 실제 선택 대상을 유지한다.
    ========================================================= */
 export function AssassinScene({game}:{game:ClientGameState}){
   const[aim,setAim]=useState<string|null>(()=>getAssassinAim(game.roomCode)?.targetId??null);const[chosen,setChosen]=useState<string|null>(null);const[locked,setLocked]=useState(()=>!!getAssassinAim(game.roomCode)?.locked);
   const[actor,setActor]=useState<string|null>(()=>getAssassinAim(game.roomCode)?.actorId??(game.hasAssassinationAbility?game.playerId:null));
-  const reduced=useMotion();const authority=game.hasAssassinationAbility;const ready=useClock(true,2).time>=2;
+  const reduced=useMotion();const authority=game.hasAssassinationAbility;
+  const commitPending=useRef(false);
   const aimTimer=useRef<number>();const root=useRef<HTMLElement>(null);
   useEffect(()=>{if(locked)document.documentElement.setAttribute('data-cs-still','1');return()=>document.documentElement.removeAttribute('data-cs-still');},[locked]);
-  useEffect(()=>{const receive=(message:AssassinAimState)=>{if(message.roomCode!==game.roomCode)return;setAim(message.targetId);setLocked(!!message.locked);if(message.actorId)setActor(message.actorId);if(message.locked)window.clearTimeout(aimTimer.current);};socket.on('ASSASSIN_AIM',receive);const cached=getAssassinAim(game.roomCode);if(cached)receive(cached);return()=>{socket.off('ASSASSIN_AIM',receive);window.clearTimeout(aimTimer.current);};},[game.roomCode]);
+  useEffect(()=>{const receive=(message:AssassinAimState)=>{if(message.roomCode!==game.roomCode)return;if(commitPending.current&&!message.locked)return;setAim(message.targetId);setLocked(!!message.locked);if(message.actorId)setActor(message.actorId);if(message.locked)window.clearTimeout(aimTimer.current);};socket.on('ASSASSIN_AIM',receive);const cached=getAssassinAim(game.roomCode);if(cached)receive(cached);return()=>{socket.off('ASSASSIN_AIM',receive);window.clearTimeout(aimTimer.current);};},[game.roomCode]);
   const sendAim=(targetId:string|null)=>{if(!authority||locked)return;setAim(targetId);window.clearTimeout(aimTimer.current);aimTimer.current=window.setTimeout(()=>socket.emit('ASSASSIN_AIM',{roomCode:game.roomCode,targetId}),100);};
-  const confirm=async()=>{if(!chosen||locked)return;window.clearTimeout(aimTimer.current);setLocked(true);try{await emit('ASSASSIN_COMMIT',{roomCode:game.roomCode,targetId:chosen});}catch(error){setLocked(false);useGame.getState().setError(error instanceof Error?error.message:'암살 대상을 확정하지 못했습니다.');}};
+  const confirm=async()=>{if(!chosen||locked||commitPending.current)return;commitPending.current=true;window.clearTimeout(aimTimer.current);setAim(chosen);setLocked(true);try{await emit('ASSASSIN_COMMIT',{roomCode:game.roomCode,targetId:chosen});commitPending.current=false;}catch(error){commitPending.current=false;setLocked(false);useGame.getState().setError(error instanceof Error?error.message:'암살 대상을 확정하지 못했습니다.');}};
   const n=game.players.length;
   const posOf=(id:string|null,r=SEAT_R)=>{const i=id?game.players.findIndex(player=>player.id===id):-1;return i<0?null:position(i,n,r);};
   const aimPos=posOf(aim),actorPos=posOf(actor),aimLight=posOf(aim,32),actorLight=posOf(actor,34);
@@ -224,25 +232,24 @@ export function AssassinScene({game}:{game:ClientGameState}){
       </svg>
       <div className="cs-core"><i className="cs-heart"/><span className="cs-core-dagger"><Sigil kind="dagger" size={50}/></span><small>{locked?'운명이 결정됩니다':'마지막 암살'}</small></div>
       {game.players.map((player,index)=>{const p=position(index,n);const targeted=aim===player.id;return <div data-seat-index={index} className={`cs-seat${targeted?' targeted':''}${chosen===player.id?' is-chosen':''}${player.id===actor?' assassin':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
-        <button type="button" disabled={!authority||!ready||locked||player.id===game.playerId} aria-pressed={chosen===player.id} onPointerEnter={()=>sendAim(player.id)} onPointerLeave={()=>sendAim(chosen)} onFocus={()=>sendAim(player.id)} onBlur={()=>sendAim(chosen)} onClick={()=>{setChosen(player.id);sendAim(player.id);}}><Avatar playerId={player.id}/><span className="cs-name">{player.nickname}</span><i className="cs-target-ring"/></button>
+        <button type="button" disabled={!authority||locked||player.id===game.playerId} aria-pressed={chosen===player.id} onPointerEnter={event=>{if(event.pointerType==='mouse')sendAim(player.id);}} onPointerLeave={event=>{if(event.pointerType==='mouse')sendAim(chosen);}} onFocus={()=>sendAim(player.id)} onBlur={()=>sendAim(chosen)} onClick={()=>{setChosen(player.id);sendAim(player.id);}}><Avatar playerId={player.id}/><span className="cs-name">{player.nickname}</span><i className="cs-target-ring"/></button>
       </div>;})}
     </div></div>
-    <p className="cs-progress" role="status">{aim?`조준 중: ${game.players.find(player=>player.id===aim)?.nickname??'기사'}`:'아직 조준 대상이 없습니다.'}</p>
-    {authority&&<div className="cs-assassin-actions"><p>{chosen?`${game.players.find(player=>player.id===chosen)?.nickname}님을 지목합니다. 확정 후에는 되돌릴 수 없습니다.`:'좌석을 선택한 뒤 암살을 확정하세요.'}</p><button className="cs-commit" disabled={!chosen||locked||!ready} onClick={()=>void confirm()}><Sigil kind="dagger" size={22}/>{locked?'운명이 결정되고 있습니다':'암살 확정'}</button></div>}
+    <div className={`assassin-target-summary${aim?' has-target':''}`} role="status">{aim&&<PlayerAvatar playerId={aim} size={34}/>}<div><small>{locked?'지목 확정':aim?'지목된 기사':'마지막 선택'}</small><strong>{aim?game.players.find(player=>player.id===aim)?.nickname??'기사':authority?'멀린으로 의심되는 기사를 선택하세요':'암살 능력 보유자의 선택을 기다립니다'}</strong></div></div>
+    {authority&&<div className="cs-assassin-actions"><p>{chosen?`${game.players.find(player=>player.id===chosen)?.nickname}님을 지목합니다. 확정 후에는 되돌릴 수 없습니다.`:'좌석을 선택한 뒤 암살을 확정하세요.'}</p><button className="cs-commit" disabled={!chosen||locked} onClick={()=>void confirm()}><Sigil kind="dagger" size={22}/>{locked?'운명이 결정되고 있습니다':'암살 확정'}</button></div>}
   </section>;
 }
 
 /* =========================================================
    8. 엔딩 — 선은 '빛이 채워지고', 악은 '빛이 꺼진다'
-   (암살 단계를 거쳤다면 앞에 3.2초의 타격 장면이 붙고, 홍채가 열리며 엔딩으로 이어진다)
+   (암살 단계를 거쳤다면 앞에 3.2초의 대상 클로즈업과 타격·정체 공개가 붙는다)
    선: 0.0 촛불이 한 번에 켜짐 · 카메라 상승 / 1.5 황금 먼지 / 3.0 타이틀 각인 · 정체 카드 0.25s 간격 / 6.0 기록 패널
    악: 0.0 촛불이 하나씩 꺼짐(선 진영부터) · 마지막 하나는 붉게 / 1.5 카메라 하강 · 균열 / 3.0 붉은 놋쇠 타이틀 · 악인 카드 불꽃 / 6.0 기록 패널
    ========================================================= */
 export function EndingScene({game}:{game:ClientGameState}){
   const good=game.winner==='good';const impact=!!game.assassinTarget;const offset=impact?3.2:0;const end=6+offset;
-  const clock=useClock(true,end);const merlin=game.revealedRoles?.find(item=>item.role==='merlin');
+  const clock=useClock(true,end);
   useEndingAudio(clock.time,offset+3,clock.final);
-  const target=game.players.find(player=>player.id===game.assassinTarget);
   const n=game.players.length;
   const teamOf=(id:string)=>{const info=game.revealedRoles?.find(item=>item.id===id);return info?ROLE_DEFINITIONS[info.role]?.team:undefined;};
   const snuff=useMemo(()=>{
@@ -252,25 +259,8 @@ export function EndingScene({game}:{game:ClientGameState}){
     return{rank,step:Math.min(.38,2.2/Math.max(1,game.players.length))};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[game.players,game.revealedRoles]);
-  const shards=useMemo(()=>Array.from({length:24},(_,i)=>{const a=i/24*Math.PI*2+((i*37)%11)*.05,d=70+((i*53)%110);return{dx:Math.cos(a)*d,dy:Math.sin(a)*d*.8,s:2+(i%3),lag:(i%5)*.012};}),[]);
-  const tIndex=target?game.players.indexOf(target):-1;const tpos=tIndex<0?{x:50,y:50}:position(tIndex,n);
-  const mIndex=merlin?game.players.findIndex(player=>player.id===merlin.id):-1;
-  return <section className={`cs cs-ending ${good?'good':'evil'}${clock.final?' cs-final':''}${impact?' after-assassination':''}`} style={vars({'--ending-offset':`${offset}s`,'--snuff-step':`${snuff.step}s`})}>
-    {impact&&clock.time<offset&&<div className={`cs-assassin-impact ${good?'miss':'hit'}`} role="status" style={vars({'--impact':`${offset}s`})}>
-      <div className="cs-impact-table" aria-hidden="true">
-        <RoundTable/>
-        {game.players.map((player,i)=>{const p=position(i,n,CANDLE_R);return <Flame key={`f-${player.id}`} x={p.x} y={p.y} cls={player.id===game.assassinTarget?'is-target':player.id===merlin?.id?'is-merlin':''}/>;})}
-        {game.players.map((player,i)=>{const p=position(i,n);return <div className={`cs-impact-seat${player.id===game.assassinTarget?' is-target':''}${player.id===merlin?.id?' is-merlin':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}><span className="has-char"><SeatEmoji playerId={player.id}/></span><small>{player.nickname}</small></div>;})}
-        <div className="cs-impact-fx" style={{left:`${tpos.x}%`,top:`${tpos.y}%`}}>
-          <i className="cs-dagger"/><i className="cs-hitring"/><i className="cs-hitring r2"/>
-          {shards.map((s,i)=><b className="cs-shard" style={vars({'--dx':`${s.dx}px`,'--dy':`${s.dy}px`,'--s':`${s.s}px`,'--lag':`${s.lag}s`})} key={i}/>)}
-        </div>
-        {good&&mIndex>=0&&(()=>{const mp=position(mIndex,n);return <div className="cs-merlin-return" style={{left:`${mp.x}%`,top:`${mp.y}%`}}><i className="cs-hitring m"/><i className="cs-merlin-rays"/></div>;})()}
-        <div className="cs-impact-sigil"><Sigil kind={good?'good':'dagger'} size={56}/></div>
-      </div>
-      <strong>{good?'단검이 빗나갔습니다':'멀린의 촛불이 꺼졌습니다'}</strong><span>{good?`멀린 ${merlin?game.players.find(player=>player.id===merlin.id)?.nickname??'':''} · 청백색 빛이 다시 켜집니다`:`${target?.nickname??'멀린'} · 붉은 파편이 원탁에 퍼집니다`}</span>
-      <i className="cs-impact-flash"/>
-    </div>}
+  return <section className={`cs cs-ending ${good?'good':'evil'}${clock.final?' cs-final':''}${impact?' after-assassination':''}${impact&&clock.time<offset?' is-impact':''}`} style={vars({'--ending-offset':`${offset}s`,'--snuff-step':`${snuff.step}s`})}>
+    {impact&&clock.time<offset&&<AssassinationImpact game={game}/>}
     <div className="cs-ending-world" aria-hidden="true">
       <div className="cs-ending-ray"/><div className="cs-ending-rays"/><div className="cs-ending-pillar"><i/></div>
       <div className="cs-ending-camera"><div className="cs-ending-table">

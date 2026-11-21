@@ -55,7 +55,13 @@ for(const width of [320,390,768,1440]){
     const positions:number[][]=[];
     for(const phase of ['team_build','team_vote','quest'] as const){
       await show(page,council(phase,10));
-      const seats=page.locator(phase==='team_build'?'.cs-team .cs-seat':phase==='team_vote'?'.vt-seat':'.quest-witness');
+      if(phase==='quest'){
+        await expect(page.locator('.quest-witnesses')).toBeHidden();
+        await expect(page.locator('.quest-scene-caption')).toBeVisible();
+        await expect(page.locator('.cs-altar-camera')).toHaveAttribute('data-scene-layout','landscape');
+        continue;
+      }
+      const seats=page.locator(phase==='team_build'?'.cs-team .cs-seat':'.vt-seat');
       await expect(seats).toHaveCount(10);
       const layout=await seats.evaluateAll(nodes=>nodes.map(n=>{
         const el=n as HTMLElement,b=el.getBoundingClientRect();
@@ -64,7 +70,7 @@ for(const width of [320,390,768,1440]){
       positions.push(layout.flatMap(p=>[p.left,p.top]));
       for(const seat of layout){expect(seat.x).toBeGreaterThanOrEqual(-1);expect(seat.right).toBeLessThanOrEqual(width+1);}
       if(width<=640){
-        const crown=page.locator(phase==='team_build'?'.cs-crown':phase==='team_vote'?'.leader-crown':'.witness-crown');
+        const crown=page.locator(phase==='team_build'?'.cs-crown':'.leader-crown');
         await expect(crown).toBeVisible();
         await expect.poll(async()=>{
           const ribbon=(await page.locator('.phase-ribbon').boundingBox())!,seatCrown=(await crown.boundingBox())!;
@@ -217,23 +223,24 @@ test('room creation gives immediate feedback and submits only once while waiting
   expect(await page.evaluate(()=>(window as any).__commands.filter((c:any)=>c.event==='ROOM_CREATE'))).toHaveLength(2);
 });
 
-test('quest keeps one physical table from sealed cards through the camera reveal',async({page})=>{
+test('quest keeps one landscape stage from departure through the card reveal',async({page})=>{
   const state=council('quest');state.questCardsCompleted=1;
   await show(page,state);
-  const table=page.locator('.cs-quest .council-table-art');
+  const table=page.locator('.cs-quest .cs-altar-camera');
   await expect(table).toHaveCount(1);
   await expect(page.locator('.cs-quest .cs-altar-face')).toHaveCount(0);
-  await page.evaluate(()=>{(window as any).__questTable=document.querySelector('.cs-quest .council-table-art');});
+  await page.evaluate(()=>{(window as any).__questTable=document.querySelector('.cs-quest .cs-altar-camera');});
   state.phase='quest_result';state.questResult={success:false,fails:1};state.results=['fail'];
   await show(page,state);
-  expect(await page.evaluate(()=>(window as any).__questTable===document.querySelector('.cs-quest .council-table-art'))).toBe(true);
+  expect(await page.evaluate(()=>(window as any).__questTable===document.querySelector('.cs-quest .cs-altar-camera'))).toBe(true);
   await expect(table).toBeVisible();
   await expect(page.locator('.quest-table-verdict')).toHaveCount(0);
   await expect(page.locator('.cs-quest')).not.toHaveClass(/has-revealed-fail/);
   await page.getByRole('button',{name:'결과 바로 보기',exact:true}).click();
   await expect(table).toBeVisible();
   await expect(page.locator('.quest-table-verdict')).toContainText('원정 실패');
-  await expect(page.locator('.cs-quest .council-table-art')).toHaveCount(1);
+  await expect(page.locator('.cs-quest .tc-shadow')).toHaveCount(1);
+  await expect(page.locator('.quest-scene-caption')).toContainText('원정대가 후퇴합니다');
 });
 
 
@@ -264,9 +271,10 @@ for(const viewport of [{width:320,height:640},{width:375,height:667},{width:390,
       }
     }
     const stage=(await page.locator('.cs-altar-camera').boundingBox())!;
-    expect(stage.height).toBeGreaterThanOrEqual(200);
+    expect(stage.height).toBeGreaterThanOrEqual(170);
+    expect(stage.width).toBeGreaterThanOrEqual(viewport.width-30);
     const stack=(await page.locator('.cs-qcard').first().boundingBox())!;
-    expect(stack.width).toBeGreaterThanOrEqual(35);
+    expect(stack.width).toBeGreaterThanOrEqual(26);
     expect(stack.y).toBeGreaterThan(stage.y);
     expect(stack.y+stack.height).toBeLessThan(stage.y+stage.height);
     const action=(await page.locator('.quest-stage').boundingBox())!;
@@ -309,9 +317,13 @@ for(const viewport of [{width:320,height:640},{width:375,height:667},{width:390,
         return names.flatMap(n=>marks.filter(m=>hit(n.getBoundingClientRect(),m.getBoundingClientRect())).map(m=>`${n.textContent}: ${m.className}`));
       });
       expect(collisions).toEqual([]);
-      const names=page.locator(phase==='team_build'?'.cs-name':phase==='team_vote'?'.vt .seat-name':'.witness-name');
+      const names=page.locator(phase==='team_build'?'.cs-name':phase==='team_vote'?'.vt .seat-name':'.expedition-name');
       const roster=(await page.locator('.expedition-roster').boundingBox())!;
-      for(const name of await names.all())expect((await name.boundingBox())!.y+(await name.boundingBox())!.height).toBeLessThanOrEqual(roster.y);
+      for(const name of await names.all()){
+        const box=(await name.boundingBox())!;
+        if(phase==='quest'){expect(box.y).toBeGreaterThanOrEqual(roster.y);expect(box.y+box.height).toBeLessThanOrEqual(roster.y+roster.height);}
+        else expect(box.y+box.height).toBeLessThanOrEqual(roster.y);
+      }
       const action=page.locator(phase==='team_build'?'.cs-propose':phase==='team_vote'?'.vote-stage:not(.vote-waiting)':'.quest-stage');
       const actionBox=(await action.boundingBox())!;
       const chat=page.locator('.ac-compose');const bottom=await chat.count()?(await chat.boundingBox())!.y:viewport.height;

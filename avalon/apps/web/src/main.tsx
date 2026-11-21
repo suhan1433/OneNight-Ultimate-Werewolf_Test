@@ -26,12 +26,16 @@ import './compact-game.css';
 import './quest-film.css';
 import './council-layout.css';
 import './council-polish.css';
+import './quest-stage-cinema.css';
+import './assassination-cinema.css';
 import {ExpeditionRoster} from './ExpeditionRoster';
 import {RoundTrack,QUEST_SIZES} from './RoundTrack';
 import {useImmersion} from './immersion';
 import {useCouncilLayout} from './use-council-layout';
 import {VoteCrown} from './VoteCrown';
 import {TableCinema} from './TableCinema';
+import {questDestination} from './quest-destinations';
+import {useQuestBackdrop} from './quest-backdrops';
 import {HouseCrest} from './HouseCrest';
 import {RoundTable,ExpeditionBadge,CouncilAtmosphere} from './RoundTable';
 import {CHARACTERS,characterById,myAvatarId,setMyAvatarId,serverAvatarId,syncAvatar,useCharacterResolver,PlayerAvatar,PlayerEmoji,ProfileDialog,type Character} from './profile';
@@ -98,7 +102,7 @@ function PhaseRibbon({game,turn=false}:{game:ClientGameState;turn?:boolean}){
     assassination:['마지막 암살',turn?'멀린이라고 생각하는 기사를 지목하세요.':'원정은 끝났지만, 아직 승부는 끝나지 않았습니다.'],
   };
   const [title,description]=copy[game.phase]??['원탁','기사들이 다음 행동을 기다립니다.'];
-  return <div className="phase-ribbon" data-action={turn} key={game.phase}><span className="ribbon-kicker">CHAPTER <b>{String(game.round+1).padStart(2,'0')}</b></span><div><strong>{title}</strong><small role="status">{description}</small></div>{turn&&<em className="turn-pill">내 차례</em>}</div>;
+  return <div className="phase-ribbon" data-action={turn} key={game.phase}><span className="ribbon-kicker">CHAPTER <b>{String(game.round+1).padStart(2,'0')}</b></span><div><strong>{title}</strong><small role="status">{['team_build','team_vote','vote_result','quest','quest_result'].includes(game.phase)&&<span className="destination-inline">{questDestination(game.round).name} · </span>}{description}</small></div>{turn&&<em className="turn-pill">내 차례</em>}</div>;
 }
 
 /* ---------- atmosphere & feedback ---------- */
@@ -419,7 +423,7 @@ function RoundHistory({game,open,setOpen,showSlots=true}:{game:ClientGameState;o
   const approved=record?.votes&&game.players.filter(player=>record.votes?.[player.id]);
   const rejected=record?.votes&&game.players.filter(player=>record.votes?.[player.id]===false);
   return <>{showSlots&&<RoundTrack game={game} open={open} onSelect={setOpen}/>}{record&&<section key={record.round} className="round-detail" aria-live="polite">
-    <div className="round-detail-head"><span>ROUND {record.round+1} · 원정 기록</span><b className={record.success===true?'success':record.success===false?'fail':''}>{record.success===undefined?'진행 중':record.success?'원정 성공':'원정 실패'}</b></div>
+    <div className="round-detail-head"><span>원정 {record.round+1} · {questDestination(record.round).name}</span><b className={record.success===true?'success':record.success===false?'fail':''}>{record.success===undefined?'진행 중':record.success?'원정 성공':'원정 실패'}</b></div>
     <div className="round-detail-section expedition-detail"><div className="round-detail-label"><FactionSeal team="good" size={18}/><span>원정대</span></div><div className="expedition-content"><span className="leader-chip"><CrownIcon size={13}/> 리더 · <PlayerAvatar playerId={record.leaderId} size={16}/>{name(record.leaderId)}</span><div className="member-chips">{record.team.map((id,index)=><span key={id} style={{'--member-index':index} as React.CSSProperties}><PlayerAvatar playerId={id} size={16}/>{name(id)}</span>)}</div></div></div>
     <div className="round-detail-section"><div className="round-detail-label"><ShieldIcon size={18}/><span>찬반 투표</span></div>{voteComplete?<><div className="vote-summary"><span className="approve"><CheckIcon size={13}/> 찬성 <b>{record.approveCount}</b></span><span className="reject"><SwordsIcon size={13}/> 반대 <b>{record.rejectCount}</b></span></div>{game.options.revealVoteIdentities&&<div className="vote-groups"><div className="vote-group approve"><b><CheckIcon size={13}/> 찬성</b><div>{approved?.map(player=><span key={player.id}><PlayerAvatar playerId={player.id} size={16}/>{player.nickname}</span>)}</div></div><div className="vote-group reject"><b><SwordsIcon size={13}/> 반대</b><div>{rejected?.map(player=><span key={player.id}><PlayerAvatar playerId={player.id} size={16}/>{player.nickname}</span>)}</div></div></div>}</>:<div className="round-pending"><Dots/> 투표 진행 중</div>}</div>
     <div className="round-detail-section quest-detail"><div className="round-detail-label"><SwordsIcon size={18}/><span>원정 결과</span></div><div>{record.fails===undefined?<span className="round-pending"><Dots/> 원정 결과 대기 중</span>:<div className="quest-card-count"><span className="success"><ShieldIcon size={15}/> 성공 <b>{record.team.length-record.fails}</b></span><span className="fail"><SwordsIcon size={15}/> 실패 <b>{record.fails}</b></span></div>}</div></div>
@@ -474,7 +478,7 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
     <div className="vt-wrap">
       <div className="vt-tilt vt-tilt--table">
         <div ref={tableRef} className={`table vt-table table--${game.players.length}`}>
-          <RoundTable className="council-table-art"/>{(isResult||voteCount>0)&&<TableCinema scene={isResult?'unseal':'ballot'} cue={isResult?seed:voteCount}/>}<div className="table-center">{isResult?<div className="vt-table-result">{!reduced&&plan?.mode==='identity'&&<div className="vote-reveal-cue" aria-hidden="true"><ShieldIcon size={24}/><strong>봉인된 투표</strong><small>한 표씩 진실을 밝힙니다</small></div>}<div className="vt-summary"><span className="a">찬성 <b>{totals?.approve??0}</b></span><i>/</i><span className="r">반대 <b>{totals?.reject??0}</b></span></div><h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2></div>:<div className="selection-core"><FactionSeal team="good" size={36}/><strong>{`${voteCount} / ${game.players.length}`}</strong>{waitingVote?voteWaiting:<span>찬성 또는 반대를 비밀리에 선택하세요</span>}</div>}</div>
+          <RoundTable className="council-table-art"/>{(isResult||voteCount>0)&&<TableCinema scene={isResult?'unseal':'ballot'} cue={isResult?seed:voteCount} round={game.round}/>}<div className="table-center">{isResult?<div className="vt-table-result">{!reduced&&plan?.mode==='identity'&&<div className="vote-reveal-cue" aria-hidden="true"><ShieldIcon size={24}/><strong>봉인된 투표</strong><small>한 표씩 진실을 밝힙니다</small></div>}<div className="vt-summary"><span className="a">찬성 <b>{totals?.approve??0}</b></span><i>/</i><span className="r">반대 <b>{totals?.reject??0}</b></span></div><h2 className={`vt-verdict ${resultPassed?'goodtext':'eviltext'}`}>{resultPassed?'원정대 승인':'원정대 부결'}</h2></div>:<div className="selection-core"><FactionSeal team="good" size={36}/><strong>{`${voteCount} / ${game.players.length}`}</strong>{waitingVote?voteWaiting:<span>찬성 또는 반대를 비밀리에 선택하세요</span>}</div>}</div>
           {game.players.map((player,index)=><div className={`seat vt-seat${game.proposedTeam.includes(player.id)?' on-expedition':''}`} style={{...seatPos(index,game.players.length,43),'--i':index} as React.CSSProperties} key={player.id}>
             {(()=>{const step=plan?.mode==='identity'?plan.stepOf[index]:undefined;const v=step===undefined?undefined:plan?.outcomes[step];
               return <div className="plate"><SeatFace name={player.nickname} playerId={player.id} member={game.proposedTeam.includes(player.id)}/>{player.hasVoted&&!revealing&&<i className="vt-voted" aria-label="투표 완료"/>}
@@ -513,6 +517,7 @@ function VoteStage({game,approve,setApprove}:{game:ClientGameState;approve:boole
 function Board({game}:{game:ClientGameState}){
   const boardRef=useRef<HTMLElement>(null);
   useCouncilLayout(boardRef,game.phase);
+  useQuestBackdrop(game.round);
   const[approve,setApprove]=useState<boolean|null>(null);
   const[questCard,setQuestCard]=useState<'success'|'fail'|null>(null);
   const[questSubmitting,setQuestSubmitting]=useState(false);

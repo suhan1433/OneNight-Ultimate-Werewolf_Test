@@ -1,0 +1,53 @@
+/* Every journey has its own lens movement, weather and foreground depth.
+   The camera stops after two seconds; the remaining map is entirely still. */
+.ql-depth,.ql-foreground{transform-origin:100px 100px}
+.ql-route{stroke-linecap:round}
+.tc-location-forest .ql-depth{animation:qlForestPush 2s cubic-bezier(.2,.6,.4,1) both}
+.tc-location-forest .ql-foreground{animation:qlForestFraming 2s ease-out both}
+.tc-location-strait .ql-depth{animation:qlCoastTrack 2s ease-out both}
+.tc-location-strait .ql-foreground{animation:qlReefTrack 2s ease-out both}
+.tc-location-pass .ql-depth{animation:qlMountainRise 2s ease-out both}
+.tc-location-pass .ql-foreground{animation:qlBridgeRise 2s ease-out both}
+.tc-location-ruins .ql-depth{animation:qlRuinsTrack 2s ease-out both}
+.tc-location-ruins .ql-foreground{animation:qlColumnsTrack 2s ease-out both}
+.tc-location-sanctum .ql-depth{animation:qlSanctumPush 2s cubic-bezier(.2,.7,.3,1) both}
+.tc-location-sanctum .ql-foreground{animation:qlPillarsPush 2s ease-out both}
+.ql-fog{animation:qlFogDrift 2s ease-in-out both}
+.ql-rain{animation:qlRainDrift 1.7s linear both}
+.ql-waves{animation:qlWaterTrack 2s ease-in-out both}
+.ql-beacon{transform-origin:153px 85px;animation:qlBeaconSweep 2s ease-out both}
+.ql-snow{animation:qlSnowGust 2s ease-out both}
+.ql-ash{animation:qlAshDrift 2s ease-out both}
+.ql-incense{animation:qlIncenseRise 2s ease-out both}
+.ql-grail-halo{animation:qlGrailLight 1.8s ease-out both}
+.ql-result-light{animation:qlDawnBreak 1.8s ease-out both;transform-origin:100px 35px}
+.ql-result-shadow{animation:qlShadowPass 1.8s ease-out both}
+.tc-location-pass .ql-result-shadow{animation-name:qlSnowVeil}
+.tc-location-ruins .ql-result-shadow{animation-name:qlFallingStone}
+.tc-location-sanctum .ql-result-shadow{animation-name:qlEclipse}
+.ql-result-shadow.ql-lightning{animation-name:qlLightning}
+@keyframes qlForestPush{from{transform:scale(.94) translateY(3px)}to{transform:scale(1.06) translateY(-2px)}}
+@keyframes qlForestFraming{from{transform:scale(.94) translateY(5px)}to{transform:scale(1.14) translateY(-1px)}}
+@keyframes qlCoastTrack{from{transform:translateX(4px)}to{transform:translateX(-3px)}}
+@keyframes qlReefTrack{from{transform:translate(12px,4px) scale(.98)}to{transform:translate(-10px,0) scale(1.05)}}
+@keyframes qlMountainRise{from{transform:translateY(7px) scale(1.02)}to{transform:translateY(-4px) scale(1.06)}}
+@keyframes qlBridgeRise{from{transform:translateY(13px) scale(.99)}to{transform:translateY(-5px) scale(1.1)}}
+@keyframes qlRuinsTrack{from{transform:translateX(-4px) scale(.98)}to{transform:translateX(4px) scale(1.04)}}
+@keyframes qlColumnsTrack{from{transform:translateX(-13px) scale(1.03)}to{transform:translateX(8px) scale(1.06)}}
+@keyframes qlSanctumPush{from{transform:scale(.91)}to{transform:scale(1.08)}}
+@keyframes qlPillarsPush{from{transform:scale(.95)}to{transform:scale(1.15)}}
+@keyframes qlFogDrift{from{transform:translateX(-12px);opacity:.03}50%{opacity:.2}to{transform:translateX(12px);opacity:.1}}
+@keyframes qlRainDrift{from{transform:translate(4px,-9px);opacity:0}25%{opacity:.4}to{transform:translate(-7px,16px);opacity:.1}}
+@keyframes qlWaterTrack{from{transform:translateX(9px);opacity:.2}50%{opacity:.55}to{transform:translateX(-12px);opacity:.25}}
+@keyframes qlBeaconSweep{from{transform:rotate(-7deg);opacity:0}40%{opacity:.3}to{transform:rotate(13deg);opacity:.1}}
+@keyframes qlSnowGust{from{transform:translate(8px,-5px);opacity:.1}40%{opacity:.8}to{transform:translate(-8px,12px);opacity:.25}}
+@keyframes qlAshDrift{from{transform:translate(-8px,8px);opacity:0}35%{opacity:.7}to{transform:translate(9px,-8px);opacity:.2}}
+@keyframes qlIncenseRise{from{transform:translateY(8px);opacity:.03}50%{opacity:.2}to{transform:translateY(-5px);opacity:.1}}
+@keyframes qlGrailLight{from{opacity:.1;transform:scale(.98)}55%{opacity:1}to{opacity:.6;transform:scale(1.03)}}
+@keyframes qlDawnBreak{from{opacity:0;transform:rotate(-5deg)}50%{opacity:.35}to{opacity:.15;transform:rotate(3deg)}}
+@keyframes qlShadowPass{from{opacity:0;transform:translate(-19px,8px) scale(.9)}25%{opacity:1}to{opacity:0;transform:translate(28px,-16px) scale(1.05)}}
+@keyframes qlSnowVeil{from{opacity:0;transform:translateY(-14px)}40%{opacity:.4}to{opacity:.15;transform:translateY(18px)}}
+@keyframes qlFallingStone{from{opacity:0;transform:translateY(-10px)}35%{opacity:.6}to{opacity:0;transform:translateY(17px)}}
+@keyframes qlEclipse{from{opacity:0;transform:scaleX(.3)}70%{opacity:.7}to{opacity:.4;transform:scaleX(1)}}
+@keyframes qlLightning{0%,25%,100%{opacity:0}35%{opacity:.7}65%{opacity:.2}}
+@media(prefers-reduced-motion:reduce){.table-cinema .ql-depth,.table-cinema .ql-foreground,.table-cinema .ql-weather,.table-cinema .ql-waves,.table-cinema .ql-beacon,.table-cinema .ql-grail-halo,.table-cinema .ql-result-light,.table-cinema .ql-result-shadow{animation:none!important}}

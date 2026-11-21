@@ -9,10 +9,10 @@ export function useCouncilLayout(board:RefObject<HTMLElement>,phase:string){
     let frame=0,disposed=false;
     const fit=()=>{
       frame=0;
-      if(!mobile.matches){app.style.removeProperty('--council-size');delete app.dataset.councilCompact;return;}
+      if(!mobile.matches){app.style.removeProperty('--council-size');app.style.removeProperty('--quest-scene-height');delete app.dataset.councilCompact;return;}
       // Keep the board stable while a keyboard or expanded chat sheet is open.
       if(innerHeight-(visualViewport?.height??innerHeight)>120)return;
-      const scene=root.querySelector<HTMLElement>('.cs-team,.vt,.cs-quest');
+      const scene=root.querySelector<HTMLElement>('.cs-team,.vt,.cs-quest,.cs-assassin');
       const table=scene?.querySelector<HTMLElement>('.cs-table,.vt-wrap,.cs-altar-camera');
       if(!scene||!table){app.style.removeProperty('--council-size');return;}
       const sceneBox=scene.getBoundingClientRect(),tableBox=table.getBoundingClientRect();
@@ -21,7 +21,13 @@ export function useCouncilLayout(board:RefObject<HTMLElement>,phase:string){
       const safeBottom=Math.max(0,innerHeight-(compose?.getBoundingClientRect().bottom??innerHeight));
       const controls=sceneBox.height-tableBox.height;
       const available=innerHeight-dock-safeBottom-12-(sceneBox.top+scrollY)-controls;
+      const isQuest=scene.classList.contains('cs-quest');
       const width=Math.min(420,innerWidth-40,root.getBoundingClientRect().width-16);
+      if(isQuest){
+        const maximum=Math.min(420,root.getBoundingClientRect().width*(phase==='quest_result'?.88:.74));
+        const height=Math.floor(Math.max(170,Math.min(maximum,available)));
+        if(app.style.getPropertyValue('--quest-scene-height')!==`${height}px`)app.style.setProperty('--quest-scene-height',`${height}px`);
+      }else app.style.removeProperty('--quest-scene-height');
       const size=Math.floor(Math.max(200,Math.min(width,available)));
       const compact=String(size<250);if(app.dataset.councilCompact!==compact)app.dataset.councilCompact=compact;
       const previous=parseFloat(app.style.getPropertyValue('--council-size'));
@@ -36,6 +42,6 @@ export function useCouncilLayout(board:RefObject<HTMLElement>,phase:string){
     addEventListener('resize',schedule);mobile.addEventListener('change',schedule);
     document.fonts.ready.then(schedule);
     fit();
-    return()=>{disposed=true;cancelAnimationFrame(frame);observer.disconnect();mutation.disconnect();removeEventListener('resize',schedule);mobile.removeEventListener('change',schedule);app.style.removeProperty('--council-size');delete app.dataset.councilCompact;};
+    return()=>{disposed=true;cancelAnimationFrame(frame);observer.disconnect();mutation.disconnect();removeEventListener('resize',schedule);mobile.removeEventListener('change',schedule);app.style.removeProperty('--council-size');app.style.removeProperty('--quest-scene-height');delete app.dataset.councilCompact;};
   },[board,phase]);
 }
