@@ -1,5 +1,5 @@
 import { NARRATOR_LINES } from '@werewolf/shared';
-import { applyNightAction, buildNightActionQueue, calculateResult, DISCONNECT_GRACE_MS, effectiveRole, nextRoomVersion, resolveNightDeadline, startCurrentAction, startDay, startNightIntro, validateNightAction, votingComplete } from '../game/engine.js';
+import { applyNightAction, buildNightActionQueue, calculateResult, DISCONNECT_GRACE_MS, isNightWolf, nextRoomVersion, resolveNightDeadline, startCurrentAction, startDay, startNightIntro, validateNightAction, votingComplete } from '../game/engine.js';
 import { emitActionStart, emitDayStart, emitRoomState } from '../socket/handlers.js';
 import { getRoom, getRoomCodes, getVotes, recordVote, saveRoom, withRoomLock } from './redis.js';
 function hasBotWork(room) {
@@ -31,7 +31,7 @@ function botCommand(room, playerId) {
     if (protectedIds.has(playerId) && ['robber', 'drunk', 'insomniac'].includes(action.role))
         return { type: 'skip' };
     switch (action.role) {
-        case 'werewolf': return room.players.some(p => p.id !== playerId && ['werewolf', 'alpha_wolf', 'mystic_wolf', 'dream_wolf'].includes(effectiveRole(p))) ? { type: 'confirm' } : { type: 'inspect_center', centerIndexes: [0] };
+        case 'werewolf': return room.players.some(p => p.id !== playerId && isNightWolf(p)) ? { type: 'confirm' } : { type: 'inspect_center', centerIndexes: [0] };
         case 'witch': return room.witchChoices?.[playerId] === undefined ? { type: 'inspect_center', centerIndexes: [0] } : { type: 'swap_center', targetPlayerIds: [target ?? playerId], centerIndexes: [room.witchChoices[playerId]] };
         case 'troublemaker': return targets.length >= 2 ? { type: 'swap_players', targetPlayerIds: targets.slice(0, 2) } : { type: 'skip' };
         case 'seer': return { type: 'inspect_centers', centerIndexes: [0, 1] };
@@ -40,7 +40,7 @@ function botCommand(room, playerId) {
         case 'shield_bearer': return target ? { type: 'protect', targetPlayerIds: [target] } : { type: 'skip' };
         case 'robber': return target ? { type: 'swap_player', targetPlayerIds: [target] } : { type: 'skip' };
         case 'alpha_wolf': {
-            const victim = room.players.find(p => targets.includes(p.id) && !['werewolf', 'alpha_wolf', 'mystic_wolf', 'dream_wolf'].includes(effectiveRole(p)));
+            const victim = room.players.find(p => targets.includes(p.id) && !isNightWolf(p));
             return victim ? { type: 'swap_player', targetPlayerIds: [victim.id] } : { type: 'confirm' };
         }
         case 'doppelganger':
@@ -56,8 +56,8 @@ function runBotNightActions(room) {
     for (const id of action.playerIds) {
         if (!room.players.some(p => p.id === id && p.isBot))
             continue;
-        // A Witch has two commands; resolve both before ending this pass.
-        for (let step = 0; step < 2; step++) {
+        // Doppelganger-Witch needs copy, inspection and exchange in one slot.
+        for (let step = 0; step < 3; step++) {
             if (room.nightActionQueue[room.currentNightActionIndex].actedPlayerIds.includes(id))
                 break;
             const command = botCommand(room, id);
@@ -98,7 +98,10 @@ export async function processExpiredRoom(io, code) {
                         announceAction = true;
                     }
                     else if (action?.status === 'active') {
+                        const previous = room;
                         room = action.expiresAt <= now ? resolveNightDeadline(room, now) : runBotNightActions(room);
+                        if (room === previous)
+                            return room;
                         announceAction = !!room.nightActionQueue[room.currentNightActionIndex] && room.nightActionQueue[room.currentNightActionIndex].id !== action.id;
                     }
                 }

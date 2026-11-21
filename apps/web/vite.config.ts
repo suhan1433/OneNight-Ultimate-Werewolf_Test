@@ -6,6 +6,6 @@ export default defineConfig({
   base: '/werewolf/',
   plugins: [react()],
   publicDir: '../../mp3',
-  server: { host: true, port: 5173 },
+  server: { host: true, port: 5173, ...(process.env.E2E_NO_WATCH === '1' ? { hmr: false, watch: null } : {}) },
   build: { outDir: 'dist/werewolf' },
 });

@@ -1,6 +1,6 @@
 import { installGameSwitch } from '../../../../game-switch/client';
 import { io } from 'socket.io-client'; import type { Ack, ChatMessage, ClientGameState } from '@werewolf/shared'; import { useGame } from './store';
-export const socket=io(import.meta.env.DEV?(import.meta.env.VITE_SOCKET_URL??'http://localhost:3002'):undefined,{path:import.meta.env.DEV?'/socket.io':'/api/avalon/socket',transports:['websocket','polling']});
+export const socket=io(import.meta.env.DEV?(import.meta.env.VITE_SOCKET_URL??`${location.protocol}//${location.hostname}:3002`):undefined,{path:import.meta.env.DEV?'/socket.io':'/api/avalon/socket',transports:['websocket','polling']});
 export type AssassinAimState={roomCode:string;targetId:string|null;actorId?:string;locked?:boolean};
 export type TeamSelectionState={roomCode:string;actorId?:string;team:string[]};
 let lastAssassinAim:AssassinAimState|null=null;
@@ -13,7 +13,11 @@ socket.on('ROOM_STATE',(game:ClientGameState)=>{if(game.phase!=='assassination')
 socket.on('ROOM_STATE',(game:ClientGameState)=>useGame.getState().setGame(game)); socket.on('ERROR',({message})=>useGame.getState().setError(message));
 socket.on('ROOM_KICKED',({message}:{message:string})=>{localStorage.removeItem('avalon-session');useGame.getState().setGame(null);useGame.getState().setError(message);});
 socket.on('CHAT_MESSAGE',(message:ChatMessage)=>useGame.getState().addChat(message)); socket.on('CHAT_HISTORY',(messages:ChatMessage[])=>useGame.getState().setChatHistory(messages));
-export const emit=(event:string,data:unknown)=>new Promise<any>((resolve,reject)=>socket.emit(event,data,(a:Ack)=>a.ok?resolve(a.data):reject(Error(a.error))));
+export const emit=(event:string,data:unknown)=>new Promise<any>((resolve,reject)=>socket.timeout(10_000).emit(event,data,(error:Error|null,a:Ack)=>{
+  if(error)reject(Error('서버 응답이 늦어지고 있습니다. 연결을 확인하고 다시 시도해주세요.'));
+  else if(a?.ok)resolve(a.data);
+  else reject(Error(a?.error??'요청을 처리하지 못했습니다.'));
+}));
 export const session=()=>{try{return JSON.parse(localStorage.getItem('avalon-session')??'null');}catch{return null;}};
 export const saveSession=(value:unknown)=>localStorage.setItem('avalon-session',JSON.stringify(value));
 socket.on('connect',()=>{const s=session();if(s)void emit('ROOM_JOIN',s).catch(()=>localStorage.removeItem('avalon-session'));});

@@ -28,7 +28,7 @@ test.beforeEach(async({page})=>{
     (window as any).__commands=[];
     socket.emit=(event:string,...args:any[])=>{
       (window as any).__commands.push({event,data:args[0]});
-      if(typeof args[1]==='function')args[1]({ok:true});
+      if(typeof args[1]==='function')args[1](null,{ok:true});
       return socket;
     };
   });
@@ -136,3 +136,76 @@ for(const width of [320,390,768,1440]){
     expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   });
 }
+
+
+for(const viewport of [{width:375,height:667},{width:390,height:844},{width:430,height:932}]){
+  for(const phase of ['team_build','team_vote','quest','vote_result','quest_result'] as const){
+    test(`${phase} fits above the mobile chat dock at ${viewport.width}x${viewport.height}`,async({page})=>{
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({reducedMotion:'reduce'});
+      const state=council(phase,10);state.questSize=5;state.proposedTeam=['p0','p1','p2','p3','p4'];
+      state.players.forEach(p=>p.nickname=`기사${p.id.slice(1)}`);
+      if(phase==='vote_result')state.voteResult={approve:6,reject:4,passed:true};
+      if(phase==='quest_result'){state.questResult={success:false,fails:2};state.results=['fail'];}
+      await show(page,state);
+      const target=page.locator(phase==='team_build'?'.cs-propose':phase==='team_vote'?'.vote-stage':phase==='quest'?'.quest-stage':phase==='vote_result'?'.vt-continue':'.cs-quest-verdict .primary');
+      const box=(await target.boundingBox())!;
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y+box.height).toBeLessThanOrEqual(viewport.height-60);
+      expect(await page.evaluate(()=>window.scrollY)).toBe(0);
+      const table=page.locator(phase.includes('vote')?'.vt-wrap':phase==='team_build'?'.cs-camera':'.cs-altar-camera');
+      const tableBox=(await table.boundingBox())!,roster=(await page.locator('.expedition-roster').boundingBox())!;
+      expect(roster.y).toBeGreaterThanOrEqual(tableBox.y+tableBox.height);
+    });
+  }
+}
+
+test('quest report uses the same round markers as the public header',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const state=council('quest_result');state.questResult={success:true,fails:0};state.results=['success'];
+  await show(page,state);
+  await expect(page.locator('.cs-quest-verdict .round-history-item')).toHaveCount(5);
+  await expect(page.locator('.game-status .round-history-item').first()).toContainText('성공');
+  await expect(page.locator('.cs-quest-verdict .round-history')).toHaveText((await page.locator('.game-status .round-history').textContent())!);
+  await expect(page.locator('.cs-quest-verdict .cs-score')).toHaveCount(0);
+});
+
+test('room creation gives immediate feedback and submits only once while waiting',async({page})=>{
+  await page.getByPlaceholder('닉네임을 입력하세요').fill('아서');
+  await page.locator('.role-card').filter({hasText:'암살자'}).click();
+  await page.evaluate(async()=>{
+    const {socket}=await import('/avalon/src/socket.ts');
+    socket.emit=(event:string,...args:any[])=>{
+      (window as any).__commands.push({event,data:args[0]});
+      if(event==='ROOM_CREATE')(window as any).__creationReply=args[1];
+      return socket;
+    };
+  });
+  const create=page.getByRole('button',{name:'원탁 열기',exact:true});
+  await create.tap();
+  await expect(page.getByRole('button',{name:'원탁 여는 중…'})).toBeDisabled();
+  expect(await page.evaluate(()=>(window as any).__commands.filter((c:any)=>c.event==='ROOM_CREATE'))).toHaveLength(1);
+  await page.evaluate(()=>(window as any).__creationReply(null,{ok:false,error:'다시 시도하세요'}));
+  await expect(create).toBeEnabled();
+  await create.tap();
+  expect(await page.evaluate(()=>(window as any).__commands.filter((c:any)=>c.event==='ROOM_CREATE'))).toHaveLength(2);
+});
+
+test('quest keeps one physical table from sealed cards through the camera reveal',async({page})=>{
+  const state=council('quest');state.questCardsCompleted=1;
+  await show(page,state);
+  const table=page.locator('.cs-quest .council-table-art');
+  await expect(table).toHaveCount(1);
+  await expect(page.locator('.cs-quest .cs-altar-face')).toHaveCount(0);
+  await page.evaluate(()=>{(window as any).__questTable=document.querySelector('.cs-quest .council-table-art');});
+  state.phase='quest_result';state.questResult={success:false,fails:1};state.results=['fail'];
+  await show(page,state);
+  expect(await page.evaluate(()=>(window as any).__questTable===document.querySelector('.cs-quest .council-table-art'))).toBe(true);
+  await expect(table).toBeVisible();
+  await expect(page.locator('.quest-table-verdict')).toHaveCount(0);
+  await expect(page.locator('.cs-quest')).not.toHaveClass(/has-revealed-fail/);
+  await page.getByRole('button',{name:'결과 바로 보기',exact:true}).click();
+  await expect(table).toBeVisible();
+  await expect(page.locator('.quest-table-verdict')).toContainText('원정 실패');
+  await expect(page.locator('.cs-quest .council-table-art')).toHaveCount(1);
+});

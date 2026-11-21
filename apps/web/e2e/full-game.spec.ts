@@ -38,6 +38,19 @@ test('compact role settings preserve the selected deck and edition descriptions'
 });
 
 test('three mobile devices finish ordered night, private voting, replay and a rematch',async({browser,page},testInfo)=>{
+  const calls: Array<{id:string;role:string}> = [];
+  const durations: number[] = [];
+  page.on('websocket',ws=>ws.on('framereceived',frame=>{
+    const payload=frame.payload.toString();
+    if(!payload.startsWith('42'))return;
+    try {
+      const [event,state]=JSON.parse(payload.slice(2));
+      if(event!=='ROOM_STATE'||state.phase!=='night'||state.currentNightAction?.status!=='active')return;
+      const action=state.currentNightAction;
+      durations.push(action.expiresAt-action.startedAt);
+      if(calls.at(-1)?.id!==action.id)calls.push({id:action.id,role:action.role});
+    } catch { /* Ignore non-game Socket.IO frames. */ }
+  }));
   await page.goto('./');await page.getByRole('button',{name:'새로운 밤 열기',exact:true}).click();
   await page.getByPlaceholder('이름을 입력하세요').fill('달빛');
   await page.getByRole('button',{name:'−',exact:true}).first().click();await page.getByRole('button',{name:'−',exact:true}).first().click();
@@ -53,6 +66,16 @@ test('three mobile devices finish ordered night, private voting, replay and a re
   await page.getByLabel('밤 행동 시간',{exact:true}).selectOption('8');
   for(const p of pages)await p.getByRole('button',{name:'준비 완료',exact:true}).click();
   await page.getByRole('button',{name:'게임 시작',exact:true}).click();for(const p of pages)await reveal(p);
+  await page.locator('.smooth-countdown').waitFor();
+  const frames=await page.evaluate(async()=>{
+    const values:string[]=[];
+    for(let i=0;i<24;i++){
+      await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+      values.push(document.querySelector('.smooth-countdown .ring-fg')?.getAttribute('stroke-dashoffset')??'');
+    }
+    return values;
+  });
+  expect(new Set(frames).size).toBeGreaterThan(8);
   await page.screenshot({path:testInfo.outputPath('night.png'),fullPage:true});
   let capturedChoice=false;
   const deadline=Date.now()+110_000;
@@ -66,6 +89,10 @@ test('three mobile devices finish ordered night, private voting, replay and a re
     }
     await page.waitForTimeout(400);
   }
+  expect(durations.length).toBeGreaterThan(0);
+  expect(durations.every(duration=>duration===8_000)).toBe(true);
+  expect(calls.map(call=>call.role)).toEqual(['werewolf','seer','robber','troublemaker']);
+  expect(new Set(calls.map(call=>call.id)).size).toBe(calls.length);
   await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(0);
   await page.screenshot({path:testInfo.outputPath('day.png'),fullPage:true});
   for(const p of pages){

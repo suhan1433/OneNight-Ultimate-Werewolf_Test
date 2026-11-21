@@ -4,12 +4,10 @@ import { NIGHT_ROLES, ROLE_DEFINITIONS, WOLF_ROLES, type ClientGameState, type F
 export const DISCONNECT_GRACE_MS = 45_000;
 export const NIGHT_INTRO_DURATION_MS = 4_300;
 export const NIGHT_RESULT_DURATION_MS = 6_000;
-// Leave time for the recorded instruction before the configured choice window.
-export const NIGHT_INSTRUCTION_MS = 7_200;
 export const effectiveRole = (card: { currentRole?: RoleType | null; role?: RoleType; copiedRole?: RoleType }): RoleType | null =>
   (card.currentRole ?? card.role) === 'doppelganger' ? card.copiedRole ?? 'doppelganger' : card.currentRole ?? card.role ?? null;
 const nightRole = (p: Player) => p.originalRole === 'doppelganger' ? p.nightCopiedRole ?? 'doppelganger' : p.originalRole;
-const nightWolf = (p: Player) => WOLF_ROLES.includes(nightRole(p)!);
+export const isNightWolf = (p: Player) => WOLF_ROLES.includes(nightRole(p)!);
 const isWolf = (p: Player) => WOLF_ROLES.includes(effectiveRole(p)!);
 const shields = (room: Room) => new Set(room.protectedPlayerIds ?? (room.protectedPlayerId ? [room.protectedPlayerId] : []));
 export const OPTIONAL_NIGHT_ROLES: RoleType[] = ['shield_bearer','seer','apprentice_seer','robber','witch','troublemaker','mystic_wolf','journalist'];
@@ -37,11 +35,11 @@ export function buildNightActionQueue(selectedRoles: RoleType[], players: Player
   const queue = NIGHT_ROLES.filter(r => selected.has(r.id)).map(r => make(r.id, r.nightOrder!, players.filter(p =>
     r.id === 'werewolf' ? p.originalRole && WOLF_ROLES.includes(p.originalRole) && p.originalRole !== 'dream_wolf' : p.originalRole === r.id
   ).map(p => p.id)));
-  // Reserve both windows even if the Doppelganger is in the center, or copies
-  // a passive card. Public timing must never reveal which card was copied.
-  if (selected.has('doppelganger')) {
-    queue.push(make('doppelganger', -6.9, [], true));
-    if (selected.has('insomniac')) queue.push(make('insomniac', 9.1, [], true));
+  // Immediate copied abilities share the original Doppelganger window.
+  // Only copied Insomniac needs a later wake-up. Reserve it independently of
+  // card assignment so its presence cannot reveal who copied what.
+  if (selected.has('doppelganger') && selected.has('insomniac')) {
+    queue.push(make('insomniac', 9.1, [], true));
   }
   return queue.sort((a,b) => a.order - b.order);
 }
@@ -61,11 +59,11 @@ export function startCurrentAction(room: Room, now = Date.now()): Room {
   let playerIds = current.playerIds;
   if (!current.copied && ['werewolf','mason'].includes(current.role)) {
     playerIds = [...new Set([...playerIds, ...room.players.filter(p => p.originalRole === 'doppelganger' &&
-      (current.role === 'werewolf' ? nightWolf(p) && nightRole(p) !== 'dream_wolf' : nightRole(p) === 'mason')).map(p => p.id)])];
+      (current.role === 'werewolf' ? isNightWolf(p) && nightRole(p) !== 'dream_wolf' : nightRole(p) === 'mason')).map(p => p.id)])];
   }
   const queue = room.nightActionQueue.map((action,i) => i === index ? {
     ...action, playerIds, status: 'active' as const, startedAt: now,
-    expiresAt: now + NIGHT_INSTRUCTION_MS + room.actionTimeLimitSeconds * 1000
+    expiresAt: now + room.actionTimeLimitSeconds * 1000
   } : action);
   return { ...room, nightActionQueue: queue, pendingNightCommands: {}, updatedAt: nextRoomVersion(room, now) };
 }
@@ -112,7 +110,7 @@ export function validateNightAction(room: Room, playerId: string, actionId: stri
   switch (role) {
     case 'doppelganger': case 'mystic_wolf': case 'journalist': valid = shape('inspect_player',1,0); break;
     case 'shield_bearer': valid = shape('protect',1,0); break;
-    case 'alpha_wolf': valid = (shape('swap_player',1,0) && room.centerCards.length === 4 && !room.players.some(p => p.id === targets[0] && nightWolf(p))) || (shape('confirm',0,0) && !room.players.some(p => p.id !== playerId && !protectedIds.has(p.id) && !nightWolf(p))); break;
+    case 'alpha_wolf': valid = (shape('swap_player',1,0) && room.centerCards.length === 4 && !room.players.some(p => p.id === targets[0] && isNightWolf(p))) || (shape('confirm',0,0) && !room.players.some(p => p.id !== playerId && !protectedIds.has(p.id) && !isNightWolf(p))); break;
     case 'robber': valid = shape('swap_player',1,0); break;
     case 'troublemaker': valid = shape('swap_players',2,0); break;
     case 'seer': valid = shape('inspect_player',1,0) || shape('inspect_centers',0,2); break;
@@ -123,7 +121,7 @@ export function validateNightAction(room: Room, playerId: string, actionId: stri
       valid = seen === undefined ? shape('inspect_center',0,1) : shape('swap_center',1,1) && indexes[0] === seen;
       break;
     }
-    case 'werewolf': valid = room.players.some(p => p.id !== playerId && nightWolf(p)) ? shape('confirm',0,0) : shape('inspect_center',0,1) || shape('confirm',0,0); break;
+    case 'werewolf': valid = room.players.some(p => p.id !== playerId && isNightWolf(p)) ? shape('confirm',0,0) : shape('inspect_center',0,1) || shape('confirm',0,0); break;
     default: valid = shape('confirm',0,0);
   }
   return valid ? null : '역할에 맞는 행동과 대상을 선택하세요.';
@@ -158,33 +156,33 @@ export function applyNightAction(room: Room, playerId: string, command: NightCom
       const copiedRole = effectiveRole(target)!;
       self.copiedRole = copiedRole; self.nightCopiedRole = copiedRole;
       result = { kind: 'copied', targetNickname: target.nickname, role: copiedRole };
-      // Immediate abilities use the reserved private follow-up slot. The other
-      // players still see a generic Doppelganger window, regardless of the copy.
       if (['werewolf','mason','dream_wolf'].includes(copiedRole)) break;
-      const follow = copiedRole === 'insomniac'
-        ? room.nightActionQueue.find(a => a.copied && a.order === 9.1)
-        : room.nightActionQueue.find(a => a.copied && a.order === -6.9);
-      if (follow && ROLE_DEFINITIONS[copiedRole].nightOrder !== null) {
-        room = { ...room, nightActionQueue: room.nightActionQueue.map(a => a.id === follow.id ? { ...a, role: copiedRole, playerIds: [playerId] } : a) };
+      if (copiedRole === 'insomniac') {
+        room = { ...room, nightActionQueue: room.nightActionQueue.map(a => a.copied && a.order === 9.1 ? { ...a, playerIds: [playerId] } : a) };
+      } else if (ROLE_DEFINITIONS[copiedRole].nightOrder !== null && copiedRole !== 'doppelganger') {
+        // Keep the same action ID, start time and deadline. Copying a role
+        // changes only this owner's controls, never starts another full turn.
+        complete = false;
+        room = { ...room, nightActionQueue: room.nightActionQueue.map((a,i) => i === room.currentNightActionIndex ? { ...a, role: copiedRole, copied: true } : a) };
       }
       break;
     }
     case 'shield_bearer':
       if (target) { protectedIds.add(target.id); room = { ...room, protectedPlayerIds: [...protectedIds], protectedPlayerId: target.id }; result = { kind: 'protected', nickname: target.nickname }; } break;
     case 'werewolf': {
-      const wolves = players.filter(p => p.id !== playerId && nightWolf(p));
+      const wolves = players.filter(p => p.id !== playerId && isNightWolf(p));
       result = wolves.length ? { kind: 'people', title: '함께 깨어난 늑대', people: wolves.map(privatePerson) }
         : { kind: 'cards', title: '혼자인 늑대가 확인한 센터 카드', cards: indexes.map(i => ({ label: centerLabel(i), role: centers[i]!.role })) };
       break;
     }
     case 'alpha_wolf':
-      if (target && !blocked(target) && !nightWolf(target) && centers[3]) { exchangeCenter(target,3); result = { kind: 'alpha_swap', targetNickname: target.nickname }; } break;
+      if (target && !blocked(target) && !isNightWolf(target) && centers[3]) { exchangeCenter(target,3); result = { kind: 'alpha_swap', targetNickname: target.nickname }; } break;
     case 'mystic_wolf': case 'journalist':
       if (target && !blocked(target)) {
         result = { kind: 'cards', title: '확인한 카드', cards: [{ label: target.nickname, role: target.currentRole }] };
         if (action.role === 'journalist' && ROLE_DEFINITIONS[effectiveRole(target)!].faction === 'village') room = { ...room, publicReveals: [...room.publicReveals, `${target.nickname}님은 신문기자가 확인한 시점에 마을 진영이었습니다.`] };
       } break;
-    case 'minion': result = { kind: 'people', title: '늑대인간', people: players.filter(nightWolf).map(privatePerson) }; break;
+    case 'minion': result = { kind: 'people', title: '늑대인간', people: players.filter(isNightWolf).map(privatePerson) }; break;
     case 'apprentice_tanner': result = { kind: 'people', title: '무두장이', people: players.filter(p => nightRole(p) === 'tanner').map(privatePerson) }; break;
     case 'mason': result = { kind: 'people', title: '다른 프리메이슨', people: players.filter(p => p.id !== playerId && nightRole(p) === 'mason').map(privatePerson) }; break;
     case 'seer': result = target && !blocked(target)
@@ -239,10 +237,16 @@ export function resolveNightDeadline(room: Room, now = Date.now()): Room {
       const target = eligible[Math.floor(Math.random()*eligible.length)];
       if (target) command = { type: 'swap_center', targetPlayerIds: [target.id], centerIndexes: [next.witchChoices[id]!] };
     } else if (['doppelganger','alpha_wolf'].includes(action.role)) {
-      const target = next.players.find(p => p.id !== id && !protectedIds.has(p.id) && (action.role !== 'alpha_wolf' || !nightWolf(p)));
+      const target = next.players.find(p => p.id !== id && !protectedIds.has(p.id) && (action.role !== 'alpha_wolf' || !isNightWolf(p)));
       if (target) command = { type: action.role === 'doppelganger' ? 'inspect_player' : 'swap_player', targetPlayerIds: [target.id] };
     } else if (['werewolf','minion','apprentice_tanner','mason','insomniac'].includes(action.role)) command = { type: 'confirm' };
     next = applyNightAction(next,id,command).room;
+    const follow = next.nightActionQueue[next.currentNightActionIndex]!;
+    if (!follow.actedPlayerIds.includes(id) && follow.copied) {
+      // Resolve mandatory copied abilities at the same deadline as the copy.
+      // Optional abilities are explicitly skipped, rather than queued again.
+      return resolveNightDeadline(next, now);
+    }
   }
   return advanceNight(next, action.playerIds.length === 0 ? 'skipped' : timedOut ? 'timeout' : 'completed',now);
 }
@@ -332,12 +336,12 @@ export function buildPlayerGameState(room: Room, playerId: string): ClientGameSt
   const action = current ? { id:current.id,role:isActor || current.playerIds.includes(playerId) ? current.role : publicRole!,order:current.order,startedAt:current.startedAt,expiresAt:current.expiresAt,status:current.status,copied:current.copied } : null;
   let actionContext: Record<string,unknown> | undefined;
   if (isActor && current) {
-    if (['werewolf','alpha_wolf','mystic_wolf','minion'].includes(current.role)) actionContext = {kind:'people',title:'늑대인간',people:room.players.filter(p => p.id !== playerId && nightWolf(p)).map(privatePerson)};
+    if (['werewolf','alpha_wolf','mystic_wolf','minion'].includes(current.role)) actionContext = {kind:'people',title:'늑대인간',people:room.players.filter(p => p.id !== playerId && isNightWolf(p)).map(privatePerson)};
     if (current.role === 'mason') actionContext = {kind:'people',title:'다른 프리메이슨',people:room.players.filter(p => p.id !== playerId && nightRole(p) === 'mason').map(privatePerson)};
     if (current.role === 'apprentice_tanner') actionContext = {kind:'people',title:'무두장이',people:room.players.filter(p => nightRole(p) === 'tanner').map(privatePerson)};
   }
   // No preliminary Insomniac snapshot: only its resolved action may reveal it.
-  const hasOwnResult = !!current?.playerIds.includes(playerId) && room.privateNightActions?.[playerId]?.some(a => a.role === current.role);
+  const hasOwnResult = !!current?.playerIds.includes(playerId) && (room.privateNightActions?.[playerId]?.some(a => a.role === current.role) || (current.copied && current.order < 0));
   return {
     roomCode:room.roomCode,playerId,hostId:room.hostId,maxPlayers:room.maxPlayers,phase:room.phase,selfRole:self.originalRole,stateVersion:room.updatedAt,botMode:!!room.botMode,
     players:room.players.map(p => ({id:p.id,nickname:p.nickname,avatar:p.avatar,isReady:p.isReady,hasConfirmedCard:p.hasConfirmedCard,connected:p.connected,isHost:p.id===room.hostId,hasVoted:!!room.votes[p.id],isBot:!!p.isBot})),

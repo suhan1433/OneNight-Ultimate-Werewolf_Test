@@ -112,8 +112,11 @@ socket.on('ROOM_STATE', (game: ClientGameState) => {
   // Start fetching every selected role's recording while cards are being
   // viewed, so the first real night instruction never waits for a download.
   if (game.phase === 'card_reveal' || game.phase === 'night') preloadNarrations(['night-start', ...game.selectedRoles]);
+  const previous = useGame.getState().game;
   useGame.getState().setGame(game);
-  reconcileNarration(useGame.getState().game ?? game);
+  const accepted = useGame.getState().game;
+  if (accepted === game && (previous?.roomCode !== game.roomCode || (game.phase === 'card_reveal' && previous?.phase !== 'card_reveal'))) seenNarrations.clear();
+  reconcileNarration(accepted ?? game);
 });
 socket.on('CHAT_MESSAGE', (message) => useGame.getState().addChat(message, 'day'));
 socket.on('CHAT_HISTORY', (messages) => useGame.getState().setChatHistory(messages));
@@ -200,8 +203,8 @@ socket.on('NARRATOR_SPEECH', ({ audioKey, actionId, stateVersion }: { audioKey?:
   if (!useGame.getState().tts || !audioKey || !actionId || stateVersion === undefined) return;
   // A reconnect or a racing scheduler can deliver this exact announcement
   // more than once with a different transport timestamp. Its action and room
-  // state identify the actual announcement, so deduplicate by those values.
-  const key = `${actionId}-${stateVersion}`;
+  // state identify the actual announcement, so deduplicate by action ID within each round, even if the room revision changes.
+  const key = `${useGame.getState().game?.roomCode ?? ''}:${actionId}`;
   if (seenNarrations.has(key)) return;
   seenNarrations.add(key);
   const game = useGame.getState().game;

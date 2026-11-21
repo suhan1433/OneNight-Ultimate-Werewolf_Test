@@ -40,13 +40,11 @@
 .cs-quest-verdict .primary{min-width:200px;min-height:48px;margin-top:12px}
 @media(max-width:390px){.expedition-roster{padding:12px}.expedition-roster li{padding:8px 6px;gap:6px}.expedition-number{display:none}.expedition-roster h3{font-size:15px}.expedition-name{font-size:12px}.expedition-roster .pf-avatar{width:26px!important;height:26px!important}.vote-stage,.cs-quest .quest-stage{padding:20px 10px}}
 @media(prefers-reduced-motion:reduce){.cs-quest.is-reveal.is-resolved .cs-qcard{animation-duration:0s}}
-/* Put the decision directly below the roster; the council remains available below it. */
-.vt:not(.is-reveal){display:flex;flex-direction:column}
-.vt:not(.is-reveal) .vote-stage{order:1;width:100%;margin-top:0}
-.vt:not(.is-reveal) .vt-wrap{order:2;margin-top:28px}
-.cs-quest:not(.is-reveal){display:flex;flex-direction:column}
-.cs-quest:not(.is-reveal) .quest-stage{order:1;width:100%;margin-top:0}
-.cs-quest:not(.is-reveal) .cs-altar-camera{order:2;margin-top:28px}
+/* Keep the council above membership and personal decisions. */
+.vt:not(.is-reveal),.cs-quest:not(.is-reveal){display:flex;flex-direction:column}
+.vt:not(.is-reveal) .vt-wrap,.cs-quest:not(.is-reveal) .cs-altar-camera{order:0}
+.vt:not(.is-reveal) .expedition-roster,.cs-quest:not(.is-reveal) .expedition-roster{order:1}
+.vt:not(.is-reveal) .vote-stage,.cs-quest:not(.is-reveal) .quest-stage{order:2;width:100%;margin-top:0}
 
 .app[data-phase="quest"] .board{padding-bottom:32px}
 

@@ -2,6 +2,7 @@ import { mountGameSwitch } from '../../../game-switch/client';
 import { gameAudio } from './audio-settings';
 import { RoleSetup } from './RoleSetup';
 import { NightReplay } from './NightReplay';
+import { NightCountdown } from './NightCountdown';
 import { playCue, setSoundScene } from './sound';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import ReactDOM from "react-dom/client";
@@ -1353,18 +1354,20 @@ function Reveal({ game }: { game: ClientGameState }) {
 }
 function Night({ game }: { game: ClientGameState }) {
   const a = game.currentNightAction;
-  useLayoutEffect(() => { window.scrollTo({top:0,left:0,behavior:'auto'}); },[a?.id]);
+  useLayoutEffect(() => { window.scrollTo({top:0,left:0,behavior:'auto'}); },[a?.id,a?.role]);
   if (game.nightResolutionEndsAt) return <NightResolution game={game} />;
   if (a?.status === "pending") return <NightIntro game={game} />;
   const role = a && ROLE_DEFINITIONS[a.role];
+  const title = a?.order === -7 ? '도플갱어 · 복사' : a?.copied ? '도플갱어 · 최종 확인' : a?.role === 'werewolf' ? '늑대 무리 확인' : a?.role === 'alpha_wolf' ? '대장 늑대 · 교환' : a?.role === 'mystic_wolf' ? '신비한 늑대 · 조사' : role?.name ?? '마을의 밤';
   return <section className="center night ritual-night" data-faction={role?.faction}>
     <div className="eyebrow">THE VILLAGE SLEEPS</div>
     <div className="night-emblem"><RoleIcon id={a?.role} faction={role?.faction} size={58}/></div>
-    <h1>{a?.copied ? "도플갱어의 시간" : role?.name ?? "마을의 밤"}</h1>
+    <h1>{title}</h1>
+    {a?.copied && a.order === -7 && game.isNightActor && <p className="tiny">복사한 {role?.name} 능력을 같은 차례의 남은 시간 안에 사용하세요.</p>}
     <p>{game.isNightActor ? role?.description : "내 차례가 올 때까지 비밀을 지켜주세요."}</p>
-    <NightCountdown expires={game.nightEndsAt} serverNow={game.serverNow} total={game.settings.actionTimeLimitSeconds+7.2} actionId={a?.id} status={a?.status}/>
+    <NightCountdown expires={game.nightEndsAt} serverNow={game.serverNow} total={game.settings.actionTimeLimitSeconds} onExpire={() => a ? recoverExpiredAction(a.id, true) : void syncRoom()}/>
     {game.actionResult && <div aria-live="polite"><PrivateResult data={game.actionResult}/></div>}
-    {game.isNightActor ? <NightControls key={a?.id} game={game}/> : <Panel>
+    {game.isNightActor ? <NightControls key={`${a?.id}:${a?.role}`} game={game}/> : <Panel>
       <p>{game.actionResult ? "행동을 마쳤습니다. 내 밤 기록에서 다시 볼 수 있어요." : "지금 호출된 역할만 행동합니다."}</p>
       <p className="tiny">카드가 센터에 있어도 같은 시간 동안 기다립니다.</p>
     </Panel>}
@@ -1404,26 +1407,6 @@ function useNightRecovery(remain: number, expires?: number | null, actionId?: st
   }, [actionId, status, expires, remain]);
 }
 
-function NightCountdown({ expires, serverNow, total, actionId, status }: { expires?: number | null; serverNow: number; total: number; actionId?: string; status?: NightActionStatus }) {
-  const remain = useCountdown(expires, serverNow, 250);
-  useNightRecovery(remain, expires, actionId, status);
-  const syncedDeadline = useRef<number>();
-  useEffect(() => {
-    if (!actionId && expires && remain <= 0 && syncedDeadline.current !== expires) {
-      syncedDeadline.current = expires;
-      void syncRoom();
-    }
-  }, [actionId, expires, remain]);
-  return (
-    <>
-      <NightTimer remain={remain} total={total} />
-      {remain <= 0 && actionId && useGame.getState().transitioningActionId === actionId && (
-        <p className="transitioning">다음 역할을 준비 중…</p>
-      )}
-    </>
-  );
-}
-
 /** The server has applied every queued role in canonical order. */
 function NightResolution({ game }: { game: ClientGameState }) {
   return (
@@ -1432,15 +1415,11 @@ function NightResolution({ game }: { game: ClientGameState }) {
       <div className="eyebrow">NIGHT RESULTS</div>
       <h1>밤 행동 결과</h1>
       <p>마을이 깨어나기 전, 내 밤의 단서를 기억하세요.</p>
-      {game.actionResult ? (
-        <PrivateResult data={game.actionResult} />
-      ) : (
-        <Panel className="private-result">
-          <small><Icon.Lock /> 나만 보는 정보</small>
-          <h3>오늘 밤의 결과</h3>
-          <p>당신이 직접 수행한 밤 행동은 없습니다.</p>
-        </Panel>
-      )}
+      <Panel className="private-result">
+        <small><Icon.Lock /> 밤 행동 종료</small>
+        <h3>모든 역할의 차례가 끝났습니다</h3>
+        <p>직접 확인한 정보는 상단의 ‘내 밤 기록’에서 다시 볼 수 있습니다.</p>
+      </Panel>
       <ResolutionCountdown expires={game.nightResolutionEndsAt} serverNow={game.serverNow} />
     </section>
   );
@@ -2523,19 +2502,6 @@ function Help({ close }: { close: () => void }) {
   );
 }
 const buzz = (ms = 14) => navigator.vibrate?.(ms);
-function NightTimer({ remain, total }: { remain: number; total: number }) {
-  const C = 339.3;
-  const ratio = Math.min(1, Math.max(0, remain / Math.max(1, total)));
-  return (
-    <div className={remain <= 2 ? "ring-wrap danger" : "ring-wrap"}>
-      <svg viewBox="0 0 120 120" aria-hidden="true">
-        <circle className="ring-bg" cx="60" cy="60" r="54" />
-        <circle className="ring-fg" cx="60" cy="60" r="54" strokeDashoffset={C * (1 - ratio)} />
-      </svg>
-      <div className="timer">{Math.max(0, remain).toFixed(1)}</div>
-    </div>
-  );
-}
 const Panel = ({
   children,
   className = "",

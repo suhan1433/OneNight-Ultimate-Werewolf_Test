@@ -36,7 +36,7 @@ test.beforeEach(async ({ page }) => {
         return socket;
       }
       if (event === 'CHAT_SEND') {
-        args[1]?.({ ok: true });
+        args[1]?.(null, { ok: true });
         return socket;
       }
       return original(event, ...args);
@@ -46,14 +46,15 @@ test.beforeEach(async ({ page }) => {
 
 test('a delayed vote immediately locks both controls, and a rejection allows retry', async ({ page }) => {
   await setGame(page, game());
-  await page.locator('.token.approve').click();
-  await page.getByRole('button', { name: '원정 투표하기' }).click();
+  await page.getByRole('button', { name: '지난 대화 보기' }).click();
+  await page.locator('.ac-act-yes').click();
+  await page.locator('.ac-act-yes').click();
   await expect(page.locator('.vote-stage [role="status"]')).toContainText('투표 제출 중');
   await expect(page.locator('.chat-panel .ac-act button')).toBeDisabled();
   expect(await page.evaluate(() => (window as any).__votes.length)).toBe(1);
   await page.evaluate(() => (window as any).__finishVote(null, { ok: false, error: '다시 시도해주세요.' }));
-  await expect(page.getByRole('button', { name: '원정 투표하기' })).toBeEnabled();
-  await page.getByRole('button', { name: '원정 투표하기' }).click();
+  await expect(page.locator('.ac-act-yes')).toBeEnabled();
+  await page.locator('.ac-act-yes').click();
   expect(await page.evaluate(() => (window as any).__votes.length)).toBe(2);
   const state = game(); state.players[0].hasVoted = true; state.teamVotesCompleted = 1;
   await setGame(page, state);
@@ -75,6 +76,8 @@ test('vote results start immediately and can be shown without waiting for the ci
   await page.getByRole('button', { name: '투표 결과 바로 보기' }).click();
   await expect(page.locator('.vt-summary')).toHaveCSS('opacity', '1');
   await expect(page.locator('.vt-continue')).toHaveCSS('opacity', '1');
+  await expect(page.locator('.chat-panel .ac-act-go')).toHaveCount(0);
+  await page.getByRole('button', { name: '지난 대화 보기' }).click();
   await expect(page.locator('.chat-panel .ac-act-go')).toHaveText('계속');
 });
 

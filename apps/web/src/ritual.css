@@ -87,3 +87,8 @@ main.day .village-seat>span:not(.char-avatar){color:#553c24}
 .deck-token>button{width:32px;min-height:36px}
 .deck-role{grid-template-columns:30px minmax(0,1fr) 112px}
 .deck-counter button{width:44px;height:44px}
+
+/* Frame-driven progress must not pause between short CSS transitions. */
+.smooth-countdown .ring-fg{transition:stroke .3s;filter:none!important}
+.smooth-countdown.danger{animation:none}
+.smooth-countdown .timer{font-variant-numeric:tabular-nums;min-width:4ch}

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NightCommand, Player, RoleType, Room } from '@werewolf/shared';
-import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, calculateVotes, determineExecutions, effectiveRole, NIGHT_INSTRUCTION_MS, NIGHT_RESULT_DURATION_MS, resolveNightDeadline, shuffleRoles, startCurrentAction, startNightIntro, validateNightAction, votingComplete } from './engine.js';
+import { applyNightAction, assignRoles, buildNightActionQueue, buildPlayerGameState, calculateResult, calculateVotes, determineExecutions, effectiveRole, NIGHT_RESULT_DURATION_MS, resolveNightDeadline, shuffleRoles, startCurrentAction, startNightIntro, validateNightAction, votingComplete } from './engine.js';
 const player = (id: string, role: RoleType = 'villager'): Player => ({id,nickname:id,sessionToken:id,socketId:id,originalRole:role,currentRole:role,isReady:true,hasConfirmedCard:true,hasActedTonight:false,vote:null,connected:true});
 const room = (players: Player[], votes: Record<string,string> = {}): Room => ({roomCode:'ABC234',hostId:players[0]!.id,maxPlayers:players.length,players,selectedRoles:players.map(p=>p.originalRole!),centerCards:[{id:'center-0',role:'tanner',originalRole:'tanner'},{id:'center-1',role:'villager',originalRole:'villager'},{id:'center-2',role:'seer',originalRole:'seer'}],phase:'night',nightActionQueue:[],currentNightActionIndex:0,actionTimeLimitSeconds:15,dayTimeLimitSeconds:300,ttsEnabled:true,nightLog:[],votes,voteStartRequests:[],processedRequestIds:[],chat:[],publicReveals:[],privateResults:{},privateNightActions:{},protectedPlayerId:null,dayExpiresAt:null,result:null,createdAt:0,updatedAt:0});
 const actionRoom = (role: RoleType, players: Player[]) => startCurrentAction({...room(players),nightActionQueue:[{id:'action',role,playerIds:[players[0]!.id],actedPlayerIds:[],order:1,startedAt:0,expiresAt:0,status:'pending'}]},1_000);
@@ -16,25 +16,25 @@ describe('setup and hidden night slots',()=>{
   it.each([3,5,10])('deals %i players and three centers',n=>{const ps=Array.from({length:n},(_,i)=>player(String(i)));expect(assignRoles(ps,Array(n+3).fill('villager'))).toMatchObject({players:expect.any(Array),centerCards:expect.any(Array)});expect(assignRoles(ps,Array(n+3).fill('villager')).centerCards).toHaveLength(3);});
   it('rejects a malformed deck and does not mutate shuffles',()=>{expect(()=>assignRoles([player('a')],['villager'])).toThrow();const a=[1,2,3];expect(shuffleRoles(a,()=>.2)).not.toBe(a);expect(a).toEqual([1,2,3]);});
   it('adds a separate Alpha center without removing a dealt card',()=>{const r=assignRoles([player('a'),player('b'),player('c')],['alpha_wolf','seer','robber','villager','villager','werewolf']);expect(r.centerCards).toHaveLength(4);expect(r.centerCards[3]).toMatchObject({role:'werewolf',id:'center-alpha'});});
-  it('calls center roles and includes the common wolf wake-up for variants',()=>{const q=buildNightActionQueue(['doppelganger','shield_bearer','alpha_wolf','seer','insomniac'],[player('a','seer')]);expect(q.map(a=>a.role)).toEqual(['doppelganger','doppelganger','shield_bearer','werewolf','alpha_wolf','seer','insomniac','insomniac']);expect(q[2]!.playerIds).toEqual([]);});
-  it('starts only one slot and broadcasts its deadline to everyone',()=>{let r=room([player('seer','seer'),player('drunk','drunk'),player('v')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startNightIntro(r,1_000);expect(r.nightActionQueue[0]!.expiresAt).toBe(5_300);r=startCurrentAction(r,5_300);expect(r.nightActionQueue.map(a=>a.status)).toEqual(['active','pending']);expect(buildPlayerGameState(r,'v').nightEndsAt).toBe(5_300+15_000+NIGHT_INSTRUCTION_MS);});
-  it('never advances early when everyone submitted, and holds absent roles equally',()=>{let r=actionRoom('seer',[player('s','seer'),player('v')]);r=submit(r,'s',{type:'skip'});expect(r.currentNightActionIndex).toBe(0);expect(r.nightResolutionExpiresAt).toBeFalsy();r=next(r);expect(r.nightResolutionExpiresAt).toBe(1_000+NIGHT_INSTRUCTION_MS+15_000+NIGHT_RESULT_DURATION_MS);});
+  it('calls center roles and includes the common wolf wake-up for variants',()=>{const q=buildNightActionQueue(['doppelganger','shield_bearer','alpha_wolf','seer','insomniac'],[player('a','seer')]);expect(q.map(a=>a.role)).toEqual(['doppelganger','shield_bearer','werewolf','alpha_wolf','seer','insomniac','insomniac']);expect(q[1]!.playerIds).toEqual([]);});
+  it('starts only one slot and broadcasts its deadline to everyone',()=>{let r=room([player('seer','seer'),player('drunk','drunk'),player('v')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startNightIntro(r,1_000);expect(r.nightActionQueue[0]!.expiresAt).toBe(5_300);r=startCurrentAction(r,5_300);expect(r.nightActionQueue.map(a=>a.status)).toEqual(['active','pending']);expect(buildPlayerGameState(r,'v').nightEndsAt).toBe(5_300+15_000);});
+  it('never advances early when everyone submitted, and holds absent roles equally',()=>{let r=actionRoom('seer',[player('s','seer'),player('v')]);r=submit(r,'s',{type:'skip'});expect(r.currentNightActionIndex).toBe(0);expect(r.nightResolutionExpiresAt).toBeFalsy();r=next(r);expect(r.nightResolutionExpiresAt).toBe(1_000+15_000+NIGHT_RESULT_DURATION_MS);});
 });
 
 describe('ordered night interactions',()=>{
   it('Doppelganger-Seer sees the card before the ordinary Robber moves it',()=>{
     let r=room([player('d','doppelganger'),player('s','seer'),player('r','robber'),player('w','werewolf')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);
-    r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['s']});r=next(r);
+    r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['s']});
     expect(r.nightActionQueue[r.currentNightActionIndex]).toMatchObject({role:'seer',copied:true});
     expect(buildPlayerGameState(r,'w').currentNightAction?.role).toBe('doppelganger');
     r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['w']});expect(r.privateResults.d).toMatchObject({cards:[{role:'werewolf'}]});
     while(r.nightActionQueue[r.currentNightActionIndex]?.role!=='robber')r=next(r);
     r=submit(r,'r',{type:'swap_player',targetPlayerIds:['w']});expect(r.players.find(p=>p.id==='w')!.currentRole).toBe('robber');expect(r.privateResults.d).toMatchObject({cards:[{role:'werewolf'}]});
   });
-  it('Doppelganger-Minion sees original night wolves immediately',()=>{let r=room([player('d','doppelganger'),player('m','minion'),player('w','werewolf')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['m']});r=next(r);r=submit(r,'d',{type:'confirm'});expect(r.privateResults.d).toMatchObject({people:[{nickname:'w'}]});});
-  it('Doppelganger-Wolf joins the normal wolf wake-up without exposing the copy',()=>{let r=room([player('d','doppelganger'),player('w','werewolf'),player('v')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['w']});r=next(next(r));expect(r.nightActionQueue[r.currentNightActionIndex]!.playerIds).toEqual(['w','d']);expect(buildPlayerGameState(r,'w').actionContext).toMatchObject({people:[{nickname:'d'}]});});
-  it('a Doppelganger-Robber acquiring a Wolf never gains another night ability',()=>{let r=room([player('d','doppelganger'),player('r','robber'),player('w','werewolf')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['r']});r=next(r);r=submit(r,'d',{type:'swap_player',targetPlayerIds:['w']});r=next(r);expect(r.nightActionQueue[r.currentNightActionIndex]!.playerIds).toEqual(['w']);expect(buildPlayerGameState(r,'w').actionContext).toMatchObject({people:[]});});
-  it('Doppelganger-Insomniac waits until after the ordinary Insomniac',()=>{let r=room([player('d','doppelganger'),player('i','insomniac'),player('r','robber')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['i']});expect(r.nightActionQueue.at(-1)).toMatchObject({role:'insomniac',copied:true,playerIds:['d']});expect(r.nightActionQueue[1]!.playerIds).toEqual([]);});
+  it('Doppelganger-Minion sees original night wolves immediately',()=>{let r=room([player('d','doppelganger'),player('m','minion'),player('w','werewolf')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['m']});r=submit(r,'d',{type:'confirm'});expect(r.privateResults.d).toMatchObject({people:[{nickname:'w'}]});});
+  it('Doppelganger-Wolf joins the normal wolf wake-up without exposing the copy',()=>{let r=room([player('d','doppelganger'),player('w','werewolf'),player('v')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['w']});r=next(r);expect(r.nightActionQueue[r.currentNightActionIndex]!.playerIds).toEqual(['w','d']);expect(buildPlayerGameState(r,'w').actionContext).toMatchObject({people:[{nickname:'d'}]});});
+  it('a Doppelganger-Robber acquiring a Wolf never gains another night ability',()=>{let r=room([player('d','doppelganger'),player('r','robber'),player('w','werewolf')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['r']});r=submit(r,'d',{type:'swap_player',targetPlayerIds:['w']});r=next(r);expect(r.nightActionQueue[r.currentNightActionIndex]!.playerIds).toEqual(['w']);expect(buildPlayerGameState(r,'w').actionContext).toMatchObject({people:[]});});
+  it('Doppelganger-Insomniac waits until after the ordinary Insomniac',()=>{let r=room([player('d','doppelganger'),player('i','insomniac'),player('r','robber')]);r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['i']});expect(r.nightActionQueue.at(-1)).toMatchObject({role:'insomniac',copied:true,playerIds:['d']});expect(r.nightActionQueue.filter(a=>a.role==='doppelganger')).toHaveLength(1);});
   it('Witch must see first, may then exchange with herself, and cannot skip after seeing',()=>{let r=actionRoom('witch',[player('w','witch'),player('v')]);expect(validateNightAction(r,'w','action',{type:'swap_center',targetPlayerIds:['v'],centerIndexes:[0]})).not.toBeNull();r=submit(r,'w',{type:'inspect_center',centerIndexes:[0]});expect(r.players[0]!.currentRole).toBe('witch');expect(buildPlayerGameState(r,'w').isNightActor).toBe(true);expect(validateNightAction(r,'w','action',{type:'skip'})).not.toBeNull();expect(validateNightAction(r,'w','action',{type:'swap_center',targetPlayerIds:['w'],centerIndexes:[1]})).not.toBeNull();r=submit(r,'w',{type:'swap_center',targetPlayerIds:['w'],centerIndexes:[0]});expect(r.players[0]!.currentRole).toBe('tanner');expect(r.centerCards[0]!.role).toBe('witch');});
   it('Alpha conserves cards and previous center contents after multiple swaps',()=>{let r=actionRoom('alpha_wolf',[player('a','alpha_wolf'),player('v','seer'),player('w','werewolf')]);r.centerCards.push({id:'center-alpha',role:'werewolf',originalRole:'werewolf'});expect(validateNightAction(r,'a','action',{type:'swap_player',targetPlayerIds:['w']})).not.toBeNull();r=submit(r,'a',{type:'swap_player',targetPlayerIds:['v']});expect(r.players[1]!.currentRole).toBe('werewolf');expect(r.centerCards[3]!.role).toBe('seer');});
   it('copied card identity travels with the card and stays secret to an inspecting Seer',()=>{let r=actionRoom('robber',[player('r','robber'),{...player('d','doppelganger'),copiedRole:'tanner'}]);r=submit(r,'r',{type:'swap_player',targetPlayerIds:['d']});expect(effectiveRole(r.players[0]!)).toBe('tanner');expect(r.players[1]!.copiedRole).toBeUndefined();expect(r.privateResults.r).toMatchObject({myNewRole:'doppelganger'});expect(r.privateResults.r).not.toHaveProperty('targetNewRole');r=actionRoom('seer',[player('s','seer'),{...player('d','doppelganger'),copiedRole:'werewolf'}]);r=submit(r,'s',{type:'inspect_player',targetPlayerIds:['d']});expect(r.privateResults.s).toMatchObject({cards:[{role:'doppelganger'}]});});
@@ -60,4 +60,48 @@ describe('votes, executions and individual winners',()=>{
   it('Apprentice Tanner wins individually for a dead Tanner, or own death when no Tanner is present',()=>{const r=room([player('a','apprentice_tanner'),player('t','tanner'),player('v')],{a:'t',t:'v',v:'t'});expect(calculateResult(r).winnerIds).toContain('a');r.players[1]!.currentRole='villager';expect(calculateResult(r).winnerIds).not.toContain('a');r.votes={a:'v',t:'a',v:'a'};expect(calculateResult(r).winnerIds).toContain('a');});
   it('Cursed conversion uses the original final wolves simultaneously',()=>{const r=room([player('w','werewolf'),player('a','cursed'),player('b','cursed')],{w:'a',a:'b',b:'w'});const result=calculateResult(r);expect(result.players.find(p=>p.id==='a')!.currentRole).toBe('werewolf');expect(result.players.find(p=>p.id==='b')!.currentRole).toBe('cursed');});
   it('requires every eligible person to vote, even when a voter disconnects',()=>{const r=room([player('a'),player('b'),player('c')],{a:'b',b:'a'});r.players[0]!.connected=false;r.players[0]!.disconnectedAt=1_000;expect(votingComplete(r)).toBe(false);r.votes.c='a';expect(votingComplete(r)).toBe(true);delete r.votes.c;r.players[2]!.connected=false;r.players[2]!.disconnectedAt=1_000;expect(votingComplete(r,46_000)).toBe(true);});
+});
+
+
+describe('night timing and exactly-once abilities',()=>{
+  it.each([8,10,15,20,30])('uses exactly the configured %i seconds for every public slot',seconds=>{
+    let r=room([player('s','seer'),player('r','robber')]);r.actionTimeLimitSeconds=seconds;
+    r.nightActionQueue=buildNightActionQueue(['werewolf','seer','robber'],r.players);r=startCurrentAction(r,1_000);
+    while(r.nightActionQueue[r.currentNightActionIndex]){
+      const action=r.nightActionQueue[r.currentNightActionIndex]!;
+      expect(action.expiresAt-action.startedAt).toBe(seconds*1000);r=next(r);
+    }
+  });
+  it('copies and uses a Seer ability in one slot without restarting the deadline',()=>{
+    let r=room([player('d','doppelganger'),player('s','seer'),player('w','werewolf')]);
+    r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);
+    const original={...r.nightActionQueue[0]!};
+    vi.setSystemTime(4_000);r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['s']});
+    expect(r.nightActionQueue[0]).toMatchObject({id:original.id,startedAt:original.startedAt,expiresAt:original.expiresAt,role:'seer'});
+    expect(buildPlayerGameState(r,'w').currentNightAction?.role).toBe('doppelganger');
+    r=submit(r,'d',{type:'inspect_player',targetPlayerIds:['w']});
+    expect(validateNightAction(r,'d',original.id,{type:'inspect_player',targetPlayerIds:['s']})).not.toBeNull();
+    expect(r.privateNightActions.d?.map(a=>a.role)).toEqual(['doppelganger','seer']);
+    r=next(r);expect(r.nightActionQueue[r.currentNightActionIndex]!.role).toBe('werewolf');
+  });
+  it('never calls ordinary characters twice and handles paired Masons in one call',()=>{
+    const players=[player('a','mason'),player('b','mason'),player('c','werewolf'),player('d','werewolf')];
+    const q=buildNightActionQueue(['werewolf','werewolf','mason','mason','seer','robber'],players);
+    expect(q.map(a=>a.role)).toEqual(['werewolf','mason','seer','robber']);
+    expect(q[1]!.playerIds).toEqual(['a','b']);
+    expect(q.flatMap(a=>a.playerIds)).toHaveLength(4);
+  });
+  it('wolf variants share one pack confirmation followed by only their own ability',()=>{
+    const players=[player('w','werewolf'),player('a','alpha_wolf'),player('m','mystic_wolf'),player('d','dream_wolf')];
+    const q=buildNightActionQueue(players.map(p=>p.originalRole!),players);
+    expect(q.map(a=>a.role)).toEqual(['werewolf','alpha_wolf','mystic_wolf']);
+    expect(q[0]!.playerIds).toEqual(['w','a','m']);expect(q[1]!.playerIds).toEqual(['a']);expect(q[2]!.playerIds).toEqual(['m']);
+  });
+  it('a timed-out copy resolves required copied abilities without creating another turn',()=>{
+    let r=room([player('d','doppelganger'),player('dr','drunk'),player('w','werewolf')]);
+    r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);r=next(r);
+    expect(r.privateNightActions.d?.map(a=>a.role)).toEqual(['doppelganger','drunk']);
+    expect(r.nightActionQueue.filter(a=>a.copied&&a.role==='drunk')).toHaveLength(1);
+    expect(r.currentNightActionIndex).toBe(1);
+  });
 });

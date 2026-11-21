@@ -50,3 +50,29 @@ it('client-driven sync starts day exactly at the private-result deadline and onl
   await processExpiredRoom(io as unknown as Server,r.roomCode);
   expect(io.emit.mock.calls).toHaveLength(count);
 });
+
+it('duplicate scheduler syncs cannot restart or announce the same role twice',async()=>{
+  let r=makeRoom();r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startNightIntro(r,1_000);await saveRoom(r);
+  vi.setSystemTime(5_300);
+  await Promise.all([processExpiredRoom(io as unknown as Server,r.roomCode),processExpiredRoom(io as unknown as Server,r.roomCode)]);
+  const current=(await getRoom(r.roomCode))!.nightActionQueue[0]!;
+  expect(current.expiresAt).toBe(13_300);
+  expect(io.emit.mock.calls.filter(([event])=>event==='NARRATOR_SPEECH')).toHaveLength(1);
+  vi.setSystemTime(13_300);
+  await Promise.all([processExpiredRoom(io as unknown as Server,r.roomCode),processExpiredRoom(io as unknown as Server,r.roomCode)]);
+  r=(await getRoom(r.roomCode))!;expect(r.currentNightActionIndex).toBe(1);
+  expect(io.emit.mock.calls.filter(([event])=>event==='NARRATOR_SPEECH')).toHaveLength(2);
+});
+
+it('Doppelganger-Witch completes copy, inspection and exchange inside one configured turn',async()=>{
+  let r=makeRoom();r.players[0]!.originalRole='doppelganger';r.players[0]!.currentRole='doppelganger';
+  r.players[1]!.originalRole='witch';r.players[1]!.currentRole='witch';r.selectedRoles=['doppelganger','witch','seer'];
+  r.nightActionQueue=buildNightActionQueue(r.selectedRoles,r.players);r=startCurrentAction(r,1_000);await saveRoom(r);
+  const id=r.nightActionQueue[0]!.id;
+  r=(await processExpiredRoom(io as unknown as Server,r.roomCode))!;
+  expect(r.nightActionQueue[0]).toMatchObject({id,expiresAt:9_000,actedPlayerIds:['witch']});
+  expect(r.privateNightActions.witch?.map(a=>a.result.kind)).toEqual(['copied','witch_seen','witch_swap']);
+  expect(r.currentNightActionIndex).toBe(0);expect(r.nightActionQueue).toHaveLength(3);
+  vi.setSystemTime(9_000);r=(await processExpiredRoom(io as unknown as Server,r.roomCode))!;
+  expect(r.nightActionQueue[r.currentNightActionIndex]!.role).toBe('seer');
+});

@@ -6,6 +6,7 @@ import {PlayerAvatar,useCharacterResolver} from './profile';
 import {HouseCrest} from './HouseCrest';
 import {RoundTable} from './RoundTable';
 import {ExpeditionRoster} from './ExpeditionRoster';
+import {RoundTrack} from './RoundTrack';
 import {roleArtFor} from './role-art';
 import {useEndingAudio} from './use-recorded-audio';
 
@@ -94,8 +95,8 @@ export function TeamScene({game}:{game:ClientGameState}){
       <div className="cs-leader-light" key={game.leaderId} style={vars({'--tlx':`${lightAt.x}%`,'--tly':`${lightAt.y}%`})}/>
       {game.players.map((player,index)=>{const p=position(index,n,CANDLE_R);const isLeader=player.id===game.leaderId;return <Flame key={`f-${player.id}`} x={p.x} y={p.y} lean={isLeader?-12:0} s={isLeader?1.25:1} cls={team.includes(player.id)?'picked':''}/>;})}
       <svg className="cs-geometry" viewBox="0 0 100 100" aria-hidden="true">
-        {team.filter(id=>id!==game.leaderId).map(id=>{const t=at(id);const d=`M${origin.x} ${origin.y}L${t.x} ${t.y}`;return <g key={id}><path className="cs-thread" pathLength="1" d={d}/><path className="cs-thread-sheen" pathLength="1" d={d}/></g>;})}
-        {leaving.filter(id=>id!==game.leaderId).map(id=>{const t=at(id);return <path className="cs-thread is-unwinding" pathLength="1" d={`M${origin.x} ${origin.y}L${t.x} ${t.y}`} key={`out-${id}`} onAnimationEnd={()=>setLeaving(previous=>previous.filter(value=>value!==id))}/>;})}
+        {team.filter(id=>id!==game.leaderId).map(id=>{const t=at(id);const d=`M${origin.x} ${origin.y}Q50 50 ${t.x} ${t.y}`;return <g className="cs-link" key={id}><path className="cs-link-shadow" d={d}/><path className="cs-link-glow" d={d}/><path className="cs-thread" pathLength="1" d={d}/><circle className="cs-link-node" cx={t.x} cy={t.y} r="1.1"/></g>;})}
+        {leaving.filter(id=>id!==game.leaderId).map(id=>{const t=at(id);return <path className="cs-thread is-unwinding" pathLength="1" d={`M${origin.x} ${origin.y}Q50 50 ${t.x} ${t.y}`} key={`out-${id}`} onAnimationEnd={()=>setLeaving(previous=>previous.filter(value=>value!==id))}/>;})}
         {submitting&&<><polygon className="cs-team-poly-fill" points={pts}/><polygon className="cs-team-poly" pathLength="1" points={pts}/>{selected.map((player,i)=>{const p=position(game.players.indexOf(player),n);return <circle className="cs-node" cx={p.x} cy={p.y} r="1.5" style={vars({'--i':i})} key={player.id}/>;})}</>}
       </svg>
       <div className="cs-core">
@@ -131,23 +132,6 @@ export function questOrder(total:number,fails:number,seed:string){
   for(const char of seed)state=Math.imul(state^char.charCodeAt(0),16777619)>>>0;
   for(let i=cards.length-1;i>0;i--){state=(Math.imul(state,1664525)+1013904223)>>>0;const j=state%(i+1);[cards[i],cards[j]]=[cards[j]!,cards[i]!];}return cards;
 }
-function AltarFace(){
-  const ticks=useMemo(()=>Array.from({length:72},(_,j)=>{const a=j*5*Math.PI/180,L=j%6===0?7:4;return{j,x1:150+126*Math.sin(a),y1:100-79*Math.cos(a),x2:150+(126-L)*Math.sin(a),y2:100-(79-L*.63)*Math.cos(a)};}),[]);
-  return <svg className="cs-altar-face" viewBox="0 0 300 200" aria-hidden="true">
-    <defs>
-      <linearGradient id="cs-a-brass" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="300" y2="200"><stop offset="0" stopColor="#fde9b4"/><stop offset=".45" stopColor="#dcb262"/><stop offset="1" stopColor="#7a5726"/></linearGradient>
-      <radialGradient id="cs-a-stone" cx="50%" cy="46%" r="60%"><stop offset="0" stopColor="#2b616b"/><stop offset=".6" stopColor="#143840"/><stop offset="1" stopColor="#081a20"/></radialGradient>
-      <radialGradient id="cs-a-oak" cx="50%" cy="40%" r="62%"><stop offset="0" stopColor="#5a4129"/><stop offset="1" stopColor="#221710"/></radialGradient>
-    </defs>
-    <ellipse cx="150" cy="100" rx="149" ry="99" fill="url(#cs-a-oak)"/>
-    <ellipse cx="150" cy="100" rx="147.5" ry="97.5" fill="none" stroke="#7a5a35" strokeWidth=".9" opacity=".7"/>
-    <ellipse cx="150" cy="100" rx="138" ry="89" fill="url(#cs-a-stone)"/>
-    <ellipse cx="150" cy="100" rx="140" ry="91" fill="none" stroke="url(#cs-a-brass)" strokeWidth="2.4"/>
-    <g stroke="url(#cs-a-brass)" strokeWidth=".7" opacity=".8">{ticks.map(t=><line key={t.j} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}/>)}</g>
-    <ellipse cx="150" cy="100" rx="96" ry="60" fill="none" stroke="url(#cs-a-brass)" strokeWidth=".7" strokeDasharray="2 3.5" opacity=".6"/>
-    <ellipse cx="150" cy="100" rx="56" ry="35" fill="none" stroke="url(#cs-a-brass)" strokeWidth=".6" opacity=".4"/>
-  </svg>;
-}
 export function QuestScene({game,children,onResolved}:{game:ClientGameState;children:React.ReactNode;onResolved?:(resolved:boolean)=>void}){
   const reveal=game.phase==='quest_result';const total=game.proposedTeam.length||game.questSize;const fails=game.questResult?.fails??0;
   const order=useMemo(()=>questOrder(total,fails,`${game.roomCode}|${game.round}|${fails}`),[total,fails,game.roomCode,game.round]);
@@ -162,21 +146,20 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
   /* 실패 카드가 뒤집히는 시각마다: 제단 흔들림 · 촛불 깜빡 · 가장자리 붉은 암전 (카드 순서는 공개 시드로만 정해진다) */
   const failTimes=reveal?order.map((f,i)=>f?strike+i*gap:-1).filter(t=>t>=0):[];
   const anim=(name:string,dur:number,lag:number)=>failTimes.length?{animation:failTimes.map(t=>`${name} ${dur}s ease ${(t+lag).toFixed(2)}s both`).join(',')}:undefined;
-  return <section ref={root} className={`cs cs-quest${reveal?' is-reveal':''}${resolved?' is-resolved':''}${fails?' has-fail':' flawless'}${game.questResult?.success?' quest-success':' quest-failure'}${clock.final?' cs-final':''}${still?' is-still':''}`} style={vars({'--result-at':`${resultAt}s`,'--after-at':`${end-.5}s`,'--count':total})}>
+  return <section ref={root} className={`cs cs-quest${reveal?' is-reveal':''}${resolved?' is-resolved':''}${fails?' has-fail':' flawless'}${reveal?(game.questResult?.success?' quest-success':' quest-failure'):''}${clock.final?' cs-final':''}${still?' is-still':''}${shownFails?' has-revealed-fail':''}`} style={vars({'--result-at':`${resultAt}s`,'--after-at':`${end-.5}s`,'--count':total})}>
     <div className="cs-spot" aria-hidden="true"/>
-    {reveal&&!resolved&&!clock.final&&<><i className="cs-letterbox top" aria-hidden="true"/><i className="cs-letterbox bottom" aria-hidden="true"/></>}
-    {resolved&&!clock.final&&<><i className="cs-verdict-flash" aria-hidden="true"/><i className="cs-verdict-wave" aria-hidden="true"/></>}
-    <SceneCaption eyebrow={`QUEST ${game.round+1} · THE ALTAR`} title={reveal?'원정의 진실':'중앙 제단에 카드를 봉인합니다'} body={reveal?'카드를 섞어 한 장씩 공개합니다. 누가 제출했는지는 공개되지 않습니다.':`봉인된 카드 ${count} / ${total}장 · 원정대원만 카드를 제출할 수 있습니다.`}/>
-    <ExpeditionRoster game={game}/>
-    <div className="cs-altar-camera">
+    <SceneCaption eyebrow={`QUEST ${game.round+1} · THE ROUND TABLE`} title={reveal?'원정의 진실':'원탁에 카드를 봉인합니다'} body={reveal?'카드를 섞어 한 장씩 공개합니다. 누가 제출했는지는 공개되지 않습니다.':`봉인된 카드 ${count} / ${total}장 · 원정대원만 카드를 제출할 수 있습니다.`}/>
+    <div className="cs-altar-camera" aria-label={reveal?'원탁 위 원정 결과 공개':'원정 카드를 모으는 원탁'}>
+      <div className="quest-stage-light" aria-hidden="true"/>
+      <div className="quest-dust" aria-hidden="true">{Array.from({length:12},(_,i)=><i key={i} style={vars({'--i':i,'--x':`${9+(i*31)%83}%`,'--y':`${14+(i*17)%69}%`})}/>)}</div>
       <RoundTable className="council-table-art"/>
       <div className="quest-witnesses" aria-label="원탁의 기사들">{game.players.map((player,index)=>{const p=position(index,game.players.length);const member=game.proposedTeam.includes(player.id);return <div className={`quest-witness${member?' on-quest':''}${player.id===game.leaderId?' leader':''}`} style={{left:`${p.x}%`,top:`${p.y}%`}} key={player.id}>
         {player.id===game.leaderId&&<span className="witness-crown"><Sigil kind="crown" size={17}/></span>}
         <PlayerAvatar playerId={player.id} size={36}/><span className="witness-name">{player.nickname}</span>{member&&<i className="expedition-mark" title="원정대원"/>}
       </div>;})}</div>
       <div className="cs-altar-quake" style={reveal&&failTimes.length?{animation:[...failTimes.map(x=>`csQuake .5s ease ${(x+.08).toFixed(2)}s both`),`csQuakeBig .9s ease ${resultAt.toFixed(2)}s both`].join(',')}:undefined}><div className="cs-altar" ref={altar}>
-      <AltarFace/><div className="cs-altar-glow"/><div className="cs-altar-seal"><Sigil size={150}/></div>
-      {[15,50,85].map((left,k)=><Flame key={left} x={left} y={k===1?25:30} s={1.35} cls="lamp" style={{...vars({'--lk':k}),...(reveal?anim('csLampDip',1.1,.04):{})}}>{fails>0&&<Smoke/>}</Flame>)}
+      <div className="cs-altar-glow"/>
+      {[35,50,65].map((left,k)=><Flame key={left} x={left} y={k===1?32:35} s={.8} cls="lamp" style={{...vars({'--lk':k}),...(reveal?anim('csLampDip',1.1,.04):{})}}>{fails>0&&<Smoke/>}</Flame>)}
       <div className="cs-failflash" style={reveal?anim('csFailLight',.8,0):undefined} aria-hidden="true"/>
       <div className="cs-quest-cards" style={vars({'--team-size':total})} aria-hidden="true">{Array.from({length:count},(_,index)=><div className={`cs-qcard${reveal&&order[index]?' fail':' success'}${index<revealed?' turned':''}`} style={vars({'--i':index,'--slot':index-(total-1)/2,'--pile-x':`${((index*23)%43)-21}px`,'--pile-y':`${((index*11)%31)-15}px`,'--rotation':`${index*29-30}deg`,'--flip-at':`${strike+index*gap}s`})} key={index}>
         <i className="cs-card-land"/>
@@ -187,15 +170,20 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
         <i className="cs-card-burst"/><i className="cs-card-shock"/>
         {reveal&&(order[index]?<span className="cs-sparks">{Array.from({length:9},(_,k)=><b key={k} style={vars({'--a':`${k*40+((index*17)%25)}deg`,'--d':`${46+((k*29+index*13)%34)}px`})}/>)}</span>:<i className="cs-card-flare"/>)}
       </div>)}</div>
-      {reveal&&<><div className="cs-leak"/>{fails>0&&resolved&&<Fissure className="altar" paths={ALTAR_CRACK}/>}<div className="cs-orb"/><i className="cs-ring"/><i className="cs-ring r2"/><i className="cs-ring r3"/><div className="cs-beam"><i className="halo"/><i className="col"/><i className="core"/></div><i className="cs-bloom"/>
-        {!clock.final&&<Field mode={fails?'ember':'moon'} delay={resultAt}/>}</>}
-    </div></div></div>
+      {reveal&&fails>0&&resolved&&<Fissure className="altar" paths={ALTAR_CRACK}/>}
+    </div></div>
+      <div className="quest-camera-vignette" aria-hidden="true"/>
+      {reveal&&<div className="quest-shot-label" aria-hidden="true"><span>QUEST {String(game.round+1).padStart(2,'0')}</span><span>{resolved?'THE VERDICT':still?'THE SILENCE':'THE REVEAL'}</span></div>}
+      {resolved&&<div className="quest-table-verdict" aria-hidden="true"><small>{game.questResult?.success?'LOYALTY PREVAILS':'A SHADOW AT THE TABLE'}</small><strong>{game.questResult?.success?'원정 성공':'원정 실패'}</strong></div>}
+      {!reveal&&<div className="quest-sealed-count" role="status"><span>봉인된 원정 카드</span><b>{count}<small> / {total}</small></b></div>}
+    </div>
+    <ExpeditionRoster game={game}/>
     {reveal?<>
       <p className="cs-progress" role="status">{resolved?`성공 ${total-fails}장 · 실패 ${fails}장`:still?'봉인을 깨기 직전, 원탁이 숨을 멈춥니다.':revealed?<>공개 · 성공 <b className="ok">{revealed-shownFails}</b> · 실패 <b className="no">{shownFails}</b> · 미공개 <b>{total-revealed}</b></>:'카드를 섞고 있습니다.'}</p>
       {resolved&&<div className="cs-quest-verdict cs-glass">
         <div className="cs-verdict-seal" aria-hidden="true"><Sigil kind={game.questResult?.success?'good':'evil'} size={30}/></div>
         <small>ROUND {game.round+1} · 원정 보고</small><h2>{game.questResult?.success?'원정 성공':'원정 실패'}</h2><p className="quest-result-counts"><span>성공 카드 <b>{total-fails}</b>장</span> · <span>실패 카드 <b>{fails}</b>장</span>{game.round===3&&game.maxPlayers>=7?' · 이번 원정은 실패 2장부터 실패':''}</p>
-        <div className="cs-score" aria-label="원정 진행 점수">{Array.from({length:5},(_,i)=><span className={`${game.results[i]??'pending'}${i===game.round?' now':''}`} key={i}>{i+1}<small>{game.results[i]==='success'?'성공':game.results[i]==='fail'?'실패':'대기'}</small></span>)}</div>
+        <RoundTrack game={game}/>
         <button className="primary" disabled={game.hasContinued||clock.time<end-.5} onClick={()=>void emit('QUEST_RESULT_CONTINUE',{roomCode:game.roomCode}).catch(error=>useGame.getState().setError(error.message))}>{game.hasContinued?'계속 확인 완료':'계속'} ({game.continueConfirmedCount}/{game.players.length})</button></div>}
       {!resolved&&<button className="cs-skip" onClick={clock.skip}>결과 바로 보기</button>}
     </>:children}

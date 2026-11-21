@@ -347,7 +347,7 @@ async function mutate(io: Server, socket: Socket, raw: unknown, change: (room: R
 
 export function emitActionStart(io: Server, room: Room) {
   const action = room.nightActionQueue[room.currentNightActionIndex]; if (!action) return;
-  io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: action.copied ? '도플갱어는 복사한 능력을 사용하세요. 다른 플레이어는 기다려주세요.' : NARRATOR_LINES.action(action.role), audioKey: action.copied && action.order !== 9.1 ? undefined : action.role, actionId: action.id, stateVersion: room.updatedAt, timestamp: Date.now() });
+  io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: action.copied ? '도플갱어가 불면증을 복사했다면 지금 자신의 카드를 확인하세요.' : NARRATOR_LINES.action(action.role), audioKey: action.copied ? undefined : action.role, actionId: action.id, stateVersion: room.updatedAt, timestamp: Date.now() });
   io.to(roomChannel(room.roomCode)).emit('NIGHT_ACTION_STARTED', { actionId: action.id, role: action.copied ? (action.order === 9.1 ? 'insomniac' : 'doppelganger') : action.role, expiresAt: action.expiresAt });
 }
 export function emitDayStart(io: Server, room: Room) { io.to(roomChannel(room.roomCode)).emit('NARRATOR_SPEECH', { text: NARRATOR_LINES.dayStart, audioKey: 'day-start', actionId: 'day-start', stateVersion: room.updatedAt, timestamp: Date.now() }); io.to(roomChannel(room.roomCode)).emit('DAY_STARTED', { expiresAt: room.dayExpiresAt }); }
