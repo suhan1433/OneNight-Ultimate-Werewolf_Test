@@ -68,6 +68,7 @@ body:has(.cs-quest.is-reveal:not(.is-resolved)) .game-status{opacity:.5;transiti
 @media(max-width:640px),(pointer:coarse) and (max-width:900px){
   .cs-quest{--quest-table-size:var(--council-size)}
   .cs-quest .cs-altar-camera,.cs-quest.is-reveal .cs-altar-camera{height:var(--quest-table-size);margin:8px auto 6px}
+  .cs-quest:not(.is-reveal) .cs-altar-camera{margin-top:32px}
   .cs-quest .quest-sealed-count{font-size:8px;bottom:15%;gap:5px}
   .quest-sealed-count b{font-size:13px}
   .quest-sealed-count small{font-size:9px}

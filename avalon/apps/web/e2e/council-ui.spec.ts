@@ -63,6 +63,11 @@ for(const width of [320,390,768,1440]){
       }));
       positions.push(layout.flatMap(p=>[p.left,p.top]));
       for(const seat of layout){expect(seat.x).toBeGreaterThanOrEqual(-1);expect(seat.right).toBeLessThanOrEqual(width+1);}
+      if(width<=640){
+        const crown=page.locator(phase==='team_build'?'.cs-crown':phase==='team_vote'?'.leader-crown':'.witness-crown');
+        const ribbon=(await page.locator('.phase-ribbon').boundingBox())!;
+        await expect.poll(async()=>(await crown.boundingBox())!.y).toBeGreaterThanOrEqual(ribbon.y+ribbon.height+4);
+      }
       expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     }
     for(let i=1;i<positions.length;i++)for(let j=0;j<positions[0].length;j++)expect(positions[i][j]).toBeCloseTo(positions[0][j],4);
