@@ -22,31 +22,35 @@
 .lb .lb-table{animation:fadeIn .2s ease-out both}
 
 @media(max-width:640px),(pointer:coarse) and (max-width:900px){
-  .app:has(.board){--council-size:min(280px,calc(100vw - 64px),max(180px,calc(100svh - 486px)));padding:44px 12px 0;min-height:0}
-  .app:has(.board) .utility-actions{top:6px;right:10px;gap:5px}
-  .app:has(.board) .utility-actions button{height:30px;min-height:30px;padding:4px 9px;font-size:10px}
-  .app:has(.board) .leave-room{top:6px;left:10px;font-size:10px;padding:6px 9px;min-height:30px}
-  .game-status{padding:7px 9px;margin-bottom:0;border-radius:10px}
+  .app:has(.board){--council-size:min(330px,calc(100vw - 52px),max(220px,calc(100svh - 447px)));padding:calc(52px + env(safe-area-inset-top,0px)) 12px 0;min-height:0}
+  .app .utility-actions{top:max(6px,env(safe-area-inset-top));right:10px;gap:6px;align-items:center}
+  .app .utility-actions button{box-sizing:border-box;min-height:40px;height:40px;line-height:1;white-space:nowrap;flex-shrink:0}
+  .app .utility-actions .help-button{width:40px;min-width:40px;flex:0 0 40px;aspect-ratio:1;padding:0;border-radius:50%;font-size:18px}
+  .app .utility-actions .dossier-button{width:auto;min-width:74px;flex:0 0 auto;padding:0 10px;border-radius:20px;font-size:11px;gap:5px}
+  .app .utility-actions button>svg{display:block;width:18px;height:18px;flex:0 0 18px}
+  .app .leave-room{top:max(6px,env(safe-area-inset-top));left:10px;height:40px;min-height:40px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;line-height:1;font-size:11px;white-space:nowrap}
+  .game-status{padding:5px 8px;margin-bottom:0;border-radius:10px}
   .game-status .council-heading{display:none}
-  .game-status .leader-row{margin:0 0 5px;font-size:10px;gap:5px;line-height:1.2}
-  .game-status .leader-row>.pf-avatar{width:16px!important;height:16px!important}
+  .game-status .leader-row{margin:0 0 3px;font-size:9px;gap:4px;line-height:1.1}
+  .game-status .leader-row>.pf-avatar{width:14px!important;height:14px!important}
   .game-status .leader-row>svg{width:12px;height:12px}
   .game-status .round-history,.cs-quest-verdict .round-history{gap:4px;margin:0}
-  .round-history::before{top:15px}
-  .round-history-item>button,.round-track-slot{min-height:50px;padding:3px 1px;gap:1px;border-radius:5px}
-  .round-seal{width:22px;height:22px;font-size:13px;margin:0}
-  .round-seal svg{width:13px;height:13px}
-  .round-label,.cs-quest-verdict .round-label{font-size:9px;line-height:1.2}
+  .round-history::before{top:9px}
+  .round-history-item>button,.round-track-slot{height:30px;min-height:30px;padding:2px 1px;gap:1px;border-radius:5px}
+  .round-seal{width:15px;height:15px;font-size:10px;margin:0}
+  .round-seal svg{width:10px;height:10px}
+  .round-label,.cs-quest-verdict .round-label{display:none}
   .round-history-item>button .round-meta,.round-meta,.cs-quest-verdict .round-meta{font-size:8px;letter-spacing:0;line-height:1.2}
-  .board .phase-ribbon{gap:8px;padding:7px 1px;margin:0 auto 2px;min-height:38px}
+  .board .phase-ribbon{gap:6px;padding:5px 1px;margin:0;min-height:28px}
+  .phase-ribbon>div{display:flex;align-items:baseline;gap:7px;overflow:hidden}
   .phase-ribbon .ribbon-kicker{display:none}
-  .phase-ribbon strong{font-size:15px;line-height:1.2}
-  .phase-ribbon small{font-size:9px;line-height:1.3;margin-top:3px;max-width:none}
+  .phase-ribbon strong{flex:none;font-size:13px;line-height:1.2}
+  .phase-ribbon small{font-size:9px;line-height:1.3;margin-top:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .phase-ribbon .turn-pill{font-size:8px;margin-top:0;padding:3px 5px}
   /* The phase ribbon already provides the title and instructions. */
   .board .cs-caption{display:none}
-  .board .cs-camera{padding:12px 0 14px}
-  .vt .vt-wrap{margin:12px auto 14px}
+  .board .cs-camera{padding:8px 0 6px}
+  .vt .vt-wrap{margin:8px auto 6px}
   .vt .vt-table{width:var(--council-size);--seat-size:56px}
   .cs-team .cs-seat{width:58px}
   .cs-team .cs-avatar,.vt .vt-seat .avatar{width:30px;height:30px}
@@ -55,31 +59,34 @@
   .cs-team .cs-crown{top:-16px}.cs-team .cs-crown svg{width:16px;height:16px}
   .cs-team .cs-core strong{font-size:24px}
   .cs-team .cs-core-mark svg{width:32px;height:32px}
-  .expedition-roster{margin:3px 0 7px;padding:7px 9px;border-radius:8px}
-  .expedition-roster>header{margin:0 0 5px;gap:6px;position:static;width:auto;backdrop-filter:none}
+  .expedition-roster{margin:3px 0 5px;padding:5px 7px;border-radius:8px}
+  .expedition-roster>header{margin:0 0 4px;gap:6px;position:static;width:auto;backdrop-filter:none}
   .expedition-roster header small,.expedition-number,.expedition-name small{display:none}
-  .expedition-roster h3{font-size:11px;margin:0}
+  .expedition-roster h3{font-size:10px;line-height:1.2;margin:0}
   .expedition-roster h3>b{margin-left:5px;font-size:12px}
   .expedition-roster h3>b>span{font-size:10px}
-  .expedition-status{font-size:9px;padding:2px 5px}
+  .expedition-status{font-size:9px;line-height:1.2;padding:2px 5px}
   .expedition-roster ul{display:flex;flex-wrap:wrap;gap:4px}
-  .expedition-roster li{gap:4px;padding:3px 5px;max-width:100%;border-radius:5px}
-  .expedition-roster .pf-avatar{width:20px!important;height:20px!important}
+  .expedition-roster li{gap:4px;padding:2px 4px;max-width:100%;border-radius:5px}
+  .expedition-roster .pf-avatar{width:18px!important;height:18px!important}
   .expedition-name{font-size:10px;line-height:1.3}
   .expedition-me{font-size:8px}
   .expedition-roster>p{margin:3px 0;font-size:10px}
   .vote-stage,.cs-quest .quest-stage{margin:0;padding:9px 10px;border-radius:10px;box-shadow:none}
+  .cs-quest .quest-stage{padding:7px 10px}
+  .cs-quest .quest-cards{margin:4px 0}
+  .cs-quest .card-tap-hint{margin-top:2px}
   .vote-stage h2,.quest-stage h2{font-size:13px;margin:0 0 5px}
   .vote-tokens{gap:22px;margin:6px 0}
   .vote-tokens .token{width:68px;height:68px;font-size:11px;gap:3px}
   .vote-tokens .token svg{width:21px;height:21px}
   .card-tap-hint{font-size:10px;line-height:1.4;margin:6px 0 0}
-  .quest-cards{gap:16px;margin:7px 0}
-  .quest-cards .qcard{width:75px;height:105px;font-size:11px;gap:3px}
-  .quest-cards .qcard .faction-seal{width:28px;height:28px}
-  .quest-cards .qcard small{font-size:8px}
+  .quest-cards{gap:18px;margin:6px 0}
+  .quest-cards .qcard{--mobile-card-width:clamp(92px,12svh,114px);width:var(--mobile-card-width);height:calc(var(--mobile-card-width)*1.4);font-size:13px;gap:7px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .quest-cards .qcard .faction-seal{width:36px;height:36px}
+  .quest-cards .qcard small{font-size:9px;letter-spacing:.1em}
   .quest-rule-note{font-size:9px;margin:4px 0}
-  .cs-quest:not(.is-reveal) .cs-altar-camera{margin:12px auto 14px}
+  .cs-quest:not(.is-reveal) .cs-altar-camera{margin:8px auto 6px}
   .quest-witness{width:54px;gap:3px}
   .quest-witness .pf-avatar{width:28px!important;height:28px!important}
   .witness-name{max-width:54px;font-size:8px;padding:2px 3px}
@@ -104,6 +111,7 @@
   .vt-result-bar{font-size:10px;padding:5px 8px}
   .vt-result-bar button{font-size:10px;padding:5px 8px}
   .app:has(.board) .board{padding-bottom:12px}
+  .app[data-phase="quest"]:has(.board) .board{padding-bottom:4px}
   html.chat-half .app .board{padding-bottom:calc(var(--chat-pad,60px) + 8px)}
   .board .expedition-roster,.board .vote-stage,.board .quest-stage,.board .cs-quest-verdict{scroll-margin-bottom:80px}
 }
@@ -121,7 +129,4 @@
   .cs-quest-verdict h2{font-size:21px}
   .cs-quest-verdict .quest-result-counts{margin:2px 0 5px}
   .cs-quest-verdict .primary{margin-top:6px}
-}
-@media(max-width:640px) and (max-height:740px){
-  .quest-cards .qcard{width:64px;height:88px}
 }

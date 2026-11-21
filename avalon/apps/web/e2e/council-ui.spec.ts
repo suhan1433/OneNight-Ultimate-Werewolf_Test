@@ -151,7 +151,9 @@ for(const viewport of [{width:375,height:667},{width:390,height:844},{width:430,
       const target=page.locator(phase==='team_build'?'.cs-propose':phase==='team_vote'?'.vote-stage':phase==='quest'?'.quest-stage':phase==='vote_result'?'.vt-continue':'.cs-quest-verdict .primary');
       const box=(await target.boundingBox())!;
       expect(box.y).toBeGreaterThanOrEqual(0);
-      expect(box.y+box.height).toBeLessThanOrEqual(viewport.height-60);
+      const dock=page.locator('.chat-panel .ac-compose');
+      const visibleBottom=await dock.count()?(await dock.boundingBox())!.y:viewport.height;
+      expect(box.y+box.height).toBeLessThanOrEqual(visibleBottom);
       expect(await page.evaluate(()=>window.scrollY)).toBe(0);
       const table=page.locator(phase.includes('vote')?'.vt-wrap':phase==='team_build'?'.cs-camera':'.cs-altar-camera');
       const tableBox=(await table.boundingBox())!,roster=(await page.locator('.expedition-roster').boundingBox())!;
@@ -209,3 +211,41 @@ test('quest keeps one physical table from sealed cards through the camera reveal
   await expect(page.locator('.quest-table-verdict')).toContainText('원정 실패');
   await expect(page.locator('.cs-quest .council-table-art')).toHaveCount(1);
 });
+
+
+for(const viewport of [{width:320,height:640},{width:375,height:667},{width:390,height:844},{width:430,height:932}]){
+  test(`mobile toolbar, table and card labels keep their shape at ${viewport.width}px`,async({page})=>{
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({reducedMotion:'reduce'});
+    const state=council('quest',10);state.questSize=5;state.proposedTeam=['p0','p1','p2','p3','p4'];state.questCardsCompleted=3;
+    await show(page,state);
+    for(const selector of ['.audio-settings-button','.utility-actions .help-button:not(.audio-settings-button)']){
+      const box=(await page.locator(selector).boundingBox())!;
+      expect(box.width/box.height).toBeCloseTo(1,2);expect(box.height).toBeGreaterThanOrEqual(36);
+      const icon=page.locator(`${selector} svg`);
+      if(await icon.count()){const b=(await icon.boundingBox())!;expect(b.width).toBe(b.height);}
+    }
+    const exit=(await page.locator('.leave-room').boundingBox())!,role=(await page.locator('.dossier-button').boundingBox())!;
+    expect(exit.height).toBe(role.height);expect(exit.height).toBeGreaterThanOrEqual(36);expect(exit.x+exit.width).toBeLessThan(role.x);
+    await page.locator('.quest-cards .qcard.success').click();
+    for(const choice of await page.locator('.quest-cards .qcard').all()){
+      const box=(await choice.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(88);
+      for(const text of await choice.locator(':scope > span,:scope > small').all()){
+        const label=(await text.boundingBox())!;
+        expect(label.x).toBeGreaterThanOrEqual(box.x);
+        expect(label.x+label.width).toBeLessThanOrEqual(box.x+box.width);
+        expect(label.y+label.height).toBeLessThanOrEqual(box.y+box.height);
+      }
+    }
+    const stage=(await page.locator('.cs-altar-camera').boundingBox())!;
+    expect(stage.height).toBeGreaterThanOrEqual(220);
+    const stack=(await page.locator('.cs-qcard').first().boundingBox())!;
+    expect(stack.width).toBeGreaterThanOrEqual(35);
+    expect(stack.y).toBeGreaterThan(stage.y);
+    expect(stack.y+stack.height).toBeLessThan(stage.y+stage.height);
+    const action=(await page.locator('.quest-stage').boundingBox())!;
+    expect(action.y+action.height).toBeLessThanOrEqual(viewport.height);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+  });
+}

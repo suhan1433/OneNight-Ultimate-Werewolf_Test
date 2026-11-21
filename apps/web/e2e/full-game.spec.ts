@@ -62,7 +62,7 @@ test('three mobile devices finish ordered night, private voting, replay and a re
     const p=await context.newPage();await p.goto(new URL(`?code=${roomCode}`,page.url()).toString());await p.getByPlaceholder('이름을 입력하세요').fill(i?'새벽':'은빛');await p.getByRole('button',{name:'입장하기',exact:true}).click();return p;
   }));
   const pages=[page,...guests];const errors:string[]=[];pages.forEach(p=>p.on('pageerror',e=>errors.push(e.message)));
-  await expect(page.getByRole('button',{name:'음성 참가',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'음성 참가',exact:true})).toHaveCount(0);
   await page.getByLabel('밤 행동 시간',{exact:true}).selectOption('8');
   for(const p of pages)await p.getByRole('button',{name:'준비 완료',exact:true}).click();
   await page.getByRole('button',{name:'게임 시작',exact:true}).click();for(const p of pages)await reveal(p);

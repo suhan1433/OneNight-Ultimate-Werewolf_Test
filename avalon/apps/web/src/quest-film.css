@@ -19,8 +19,8 @@
 .cs-quest .cs-altar{width:100%;height:100%;aspect-ratio:auto;transform:none;animation:none}
 .cs-quest .cs-altar-glow{display:block;inset:18% 20%;background:radial-gradient(ellipse,rgba(var(--quest-light),.15),transparent 65%);transition:background 1.4s ease}
 .cs-quest .cs-altar .lamp{scale:1;opacity:.75;transition:opacity .8s ease}
-.cs-quest .cs-quest-cards{--card-width:clamp(26px,7vw,38px);--card-height:calc(var(--card-width)*1.55);z-index:3}
-.cs-quest:not(.is-reveal) .cs-qcard{top:51%;--pile-x:calc((var(--i) - 2)*4px)!important;--pile-y:calc(var(--i)*-2px)!important}
+.cs-quest .cs-quest-cards{--card-width:clamp(36px,calc(var(--quest-table-size)*.16),56px);--card-height:calc(var(--card-width)*1.55);z-index:3}
+.cs-quest:not(.is-reveal) .cs-qcard{top:48%;--pile-x:calc((var(--i) - (var(--sealed-count) - 1)/2)*5px)!important;--pile-y:calc(var(--i)*-2px)!important;--rotation:calc((var(--i) - (var(--sealed-count) - 1)/2)*5deg)!important}
 .cs-quest:not(.is-reveal) .cs-card-back small{display:none}
 .cs-quest .quest-sealed-count{position:absolute;left:50%;bottom:14%;translate:-50% 0;display:flex;align-items:center;gap:8px;white-space:nowrap;color:var(--brass-hi);font-size:10px;z-index:4;text-shadow:0 2px 8px #000}
 .quest-sealed-count b{font:600 18px var(--numeral)}
@@ -67,7 +67,7 @@ body:has(.cs-quest.is-reveal:not(.is-resolved)) .game-status{opacity:.5;transiti
 .cs-quest.is-resolved>.expedition-roster{opacity:1;transition:opacity 1.2s ease}
 @media(max-width:640px),(pointer:coarse) and (max-width:900px){
   .cs-quest{--quest-table-size:var(--council-size)}
-  .cs-quest .cs-altar-camera,.cs-quest.is-reveal .cs-altar-camera{height:var(--quest-table-size);margin:12px auto 14px}
+  .cs-quest .cs-altar-camera,.cs-quest.is-reveal .cs-altar-camera{height:var(--quest-table-size);margin:8px auto 6px}
   .cs-quest .quest-sealed-count{font-size:8px;bottom:15%;gap:5px}
   .quest-sealed-count b{font-size:13px}
   .quest-sealed-count small{font-size:9px}
@@ -92,13 +92,13 @@ body:has(.cs-quest.is-reveal:not(.is-resolved)) .game-status{opacity:.5;transiti
   .cs-quest .cs-altar-camera,.cs-quest .cs-altar-camera>.council-table-art,.cs-quest .quest-witnesses,.quest-camera-vignette{transition:none}
 }
 
-.cs-quest .quest-sealed-count{top:65%;bottom:auto}
+.cs-quest .quest-sealed-count{top:70%;bottom:auto}
 .cs-quest.is-reveal.has-fail .cs-altar-camera{filter:none}
 .cs-quest .quest-cards .qcard{padding:8px 6px}
 .cs-quest .quest-cards .qcard>span{white-space:nowrap}
 .cs-quest.is-reveal.flawless .cs-qcard{animation:csShuffle 1.2s ease 1s forwards,csQuestStrike .5s ease var(--flip-at) forwards}
 .cs-quest.is-reveal.is-resolved.flawless .cs-qcard{animation:questCardDisplay .45s ease-out both}
 @media(max-width:640px),(pointer:coarse) and (max-width:900px){
-  .cs-quest .quest-cards .qcard>span{font-size:11px;letter-spacing:.01em;line-height:1.3}
+  .cs-quest .quest-cards .qcard>span{font-size:13px;letter-spacing:0;line-height:1.3;max-width:100%;min-width:0;text-align:center}
 }
 .app:has(.cs-quest) .game-status{transition:opacity 1.2s ease}

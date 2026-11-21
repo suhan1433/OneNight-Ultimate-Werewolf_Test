@@ -161,7 +161,7 @@ export function QuestScene({game,children,onResolved}:{game:ClientGameState;chil
       <div className="cs-altar-glow"/>
       {[35,50,65].map((left,k)=><Flame key={left} x={left} y={k===1?32:35} s={.8} cls="lamp" style={{...vars({'--lk':k}),...(reveal?anim('csLampDip',1.1,.04):{})}}>{fails>0&&<Smoke/>}</Flame>)}
       <div className="cs-failflash" style={reveal?anim('csFailLight',.8,0):undefined} aria-hidden="true"/>
-      <div className="cs-quest-cards" style={vars({'--team-size':total})} aria-hidden="true">{Array.from({length:count},(_,index)=><div className={`cs-qcard${reveal&&order[index]?' fail':' success'}${index<revealed?' turned':''}`} style={vars({'--i':index,'--slot':index-(total-1)/2,'--pile-x':`${((index*23)%43)-21}px`,'--pile-y':`${((index*11)%31)-15}px`,'--rotation':`${index*29-30}deg`,'--flip-at':`${strike+index*gap}s`})} key={index}>
+      <div className="cs-quest-cards" style={vars({'--team-size':total,'--sealed-count':count})} aria-hidden="true">{Array.from({length:count},(_,index)=><div className={`cs-qcard${reveal&&order[index]?' fail':' success'}${index<revealed?' turned':''}`} style={vars({'--i':index,'--slot':index-(total-1)/2,'--pile-x':`${((index*23)%43)-21}px`,'--pile-y':`${((index*11)%31)-15}px`,'--rotation':`${index*29-30}deg`,'--flip-at':`${strike+index*gap}s`})} key={index}>
         <i className="cs-card-land"/>
         <div className="cs-qcard-inner">
           <div className="cs-card-back"><span className="cs-medal"><Sigil size={26}/></span><small>AVALON</small></div>
