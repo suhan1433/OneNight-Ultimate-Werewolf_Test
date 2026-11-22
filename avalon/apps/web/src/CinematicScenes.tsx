@@ -10,6 +10,7 @@ import {GameChronicle} from './GameChronicle';
 import {TableCinema} from './TableCinema';
 import {AssassinationImpact,ASSASSINATION_IMPACT_SECONDS} from './AssassinationImpact';
 import {questDestination} from './quest-destinations';
+import {EndingVista} from './EndingVista';
 import {roleArtFor} from './role-art';
 import {useEndingAudio} from './use-recorded-audio';
 import {recordedAudio} from './recorded-audio';
@@ -67,8 +68,6 @@ function Fissure({paths,className=''}:{paths:string[];className?:string}){
   </svg>;
 }
 const ALTAR_CRACK=['M14 112 L44 103 L64 115 L90 97 L108 109 L131 90 L150 101 L171 86 L190 98 L213 83 L238 98 L256 89 L286 101','M131 90 L125 71 L136 55 L129 38','M190 98 L198 121 L187 139 L196 160 L189 178','M90 97 L82 122 L90 141','M238 98 L248 117 L241 134','M213 83 L219 63 L212 47'];
-const END_CRACK=['M58 232 L104 214 L132 236 L170 196 L196 214 L226 184 L254 210 L290 196 L342 226','M170 196 L162 150 L186 118 L176 78','M254 210 L270 252 L252 290 L268 330','M132 236 L118 272 L132 306 L124 338','M226 184 L232 140 L216 108','M104 214 L84 188 L88 160'];
-const DEBRIS=Array.from({length:14},(_,i)=>({x:22+((i*47)%56),dx:((i*29)%70)-35,h:46+((i*37)%70),s:3+(i%3),d:(i%7)*.09}));
 /* 기존 .cs-avatar(링·호버·선택 연출)는 그대로 두고, 글자 대신 프로필 캐릭터를 넣는다 */
 function Avatar({playerId,member=false}:{playerId:string;member?:boolean}){const ch=useCharacterResolver()(playerId);return <span className="cs-avatar has-char" style={vars({'--pf-bg':ch.bg})} aria-hidden="true"><HouseCrest id={ch.id}/>{member&&<ExpeditionBadge/>}</span>;}
 
@@ -240,41 +239,23 @@ export function AssassinScene({game}:{game:ClientGameState}){
   </section>;
 }
 
-/* =========================================================
-   8. 엔딩 — 선은 '빛이 채워지고', 악은 '빛이 꺼진다'
-   (암살 단계를 거쳤다면 앞에 6.4초의 대상 클로즈업과 타격·정체 공개가 붙는다)
-   선: 0.0 촛불이 한 번에 켜짐 · 카메라 상승 / 1.5 황금 먼지 / 3.0 타이틀 각인 · 정체 카드 0.25s 간격 / 6.0 기록 패널
-   악: 0.0 촛불이 하나씩 꺼짐(선 진영부터) · 마지막 하나는 붉게 / 1.5 카메라 하강 · 균열 / 3.0 붉은 놋쇠 타이틀 · 악인 카드 불꽃 / 6.0 기록 패널
-   ========================================================= */
+/* 엔딩: 암살 클로즈업 → 왕국의 새벽 / 붉은 일식 → 승리 타이틀(3초)
+   → 정체 카드(4.7초부터 순차 공개) → 원정 기록(6초).
+   타이틀 공개와 기존 엔딩 음원의 재생 시점을 맞춘다. */
 export function EndingScene({game}:{game:ClientGameState}){
   const good=game.winner==='good';const impact=!!game.assassinTarget;const offset=impact?ASSASSINATION_IMPACT_SECONDS:0;const end=6+offset;
   const clock=useClock(true,end);
   useEndingAudio(clock.time,offset+3,clock.final);
-  const n=game.players.length;
-  const teamOf=(id:string)=>{const info=game.revealedRoles?.find(item=>item.id===id);return info?ROLE_DEFINITIONS[info.role]?.team:undefined;};
-  const snuff=useMemo(()=>{
-    const isGood=(i:number)=>teamOf(game.players[i]!.id)!=='evil';
-    const order=[...game.players.keys()].sort((a,b)=>Number(isGood(b))-Number(isGood(a))||a-b);
-    const rank:number[]=Array(game.players.length).fill(0);order.forEach((idx,r)=>{rank[idx]=r;});
-    return{rank,step:Math.min(.38,2.2/Math.max(1,game.players.length))};
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[game.players,game.revealedRoles]);
-  return <section className={`cs cs-ending ${good?'good':'evil'}${clock.final?' cs-final':''}${impact?' after-assassination':''}${impact&&clock.time<offset?' is-impact':''}`} style={vars({'--ending-offset':`${offset}s`,'--snuff-step':`${snuff.step}s`})}>
+  return <section className={`cs cs-ending ${good?'good':'evil'}${clock.final?' cs-final':''}${impact?' after-assassination':''}${impact&&clock.time<offset?' is-impact':''}`} style={vars({'--ending-offset':`${offset}s`})}>
     {impact&&clock.time<offset&&<AssassinationImpact game={game}/>}
-    <div className="cs-ending-world" aria-hidden="true">
-      <div className="cs-ending-ray"/><div className="cs-ending-rays"/><div className="cs-ending-pillar"><i/></div>
-      <div className="cs-ending-camera"><div className="cs-ending-table">
-        <RoundTable/>
-        <i className="cs-ending-shock"/><Fissure className="ending" paths={END_CRACK}/>
-        <i className="cs-ending-leak"/>{!good&&<div className="cs-debris-field">{DEBRIS.map((d,i)=><b key={i} className="cs-debris" style={vars({'--x':`${d.x}%`,'--dx':`${d.dx}px`,'--h':`${d.h}px`,'--s':`${d.s}px`,'--dl':`${d.d}s`})}/>)}</div>}
-        <div className="cs-ending-sigil"><Sigil kind={good?'good':'evil'} size={86}/></div>
-        {game.players.map((player,i)=>{const p=position(i,n,CANDLE_R);return <Flame key={`f-${player.id}`} x={p.x} y={p.y} s={good?1.3:1.1} cls={`end${!good&&snuff.rank[i]===n-1?' last':''}`} style={vars({'--i':snuff.rank[i]!})}>{!good&&<Smoke/>}</Flame>;})}
-        {game.players.map((player,i)=>{const p=position(i,n);const team=teamOf(player.id);return <div className={`cs-ending-seat ${team??'good'}${team===game.winner?' winner':''}`} style={vars({left:`${p.x}%`,top:`${p.y}%`,'--i':snuff.rank[i]!})} key={`s-${player.id}`}><Avatar playerId={player.id}/></div>;})}
-      </div></div>
-      {!clock.final&&<Field mode={good?'gold':'ember'} delay={offset+(good?1.5:3)}/>}
-    </div>
-    <div className="cs-ending-title"><small>THE RESISTANCE · AVALON</small><h1>{good?'선의 승리':'악의 승리'}</h1><p>{game.winReason}</p></div>
-    <div className="cs-identity-grid" aria-label="모든 기사의 정체 공개">{game.players.map((player,index)=>{const info=game.revealedRoles?.find(item=>item.id===player.id);const definition=info?ROLE_DEFINITIONS[info.role]:undefined;const won=definition?.team===game.winner;return <article className={`cs-identity ${definition?.team??'good'}${won?' winner':''}`} style={vars({'--i':index})} key={player.id} aria-label={`${player.nickname}, ${definition?.name??'역할 정보 없음'}, ${won?'승리':'패배'}`}><i className="cs-identity-halo" aria-hidden="true"/><p className="cs-identity-player">{player.nickname}</p><div className="cs-identity-inner"><div className="cs-card-back" aria-hidden="true"><span className="cs-medal"><Sigil size={30}/></span><small>AVALON</small></div><div className="cs-card-front">{info&&<img className="cs-role-card-art" src={roleArtFor(info.role,player.id)} alt="" aria-hidden="true" loading="eager"/>}<i className="cs-foil"/></div></div><div className="cs-identity-meta"><span className="cs-outcome">{won?'승리':'패배'}</span>{info?.hasAssassinationAbility&&info.role!=='assassin'&&<small className="cs-ability">암살 능력</small>}</div>{definition?.team==='evil'&&<Particles count={8}/>}</article>;})}</div>
+    <header className="ending-film">
+      <EndingVista good={good}/>
+      <div className="ending-film-top"><span>THE RESISTANCE</span><span>AVALON / EPILOGUE</span></div>
+      <div className="cs-ending-title"><small>{good?'THE DAWN OF AVALON':'THE FALL OF AVALON'}</small><div className="ending-emblem"><Sigil kind={good?'good':'evil'} size={36}/></div><h1>{good?'선의 승리':'악의 승리'}</h1><div className="ending-title-rule"/><p>{game.winReason}</p><span className="ending-last-line">{good?'가장 어두운 밤에도, 맹세는 빛을 잃지 않았다.':'마지막 불빛이 꺼지고, 왕국은 침묵에 잠겼다.'}</span></div>
+      <div className="ending-film-bottom"><span>{good?'빛을 지켜낸 기사들':'어둠이 차지한 왕국'}</span><span>FIN</span></div>
+    </header>
+    <div className="ending-cast-heading"><span>THE TRUTH BEHIND THE OATH</span><h2>가면 뒤의 진실</h2><p>모든 기사의 정체가 공개됩니다</p></div>
+    <div className="cs-identity-grid" aria-label="모든 기사의 정체 공개">{game.players.map((player,index)=>{const info=game.revealedRoles?.find(item=>item.id===player.id);const definition=info?ROLE_DEFINITIONS[info.role]:undefined;const won=definition?.team===game.winner;return <article className={`cs-identity ${definition?.team??'good'}${won?' winner':''}`} style={vars({'--i':index})} key={player.id} aria-label={`${player.nickname}, ${definition?.name??'역할 정보 없음'}, ${won?'승리':'패배'}`}><i className="cs-identity-halo" aria-hidden="true"/><p className="cs-identity-player">{player.nickname}</p><div className="cs-identity-inner"><div className="cs-card-back" aria-hidden="true"><span className="cs-medal"><Sigil size={30}/></span><small>AVALON</small></div><div className="cs-card-front">{info&&<img className="cs-role-card-art" src={roleArtFor(info.role,player.id)} alt="" aria-hidden="true" loading="eager"/>}<i className="cs-foil"/><strong className="ending-role-name">{definition?.name??'역할 정보 없음'}</strong></div></div><div className="cs-identity-meta"><span className="cs-outcome">{won?'승리':'패배'}</span>{info?.hasAssassinationAbility&&info.role!=='assassin'&&<small className="cs-ability">암살 능력</small>}</div>{definition?.team==='evil'&&<Particles count={8}/>}</article>;})}</div>
     <GameChronicle game={game}>{game.playerId===game.hostId&&<button className="primary" disabled={clock.time<end} onClick={()=>void emit('GAME_RESTART',{roomCode:game.roomCode}).catch(error=>useGame.getState().setError(error.message))}>새 게임 시작</button>}</GameChronicle>
     {clock.time<end&&<button className="cs-skip" onClick={clock.skip}>엔딩 바로 보기</button>}
   </section>;

@@ -31,7 +31,7 @@ export const TableCinema=React.memo(function TableCinema({scene,cue=scene,round=
       <img className={`tc-photograph${loaded===photograph?' is-loaded':''}`} src={photograph} alt="" decoding="async" onLoad={()=>setLoaded(photograph)}/>
       <i className="tc-weather-overlay"/>
       {scene==='dawn'&&<i className="tc-success-rays"/>}
-      {scene==='shadow'&&<><i className="tc-failure-shadow"/>{destination.id==='forest'&&<svg className="tc-raven-overlay" viewBox="0 0 200 100"><path d="M40 31q12-12 22 0 12-15 26-4L67 43ZM109 17q10-9 18 0 10-12 22-4l-18 14Z"/></svg>}</>}
+      {scene==='shadow'&&<i className="tc-failure-shadow"/>}
     </>}
     <i className="tc-film-light"/><i className="tc-frame"/>
   </div>;

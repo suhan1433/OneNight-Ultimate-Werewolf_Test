@@ -447,7 +447,7 @@ function Home() {
   useEffect(() => {
     if (roles.length !== count + 3) setRoles(autoPreset(count));
   }, [count]);
-  const create = async (botMode = false) => {
+  const create = async () => {
     setBusy(true);
     const data = (await event("ROOM_CREATE", {
       nickname,
@@ -455,7 +455,6 @@ function Home() {
       selectedRoles: roles,
       actionTimeLimitSeconds: 20,
       dayTimeLimitSeconds: 300,
-      botMode,
     })) as
       | { roomCode: string; playerId: string; sessionToken: string }
       | undefined;
@@ -607,16 +606,7 @@ function Home() {
       >
         방 만들기
       </button>
-      <button
-        className="ghost"
-        disabled={busy || !nickname.trim() || roles.length !== count + 3}
-        onClick={() => create(true)}
-      >
-        테스트 봇 방 만들기
-      </button>
-      <p className="tiny center">
-        나를 제외한 모든 자리를 테스트 봇으로 채워 실제 게임 흐름을 확인합니다.
-      </p>
+      <p className="tiny center">대기실에서 친구를 초대하거나 봇을 추가할 수 있어요.</p>
     </section>
   );
 }
@@ -711,6 +701,14 @@ function Lobby({ game }: { game: ClientGameState }) {
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [botBusy, setBotBusy] = useState(false);
+  const manageBot = async (botId?: string) => {
+    if (botBusy) return;
+    setBotBusy(true);
+    try { await emitAck(botId ? "BOT_REMOVE" : "BOT_ADD", { ...req(game), ...(botId ? { botId } : {}) }); }
+    catch (error) { useGame.getState().setError(error instanceof Error ? error.message : "봇을 변경하지 못했습니다."); }
+    finally { setBotBusy(false); }
+  };
   const [profileOpen, setProfileOpen] = useState(false);
   // 입장하면 아직 안 쓰인 캐릭터를 자동 배정하고(저장된 선택이 있으면 그대로), 서버에 알린다.
   const lastSynced = useRef("");
@@ -778,7 +776,7 @@ function Lobby({ game }: { game: ClientGameState }) {
           </>
         )}
       </InMain>
-      <Header kicker={game.botMode ? "TEST BOT ROOM" : "WAITING ROOM"} title={game.botMode ? "테스트 봇과 함께하는 밤" : "달이 뜨기 전"} />
+      <Header kicker="WAITING ROOM" title="달이 뜨기 전" />
       <Panel className="center invite">
         <small>초대 코드</small>
         <CodeTiles value={game.roomCode} />
@@ -798,6 +796,11 @@ function Lobby({ game }: { game: ClientGameState }) {
       </div>
       <RoundTable game={game} onEditMe={() => setProfileOpen(true)} />
       <p className="profile-hint">내 자리를 눌러 캐릭터를 바꿀 수 있어요</p>
+      {game.hostId === game.playerId && <div className="lobby-bots">
+        <div className="lobby-bots-heading"><div><strong>봇과 함께 플레이</strong><p>빈 자리에 봇을 추가하세요. 봇은 자동으로 준비하고 행동합니다.</p></div><button type="button" className="chip" disabled={botBusy || full || starting} onClick={() => void manageBot()}>봇 추가</button></div>
+        {game.players.some(p => p.isBot) && <ul>{game.players.filter(p => p.isBot).map(bot => <li key={bot.id}><span>{bot.nickname}</span><button type="button" className="chip" aria-label={`${bot.nickname} 제거`} disabled={botBusy || starting} onClick={() => void manageBot(bot.id)}>제거</button></li>)}</ul>}
+      </div>}
+
       {profileOpen && <ProfileDialog game={game} onClose={() => setProfileOpen(false)} />}
       <div className={`lobby-actions${game.hostId === game.playerId ? " host" : ""}`}>
         <button

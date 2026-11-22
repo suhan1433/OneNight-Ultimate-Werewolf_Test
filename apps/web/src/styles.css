@@ -358,3 +358,8 @@ main.phase-night:before{opacity:.35}
 
 /* 상단 고정 버튼: 노치·상태바 안전 영역 */
 .help-fab,.audio-fab{top:max(16px,calc(env(safe-area-inset-top) + 8px))}
+
+/* Bots occupy ordinary lobby seats and remain under the host's control. */
+.lobby-bots{margin:14px 0 20px;padding:16px;border:1px solid #c9a35c33;border-radius:12px;background:#10192388;text-align:left}
+.lobby-bots-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.lobby-bots-heading strong{font-size:14px;color:var(--gold-300)}.lobby-bots-heading p{font-size:11px;line-height:1.7;color:var(--muted);margin:5px 0 0}.lobby-bots .chip{flex-shrink:0;width:auto;margin:0;white-space:nowrap}
+.lobby-bots ul{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-wrap:wrap;gap:8px}.lobby-bots li{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 12px;border:1px solid #c9a35c22;border-radius:8px;font-size:12px}.lobby-bots li .chip{font-size:10px;padding:5px 8px}

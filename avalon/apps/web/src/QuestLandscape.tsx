@@ -27,7 +27,6 @@ export function QuestLandscape({destination,scene,uid}:{destination:QuestDestina
       <g className="ql-foreground" fill="#061c1c">{TREES.map((t,i)=><g transform={`translate(${t.x} ${t.y}) scale(${t.s})`} key={i}><path d="M0-44-12-18h6L-17 2h11l-15 18h18v18h6V20h18L6 2h11L6-18h6Z"/></g>)}</g>
       <g className="ql-weather ql-fog" fill="#cad6b9" opacity=".16"><ellipse cx="44" cy="131" rx="78" ry="7"/><ellipse cx="155" cy="158" rx="89" ry="8"/></g>
       {scene==='dawn'&&<g className="ql-result-light" fill="#e9edb8" opacity=".2"><path d="m137 47-90 153H6ZM137 47l4 153H87Z"/></g>}
-      {scene==='shadow'&&<g className="ql-result-shadow" fill="#07101a">{[0,1,2].map(i=><path key={i} transform={`translate(${50+i*37} ${41+i%2*13})`} d="M-18-4Q-8-12 0 1 9-12 20-7L6 3 0 8-6 2Z"/>)}</g>}
     </>:destination.id==='strait'?<>
       <g className="ql-depth"><circle cx="61" cy="42" r="30" fill={`url(#${uid}-halo)`}/><circle cx="61" cy="42" r="10" fill="#bccbd5" opacity=".5"/>
         <g fill="#283d50"><path d="M-10 48Q31 30 77 49t95-4l42 16v13H-10ZM-10 77Q51 57 108 77t99-2v14H-10Z"/></g>

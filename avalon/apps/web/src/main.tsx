@@ -28,6 +28,7 @@ import './council-layout.css';
 import './council-polish.css';
 import './quest-stage-cinema.css';
 import './assassination-cinema.css';
+import './ending-film.css';
 import {ExpeditionRoster} from './ExpeditionRoster';
 import {RoundTrack,QUEST_SIZES} from './RoundTrack';
 import {useImmersion} from './immersion';
