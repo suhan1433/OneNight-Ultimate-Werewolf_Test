@@ -23,6 +23,8 @@ import type { RoomView, RoomListing } from "./types";
 import { playTone, ambience } from "./audio";
 import "./styles.css";
 import "./mobile.css";
+import { Rules, FIRST_GAME_TIPS } from "./Rules";
+import "./help.css";
 const socket = io({
   path: "/api/gomoku/socket",
   autoConnect: false,
@@ -296,6 +298,7 @@ function App() {
             busy={busy}
             enter={enter}
             request={request}
+            onLearn={() => setModal("rules")}
           />
         ) : !room.game ? (
           <Lobby
@@ -337,7 +340,7 @@ function App() {
       {modal && (
         <div className="modal-backdrop" onClick={() => setModal(null)}>
           <section
-            className={`modal ${modal === "codex" ? "wide" : ""}`}
+            className={`modal ${modal === "codex" ? "wide" : ""} ${modal === "rules" ? "help-modal" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-label={
@@ -355,7 +358,7 @@ function App() {
                   {modal === "settings"
                     ? "나만의 대국 환경"
                     : modal === "rules"
-                      ? "한 수를 두기 전에"
+                      ? "한 수씩 직접 배워보기"
                       : "석혼 도감"}
                 </h2>
               </div>
@@ -370,7 +373,7 @@ function App() {
             {modal === "settings" ? (
               <SettingsPanel value={settings} change={setSettings} />
             ) : modal === "rules" ? (
-              <Rules />
+              <Rules onClose={() => setModal(null)} inGame={!!room?.game && room.game.phase !== "result"} />
             ) : (
               <Codex />
             )}
@@ -422,11 +425,13 @@ function Home({
   busy,
   enter,
   request,
+  onLearn,
 }: {
   connected: boolean;
   busy: boolean;
   enter: (e: string, d: object) => Promise<void>;
   request: (e: string, d?: object) => Promise<any>;
+  onLearn: () => void;
 }) {
   const initialCode = new URLSearchParams(location.search).get("room") || "";
   const [tab, setTab] = useState<"create" | "join">(
@@ -644,12 +649,11 @@ function Home({
             <small>AI와 전략을 다듬으세요</small>
           </button>
           <button
-            disabled={busy || !connected || !name.trim()}
-            onClick={() => go("room:create", { bot: true, tutorial: true })}
+            onClick={onLearn}
           >
             <span className="practice-symbol">✧</span>
             <b>첫 대국 안내</b>
-            <small>한 수씩 배워보세요</small>
+            <small>직접 누르며 배워보세요</small>
           </button>
         </div>
         <p className="entry-note">설치 없이, 웹과 모바일에서 같은 대국을.</p>
@@ -1289,19 +1293,9 @@ function Match({
       </div>
       {room.tutorial && g.phase !== "result" && (
         <div className="tutorial-strip">
-          <span>✧ 첫 대국 안내</span>
-          <p>
-            {
-              [
-                "준비 시간에는 석혼을 구매해 벤치에 모읍니다. 구매하지 않아도 무료 플레인 스톤으로 대국할 수 있어요.",
-                "벤치에서 돌을 고르고 빈 교차점을 탭하세요. 미리보기 후 착수 확정을 누르면 됩니다.",
-                "석혼을 배치하면 특성이 쌓입니다. 보드의 내 액티브 석혼을 탭해 스킬을 시전해 보세요.",
-                "스킬로 만든 새 승부처는 상대의 반응 후 사용할 수 있습니다. 착수 후 턴 마치기를 누르세요.",
-                "R3·7·11은 증강, R4·8·12는 공용 제단이 열립니다. 다섯 개의 돌을 이어 승리하세요.",
-              ][tip]
-            }
-          </p>
-          <button onClick={() => setTip((tip + 1) % 5)}>다음 안내</button>
+          <span>✧ 첫 대국 안내 {tip + 1}/{FIRST_GAME_TIPS.length}</span>
+          <p>{FIRST_GAME_TIPS[tip]}</p>
+          <button onClick={() => setTip((tip + 1) % FIRST_GAME_TIPS.length)}>다음 안내</button>
         </div>
       )}
       <div className="arena">
@@ -1500,9 +1494,9 @@ function Match({
             {g.phase === "prep" ? (
               <>
                 <div>
-                  <b>準備 · 전열을 정비하세요</b>
+                  <b>{me.ready ? "상대의 정비를 기다리고 있어요" : "준비가 끝나면 [정비 완료]를 누르세요"}</b>
                   <small>
-                    상점 구매와 경험치 · 양쪽 준비 완료 시 바로 시작
+                    구매는 선택이에요. 아무것도 사지 않아도 기본 돌로 플레이할 수 있어요.
                   </small>
                 </div>
                 <button
@@ -1596,20 +1590,20 @@ function Match({
                       <b>
                         {myTurn
                           ? me.placed
-                            ? "한 수를 놓았습니다"
+                            ? "돌을 놓았어요. [턴 마치기]를 누르세요"
                             : cell !== null
                               ? `${cellName(cell)} · ${HERO[previewHero]?.name || "플레인 스톤"}`
                               : selectedUnit
                                 ? `${HERO[selectedUnit.hero].name} · 놓을 칸 선택`
-                                : "당신의 한 수를 기다립니다"
-                          : `${other.name}의 수를 읽어보세요`}
+                                : "빈 교차점을 눌러 놓을 자리를 고르세요"
+                          : `${other.name}의 차례예요. 잠시 기다리세요`}
                       </b>
                       <small>
                         {myTurn
                           ? me.placed
-                            ? "스킬을 사용하거나 턴을 마치세요."
-                            : "빈 교차점을 선택하고 착수를 확정하세요."
-                          : "상대의 마나와 공개된 특성을 확인할 수 있습니다."}
+                            ? "스킬은 선택이에요. 쓰지 않고 바로 턴을 마쳐도 됩니다."
+                            : cell !== null ? "[착수 확정]을 누르세요. 다른 빈칸을 누르면 자리를 바꿀 수 있어요." : "기본 돌은 무료예요. 칸을 고른 뒤 [착수 확정]을 누르세요."
+                          : "상단에 ‘당신의 차례’가 표시되면 돌을 놓을 수 있어요."}
                       </small>
                     </div>
                     {myTurn && me.shields > 0 && !me.shieldUsed && (
@@ -2161,56 +2155,6 @@ function Replay({ game }: { game: GameView }) {
         <button onClick={download}>기록 저장</button>
       </div>
       <small>착수·스킬·봉인·소멸을 포함한 실제 보드 상태를 복기합니다.</small>
-    </div>
-  );
-}
-function Rules() {
-  return (
-    <div className="rules">
-      <p>
-        13×13 기반에서 가로·세로·대각선으로 <strong>5개 이상</strong>을 이으면
-        승리합니다. 장목을 허용하고 금수는 없습니다.
-      </p>
-      <ol>
-        <li>
-          <b>준비 20초</b> · 상점의 석혼을 구매하거나 4G로 4XP를 얻습니다.
-          리롤은 기본 2G, 벤치는 9칸입니다. 동일한 ★1 석혼 3개는 ★2로 자동
-          합성됩니다.
-        </li>
-        <li>
-          <b>선공 30초 → 후공 30초</b> · 벤치 석혼 또는 무료 기본 돌 하나를
-          놓습니다. 액티브 스킬은 턴당 1회 선택입니다. 착수 후 턴 마치기를
-          눌러주세요.
-        </li>
-        <li>
-          <b>스킬과 예고</b> · 보드의 아군 액티브 석혼을 탭해 스킬을 누르고
-          대상을 선택합니다. 스킬로 열린 새 승부처는 상대가 반응한 다음 턴부터
-          사용할 수 있습니다. 직접 만든 5목도 상대 반응 후 유지되어야
-          승리합니다.
-        </li>
-        <li>
-          <b>보호와 반응</b> · 방금 둔 돌은 다음 상대 턴까지 스킬로 건드릴 수
-          없습니다. 승부처를 토큰이나 밀기로 막을 수 없으며, 추가 착수는 5목을
-          완성할 수 없습니다.
-        </li>
-        <li>
-          <b>경제와 성장</b> · 시작 골드 5, 후공 +3G / +2마나. 매 라운드 +5G,
-          10G당 이자 +1(최대 +5), 자동 +2XP. 턴 종료 마나 +2, 최대 레벨+2입니다.
-        </li>
-        <li>
-          <b>이야기의 사건</b> · R3·7·11 증강, R4·8·12 공용 제단. 같은 고유
-          석혼의 특성은 한 번만 셉니다. 5코는 합성하지 않습니다.
-        </li>
-        <li>
-          <b>시간 초과</b> · 위험한 칸을 막는 대리 착수를 진행하며, 누적 3회면
-          기권입니다. 연결이 끊겨도 시간은 흐르고 같은 브라우저에서 좌석을
-          복구할 수 있습니다.
-        </li>
-      </ol>
-      <p className="muted">
-        키보드: 1~5 구매 · D 리롤 · F 경험치 · Space 확정/턴 종료 · Q/W 선택한
-        석혼 스킬 · Esc 취소
-      </p>
     </div>
   );
 }

@@ -51,7 +51,7 @@ npm run dev
 
 기획에 대상 선택 방식이 없는 배치 효과(수호병 방패·연막 토큰·칼날 방패 파괴)는 조건을 만족하는 대상으로 자동 적용합니다. ★3은 적용 가능한 스킬의 인접 대상 추가 또는 범위 확장으로 처리합니다. 승급 증강의 대상을 고르지 않으면 적격 벤치 석혼 중 첫 대상을 고릅니다. 제단은 빈 벤치도 합성 가능성도 없으면 선택을 건너뜁니다. 증강 시간 초과는 사용 가능한 후보를 자동 선택합니다.
 
-현재 AI는 위협 차단과 연결 점수에 기반한 휴리스틱 사범입니다. MCTS와 실력 3단계, 첫 판 R1~R6 강제 시나리오는 아직 구현하지 않았습니다. 첫 대국 안내는 실제 봇 대국에 단계별 설명을 표시합니다.
+현재 AI는 위협 차단과 연결 점수에 기반한 휴리스틱 사범입니다. MCTS와 실력 3단계는 아직 구현하지 않았습니다. **첫 대국 안내** 또는 **게임 방법 → 직접 연습**에서는 시간 제한 없이 8개 상황을 직접 플레이합니다. 기본 착수·방어·구매와 배치·봉인 스킬·특성·5목 승리·증강·제단 순서이며, 실제 룰 엔진으로 판정하고 눌러야 할 칸과 버튼을 표시합니다. 이름 입력과 방 생성이 필요 없고 진행 중인 대국의 상태를 바꾸지 않습니다. 봇과의 실전 연습은 별도의 **사범과 연습**을 사용합니다.
 
 렌더링은 React·SVG·CSS를 사용합니다. 착수, 상태 문양, 위협 라인, 스킬 배너, 막과 라운드 표시는 구현되어 있으며, PixiJS/GSAP 기반 영웅별 컷신·자동 편집 영상과 4스템 국악 오케스트라 음원은 포함하지 않습니다. 오디오는 Web Audio로 합성합니다. 공유 기록은 JSON이며 완성 영상 내보내기는 제공하지 않습니다.
 
@@ -69,8 +69,14 @@ npx playwright install chromium
 npm run test:browser
 # 모바일 화면 검증 (서버는 테스트가 자동 실행):
 npm run test:mobile
+# 도움말의 직접 연습 8개를 실제 브라우저로 완료:
+npm run test:practice
+MOBILE_BROWSER=webkit npm run test:practice
 # Safari 계열 엔진 검증 (최초 1회 npx playwright install webkit):
 MOBILE_BROWSER=webkit npm run test:mobile
+# 도움말의 직접 연습 8개를 실제 브라우저로 완료:
+npm run test:practice
+MOBILE_BROWSER=webkit npm run test:practice
 # 시드 기반 자가대국:
 npm run simulate -- --games=100 --mode=tactics
 npm run simulate -- --games=10000 --mode=plain
