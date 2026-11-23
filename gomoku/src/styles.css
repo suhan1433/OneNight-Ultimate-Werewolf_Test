@@ -934,8 +934,7 @@ form > label {
 }
 .trait-panel h3,
 .augment-slots h3,
-.opponent-panel h3,
-.game-log h3 {
+.opponent-panel h3 {
   font-family: var(--serif);
   font-size: 1.05rem;
 }
@@ -1691,28 +1690,6 @@ form > label {
   background: linear-gradient(90deg, #5ce1e6, #e8c170, #ff6b5a);
   transition: width 1s;
 }
-.game-log > div {
-  max-height: 330px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  mask-image: linear-gradient(black 85%, transparent);
-}
-.game-log p {
-  font-size: 0.7rem;
-  padding: 8px 0;
-  border-bottom: 1px solid #52607522;
-  margin: 0;
-  line-height: 1.7;
-  color: #a0aec0;
-}
-.game-log p.gold {
-  color: #d9bf86;
-}
-.game-log p small {
-  font-size: 0.55rem;
-  color: #63788e;
-  margin-right: 8px;
-}
 .right-panel .chat {
   padding: 16px;
 }
@@ -2338,11 +2315,8 @@ form > label {
   }
   .right-panel {
     grid-column: 1/-1;
-    grid-template-columns: 1fr 1.3fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-top: 12px;
-  }
-  .game-log > div {
-    max-height: 180px;
   }
   .hero-stage {
     min-height: 650px !important;
@@ -3328,7 +3302,6 @@ form > label {
 .xp-track{height:14px}.xp-track span{font-size:.65rem;line-height:14px}
 .sell-button{font-size:.68rem;padding:6px 0}.bench-main b{font-size:.68rem}
 .plain-select small,.player-title>span,.player-resources small{font-size:.7rem}
-.game-log p small{font-size:.7rem;color:#8aa0b6}
 .trait summary,.trait summary small,.trait-icon{color:#a3b2c4}
 .home-footer,.entry-note{color:#8c9aad;font-size:.75rem}
 .practice-row small{font-size:.75rem;color:#9aa7b8;white-space:normal}

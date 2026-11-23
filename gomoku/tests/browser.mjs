@@ -165,7 +165,7 @@ try {
       await host.waitForTimeout(100);
     }
   }
-  await host.getByRole("button", { name: "특성 · 기록", exact: true }).click();
+  await host.getByRole("button", { name: "대국 정보", exact: true }).click();
   await button(host, "기권하기");
   await host
     .getByRole("dialog", { name: "대국 종료 확인" })

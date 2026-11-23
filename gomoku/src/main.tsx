@@ -22,6 +22,7 @@ import type {
 import type { RoomView, RoomListing } from "./types";
 import { playTone, ambience } from "./audio";
 import "./styles.css";
+import "./mobile.css";
 const socket = io({
   path: "/api/gomoku/socket",
   autoConnect: false,
@@ -924,15 +925,47 @@ function StoneView({ stone, side, mine, preview = false,
     </span>
   );
 }
-let lpFired = false;
+// Pointer handlers are recreated by the clock render. Keep each element's
+// pending press outside those closures so pointerup always cancels its timer.
+const pressTimers = new WeakMap<HTMLElement, number>();
+const longPressed = new WeakSet<HTMLElement>();
 function longPress(cb: () => void) {
-  let t: number | undefined;
-  const stop = () => window.clearTimeout(t);
+  const stop = (e: React.SyntheticEvent<HTMLElement>) => {
+    window.clearTimeout(pressTimers.get(e.currentTarget));
+    pressTimers.delete(e.currentTarget);
+  };
   return {
-    onPointerDown: () => { lpFired = false; t = window.setTimeout(() => { lpFired = true; cb(); }, 450); },
-    onPointerUp: stop, onPointerLeave: stop, onPointerCancel: stop,
-    onContextMenu: (e: React.SyntheticEvent) => { e.preventDefault(); cb(); },
-    onClickCapture: (e: React.SyntheticEvent) => { if (lpFired) { e.stopPropagation(); e.preventDefault(); lpFired = false; } },
+    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+      stop(e);
+      longPressed.delete(e.currentTarget);
+      if (e.button !== 0) return;
+      const element = e.currentTarget;
+      pressTimers.set(element, window.setTimeout(() => {
+        pressTimers.delete(element);
+        if (element.isConnected) {
+          longPressed.add(element);
+          cb();
+        }
+      }, 450));
+    },
+    onPointerUp: stop,
+    onPointerLeave: stop,
+    onPointerCancel: stop,
+    onContextMenu: (e: React.SyntheticEvent<HTMLElement>) => {
+      stop(e);
+      e.preventDefault();
+      if (!longPressed.has(e.currentTarget)) {
+        longPressed.add(e.currentTarget);
+        cb();
+      }
+    },
+    onClickCapture: (e: React.SyntheticEvent<HTMLElement>) => {
+      if (longPressed.has(e.currentTarget)) {
+        e.stopPropagation();
+        e.preventDefault();
+        longPressed.delete(e.currentTarget);
+      }
+    },
   };
 }
 function ResourcePlayer({
@@ -1225,7 +1258,7 @@ function Match({
     (!needTwo || destination !== null);
   return (
     <div
-      className={`match page-width phase-${g.phase} ${remaining <= 5 && g.phase !== "result" ? "time-critical" : ""}`}
+      className={`match page-width phase-${g.phase} ${resultHidden ? "result-board-open" : ""} ${remaining <= 5 && g.phase !== "result" ? "time-critical" : ""}`}
     >
       <div className="match-top">
         <div>
@@ -1250,8 +1283,8 @@ function Match({
           </span>
           <b>{g.phase === "result" ? "終" : `00:${fmt(remaining)}`}</b>
         </div>
-        <button className="mobile-details" onClick={() => setDrawer(!drawer)}>
-          {drawer ? "패널 닫기" : "특성 · 기록"}
+        <button className="mobile-details" aria-expanded={drawer} aria-controls="match-build-panel match-info-panel" onClick={() => setDrawer(!drawer)}>
+          {drawer ? "패널 닫기" : "대국 정보"}
         </button>
       </div>
       {room.tutorial && g.phase !== "result" && (
@@ -1272,7 +1305,7 @@ function Match({
         </div>
       )}
       <div className="arena">
-        <aside className={`left-panel ${drawer ? "mobile-open" : ""}`}>
+        <aside id="match-build-panel" className={`left-panel ${drawer ? "mobile-open" : ""}`}>
           <section className="panel trait-panel">
             <h3>깨어난 특성</h3>
             {(Object.keys(TRAITS) as Trait[]).map((t) => {
@@ -1763,7 +1796,7 @@ function Match({
             )}
           </section>
         </section>
-        <aside className={`right-panel ${drawer ? "mobile-open" : ""}`}>
+        <aside id="match-info-panel" className={`right-panel ${drawer ? "mobile-open" : ""}`}>
           <section className="panel opponent-panel">
             <h3>상대의 전략</h3>
             <p className="muted">
@@ -1802,23 +1835,6 @@ function Match({
               <div>
                 <i style={{ width: `${g.tension * 100}%` }} />
               </div>
-            </div>
-          </section>
-          <section className="panel game-log">
-            <h3>한 수의 기록</h3>
-            <div aria-live="polite">
-              {g.events
-                .slice(-18)
-                .reverse()
-                .map((e) => (
-                  <p
-                    key={e.id}
-                    className={e.type === "SKILL_CAST" ? "gold" : ""}
-                  >
-                    <small>R{e.round}</small>
-                    {e.text}
-                  </p>
-                ))}
             </div>
           </section>
           <Chat room={room} request={request} />

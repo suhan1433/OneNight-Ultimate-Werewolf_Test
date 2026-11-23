@@ -67,6 +67,10 @@ npm run test:browser
 # Chrome이 없는 환경:
 npx playwright install chromium
 npm run test:browser
+# 모바일 화면 검증 (서버는 테스트가 자동 실행):
+npm run test:mobile
+# Safari 계열 엔진 검증 (최초 1회 npx playwright install webkit):
+MOBILE_BROWSER=webkit npm run test:mobile
 # 시드 기반 자가대국:
 npm run simulate -- --games=100 --mode=tactics
 npm run simulate -- --games=10000 --mode=plain
@@ -74,7 +78,7 @@ npm run simulate -- --games=10000 --mode=plain
 
 룰·서버 테스트는 예고 규칙 5개 조항, 승리/장목/경계, 모든 스킬 프리미티브, 보호·봉인·방패·시간 정지, 12종 증강, 제단, 경제·풀 보존·합성, 상점 확률(레벨마다 10만 회), 특성 도달과 가치/마나 상한을 검사합니다. 실제 Socket.IO 클라이언트로 인증·방장 권한·차례·상대 정보 은닉·재접속·재대국도 검증합니다.
 
-브라우저 검증은 서로 다른 두 세션에서 생성/참가, 구매, 벤치 비공개, 착수 동기화, 새로고침 복구, 증강, 제단, 기권, 재대국과 390px 모바일 화면의 가로 넘침을 검사합니다. 스크린샷은 `artifacts/`에 생성합니다.
+브라우저 검증은 서로 다른 두 세션에서 생성/참가, 구매, 벤치 비공개, 착수 동기화, 새로고침 복구, 증강, 제단, 기권, 재대국과 390px 모바일 화면의 가로 넘침을 검사합니다. 스크린샷은 `artifacts/`에 생성합니다. 모바일 전용 검증은 320·360·390·430px 세로 화면과 667px 가로 화면, 768px 태블릿에서 시작·대기실·준비·착수·스킬·증강·제단·결과·설정의 겹침과 보드 크기를 검사합니다. 긴 닉네임, 꽉 찬 벤치와 터치/길게 누르기도 확인하며, 결과 이미지는 `artifacts/mobile-chromium/`, `artifacts/mobile-webkit/`에 저장됩니다.
 
 초기 전략 봇 100판 결과는 `tests/baselines/tactics-100.json`에 있습니다. 오류 없이 종료됐으나 **선공 승률 72%, 평균 21.38라운드, 스킬 사용 비율 약 74.6%**로 기획안의 목표와 차이가 있습니다. 상대 알고리즘이 동일한 휴리스틱이고 표본이 작으므로 사람의 승률로 해석해서는 안 됩니다. 기본 돌 무작위 대국 1,000판도 오류 없이 종료됐으며 결과는 `tests/baselines/plain-1000.json`에 기록했습니다. 현재 수치는 플레이테스트와 밸런스 조정이 필요한 상태입니다.
 
