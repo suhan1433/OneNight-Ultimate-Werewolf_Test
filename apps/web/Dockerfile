@@ -8,6 +8,7 @@ RUN npm install --global pnpm@10.11.0 \
   && npm --prefix spacecrew ci --include=dev \
   && npm --prefix rummikub ci --include=dev \
   && npm --prefix secret_hitler ci --include=dev \
+  && npm --prefix gomoku ci --include=dev \
   && pnpm --dir deception install --frozen-lockfile --prod=false
 ARG VITE_SOCKET_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL

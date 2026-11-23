@@ -52,6 +52,30 @@ server {
     proxy_read_timeout 3600s;
   }
 
+  # Gomoku keeps its full Socket.IO path; do not rewrite it to /socket.io/.
+  location /api/gomoku/socket/ {
+    proxy_pass http://127.0.0.1:3011;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_read_timeout 3600s;
+  }
+
+  location = /api/gomoku/health {
+    proxy_pass http://127.0.0.1:3011/health;
+  }
+
+  location = /gomoku {
+    absolute_redirect off;
+    return 301 /gomoku/$is_args$args;
+  }
+
+  location /gomoku/ {
+    alias /app/apps/web/dist/gomoku/;
+    try_files $uri $uri/ /gomoku/index.html;
+  }
+
   location = /health {
     proxy_pass http://127.0.0.1:3001/health;
   }

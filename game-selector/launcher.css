@@ -132,9 +132,9 @@ h1 em { font-weight: 600; }
 .reset-filters>span { margin-left: 6px; }
 .games { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
 .game-card { --accent: #bccebb; position: relative; min-width: 0; border: 1px solid #c3d0ba24; border-radius: 9px; background: #101d1d; box-shadow: 0 5px 22px #0001; transition: transform .4s var(--ease), border-color .35s, box-shadow .4s; }
-.game-card:last-child { grid-column: 1 / -1; }
+.game-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .game-card:hover, .game-card:focus-within { border-color: color-mix(in srgb, var(--accent) 65%, transparent); box-shadow: 0 18px 38px #0003; transform: translateY(-4px); }
-.game-card.avalon { background: #15221e; }.game-card.skullking { background: #231f18; }.game-card.spacecrew { background: #151e2a; }.game-card.rummikub { background: #12231e; }.game-card.deception { background: #112327; }.game-card.secret-hitler { background: #251e20; }
+.game-card.avalon { background: #15221e; }.game-card.skullking { background: #231f18; }.game-card.spacecrew { background: #151e2a; }.game-card.rummikub { background: #12231e; }.game-card.deception { background: #112327; }.game-card.secret-hitler { background: #251e20; }.game-card.gomoku { background: #151f2d; }
 .card-main { display: flex; flex-direction: column; height: 100%; border-radius: inherit; }
 .card-main:focus-visible { outline-offset: 5px; }
 .card-scene { position: relative; height: 240px; flex: none; overflow: hidden; border-radius: 8px 8px 0 0; isolation: isolate; }
@@ -194,9 +194,9 @@ footer { display: flex; align-items: center; justify-content: space-between; fle
 .hero-copy, .spotlight { animation: entrance .9s var(--ease) both; }.spotlight { animation-delay: .1s; }
 /* Keep the same reading order and alignment at every viewport width. */
 @media (min-width: 1000px) {
-  .games:not(.is-filtered) .game-card:last-child .card-main { display: grid; grid-template-columns: 1fr 1fr; }
-  .games:not(.is-filtered) .game-card:last-child .card-scene { height: 100%; min-height: 290px; border-radius: 8px 0 0 8px; }
-  .games:not(.is-filtered) .game-card:last-child .card-info { right: calc(50% + 12px); }
+  .games:not(.is-filtered) .game-card:last-child:nth-child(odd) .card-main { display: grid; grid-template-columns: 1fr 1fr; }
+  .games:not(.is-filtered) .game-card:last-child:nth-child(odd) .card-scene { height: 100%; min-height: 290px; border-radius: 8px 0 0 8px; }
+  .games:not(.is-filtered) .game-card:last-child:nth-child(odd) .card-info { right: calc(50% + 12px); }
 }
 @media (max-width: 1180px) {
   .shell { padding: 0 40px; }
@@ -288,7 +288,7 @@ footer { display: flex; align-items: center; justify-content: space-between; fle
   .results-line { min-height: 62px; gap: 10px; }
   .results-line p { font-size: 12px; }
   .games, .games.is-filtered { grid-template-columns: minmax(0, 1fr); gap: 24px; }
-  .game-card:last-child { grid-column: auto; }
+  .game-card:last-child:nth-child(odd) { grid-column: auto; }
   .card-scene { height: 230px; }
   .scene-tagline { font-size: 25px; }
   .card-body h3 { font-size: 26px; }

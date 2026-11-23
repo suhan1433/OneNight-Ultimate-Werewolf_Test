@@ -15,6 +15,8 @@ PORT=3006 node rummikub/apps/server/dist/server.js &
 PORT=3007 node deception/apps/server/dist/server.js &
 PORT=3008 DATA_DIR="${SECRET_HITLER_DATA_DIR:-/app/secret_hitler/.data}" secret_hitler/node_modules/.bin/tsx secret_hitler/apps/server/src/index.ts &
 
+PORT=3011 node gomoku/build/server/index.js &
+
 trap 'kill $(jobs -p) 2>/dev/null || true; exit 0' INT TERM
 nginx -g 'daemon off;' &
 nginx_pid=$!

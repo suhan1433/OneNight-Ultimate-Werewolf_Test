@@ -7,3 +7,6 @@ skullking/skullking_imgs
 .git
 .vercel
 npm-debug.log*
+
+gomoku/build
+gomoku/artifacts

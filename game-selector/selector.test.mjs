@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
+import { createGame } from '../gomoku/shared/engine.ts';
 import { games as actualGames } from '../game-switch/catalog.ts';
 
 const root=fileURLToPath(new URL('./',import.meta.url));
@@ -49,13 +50,20 @@ test('launcher styles load at the root, in its folder and from a local HTML file
   }finally{await context.close();}
 });
 
-test('seven destinations and player ranges match the game implementations',()=>{
-  assert.equal(games.length,7);
-  assert.equal(new Set(games.map(game=>game.id)).size,7);
+test('eight destinations and player ranges match the game implementations',()=>{
+  assert.equal(games.length,8);
+  assert.equal(new Set(games.map(game=>game.id)).size,8);
   for(const game of games){
     const id=game.id.replaceAll('-','_');
-    assert.ok(actualGames[id],game.id);
     assert.equal(game.href,`/${id}/`);
+    if(id==='gomoku'){
+      const state=createGame([{id:'one',name:'흑'},{id:'two',name:'백'}],1,0);
+      assert.equal(game.min,state.players.length);
+      assert.equal(game.max,state.players.length);
+      assert.throws(()=>createGame([{id:'one',name:'혼자'}],1,0));
+      continue;
+    }
+    assert.ok(actualGames[id],game.id);
     assert.equal(game.min,actualGames[id].min);
     assert.equal(game.max,actualGames[id].max);
   }
@@ -65,7 +73,7 @@ test('responsive layouts, readable cards and unique SVG ids',async()=>{
     const {context,page,errors}=await open({viewport:{width,height:950}});
     try{
       await page.locator('html.is-ready').waitFor();
-      assert.equal((await visibleIds(page)).length,7);
+      assert.equal((await visibleIds(page)).length,8);
       if(width<=700) assert.equal(await page.locator(".title-star").evaluate(el=>getComputedStyle(el).position),"absolute","decorative star must not wrap onto its own headline line");
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${width}: horizontal overflow`);
       const layoutProblems=await page.evaluate(()=>{
@@ -107,7 +115,7 @@ test('manual spotlight selection and details preserve the selected destination',
       assert.equal(await page.locator('#dialog-title').textContent(),game.title+(game.subtitle?` · ${game.subtitle}`:''));
       assert.equal(await page.locator('#dialog-how li').count(),3);
       assert.equal(await page.locator('#dialog-play').getAttribute('href'),game.href);
-      assert.equal(await page.locator('#dialog-people').textContent(),`${game.min}–${game.max}명`);
+      assert.equal(await page.locator('#dialog-people').textContent(),game.min===game.max?`${game.min}명`:`${game.min}–${game.max}명`);
       assert.ok(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth));
       await page.keyboard.press('Escape');
       assert.equal(await page.locator('dialog[open]').count(),0);
@@ -122,7 +130,7 @@ test('filters, shareable URLs, browser back, empty state and honest random picks
   const {context,page,errors}=await open();
   try{
     await page.locator('[data-mood="strategy"]').click();
-    assert.deepEqual(await visibleIds(page),['skullking','rummikub']);
+    assert.deepEqual(await visibleIds(page),['skullking','rummikub','gomoku']);
     await page.locator('#people-filter').selectOption('2');
     assert.equal(new URL(page.url()).searchParams.get('players'),'2');
     await page.locator('[data-mood="cooperative"]').click();
@@ -130,9 +138,9 @@ test('filters, shareable URLs, browser back, empty state and honest random picks
     assert.equal(await page.locator('#empty-state').isVisible(),true);
     assert.equal(await page.locator('#pick-game').isDisabled(),true);
     await page.goBack();
-    assert.deepEqual(await visibleIds(page),['skullking','rummikub']);
+    assert.deepEqual(await visibleIds(page),['skullking','rummikub','gomoku']);
     await page.locator('#reset-filters').click();
-    assert.equal((await visibleIds(page)).length,7);
+    assert.equal((await visibleIds(page)).length,8);
     assert.equal(await page.evaluate(()=>document.activeElement.dataset.mood),'all');
     await page.locator('#people-filter').selectOption('12');
     assert.deepEqual(await visibleIds(page),['deception']);
@@ -142,11 +150,11 @@ test('filters, shareable URLs, browser back, empty state and honest random picks
     await page.screenshot({path:join(screenshots,'selector-details.png'),animations:'disabled'});
     await page.keyboard.press('Escape');
     await page.locator('#people-filter').selectOption('1');
-    assert.equal((await visibleIds(page)).length,7);
+    assert.equal((await visibleIds(page)).length,8);
     await page.goto(`${origin}/?mood=cooperative&players=4`);
     assert.deepEqual(await visibleIds(page),['spacecrew']);
     await page.goto(`${origin}/?mood=invalid&players=999`);
-    assert.equal((await visibleIds(page)).length,7);
+    assert.equal((await visibleIds(page)).length,8);
     assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });
@@ -171,7 +179,7 @@ test('card details are separate from navigation and recently selected means a re
 test('navigation works without JavaScript or browser storage; reduced motion is respected',async()=>{
   const noScript=await open({javaScriptEnabled:false});
   try{
-    assert.equal((await visibleIds(noScript.page)).length,7);
+    assert.equal((await visibleIds(noScript.page)).length,8);
     assert.equal(await noScript.page.locator('.card-info:visible').count(),0);
     await noScript.page.locator('[data-game="rummikub"] .card-main').click();
     await noScript.page.waitForURL(`${origin}/rummikub/`);
@@ -197,8 +205,29 @@ test('a slow external font stylesheet cannot block game selection',async()=>{
     await page.goto(origin,{waitUntil:'domcontentloaded',timeout:5000});
     await page.locator('html.is-ready').waitFor({timeout:5000});
     await page.locator('[data-mood="strategy"]').click();
-    assert.deepEqual(await visibleIds(page),['skullking','rummikub']);
+    assert.deepEqual(await visibleIds(page),['skullking','rummikub','gomoku']);
     await page.locator('[data-game="rummikub"] .card-main').click();
     await page.waitForURL(`${origin}/rummikub/`);
+  }finally{await context.close();}
+});
+
+test('gomoku appears for two players, has its own preview and supports direct navigation',async()=>{
+  const {context,page,errors}=await open({viewport:{width:390,height:844}});
+  try{
+    await page.locator('#people-filter').selectOption('2');
+    assert.ok((await visibleIds(page)).includes('gomoku'));
+    await page.locator('#people-filter').selectOption('3');
+    assert.equal(await page.locator('[data-game="gomoku"]').isVisible(),false);
+    await page.locator('#people-filter').selectOption('2');
+    await page.locator('[data-preview="gomoku"]').click();
+    assert.equal(await page.locator('#spotlight-title').textContent(),'천원 · 오목 택틱스');
+    assert.equal(await page.locator('#spotlight-people').textContent(),'2명');
+    await page.locator('[data-info="gomoku"]').click();
+    assert.equal(await page.locator('#dialog-play').getAttribute('href'),'/gomoku/');
+    await page.locator('#dialog-play').click();
+    await page.waitForURL(`${origin}/gomoku/`);
+    await page.goto(origin);
+    assert.equal(await page.locator('#recent-link').getAttribute('href'),'/gomoku/');
+    assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });
