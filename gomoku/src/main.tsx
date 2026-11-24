@@ -1014,6 +1014,7 @@ function Match({
   const g = room.game!,
     me = g.players.find((p) => p.id === room.self)!,
     other = g.players.find((p) => p.id !== room.self)!,
+    bench = me.bench ?? [],
     myIndex = g.players.indexOf(me),
     myTurn = g.phase === "turn" && g.turn === me.id;
   const [cell, setCell] = useState<number | null>(null),
@@ -1023,7 +1024,7 @@ function Match({
     [target, setTarget] = useState<number | null>(null),
     [destination, setDestination] = useState<number | null>(null),
     [detail, setDetail] = useState<Hero | null>(null),
-    [drawer, setDrawer] = useState<"" | "me" | "log">(""), [sheet, setSheet] = useState(true), [coach, setCoach] = useState(() => !room.tutorial && read("cheonwon-coach", "") !== "1"),
+    [drawer, setDrawer] = useState<"" | "me" | "log">(""), [sheet, setSheet] = useState(true), [coach, setCoach] = useState(() => !room.tutorial && read<string>("cheonwon-coach", "") !== "1"),
     [effect, setEffect] = useState(""),
     [augmentUnit, setAugmentUnit] = useState(""),
     [emblem, setEmblem] = useState<Trait | "">(""),
@@ -1202,7 +1203,7 @@ function Match({
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
   });
-  const selectedUnit = me.bench?.find((u) => u.uid === unit),
+  const selectedUnit = bench.find((u) => u.uid === unit),
     previewHero = selectedUnit?.hero || "plain";
   const needTwo = ["push", "swap"].includes(sourceHero?.op || "");
   const skillHint = !sourceHero
@@ -1467,7 +1468,7 @@ function Match({
           </div>
           {g.phase === "turn" && (foeWin.length > 0 || myWin.length > 0) && (<div className={`danger-banner ${myWin.length ? "win" : ""}`}>{myWin.length ? `승리 칸 ${myWin.map(cellName).join(", ")} — 여기에 두면 5목` : `⚠ 상대 승부처 ${foeWin.map(cellName).join(", ")} — 막아야 합니다`}</div>)}
           {g.phase !== "result" && (<div className="synergy"><span className="syn-label">특성</span>{(Object.keys(TRAITS) as Trait[]).map((t) => { const d = TRAITS[t], n = me.traits[t] || 0, step = d.steps.filter((x) => n >= x).length, next = d.steps.find((x) => x > n), plus = !!selectedUnit && HERO[selectedUnit.hero].traits.includes(t); if (!n && !plus) return null; return (<button key={t} className={`syn ${step ? "on" : ""} ${hlTrait === t ? "sel" : ""}`} onClick={() => setHlTrait(hlTrait === t ? "" : t)}><span className="row"><span>{d.icon}</span><b>{d.name}</b><i>{n}{next ? `/${next}` : ""}</i>{plus && <em>+1</em>}</span><span className="pips">{d.steps.map((x) => (<u key={x} className={n >= x ? "f" : ""}>{x}</u>))}</span></button>); })}</div>)}
-          {hlTrait && (<p className="syn-detail" onClick={() => setHlTrait("")}><b>{TRAITS[hlTrait].icon} {TRAITS[hlTrait].name}</b> <small>벤치 제외, 서로 다른 석혼 수 기준 · {(() => { const n = me.traits[hlTrait] || 0, nx = TRAITS[hlTrait].steps.find((x) => x > n); return nx ? `${nx - n}명 더 놓으면 ${nx}단계` : "최고 단계"; })()}</small><br />{TRAITS[hlTrait].effects.map((e, i) => (<span key={i} className={me.traits[hlTrait] >= TRAITS[hlTrait].steps[i] ? "on" : ""}>{TRAITS[hlTrait].steps[i]}명 · {e}<br /></span>))}</p>)}
+          {hlTrait && (<p className="syn-detail" onClick={() => setHlTrait("")}><b>{TRAITS[hlTrait].icon} {TRAITS[hlTrait].name}</b> <small>벤치 제외, 서로 다른 석혼 수 기준 · {(() => { const n = me.traits[hlTrait] || 0, nx = TRAITS[hlTrait].steps.find((x) => x > n); return nx ? `${nx - n}명 더 놓으면 ${nx}단계` : "최고 단계"; })()}</small><br />{TRAITS[hlTrait].effects.map((e, i) => (<span key={i} className={(me.traits[hlTrait] ?? 0) >= TRAITS[hlTrait].steps[i] ? "on" : ""}>{TRAITS[hlTrait].steps[i]}명 · {e}<br /></span>))}</p>)}
           {g.phase === "turn" && myTurn && !skill && !shieldMode && source === null && skillList.length > 0 && (<div className="skill-row"><span className="syn-label">스킬</span>{skillList.map(({ c, h, why, need }) => (<button key={c} className={`skill-chip ${why ? "off" : ""}`} aria-disabled={!!why} onClick={() => { if (why) return; setCell(null); setSource(c); setSkill(true); setTarget(null); setDestination(null); }}><b>{h.glyph} {h.name}</b><small>{why || `${need}✧ · 지금 사용`}</small></button>))}</div>)}
           <div className="action-dock">
             {g.phase === "prep" ? (
@@ -1722,7 +1723,7 @@ function Match({
               </div>
             </div>
             {g.phase === "prep" && (<div className="sheet-bar"><button onClick={() => setSheet(!sheet)}>{sheet ? "상점 접기" : "상점 펼치기"}</button><button className="primary" disabled={busy || me.ready} onClick={() => void action({ type: "ready" })}>{me.ready ? "상대를 기다리는 중" : "정비 완료"}</button></div>)}
-            {g.phase === "prep" && (<div className="sheet-bench"><b>벤치 {me.bench.length}/9</b>{me.bench.length === 0 && <small>산 석혼은 여기에 보관되고, 대국 중 착수할 때 골라 놓습니다.</small>}{me.bench.map((u) => (<button key={u.uid} className={`mini-unit ${unit === u.uid ? "sel" : ""}`} onClick={() => setUnit(unit === u.uid ? undefined : u.uid)} {...longPress(() => setDetail(HERO[u.hero]))}><span>{HERO[u.hero].glyph}</span>{"★".repeat(u.star)}</button>))}{me.bench.find((u) => u.uid === unit) && (<button className="mini-sell" disabled={busy} onClick={() => void action({ type: "sell", uid: unit! })}>판매 +{me.bench.find((u) => u.uid === unit)!.paid}G</button>)}</div>)}
+            {g.phase === "prep" && (<div className="sheet-bench"><b>벤치 {bench.length}/9</b>{bench.length === 0 && <small>산 석혼은 여기에 보관되고, 대국 중 착수할 때 골라 놓습니다.</small>}{bench.map((u) => (<button key={u.uid} className={`mini-unit ${unit === u.uid ? "sel" : ""}`} onClick={() => setUnit(unit === u.uid ? undefined : u.uid)} {...longPress(() => setDetail(HERO[u.hero]))}><span>{HERO[u.hero].glyph}</span>{"★".repeat(u.star)}</button>))}{selectedUnit && (<button className="mini-sell" disabled={busy} onClick={() => void action({ type: "sell", uid: selectedUnit.uid })}>판매 +{selectedUnit.paid}G</button>)}</div>)}
             <div className="xp-track">
               <i
                 style={{
