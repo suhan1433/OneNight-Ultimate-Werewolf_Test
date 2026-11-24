@@ -443,10 +443,7 @@ function Home({
       socket.off("rooms", listener);
     };
   }, [connected]);
-  const go = (event: string, extra: object = {}) => {
-    save("cheonwon-name", name.trim());
-    void enter(event, { name, code, ...extra });
-  };
+  const go = (event: string, extra: object = {}) => { const nm = name.trim() || "손님"; save("cheonwon-name", name.trim()); void enter(event, { name: nm, code, ...extra }); };
   return (
     <div className="home">
       <section className="hero-stage">
@@ -588,8 +585,7 @@ function Home({
             <input
               value={name}
               maxLength={16}
-              required
-              placeholder="어떤 이름으로 기억될까요?"
+              placeholder="이름 (비워두면 손님)"
               autoComplete="nickname"
               onChange={(e) => setName(e.target.value)}
             />
@@ -623,7 +619,7 @@ function Home({
           )}
           <button
             className="primary full"
-            disabled={busy || !connected || !name.trim()}
+            disabled={busy || !connected}
           >
             {tab === "create" ? "대국 시작 · 방 만들기" : "신전에 입장하기"}
           </button>
@@ -633,7 +629,7 @@ function Home({
         </div>
         <div className="practice-row">
           <button
-            disabled={busy || !connected || !name.trim()}
+            disabled={busy || !connected}
             onClick={() => go("room:create", { bot: true })}
           >
             <span className="practice-symbol">◐</span>
@@ -641,7 +637,7 @@ function Home({
             <small>AI와 전략을 다듬으세요</small>
           </button>
           <button
-            disabled={busy || !connected || !name.trim()}
+            disabled={busy || !connected}
             onClick={() => go("room:create", { bot: true, tutorial: true })}
           >
             <span className="practice-symbol">✧</span>
@@ -671,10 +667,10 @@ function Home({
             {rooms.map((r) => (
               <button
                 key={r.code}
-                disabled={busy || !name.trim() || !connected}
+                disabled={busy || !connected}
                 onClick={() => {
                   save("cheonwon-name", name.trim());
-                  void enter("room:join", { name, code: r.code });
+                  void enter("room:join", { name: name.trim() || "손님", code: r.code });
                 }}
               >
                 <span className="mini-seal">◯</span>
@@ -846,10 +842,7 @@ function Lobby({
             )}
             {host &&
               (room.seats.length === 1 || room.seats.some((s) => s.bot)) && (
-                <button
-                  disabled={busy}
-                  onClick={() => void request("room:bot")}
-                >
+                <button className={room.seats.length === 1 ? "primary" : ""} disabled={busy} onClick={() => void request("room:bot")} >
                   {room.seats.some((s) => s.bot)
                     ? "사범 내보내기"
                     : "AI 사범 초대"}
@@ -936,14 +929,7 @@ function longPress(cb: () => void) {
 function ResourcePlayer({
   p,
   index,
-  self,
-  active,
-}: {
-  p: PublicPlayer;
-  index: number;
-  self: boolean;
-  active: boolean;
-}) {
+  self, active, hl, plus, onTrait, }: { p: PublicPlayer; index: number; self: boolean; active: boolean; hl?: string; plus?: string[]; onTrait?: (t: Trait) => void; }) {
   return (
     <section
       className={`player-card ${self ? "self" : "opponent"} ${active ? "active" : ""}`}
@@ -967,7 +953,7 @@ function ResourcePlayer({
         <span className="cyan">
           ✧ {p.mana}/{maxMana(p)} <small>마나</small><i className="pips" aria-hidden="true">{Array.from({ length: maxMana(p) }, (_, k) => (<i key={k} className={k < p.mana ? "on" : ""} />))}</i>
         </span> </div>
-      <div className={`chips ${self ? "mine-chips" : ""}`}>{(Object.entries(p.traits) as [Trait, number][]).filter(([, n]) => n > 0).map(([t, n]) => (<span key={t} className={n >= TRAITS[t].steps[0] ? "on" : ""}>{TRAITS[t].icon}{n}/{TRAITS[t].steps.find((x) => x > n) ?? TRAITS[t].steps.at(-1)}</span>))}</div>
+      <div className="chips">{(Object.keys(TRAITS) as Trait[]).map((t) => { const n = p.traits[t] || 0, add = !!plus?.includes(t); if (!n && !add) return null; const d = TRAITS[t], next = d.steps.find((x) => x > n); const cls = `${n >= d.steps[0] ? "on" : ""} ${hl === t ? "sel" : ""}`; const inner = (<>{d.icon}<b>{n}{next ? `/${next}` : ""}</b>{add && <em>+1</em>}</>); return onTrait ? (<button key={t} className={cls} aria-label={d.name} onClick={() => onTrait(t)}>{inner}</button>) : (<span key={t} className={cls} title={d.name}>{inner}</span>); })}</div>
     </section> ); } function HeroCard({
   hero,
   unit,
@@ -1037,7 +1023,7 @@ function Match({
     [target, setTarget] = useState<number | null>(null),
     [destination, setDestination] = useState<number | null>(null),
     [detail, setDetail] = useState<Hero | null>(null),
-    [drawer, setDrawer] = useState<"" | "me" | "log">(""), [sheet, setSheet] = useState(true),
+    [drawer, setDrawer] = useState<"" | "me" | "log">(""), [sheet, setSheet] = useState(true), [coach, setCoach] = useState(() => !room.tutorial && read("cheonwon-coach", "") !== "1"),
     [effect, setEffect] = useState(""),
     [augmentUnit, setAugmentUnit] = useState(""),
     [emblem, setEmblem] = useState<Trait | "">(""),
@@ -1086,7 +1072,7 @@ function Match({
     if (st.sealedUntil > g.ply) return `봉인 ${st.sealedUntil - g.ply}턴`;
     if (st.cooldown > 0 && !((me.traits.assassin || 0) >= 4 && !me.assassinUsed)) return `쿨다운 ${st.cooldown}턴`;
     const need = Math.max(1, h.mana - Number((me.traits.mage || 0) >= 4) + Number(me.skills > 0));
-    return me.mana < need ? `마나 ${need}✧ 필요 (보유 ${me.mana})` : "";
+    return me.mana < need ? `마나 ${need}✧ 필요` : "";
   };
   const skillList = g.board.flatMap((st, c) => st && st.owner === me.id && HERO[st.hero]?.type === "active" ? [{ c, h: HERO[st.hero], why: reasonOf(c), need: Math.max(1, HERO[st.hero].mana - Number((me.traits.mage || 0) >= 4) + Number(me.skills > 0)) }] : []).sort((a, b) => Number(!!a.why) - Number(!!b.why));
   const readyCells = new Set(skillList.filter((x) => !x.why).map((x) => x.c));
@@ -1096,7 +1082,7 @@ function Match({
     if (op === "token" || op === "extra") return !st;
     if (op === "storm") return true;
     if (op === "swap") return target === null ? st?.owner === me.id : st?.owner === other.id;
-    if (op === "push") return target === null ? st?.owner === other.id : !st;
+    if (op === "push") return target === null ? st?.owner === other.id : !st && near(c, target);
     return st?.owner === other.id;
   };
   const foeWin = g.winningCells[other.id] || [], myWin = g.winningCells[me.id] || [];
@@ -1181,8 +1167,7 @@ function Match({
     const s = g.board[c];
     if (s) { if (cell !== null && myTurn && !me.placed) return; setSource(c); setCell(null); return; }
     if (myTurn && !me.placed) {
-      setSource(null);
-      setCell(c);
+      setSource(null); setCell(cell === c && !settings.oneTap ? null : c);
       if (settings.oneTap)
         void action({ type: "place", cell: c, uid: unit }).then(
           (r) => r && setUnit(undefined),
@@ -1351,7 +1336,7 @@ function Match({
         </aside>
         <section className="board-column">
           <div className="player-pair">
-            <ResourcePlayer p={me} self index={myIndex} active={myTurn} />
+            <ResourcePlayer p={me} self index={myIndex} active={myTurn} hl={hlTrait} plus={selectedUnit ? HERO[selectedUnit.hero].traits : []} onTrait={(t) => setHlTrait(hlTrait === t ? "" : t)} />
             <ResourcePlayer
               p={other}
               self={false}
@@ -1364,7 +1349,7 @@ function Match({
           >
             <div className="board-corner tl" />
             <div className="board-corner br" />
-            <div className={`board ${hlTrait ? "has-hl" : ""} ${skill ? "skill-on" : ""}`}>
+            <div className={`board ${hlTrait ? "has-hl" : ""} ${skill ? "skill-on" : ""} ${skill && ["token", "extra", "storm"].includes(sourceHero?.op || "") ? "skill-wide" : ""}`}>
               <svg
                 className="board-grid"
                 viewBox="0 0 1300 1300"
@@ -1391,7 +1376,7 @@ function Match({
                     r="9"
                   />
                 ))}
-                {Array.from({ length: 13 }, (_, i) => (<g key={"l" + i} className="coord"><text x={50 + i * 100} y={-16} textAnchor="middle">{String.fromCharCode(65 + i)}</text><text x={-16} y={62 + i * 100} textAnchor="end">{13 - i}</text></g>))}{Object.entries(g.threats).flatMap(([id, lines]) =>
+                {cell !== null && (<g className="cross"><line x1={50 + (cell % 13) * 100} y1={50} x2={50 + (cell % 13) * 100} y2={1250} /><line x1={50} y1={50 + Math.floor(cell / 13) * 100} x2={1250} y2={50 + Math.floor(cell / 13) * 100} /></g>)}{Array.from({ length: 13 }, (_, i) => (<g key={"l" + i} className="coord"><text x={50 + i * 100} y={-16} textAnchor="middle">{String.fromCharCode(65 + i)}</text><text x={-16} y={62 + i * 100} textAnchor="end">{13 - i}</text></g>))}{Object.entries(g.threats).flatMap(([id, lines]) =>
                   lines
                     .filter((l) => l.size >= 3 && l.open > 0)
                     .map((l, i) => (
@@ -1433,7 +1418,7 @@ function Match({
                     <button
                       type="button"
                       key={c}
-                      className={`intersection ${selected ? "picked" : ""} ${win ? "winning-cell" : ""} ${threat ? "threat-cell" : ""} ${g.barredCells.includes(c) ? "barred" : ""} ${skill && validTarget(c) ? "valid" : ""} ${areaOf(c)}`}
+                      className={`intersection ${selected ? "picked" : ""} ${win ? "winning-cell" : ""} ${threat ? "threat-cell" : ""} ${g.barredCells.includes(c) ? "barred" : ""} ${skill && validTarget(c) ? "valid" : ""} ${areaOf(c)} ${source === c ? "src" : ""}`}
                       aria-label={`${cellName(c)} ${s ? `${g.players.find((p) => p.id === s.owner)?.name} ${HERO[s.hero]?.name || (s.tokenUntil ? "토큰" : "플레인 스톤")}${expires ? " 봉인 " + expires + "턴" : ""}${s.shield ? " 방패" : ""}` : "빈 칸"}`}
                       aria-pressed={selected}
                       onClick={() => tap(c)}
@@ -1481,9 +1466,9 @@ function Match({
             )}
           </div>
           {g.phase === "turn" && (foeWin.length > 0 || myWin.length > 0) && (<div className={`danger-banner ${myWin.length ? "win" : ""}`}>{myWin.length ? `승리 칸 ${myWin.map(cellName).join(", ")} — 여기에 두면 5목` : `⚠ 상대 승부처 ${foeWin.map(cellName).join(", ")} — 막아야 합니다`}</div>)}
-          {g.phase !== "result" && (<div className="synergy">{(Object.keys(TRAITS) as Trait[]).map((t) => { const d = TRAITS[t], n = me.traits[t] || 0, step = d.steps.filter((x) => n >= x).length, next = d.steps.find((x) => x > n), plus = !!selectedUnit && HERO[selectedUnit.hero].traits.includes(t); if (!n && !plus) return null; return (<button key={t} className={`syn ${step ? "on" : ""} ${hlTrait === t ? "sel" : ""}`} onClick={() => setHlTrait(hlTrait === t ? "" : t)}><span className="row"><span>{d.icon}</span><b>{d.name}</b><i>{n}{next ? `/${next}` : ""}</i>{plus && <em>+1</em>}</span><span className="pips">{d.steps.map((x) => (<u key={x} className={n >= x ? "f" : ""}>{x}</u>))}</span></button>); })}</div>)}
-          {hlTrait && (<p className="syn-detail"><small>벤치 제외, 서로 다른 석혼 수 기준 · {(() => { const n = me.traits[hlTrait] || 0, nx = TRAITS[hlTrait].steps.find((x) => x > n); return nx ? `${nx - n}명 더 놓으면 ${nx}단계` : "최고 단계"; })()}</small><br />{TRAITS[hlTrait].effects.map((e, i) => (<span key={i} className={(me.traits[hlTrait] ?? 0) >= TRAITS[hlTrait].steps[i] ? "on" : ""}>{TRAITS[hlTrait].steps[i]}명 · {e}<br /></span>))}</p>)}
-          {g.phase === "turn" && myTurn && !skill && !shieldMode && source === null && skillList.length > 0 && (<div className="skill-row">{skillList.map(({ c, h, why, need }) => (<button key={c} className={`skill-chip ${why ? "off" : ""}`} aria-disabled={!!why} onClick={() => { if (why) return; setCell(null); setSource(c); setSkill(true); setTarget(null); setDestination(null); }}><b>{h.glyph} {h.name}</b><small>{why || `${need}✧ · 지금 사용`}</small></button>))}</div>)}
+          {g.phase !== "result" && (<div className="synergy"><span className="syn-label">특성</span>{(Object.keys(TRAITS) as Trait[]).map((t) => { const d = TRAITS[t], n = me.traits[t] || 0, step = d.steps.filter((x) => n >= x).length, next = d.steps.find((x) => x > n), plus = !!selectedUnit && HERO[selectedUnit.hero].traits.includes(t); if (!n && !plus) return null; return (<button key={t} className={`syn ${step ? "on" : ""} ${hlTrait === t ? "sel" : ""}`} onClick={() => setHlTrait(hlTrait === t ? "" : t)}><span className="row"><span>{d.icon}</span><b>{d.name}</b><i>{n}{next ? `/${next}` : ""}</i>{plus && <em>+1</em>}</span><span className="pips">{d.steps.map((x) => (<u key={x} className={n >= x ? "f" : ""}>{x}</u>))}</span></button>); })}</div>)}
+          {hlTrait && (<p className="syn-detail" onClick={() => setHlTrait("")}><b>{TRAITS[hlTrait].icon} {TRAITS[hlTrait].name}</b> <small>벤치 제외, 서로 다른 석혼 수 기준 · {(() => { const n = me.traits[hlTrait] || 0, nx = TRAITS[hlTrait].steps.find((x) => x > n); return nx ? `${nx - n}명 더 놓으면 ${nx}단계` : "최고 단계"; })()}</small><br />{TRAITS[hlTrait].effects.map((e, i) => (<span key={i} className={me.traits[hlTrait] >= TRAITS[hlTrait].steps[i] ? "on" : ""}>{TRAITS[hlTrait].steps[i]}명 · {e}<br /></span>))}</p>)}
+          {g.phase === "turn" && myTurn && !skill && !shieldMode && source === null && skillList.length > 0 && (<div className="skill-row"><span className="syn-label">스킬</span>{skillList.map(({ c, h, why, need }) => (<button key={c} className={`skill-chip ${why ? "off" : ""}`} aria-disabled={!!why} onClick={() => { if (why) return; setCell(null); setSource(c); setSkill(true); setTarget(null); setDestination(null); }}><b>{h.glyph} {h.name}</b><small>{why || `${need}✧ · 지금 사용`}</small></button>))}</div>)}
           <div className="action-dock">
             {g.phase === "prep" ? (
               <>
@@ -1534,8 +1519,7 @@ function Match({
                 ) : sourceStone ? (
                   <>
                     <div>
-                      <b>
-                        {HERO[sourceStone.hero]?.name || "플레인 스톤"}{" "}
+                      <b> {sourceStone.owner !== me.id ? "상대 · " : "내 석혼 · "}{HERO[sourceStone.hero]?.name || "플레인 스톤"}{" "}
                         {sourceStone.shield ? "◇ 방패" : ""}
                       </b>
                       <small>
@@ -1596,7 +1580,7 @@ function Match({
                         {myTurn
                           ? me.placed
                             ? "스킬을 사용하거나 턴을 마치세요."
-                            : "빈 교차점을 선택하고 착수를 확정하세요."
+                            : cell !== null ? (selectedUnit ? HERO[selectedUnit.hero].description : "이 칸에 놓으려면 확정을 누르세요.") : selectedUnit ? HERO[selectedUnit.hero].description : "빈 교차점을 탭해서 놓을 곳을 고르세요."
                           : "상대의 마나와 공개된 특성을 확인할 수 있습니다."}
                       </small>
                     </div>
@@ -1605,16 +1589,13 @@ function Match({
                         방패 {me.shields}
                       </button>
                     )}
-                    <button
-                      className="primary"
-                      disabled={
-                        busy || !myTurn || (!me.placed && cell === null)
-                      }
+                    {myTurn && !me.placed && cell !== null && (<button className="quiet" onClick={reset}>취소</button>)}
+                    <button className="primary" disabled={ busy || !myTurn || (!me.placed && cell === null) }
                       onClick={() =>
                         me.placed ? void action({ type: "end" }) : void place()
                       }
                     >
-                      {me.placed ? "턴 마치기" : "착수 확정"}
+                      {!myTurn ? "상대 차례" : me.placed ? "턴 마치기" : "착수 확정"}
                     </button>
                   </>
                 )}
@@ -1741,6 +1722,7 @@ function Match({
               </div>
             </div>
             {g.phase === "prep" && (<div className="sheet-bar"><button onClick={() => setSheet(!sheet)}>{sheet ? "상점 접기" : "상점 펼치기"}</button><button className="primary" disabled={busy || me.ready} onClick={() => void action({ type: "ready" })}>{me.ready ? "상대를 기다리는 중" : "정비 완료"}</button></div>)}
+            {g.phase === "prep" && (<div className="sheet-bench"><b>벤치 {me.bench.length}/9</b>{me.bench.length === 0 && <small>산 석혼은 여기에 보관되고, 대국 중 착수할 때 골라 놓습니다.</small>}{me.bench.map((u) => (<button key={u.uid} className={`mini-unit ${unit === u.uid ? "sel" : ""}`} onClick={() => setUnit(unit === u.uid ? undefined : u.uid)} {...longPress(() => setDetail(HERO[u.hero]))}><span>{HERO[u.hero].glyph}</span>{"★".repeat(u.star)}</button>))}{me.bench.find((u) => u.uid === unit) && (<button className="mini-sell" disabled={busy} onClick={() => void action({ type: "sell", uid: unit! })}>판매 +{me.bench.find((u) => u.uid === unit)!.paid}G</button>)}</div>)}
             <div className="xp-track">
               <i
                 style={{
@@ -1855,7 +1837,7 @@ function Match({
             <h2>어떤 별을 따르겠습니까?</h2>
             <p className="muted">
               {me.choices?.length
-                ? "선택한 증강은 상대에게 공개됩니다."
+                ? "카드를 탭하면 바로 선택됩니다. 선택한 증강은 상대에게 공개됩니다."
                 : "상대의 별이 정해지기를 기다리는 중입니다."}{" "}
               · {remaining}초
             </p>
@@ -1889,7 +1871,7 @@ function Match({
             </div>
             {!!me.choices?.length && (
               <>
-                <div className="augment-options">
+                <details className="augment-more"><summary>선택 사항 · 승급 대상, 인장 특성</summary><div className="augment-options">
                   <label>
                     승급 대상
                     <select
@@ -1917,10 +1899,7 @@ function Match({
                         </option>
                       ))}
                     </select>
-                  </label>
-                </div>
-                <button
-                  disabled={busy || me.augmentRerolls <= 0}
+                  </label> </div></details> <button disabled={busy || me.augmentRerolls <= 0}
                   onClick={() => void action({ type: "augmentReroll" })}
                 >
                   별 다시 보기 · {me.augmentRerolls}회
@@ -1993,7 +1972,7 @@ function Match({
                   ? "당신의 수가 운명이 되었습니다."
                   : "다음 한 수를 위한 이야기."}
             </h2>
-            <p>{g.reason}</p><button className="quiet" onClick={() => setResultHidden(true)}>판 위의 마지막 한 수 보기</button>
+            <p>{g.reason}</p><button className="quiet board-peek" onClick={() => setResultHidden(true)}>판 위의 마지막 한 수 보기</button>
             <div className="result-stats">
               <span>
                 <b>{g.round}</b>라운드
@@ -2041,6 +2020,7 @@ function Match({
           </section>
         </div>
       )}
+      {coach && g.phase === "turn" && myTurn && !me.placed && (<div className="coach" role="dialog"><b>처음이시군요 — 이렇게 둡니다</b><ol><li>빈 칸을 탭하면 <em>미리보기</em>, <em>착수 확정</em>을 눌러 놓습니다.</li><li>금색 ⚡ 석혼은 지금 <em>스킬</em>을 쓸 수 있어요. 위의 스킬 칩을 탭하세요.</li><li><em>특성 칩</em>을 탭하면 같은 특성의 돌이 표시되고, 석혼을 <em>길게 누르면</em> 설명이 열립니다.</li></ol><button className="primary" onClick={() => { save("cheonwon-coach", "1"); setCoach(false); }}>알겠어요</button></div>)}
       {act > 0 && (() => { const a = ({ 1: ["제1막", "서막", "序"], 5: ["제2막", "격돌", "激"], 11: ["제3막", "결전", "決"] } as Record<number, string[]>)[act]; return (<div className="act-card" role="status"><small>{a[0]}</small><b>{a[2]}</b><h2>{a[1]}</h2></div>); })()}
       {detail && (
         <div
