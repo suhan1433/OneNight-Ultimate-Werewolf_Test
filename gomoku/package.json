@@ -11,10 +11,11 @@
     "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json",
     "start": "node build/server/index.js",
     "test": "tsx --test tests/*.test.ts",
-    "test:browser": "node tests/browser.mjs",
+    "test:browser": "node --import tsx tests/browser.mjs",
     "simulate": "tsx tests/simulate.ts",
     "test:mobile": "node --import tsx tests/mobile-layout.mjs",
-    "test:practice": "node --import tsx tests/practice.browser.mjs"
+    "test:practice": "node --import tsx tests/practice.browser.mjs",
+    "test:tactics": "node --import tsx tests/tactical.browser.mjs"
   },
   "dependencies": {
     "express": "^4.21.0",

@@ -11,6 +11,8 @@ import {
   player,
   bestMove,
   skillCost,
+  winningCells,
+  threatLines,
 } from "../shared/engine.js";
 import { HERO } from "../shared/data.js";
 import type { Game, Action } from "../shared/types.js";
@@ -184,6 +186,7 @@ export function createGameServer(
       seats.map((p) => ({ id: p.id, name: p.name })),
       randomBytes(4).readUInt32BE(),
       now(),
+      { ruleset: "focused", prepSeconds: 25, turnSeconds: 45 },
     );
     r.botAt = now() + 1000;
   }
@@ -228,10 +231,37 @@ export function createGameServer(
       return slot >= 0 ? { type: "altar", slot } : null;
     }
     if (g.phase !== "turn" || g.turn !== id) return null;
+    if (g.ruleset === "focused" && p.skills === 0 && !winningCells(g, id).length) {
+      const enemy = g.players.find(other => other.id !== id)!.id;
+      const value = (state: Game) => {
+        const strength = (who: string) => winningCells(state, who).length * 200 + threatLines(state, who).filter(l => l.open > 0).reduce((n,l) => n + l.size * l.size * l.open, 0);
+        return strength(id) - strength(enemy);
+      };
+      let best: Action | null = null, bestValue = value(g) + 5;
+      for (let source = 0; source < 169; source++) {
+        const stone = g.board[source];
+        if (!stone || stone.owner !== id || stone.cooldown || stone.sealedUntil > g.ply || !["push", "seal"].includes(HERO[stone.hero]?.op)) continue;
+        for (let target = 0; target < 169; target++) {
+          if (!g.board[target] || g.board[target]!.owner === id) continue;
+          const destinations = HERO[stone.hero].op === "push" ? g.board.flatMap((s,c) => !s && Math.max(Math.abs(c % 13 - target % 13),Math.abs(Math.floor(c / 13)-Math.floor(target / 13))) === 1 ? [c] : []) : [undefined];
+          for (const destination of destinations) {
+            const action: Action = { type: "skill", source, target, destination };
+            try {
+              const candidate = reduce(g,id,action,now()), score = value(candidate);
+              if (score > bestValue) { best = action; bestValue = score; }
+            } catch {}
+          }
+        }
+      }
+      if (best) return best;
+    }
     if (!p.placed) {
       const cell = bestMove(g, id);
-      return cell >= 0 ? { type: "place", cell, uid: p.bench[0]?.uid } : null;
+      const guarded = g.board.some((s,c) => s?.owner === id && !s.shield && Math.max(Math.abs(c % 13 - cell % 13),Math.abs(Math.floor(c / 13)-Math.floor(cell / 13))) <= 1);
+      const unit = g.ruleset === "focused" ? p.bench.find(u => u.hero === "guard" && guarded) || p.bench.find(u => HERO[u.hero].type === "active" && !g.board.some(s => s?.owner === id && s.hero === u.hero)) : p.bench[0];
+      return cell >= 0 ? { type: "place", cell, uid: unit?.uid } : null;
     }
+    if (g.ruleset === "focused") return { type: "end" };
     if (p.skills === 0) {
       for (let source = 0; source < 169; source++) {
         const s = g.board[source];

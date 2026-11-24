@@ -1,0 +1,163 @@
+/* The tactical match keeps the board and the actions as two predictable regions. */
+.focused { --controls-height: 260px; }
+.focused-hidden { display: none !important; }
+.focused .arena { grid-template-columns: minmax(0, 1fr) 280px; }
+.focused .board-column { min-width: 0; }
+.focused .board-frame { transform: none; max-width: 640px; width: 100%; }
+.focused .board { transform: none; }
+.board-instruction { color: #c4cedb; font-size: .8rem; margin-bottom: 12px; line-height: 1.6; }
+.focused .player-title > span { font-size: .75rem; }
+.focused .player-resources .pips, .focused .chips { display: none; }
+.focused .turn-controls { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #101a29; }
+.control-heading { order: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .8rem; }
+.control-heading span { color: var(--cyan); }
+.focused .bench-section { order: 1; margin: 0; }
+.focused .bench-section .section-heading { display: none; }
+.focused .bench { display: flex; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+.focused .bench > .plain-select, .focused .bench > .bench-unit { flex: 0 0 88px; width: 88px; min-width: 88px; }
+.focused .bench-main, .focused .plain-select { width: 100%; min-height: 72px; padding: 5px; }
+.focused .bench-main b { font-size: .85rem; min-height: 0; }
+.focused .bench-main small { font-size: .7rem; }
+.focused .bench-main > span { font-size: 1.15rem; line-height: 1.2; }
+.focused .plain-select small, .focused .bench-empty { display: none; }
+.focused .skill-row { order: 2; display: flex; overflow-x: auto; padding: 0 0 2px; gap: 6px; }
+.focused .skill-chip { flex: 0 0 auto; width: auto; min-width: 112px; min-height: 44px; }
+.focused .skill-row .syn-label { display: none; }
+.tactical-preview { order: 3; color: #d2dfed; font-size: .8rem; line-height: 1.5; }
+.precision { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+.precision span { flex: 1; color: var(--gold); font-size: .75rem; }
+.precision button { width: 44px; min-height: 44px; padding: 0; flex-shrink: 0; font-size: 1.1rem; }
+.focused .action-dock { order: 4; position: static; margin: 0; min-height: 44px; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; gap: 8px; }
+.focused .action-dock > div { flex: 1; min-width: 0; }
+.focused .action-dock small { white-space: normal; font-size: .75rem; }
+.focused .action-dock button { min-height: 44px; }
+.tactical-feedback { padding: 10px 12px; border-left: 3px solid var(--cyan); font-size: .85rem; color: #d2dfed; line-height: 1.6; background: #122735; }
+.tactical-feedback b { color: var(--cyan); }
+.focused .intersection.preview-change { outline: 2px solid var(--gold); outline-offset: -2px; background: #e8c17025; }
+.focused.phase-prep .board-frame, .focused.phase-prep .turn-controls { display: none; }
+.supply-panel { padding: 20px; }
+.supply-panel h2 { font-size: 1.2rem; margin: 0; }
+.supply-panel > p { color: #afbed0; line-height: 1.7; font-size: .9rem; }
+.supply-cards { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.supply-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: #182435; border: 1px solid #e8c17044; border-radius: 8px; min-width: 0; }
+.supply-card > b { color: var(--gold); font-size: 1.05rem; }
+.supply-card > b small { float: right; }
+.supply-card p { margin: 0; line-height: 1.6; font-size: .85rem; }
+.supply-card > small { color: #afbed0; line-height: 1.5; }
+.supply-card button { margin-top: auto; min-height: 44px; padding: 8px; }
+.supply-card.sold { color: #9aabba; justify-content: center; min-height: 140px; }
+.supply-inventory { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0; font-size: .8rem; }
+.supply-inventory > span { border: 1px solid var(--line); border-radius: 6px; padding-left: 8px; }
+.supply-inventory button { min-height: 44px; margin-left: 6px; padding: 6px; font-size: .75rem; }
+.supply-ready { width: 100%; min-height: 48px; }
+.focused .drawer-close { min-height: 44px; width: 100%; }
+@media (min-width: 901px) { .focused .drawer-close { display: none; } }
+@media (max-width: 900px) {
+  .focused .arena { display: flex; }
+  .focused .right-panel { display: none; }
+  .focused .right-panel.mobile-open { display: grid; position: fixed; inset: auto 0 0; z-index: 50; max-height: 70dvh; overflow-y: auto; padding: 16px; background: #0c1524; }
+}
+@media (max-width: 700px) {
+  .focused { min-height: 0; height: calc(100dvh - 48px); overflow: hidden; padding: 0 10px; }
+  .focused .match-top { flex: 0 0 48px; padding: 4px 0; }
+  .focused .match-top h1 { font-size: .85rem; }
+  .focused .match-top .last-move { display: none; }
+  .focused .mobile-details { min-height: 44px; font-size: .75rem; }
+  .focused .arena { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; }
+  .focused .board-column { flex-shrink: 0; padding-bottom: calc(var(--controls-height) + 14px); }
+  .focused .player-pair { margin: 0 0 6px; gap: 6px; }
+  .focused .player-card { padding: 6px; grid-template-columns: 20px minmax(0,1fr); gap: 2px 5px; }
+  .focused .player-title > b { display: block; max-width: 100%; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+  .focused .player-title > span, .focused .player-resources { display: none; }
+  .focused .board-frame { flex-shrink: 0; width: 100%; max-width: none; padding: 20px 12px 12px; margin: 0; }
+  .board-instruction { display: none; }
+  .focused .turn-controls { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; border-radius: 12px 12px 0 0; border-bottom: 0; padding: 8px 10px max(8px,env(safe-area-inset-bottom)); gap: 6px; box-shadow: 0 -8px 20px #0006; max-height: 60dvh; overflow-y: auto; }
+  .focused .action-dock { flex-wrap: nowrap; }
+  .focused .action-dock b { font-size: .8rem; }
+  .focused .action-dock small { display: none; }
+  .focused .action-dock button { padding: 6px 12px; font-size: .85rem; }
+  .focused .bench > .plain-select, .focused .bench > .bench-unit { flex-basis: 78px; width: 78px; min-width: 78px; }
+  .focused .bench-main, .focused .plain-select { min-height: 65px; }
+  .focused .plain-stone { margin: 0; }
+  .focused .tactical-preview { font-size: .75rem; }
+  .focused.phase-prep .board-column { padding-bottom: 16px; }
+  .focused.phase-result { height: auto; overflow: visible; }
+  .focused.phase-result .arena { overflow: visible; }
+  .focused.phase-result .turn-controls { display: none; }
+  .supply-panel { padding: 14px 10px; }
+  .supply-cards { grid-template-columns: 1fr; gap: 8px; }
+  .supply-card { display: grid; grid-template-columns: minmax(0,1fr) 100px; gap: 6px 12px; padding: 12px; }
+  .supply-card > b, .supply-card p, .supply-card > small { grid-column: 1; }
+  .supply-card > button { grid-column: 2; grid-row: 1 / 4; align-self: center; margin: 0; }
+  .supply-card.sold { display: flex; min-height: 60px; }
+  .tactical-feedback { margin: 8px 0; }
+}
+@media (max-width: 700px) and (orientation: landscape) {
+  .focused .board-column { width: 52%; padding-bottom: 16px; }
+  .focused .turn-controls { left: 53%; top: 100px; bottom: 0; border-radius: 10px 0 0; max-height: none; }
+  .focused .control-heading { flex-wrap: wrap; }
+  .focused.phase-prep .board-column, .focused.phase-result .board-column { width: 100%; }
+  .focused.phase-prep .supply-cards { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .focused.phase-prep .supply-card { display: flex; }
+}
+.control-tabs { display: flex; gap: 4px; }
+.control-tabs button { min-height: 44px; padding: 6px 10px; color: #b9c8d8; font-size: .8rem; }
+.control-tabs button[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); background: #e8c17012; }
+.control-heading > span { text-align: right; }
+.control-heading > span small { display: block; color: #9cacc0; font-size: .7rem; }
+.focused .tray-place .skill-row, .focused .tray-skills .bench-section, .focused .inspecting .bench-section { display: none; }
+.focused.phase-result .turn-controls { display: none; }
+@media (max-width: 700px) {
+  .focused-app .topbar { height: 44px; }
+  .focused { height: calc(100dvh - 44px); }
+  .focused .match-top { flex-basis: 44px; }
+  .focused .player-pair { display: none; }
+  .focused .board-frame { padding-top: 14px; padding-bottom: 8px; }
+  .focused .bench-main, .focused .plain-select { min-height: 60px; }
+  .focused .control-heading { font-size: .75rem; }
+  .focused-app .choice-backdrop, .focused-app .result-overlay { inset: 44px 0 0; }
+}
+@media (max-width: 700px) and (orientation: landscape) {
+  .focused .turn-controls { top: 88px; }
+  .focused .board-frame { max-width: min(100%,calc(100dvh - 104px)); margin-inline: auto; }
+}
+
+@media (max-width: 700px) {
+  .focused .match-top { padding: 0; }
+  .focused .turn-controls { gap: 4px; padding: 6px max(10px, env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)); }
+}
+@media (min-width: 901px) {
+  .focused .arena { display: block; }
+  .focused .board-column { display: grid; grid-template-columns: minmax(0,1fr) 300px; align-items: start; gap: 12px 16px; }
+  .focused .board-column > .player-pair, .focused .board-column > .board-frame, .focused .danger-banner, .focused .tactical-feedback { grid-column: 1; }
+  .focused .board-frame { padding: 16px; max-width: min(100%,calc(100dvh - 240px)); justify-self: center; margin: 0; }
+  .focused .turn-controls { grid-column: 2; grid-row: 1 / 6; position: sticky; top: 12px; }
+  .focused .right-panel { display: none; }
+  .focused .right-panel.mobile-open { display: grid; position: fixed; right: 20px; top: 110px; width: 340px; max-height: calc(100dvh - 130px); overflow-y: auto; padding: 16px; z-index: 50; background: #0c1524; box-shadow: 0 0 30px #0009; }
+  .focused .drawer-close, .focused .mobile-details { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; }
+  .focused.phase-prep .board-column { display: block; }
+}
+
+.focused .arena { overflow-anchor: none; }
+@media (max-width: 900px) {
+  .focused .board-column { width: 100%; display: flex; flex-direction: column; }
+}
+@media (max-width: 700px) and (orientation: landscape) {
+  .focused.phase-turn .board-column { width: 52%; }
+}
+@media (min-width: 701px) {
+  .focused .match-top { display: flex; align-items: center; padding-block: 12px; gap: 12px; }
+  .focused .match-top .eyebrow, .focused .match-top h1 > span { display: none; }
+  .focused .match-top h1 { font-size: 1.2rem; margin: 0; }
+  .focused .phase-clock { margin-left: auto; }
+}
+/* Results stay in the action area so animation never obscures a live board. */
+.focused .event-cut { display: none; }
+.supply-panel { display: flex; flex-direction: column; }
+.supply-panel > .section-heading { order: 0; }
+.supply-panel > p { order: 1; }
+.supply-panel > .supply-ready { order: 2; margin-bottom: 12px; }
+.supply-panel > .supply-cards { order: 3; }
+.supply-panel > .supply-inventory { order: 4; }
+.focused .intersection.deployment-range { box-shadow: inset 0 0 0 1px #5ce1e62a; }
+.focused .intersection.deployment-range:has(.stone.theirs) { background-color: #5ce1e626; }

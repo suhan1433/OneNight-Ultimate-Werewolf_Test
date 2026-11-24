@@ -1,6 +1,8 @@
 import {
   HERO,
   HEROES,
+  TACTICAL_HEROES,
+  TACTICAL_RANGE,
   TRAITS,
   ODDS,
   XP,
@@ -86,6 +88,7 @@ export function traitCounts(
   id: string,
 ): Partial<Record<Trait, number>> {
   const counts: Partial<Record<Trait, number>> = {};
+  if (g.ruleset === "focused") return counts;
   const seen = new Set<string>();
   for (const s of g.board) {
     if (
@@ -285,9 +288,9 @@ function canReceive(p: Player, id: string) {
   );
 }
 function receive(g: Game, p: Player, id: string, paid = HERO[id].cost) {
-  requireRule(canReceive(p, id), "벤치가 가득 찼습니다. 먼저 판매해 주세요.");
+  requireRule(g.ruleset === "focused" ? p.bench.length < 6 : canReceive(p, id), "벤치가 가득 찼습니다. 먼저 판매해 주세요.");
   p.bench.push(newUnit(g, id, 1, paid));
-  merge(g, p);
+  if (g.ruleset !== "focused") merge(g, p);
 }
 function draw(g: Game, cost: number) {
   const available = HEROES.filter(
@@ -368,6 +371,24 @@ function startPrep(g: Game, now: number) {
   event(g, "PREP", `제 ${g.round} 라운드 · 준비`);
 }
 function startRound(g: Game, now: number) {
+  if (g.ruleset === "focused") {
+    if ((g.round - 1) % 4 !== 0) {
+      beginTurn(g, g.players[0], now);
+      return;
+    }
+    for (const p of g.players) {
+      for (const id of p.shop) if (id) g.pool[id]++;
+      p.shop = TACTICAL_HEROES.map((id) => {
+        if (g.pool[id] <= 0) return null;
+        g.pool[id]--;
+        return id;
+      });
+      if (g.round > 1) p.gold += 4;
+    }
+    event(g, "SUPPLY", "보급 · 보호, 밀기, 봉인 중 다음 공격에 필요한 돌을 고르세요.");
+    startPrep(g, now);
+    return;
+  }
   g.players.forEach((p) => {
     p.merchantGold = 0;
     p.roundRerolls = 0;
@@ -413,7 +434,7 @@ export function createGame(
   names: { id: string; name: string }[],
   seed = Date.now(),
   now = Date.now(),
-  settings = { prepSeconds: 20, turnSeconds: 30 },
+  settings: { prepSeconds: number; turnSeconds: number; ruleset?: "classic" | "focused" } = { prepSeconds: 20, turnSeconds: 30 },
 ): Game {
   requireRule(names.length === 2, "대국에는 두 명이 필요합니다.");
   const g: Game = {
@@ -427,6 +448,7 @@ export function createGame(
     ply: 0,
     turn: "",
     deadline: 0,
+    ruleset: "classic",
     ...settings,
     altar: [],
     altarOrder: [],
@@ -473,11 +495,21 @@ export function createGame(
     assassinUsed: false,
     barred: {},
   }));
+  if (g.ruleset === "focused") {
+    for (const p of g.players) {
+      p.gold = 3;
+      p.mana = 4;
+      for (const id of TACTICAL_HEROES) {
+        g.pool[id]--;
+        receive(g, p, id, 0);
+      }
+    }
+  }
   g.turn = g.players[0].id;
   event(
     g,
     "COIN",
-    `금화는 ${g.players[0].name}에게. 흑석 선공 · 백석 후공 보정 +3골드 / +2마나`,
+    g.ruleset === "focused" ? `${g.players[0].name} 선공 · 양쪽 모두 보호·밀기·봉인 석혼으로 시작합니다.` : `금화는 ${g.players[0].name}에게. 흑석 선공 · 백석 후공 보정 +3골드 / +2마나`,
   );
   startRound(g, now);
   return g;
@@ -607,7 +639,7 @@ function deploy(g: Game, p: Player, c: number, s: Stone) {
   const scale = s.star >= 2 ? 1.5 : 1;
   switch (h.op) {
     case "shieldNeighbor": {
-      const near = alliedNeighbors(g, c, p.id).slice(0, s.star >= 3 ? 2 : 1);
+      const near = alliedNeighbors(g, c, p.id).filter(o => g.ruleset !== "focused" || (!o.s.shield && !o.s.tokenUntil)).slice(0, s.star >= 3 ? 2 : 1);
       near.filter((o) => !o.s.tokenUntil).forEach((o) => (o.s.shield = true));
       break;
     }
@@ -735,6 +767,9 @@ function cast(g: Game, p: Player, a: Extract<Action, { type: "skill" }>) {
   );
   const c = a.target ?? -1;
   const t = valid(c) ? g.board[c] : null;
+  if (g.ruleset === "focused" && TACTICAL_RANGE[s.hero]) {
+    requireRule(valid(c) && distance(a.source, c) <= TACTICAL_RANGE[s.hero], `이 석혼의 스킬은 주변 ${TACTICAL_RANGE[s.hero]}칸 안에서 사용할 수 있습니다.`);
+  }
   const cost = skillCost(g, p, s, c);
   requireRule(p.mana >= cost, `마나가 부족합니다. 필요 마나 ${cost}`);
   const before = winningBefore(g);
@@ -928,6 +963,7 @@ function beginTurn(g: Game, p: Player, now: number) {
   event(g, "TURN", `${p.name}의 한 수`, p.id);
 }
 function settle(g: Game) {
+  if (g.ruleset === "focused") return;
   for (const p of g.players) {
     const interest = Math.min(
       p.augments.includes("interest") ? 8 : 5,
@@ -1122,6 +1158,8 @@ function apply(g: Game, id: string, a: Action, now: number) {
   }
   if (["buy", "sell", "reroll", "xp", "ready"].includes(a.type)) {
     requireRule(g.phase === "prep", "상점은 준비 시간에만 사용할 수 있습니다.");
+    requireRule(g.ruleset !== "focused" || !["reroll", "xp"].includes(a.type), "전술 오목에서는 보급 석혼만 구매할 수 있습니다.");
+    requireRule(g.ruleset !== "focused" || a.type === "ready" || !p.ready, "보급 준비를 마쳤습니다. 상대를 기다려 주세요.");
     switch (a.type) {
       case "buy": {
         requireRule(
@@ -1219,9 +1257,35 @@ function recordFrame(before: Game, after: Game, actor: string, label: string) {
       changes,
     });
 }
+export function tacticalOutcome(before: Game, after: Game, id: string): string[] {
+  const enemy = opponent(before, id).id;
+  const result: string[] = [];
+  const oldWins = winningCells(before, enemy), newWins = winningCells(after, enemy);
+  if (oldWins.length && newWins.length < oldWins.length)
+    result.push(newWins.length ? `상대의 5목 완성 자리 ${oldWins.length - newWins.length}곳을 막았습니다` : "상대의 즉시 5목 위협을 막았습니다");
+  const size = (g: Game, who: string) => Math.max(0, ...threatLines(g, who).filter(l => l.open > 0).map(l => l.size));
+  const oldLines = threatLines(before, enemy).filter(l => l.size >= 3 && l.open > 0);
+  const newLines = threatLines(after, enemy);
+  const broken = oldLines.filter(l => !newLines.some(next => l.cells.every(c => next.cells.includes(c))));
+  if (broken.length) result.push(`상대 ${Math.max(...broken.map(l => l.size))}목 연결을 끊었습니다`);
+  const shieldsBroken = before.board.filter(s => s?.owner === enemy && s.shield).length - after.board.filter(s => s?.owner === enemy && s.shield).length;
+  if (shieldsBroken > 0) result.push(`상대 방패 ${shieldsBroken}개를 파괴했습니다 · 연결은 유지됩니다`);
+  const ownBefore = size(before, id), ownAfter = size(after, id);
+  if (ownAfter >= 3 && ownAfter > ownBefore) result.push(`내 ${ownAfter}목 공격을 만들었습니다`);
+  const shields = after.board.filter(s => s?.owner === id && s.shield).length - before.board.filter(s => s?.owner === id && s.shield).length;
+  if (shields > 0) result.push(`아군 돌 ${shields}개를 방패로 보호합니다`);
+  if (after.winner === id) result.push("5목 완성 · 승리");
+  return result;
+}
+
 export function reduce(g: Game, id: string, a: Action, now = Date.now()): Game {
   const next = structuredClone(g);
   apply(next, id, a, now);
+  if (g.ruleset === "focused" && (a.type === "place" || a.type === "skill")) {
+    const outcome = tacticalOutcome(g, next, id);
+    const fallback = a.type === "place" ? "돌을 놓았습니다. 다음 연결과 상대의 대응을 살펴보세요." : "판이 바뀌었습니다. 다음 공격에 쓸 길을 살펴보세요.";
+    event(next, "TACTICAL_RESULT", outcome.join(" · ") || fallback, id, a.type === "place" ? [a.cell] : [a.source, ...(a.target === undefined ? [] : [a.target])]);
+  }
   recordFrame(
     g,
     next,

@@ -64,7 +64,9 @@ test("실제 2인 Socket.IO 대국: 방 권한·정보 은닉·착수 동기화�
     ]) {
       const mine = v.game.players.find((p: any) => p.id === id),
         enemy = v.game.players.find((p: any) => p.id !== id);
-      assert.equal(mine.shop.length, 5);
+      assert.equal(mine.shop.length, 3);
+      assert.equal(v.game.ruleset, "focused");
+      assert.equal(mine.bench.length, 3);
       assert.equal("shop" in enemy, false);
       assert.equal("bench" in enemy, false);
       assert.equal("choices" in enemy, false);
@@ -111,7 +113,7 @@ test("실제 2인 Socket.IO 대국: 방 권한·정보 은닉·착수 동기화�
     assert.ok(cv.game.board[84]);
     assert.equal(
       cv.game.players.find((p: any) => p.id === join.playerId).shop.length,
-      5,
+      3,
     );
     assert.equal((await ask(c, "game:action", { type: "surrender" })).ok, true);
     await wait();

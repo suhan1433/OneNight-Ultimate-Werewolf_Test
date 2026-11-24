@@ -69,6 +69,7 @@ export interface ReplayFrame {
   changes: { cell: number; stone: Stone | null }[];
 }
 export interface Game {
+  ruleset: "classic" | "focused";
   seed: number;
   serial: number;
   players: Player[];

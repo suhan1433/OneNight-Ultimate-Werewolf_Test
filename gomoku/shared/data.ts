@@ -449,6 +449,13 @@ export const HERO = Object.fromEntries(HEROES.map((h) => [h.id, h])) as Record<
   string,
   Hero
 >;
+export const TACTICAL_HEROES = ["guard", "ember", "thunder"] as const;
+export const TACTICAL_RANGE: Record<string, number> = { ember: 2, thunder: 3 };
+export const TACTICAL_ROLE: Record<string, { label: string; purpose: string }> = {
+  guard: { label: "보호", purpose: "내 공격 줄 옆에 배치해 돌 하나를 방패로 보호합니다." },
+  ember: { label: "밀기", purpose: "주변 2칸 안의 상대 돌을 밀어 연결을 끊거나 막힌 길을 엽니다." },
+  thunder: { label: "봉인", purpose: "주변 3칸 안의 상대 돌을 잠시 연결에서 제외해 공격을 늦춥니다." },
+};
 export const ODDS: Record<number, number[]> = {
   2: [100, 0, 0, 0, 0],
   3: [75, 25, 0, 0, 0],
