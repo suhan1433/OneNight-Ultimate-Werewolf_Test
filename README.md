@@ -48,6 +48,10 @@ Dockerfile Path와 저장소 루트 Build Context 설정을 그대로 사용할 
 게임 선택 화면의 **오목** 카드에서 입장한다. 오목의
 방·대국 상태는 서버 메모리에 저장되어 재배포 시 초기화된다.
 
+루멘 테더는 게임 선택기의 **루멘 테더** 카드와 `/hushfall/`에서 실행한다.
+온라인 2인 연결 경로는 `/api/hushfall/socket`이고, 내부 포트는 `3012`다.
+로컬 실행과 테스트는 [루멘 테더 README](hushfall/README.md)를 참고한다.
+
 시크릿 히틀러는 `/secret_hitler/`과 `/secret_hitler/socket.io/`를 사용한다.
 통합 배포의 내부 서버 포트는 `3008`이며 `/api/secret_hitler/health`로 상태를 확인한다.
 게임 기록은 기본 `/app/secret_hitler/.data`에 저장된다. Render에서 재배포 후에도
@@ -62,7 +66,7 @@ Render의 Dockerfile Path는 기존 설정을 유지하면 되고, `apps/server/
 로컬에서 Render용 전체 빌드를 검증하려면 다른 게임의 npm 의존성과 함께
 `npx pnpm@10.11.0 --dir deception install --frozen-lockfile`을 실행한 후
 `npm --prefix secret_hitler ci --include=dev`와
-`npm --prefix gomoku ci --include=dev`도 실행한 뒤 `npm run build:render`를
+`npm --prefix gomoku ci --include=dev`, `npm --prefix hushfall ci --include=dev`를 실행한 뒤 `npm run build:render`를
 실행한다. 이 명령은 시크릿 히틀러와 오목의 웹 빌드를 각각
 `apps/web/dist/secret_hitler`, `apps/web/dist/gomoku`에 포함한다.
 기존 `npm run build`는 종전 빌드 대상을 유지한다. 빌드 후

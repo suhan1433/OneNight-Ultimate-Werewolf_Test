@@ -50,12 +50,17 @@ test('launcher styles load at the root, in its folder and from a local HTML file
   }finally{await context.close();}
 });
 
-test('eight destinations and player ranges match the game implementations',()=>{
-  assert.equal(games.length,8);
-  assert.equal(new Set(games.map(game=>game.id)).size,8);
+test('nine destinations and player ranges match the game implementations',()=>{
+  assert.equal(games.length,9);
+  assert.equal(new Set(games.map(game=>game.id)).size,9);
   for(const game of games){
     const id=game.id.replaceAll('-','_');
     assert.equal(game.href,`/${id}/`);
+    if(id==='hushfall'){
+      assert.equal(game.min,1);
+      assert.equal(game.max,2);
+      continue;
+    }
     if(id==='gomoku'){
       const state=createGame([{id:'one',name:'흑'},{id:'two',name:'백'}],1,0);
       assert.equal(game.min,state.players.length);
@@ -73,7 +78,7 @@ test('responsive layouts, readable cards and unique SVG ids',async()=>{
     const {context,page,errors}=await open({viewport:{width,height:950}});
     try{
       await page.locator('html.is-ready').waitFor();
-      assert.equal((await visibleIds(page)).length,8);
+      assert.equal((await visibleIds(page)).length,9);
       if(width<=700) assert.equal(await page.locator(".title-star").evaluate(el=>getComputedStyle(el).position),"absolute","decorative star must not wrap onto its own headline line");
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${width}: horizontal overflow`);
       const layoutProblems=await page.evaluate(()=>{
@@ -134,13 +139,17 @@ test('filters, shareable URLs, browser back, empty state and honest random picks
     await page.locator('#people-filter').selectOption('2');
     assert.equal(new URL(page.url()).searchParams.get('players'),'2');
     await page.locator('[data-mood="cooperative"]').click();
+    assert.deepEqual(await visibleIds(page),['hushfall']);
+    await page.locator('#people-filter').selectOption('12');
     assert.deepEqual(await visibleIds(page),[]);
     assert.equal(await page.locator('#empty-state').isVisible(),true);
     assert.equal(await page.locator('#pick-game').isDisabled(),true);
     await page.goBack();
+    assert.deepEqual(await visibleIds(page),['hushfall']);
+    await page.goBack();
     assert.deepEqual(await visibleIds(page),['skullking','rummikub','gomoku']);
     await page.locator('#reset-filters').click();
-    assert.equal((await visibleIds(page)).length,8);
+    assert.equal((await visibleIds(page)).length,9);
     assert.equal(await page.evaluate(()=>document.activeElement.dataset.mood),'all');
     await page.locator('#people-filter').selectOption('12');
     assert.deepEqual(await visibleIds(page),['deception']);
@@ -150,11 +159,11 @@ test('filters, shareable URLs, browser back, empty state and honest random picks
     await page.screenshot({path:join(screenshots,'selector-details.png'),animations:'disabled'});
     await page.keyboard.press('Escape');
     await page.locator('#people-filter').selectOption('1');
-    assert.equal((await visibleIds(page)).length,8);
+    assert.equal((await visibleIds(page)).length,9);
     await page.goto(`${origin}/?mood=cooperative&players=4`);
     assert.deepEqual(await visibleIds(page),['spacecrew']);
     await page.goto(`${origin}/?mood=invalid&players=999`);
-    assert.equal((await visibleIds(page)).length,8);
+    assert.equal((await visibleIds(page)).length,9);
     assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });
@@ -179,7 +188,7 @@ test('card details are separate from navigation and recently selected means a re
 test('navigation works without JavaScript or browser storage; reduced motion is respected',async()=>{
   const noScript=await open({javaScriptEnabled:false});
   try{
-    assert.equal((await visibleIds(noScript.page)).length,8);
+    assert.equal((await visibleIds(noScript.page)).length,9);
     assert.equal(await noScript.page.locator('.card-info:visible').count(),0);
     await noScript.page.locator('[data-game="rummikub"] .card-main').click();
     await noScript.page.waitForURL(`${origin}/rummikub/`);

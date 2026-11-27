@@ -76,6 +76,30 @@ server {
     try_files $uri $uri/ /gomoku/index.html;
   }
 
+  location = /api/hushfall/socket {
+    proxy_pass http://127.0.0.1:3012;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_read_timeout 120s;
+  }
+
+  location = /api/hushfall/health {
+    proxy_pass http://127.0.0.1:3012/health;
+  }
+
+  location = /hushfall {
+    absolute_redirect off;
+    return 301 /hushfall/$is_args$args;
+  }
+
+  location /hushfall/ {
+    alias /app/apps/web/dist/hushfall/;
+    try_files $uri $uri/ /hushfall/index.html;
+  }
+
   location = /health {
     proxy_pass http://127.0.0.1:3001/health;
   }
