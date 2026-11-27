@@ -67,17 +67,16 @@ test('integrated static output launches Gomoku and serves two real clients over 
  try{
   assert.equal((await fetch(`${origin}/gomoku`,{redirect:'manual'})).headers.get('location'),'/gomoku/');
   assert.equal((await (await fetch(`${origin}/api/gomoku/health`)).json()).game,'gomoku');
-  const html=await (await fetch(`${origin}/gomoku/`)).text();assert.match(html,/천원/);
+  const html=await (await fetch(`${origin}/gomoku/`)).text();assert.match(html,/오목/);
   for(const asset of [...html.matchAll(/(?:src|href)="(\/gomoku\/[^\"]+)"/g)].map(m=>m[1]))assert.equal((await fetch(origin+asset)).status,200,asset);
   const a=await connect('polling'),b=await connect('websocket');
   const room=await call(a,'room:create',{name:'흑석'});await call(b,'room:join',{name:'백석',code:room.code});
-  await call(a,'room:ready');await call(b,'room:ready');await call(a,'room:start');await call(a,'game:action',{type:'ready'});await call(b,'game:action',{type:'ready'});
   const game=service.rooms.get(room.code).game;const actor=game.turn===room.playerId?a:b;
   await call(actor,'game:action',{type:'place',cell:84});assert.ok(service.rooms.get(room.code).game.board[84]);
   browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL});
   const page=await browser.newPage({viewport:{width:390,height:844}});const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto(origin);await page.locator('[data-game="gomoku"] .card-main').click();await page.waitForURL(`${origin}/gomoku/`);
-  await page.getByLabel('대국자 이름').fill('Render 대국자');await page.getByRole('button',{name:'대국 시작 · 방 만들기',exact:true}).click();
-  await page.getByRole('heading',{name:'달이 머무는 대기실'}).waitFor();assert.deepEqual(errors,[]);
+  await page.getByLabel('대국자 이름').fill('Render 대국자');await page.getByRole('button',{name:'친구와 두기 · 방 만들기',exact:true}).click();
+  await page.getByRole('heading',{name:'상대를 기다려요'}).waitFor();assert.deepEqual(errors,[]);
  }finally{clients.forEach(s=>s.disconnect());await browser?.close();network.forEach(s=>s.destroy());await new Promise(resolve=>gateway.close(resolve));await service.close();}
 });

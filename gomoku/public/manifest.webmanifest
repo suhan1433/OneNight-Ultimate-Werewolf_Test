@@ -1,12 +1,12 @@
 {
-  "name": "천원 · 오목 택틱스",
-  "short_name": "천원",
+  "name": "오목 · GOMOKU",
+  "short_name": "오목",
   "lang": "ko",
   "start_url": "/gomoku/",
   "scope": "/gomoku/",
   "display": "standalone",
-  "background_color": "#0b1020",
-  "theme_color": "#0b1020",
+  "background_color": "#111816",
+  "theme_color": "#111816",
   "icons": [
     {
       "src": "/gomoku/icon-192.png",

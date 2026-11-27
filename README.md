@@ -39,13 +39,13 @@ Socket.IO 서버와 분리되어 있다.
 디셉션(네온 사건파일)은 `/deception/`과 `/api/deception/socket/`을 사용한다.
 내부 서버 포트는 `3007`이며 `/api/deception/health`로 개별 상태를 확인할 수 있다.
 
-천원(오목 택틱스)은 `/gomoku/`와 `/api/gomoku/socket/`을 사용한다.
+오목은 `/gomoku/`와 `/api/gomoku/socket/`을 사용한다.
 내부 서버 포트는 `3011`이며 `/api/gomoku/health`로 상태를 확인한다.
 `npm run build:render`가 오목 웹 빌드를 `apps/web/dist/gomoku/`에 복사하고,
 공통 `docker-start.sh`가 `gomoku/build/server/index.js`를 함께 실행한다.
 루트 `Dockerfile`과 `apps/server/Dockerfile` 모두 포함하며, Render의 기존
 Dockerfile Path와 저장소 루트 Build Context 설정을 그대로 사용할 수 있다.
-게임 선택 화면의 **천원 · 오목 택틱스** 카드에서 입장한다. 오목의
+게임 선택 화면의 **오목** 카드에서 입장한다. 오목의
 방·대국 상태는 서버 메모리에 저장되어 재배포 시 초기화된다.
 
 시크릿 히틀러는 `/secret_hitler/`과 `/secret_hitler/socket.io/`를 사용한다.

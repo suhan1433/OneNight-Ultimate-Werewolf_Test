@@ -220,7 +220,7 @@ test('gomoku appears for two players, has its own preview and supports direct na
     assert.equal(await page.locator('[data-game="gomoku"]').isVisible(),false);
     await page.locator('#people-filter').selectOption('2');
     await page.locator('[data-preview="gomoku"]').click();
-    assert.equal(await page.locator('#spotlight-title').textContent(),'천원 · 오목 택틱스');
+    assert.equal(await page.locator('#spotlight-title').textContent(),'오목');
     assert.equal(await page.locator('#spotlight-people').textContent(),'2명');
     await page.locator('[data-info="gomoku"]').click();
     assert.equal(await page.locator('#dialog-play').getAttribute('href'),'/gomoku/');

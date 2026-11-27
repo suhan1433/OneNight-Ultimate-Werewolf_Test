@@ -2,12 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { io, type Socket } from "socket.io-client";
 import { createGameServer } from "../server/app.js";
-const wait = (ms = 60) => new Promise((r) => setTimeout(r, ms));
-test("실제 2인 Socket.IO 대국: 방 권한·정보 은닉·착수 동기화·재접속·재대국", async () => {
+const wait = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
+test("2인 즉시 시작·착수 동기화·권한·세션 복구·양쪽 재대국 동의·퇴장", async () => {
   const service = createGameServer();
-  await new Promise<void>((r) => service.server.listen(0, "127.0.0.1", r));
-  const port = (service.server.address() as any).port;
   const sockets: Socket[] = [];
+  await new Promise<void>((resolve) =>
+    service.server.listen(0, "127.0.0.1", resolve),
+  );
+  const port = (service.server.address() as any).port;
   async function connect() {
     const s = io(`http://127.0.0.1:${port}`, {
       path: "/api/gomoku/socket",
@@ -15,124 +17,135 @@ test("실제 2인 Socket.IO 대국: 방 권한·정보 은닉·착수 동기화�
       forceNew: true,
     });
     sockets.push(s);
-    await new Promise<void>((r) => s.on("connect", () => r()));
+    await new Promise<void>((resolve) => s.once("connect", () => resolve()));
     return s;
   }
-  const ask = (s: Socket, e: string, d: object = {}) =>
-    s.timeout(3000).emitWithAck(e, d);
+  const ask = (s: Socket, event: string, data: object = {}) =>
+    s.timeout(2000).emitWithAck(event, data);
   try {
     const a = await connect(),
       b = await connect(),
-      intruder = await connect();
+      stranger = await connect();
     let av: any, bv: any;
     a.on("state", (v) => (av = v));
     b.on("state", (v) => (bv = v));
-    const create = await ask(a, "room:create", { name: "주인", public: true });
-    assert.equal(create.ok, true);
-    assert.match(create.code, /^[0-9A-F]{6}$/);
-    assert.ok(create.token);
+    const room = await ask(a, "room:create", { name: "흑" });
+    assert.equal(room.ok, true);
+    assert.equal(av.game, null);
+    assert.equal(JSON.stringify(av).includes(room.token), false);
     assert.equal(
       (
-        await ask(intruder, "session:resume", {
-          code: create.code,
-          token: "nope",
+        await ask(stranger, "session:resume", {
+          code: room.code,
+          token: "wrong",
         })
       ).ok,
       false,
     );
-    const join = await ask(b, "room:join", { name: "손님", code: create.code });
-    assert.equal(join.ok, true);
+    const joined = await ask(b, "room:join", {
+      name: "백",
+      code: room.code.toLowerCase(),
+    });
+    assert.equal(joined.ok, true);
     await wait();
-    assert.equal(bv.seats.length, 2);
-    assert.equal(JSON.stringify(bv).includes(create.token), false);
+    assert.equal(av.game.phase, "turn");
+    assert.equal(av.game.turn, room.playerId);
     assert.equal(
-      (await ask(intruder, "room:join", { name: "침입자", code: create.code }))
+      (await ask(stranger, "room:join", { name: "제삼자", code: room.code }))
         .ok,
       false,
     );
-    assert.equal((await ask(b, "room:start")).ok, false);
-    assert.equal((await ask(a, "room:start")).ok, false);
-    await ask(a, "room:ready");
-    await ask(b, "room:ready");
-    assert.equal((await ask(a, "room:start")).ok, true);
-    await wait();
-    assert.equal(av.game.phase, "prep");
-    assert.equal(bv.game.phase, "prep");
-    for (const [v, id] of [
-      [av, create.playerId],
-      [bv, join.playerId],
-    ]) {
-      const mine = v.game.players.find((p: any) => p.id === id),
-        enemy = v.game.players.find((p: any) => p.id !== id);
-      assert.equal(mine.shop.length, 3);
-      assert.equal(v.game.ruleset, "focused");
-      assert.equal(mine.bench.length, 3);
-      assert.equal("shop" in enemy, false);
-      assert.equal("bench" in enemy, false);
-      assert.equal("choices" in enemy, false);
-      assert.equal("pool" in v.game, false);
-      assert.equal("seed" in v.game, false);
-    }
-    assert.equal((await ask(b, "game:action", { type: "UNKNOWN" })).ok, false);
-    await ask(a, "game:action", { type: "ready" });
-    await ask(b, "game:action", { type: "ready" });
-    await wait();
-    const first = av.game.turn === create.playerId ? a : b,
-      second = first === a ? b : a;
     assert.equal(
-      (await ask(second, "game:action", { type: "place", cell: 84 })).ok,
+      (await ask(b, "game:action", { type: "place", cell: 112 })).ok,
       false,
     );
     assert.equal(
-      (await ask(first, "game:action", { type: "place", cell: 84 })).ok,
+      (await ask(a, "game:action", { type: "buy", slot: 0 })).ok,
+      false,
+    );
+    assert.equal(
+      (await ask(a, "game:action", { type: "place", cell: 112 })).ok,
       true,
     );
     await wait();
-    assert.deepEqual(av.game.board, bv.game.board);
-    assert.ok(av.game.board[84]);
+    assert.deepEqual(av.game, bv.game);
+    assert.equal(bv.game.turn, joined.playerId);
     assert.equal(
-      (await ask(first, "game:action", { type: "place", cell: 85 })).ok,
+      (await ask(a, "game:action", { type: "place", cell: 113 })).ok,
       false,
     );
-    assert.equal((await ask(first, "game:action", { type: "end" })).ok, true);
-    await ask(a, "chat:send", { text: "안녕하세요 <script>text</script>" });
-    await wait();
-    assert.equal(bv.chat.at(-1).text, "안녕하세요 <script>text</script>");
+    assert.equal(
+      (await ask(b, "game:action", { type: "place", cell: 112 })).ok,
+      false,
+    );
     b.disconnect();
     await wait();
-    assert.equal(
-      av.seats.find((s: any) => s.id === join.playerId).connected,
-      false,
-    );
+    assert.equal(av.seats[1].connected, false);
     const c = await connect();
     let cv: any;
     c.on("state", (v) => (cv = v));
-    assert.equal((await ask(c, "session:resume", join)).ok, true);
+    assert.equal((await ask(c, "session:resume", joined)).ok, true);
     await wait();
-    assert.equal(cv.self, join.playerId);
-    assert.ok(cv.game.board[84]);
-    assert.equal(
-      cv.game.players.find((p: any) => p.id === join.playerId).shop.length,
-      3,
-    );
-    assert.equal((await ask(c, "game:action", { type: "surrender" })).ok, true);
+    assert.equal(cv.game.board[112], room.playerId);
+    assert.equal(cv.self, joined.playerId);
+    await ask(c, "game:action", { type: "surrender" });
     await wait();
-    assert.equal(cv.game.phase, "result");
-    assert.equal(av.game.winner, create.playerId);
-    assert.equal((await ask(c, "room:rematch")).ok, false);
-    assert.equal((await ask(a, "room:rematch")).ok, true);
+    assert.equal(av.game.winner, room.playerId);
+    await ask(a, "room:rematch");
+    assert.equal(av.game.phase, "result");
+    await ask(c, "room:rematch");
     await wait();
-    assert.equal(av.game, null);
-    assert.equal(cv.game, null);
-    assert.equal((await ask(a, "room:leave")).ok, true);
+    assert.equal(av.game.phase, "turn");
+    assert.equal(av.game.turn, joined.playerId);
+    assert.equal(av.game.ply, 0);
+    await ask(a, "game:action", { type: "surrender" });
+    await ask(c, "room:rematch");
+    c.disconnect();
     await wait();
-    assert.equal(cv.host, join.playerId);
-    assert.equal(cv.seats.length, 1);
-    assert.equal((await ask(c, "room:bot")).ok, true);
+    await ask(a, "room:rematch");
+    assert.equal(av.game.phase, "result");
+    const d = await connect();
+    assert.equal((await ask(d, "session:resume", joined)).ok, true);
     await wait();
-    assert.equal(cv.seats[1].bot, true);
+    assert.equal(av.game.phase, "turn");
+    assert.equal(av.game.turn, room.playerId);
+    await ask(d, "room:leave");
+    await wait();
+    assert.equal(av.game.reason, "기권");
+    assert.equal((await ask(a, "room:rematch")).ok, false);
+    await ask(a, "room:leave");
+    assert.equal(service.rooms.size, 0);
   } finally {
     sockets.forEach((s) => s.disconnect());
+    await service.close();
+  }
+});
+test("AI 즉시 시작·자동 응수·준비 없이 재대국", async () => {
+  const service = createGameServer();
+  await new Promise<void>((resolve) =>
+    service.server.listen(0, "127.0.0.1", resolve),
+  );
+  const s = io(`http://127.0.0.1:${(service.server.address() as any).port}`, {
+    path: "/api/gomoku/socket",
+    transports: ["polling"],
+    upgrade: false,
+  });
+  try {
+    await new Promise<void>((resolve) => s.once("connect", () => resolve()));
+    const ask = (event: string, data = {}) =>
+      s.timeout(2000).emitWithAck(event, data);
+    const room = await ask("room:create", { name: "나", bot: true });
+    assert.equal(service.rooms.get(room.code)!.game!.phase, "turn");
+    await ask("game:action", { type: "place", cell: 112 });
+    await wait(800);
+    assert.equal(service.rooms.get(room.code)!.game!.ply, 2);
+    await ask("game:action", { type: "surrender" });
+    await ask("room:rematch");
+    await wait(800);
+    assert.equal(service.rooms.get(room.code)!.game!.ply, 1);
+    assert.equal(service.rooms.get(room.code)!.game!.turn, room.playerId);
+  } finally {
+    s.disconnect();
     await service.close();
   }
 });
