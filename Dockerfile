@@ -13,7 +13,6 @@ RUN npm install --global pnpm@10.11.0 \
   && npm --prefix rummikub ci --include=dev \
   && npm --prefix secret_hitler ci --include=dev \
   && npm --prefix gomoku ci --include=dev \
-  && npm --prefix hushfall ci --include=dev \
   && pnpm --dir deception install --frozen-lockfile --prod=false \
   && npm run build:render
 

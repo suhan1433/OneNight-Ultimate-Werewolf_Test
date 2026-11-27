@@ -48,8 +48,6 @@ COPY secret_hitler/apps/client/package.json secret_hitler/apps/client/package.js
 RUN npm --prefix secret_hitler ci --include=dev
 COPY gomoku/package*.json gomoku/
 RUN npm --prefix gomoku ci --include=dev
-COPY hushfall/package*.json hushfall/
-RUN npm --prefix hushfall ci --include=dev
 COPY packages/shared packages/shared
 COPY apps/server apps/server
 COPY apps/web apps/web
@@ -63,7 +61,6 @@ COPY rummikub rummikub
 COPY deception deception
 COPY secret_hitler secret_hitler
 COPY gomoku gomoku
-COPY hushfall hushfall
 COPY game-selector game-selector
 COPY game-audio game-audio
 # Shared game-switch runtime and type declarations are required by game servers.

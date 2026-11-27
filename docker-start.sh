@@ -16,7 +16,6 @@ PORT=3007 node deception/apps/server/dist/server.js &
 PORT=3008 DATA_DIR="${SECRET_HITLER_DATA_DIR:-/app/secret_hitler/.data}" secret_hitler/node_modules/.bin/tsx secret_hitler/apps/server/src/index.ts &
 
 PORT=3011 node gomoku/build/server/index.js &
-LUMEN_TRUST_PROXY=1 PORT=3012 node hushfall/server/index.mjs &
 
 trap 'kill $(jobs -p) 2>/dev/null || true; exit 0' INT TERM
 nginx -g 'daemon off;' &
